@@ -1,0 +1,92 @@
+import { ReportData, AttainmentRow } from '@/lib/types';
+import { formatCurrency, formatPercent, formatCoverage, getRAGColor } from '@/lib/formatters';
+
+interface ExecutiveSummaryProps {
+  data: ReportData;
+}
+
+export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
+  const { period, grand_total, product_totals, attainment_detail } = data;
+
+  // Calculate hits and misses
+  const allAttainment = [
+    ...attainment_detail.POR.map(a => ({ ...a, product: 'POR' as const })),
+    ...attainment_detail.R360.map(a => ({ ...a, product: 'R360' as const }))
+  ];
+  const hits = allAttainment.filter(a => a.rag_status === 'GREEN');
+  const misses = allAttainment.filter(a => a.rag_status === 'RED' || a.rag_status === 'YELLOW');
+
+  const qtdAtt = grand_total.total_qtd_attainment_pct || 0;
+  const attColor = qtdAtt >= 90 ? '#28a745' : qtdAtt >= 70 ? '#ffc107' : '#dc3545';
+
+  const cov = grand_total.total_pipeline_coverage_x || 0;
+  const covColor = cov >= 3 ? '#28a745' : cov >= 2 ? '#ffc107' : '#dc3545';
+
+  const por = product_totals.POR;
+  const porAtt = por?.total_qtd_attainment_pct || 0;
+  const porColor = porAtt >= 90 ? '#28a745' : porAtt >= 70 ? '#ffc107' : '#dc3545';
+
+  const r360 = product_totals.R360;
+  const r360Att = r360?.total_qtd_attainment_pct || 0;
+  const r360Color = r360Att >= 90 ? '#28a745' : r360Att >= 70 ? '#ffc107' : '#dc3545';
+
+  return (
+    <section>
+      <h2>1. Executive Summary</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th className="right">Total</th>
+            <th className="right">POR</th>
+            <th className="right">R360</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Q1 Target</td>
+            <td className="right">{formatCurrency(grand_total.total_q1_target)}</td>
+            <td className="right">{formatCurrency(por?.total_q1_target)}</td>
+            <td className="right">{formatCurrency(r360?.total_q1_target)}</td>
+          </tr>
+          <tr>
+            <td>QTD Target</td>
+            <td className="right">{formatCurrency(grand_total.total_qtd_target)}</td>
+            <td className="right">{formatCurrency(por?.total_qtd_target)}</td>
+            <td className="right">{formatCurrency(r360?.total_qtd_target)}</td>
+          </tr>
+          <tr>
+            <td>QTD Actual</td>
+            <td className="right"><strong>{formatCurrency(grand_total.total_qtd_acv)}</strong></td>
+            <td className="right"><strong>{formatCurrency(por?.total_qtd_acv)}</strong></td>
+            <td className="right"><strong>{formatCurrency(r360?.total_qtd_acv)}</strong></td>
+          </tr>
+          <tr>
+            <td>QTD Attainment</td>
+            <td className="right" style={{ color: attColor }}><strong>{formatPercent(qtdAtt)}</strong></td>
+            <td className="right" style={{ color: porColor }}><strong>{formatPercent(porAtt)}</strong></td>
+            <td className="right" style={{ color: r360Color }}><strong>{formatPercent(r360Att)}</strong></td>
+          </tr>
+          <tr>
+            <td>Pipeline Coverage</td>
+            <td className="right" style={{ color: covColor }}><strong>{formatCoverage(cov)}</strong></td>
+            <td className="right">{formatCoverage(por?.total_pipeline_coverage_x)}</td>
+            <td className="right">{formatCoverage(r360?.total_pipeline_coverage_x)}</td>
+          </tr>
+          <tr>
+            <td>Win Rate</td>
+            <td className="right">{formatPercent(grand_total.total_win_rate_pct)}</td>
+            <td className="right">{formatPercent(por?.total_win_rate_pct)}</td>
+            <td className="right">{formatPercent(r360?.total_win_rate_pct)}</td>
+          </tr>
+          <tr>
+            <td>Hits / Misses</td>
+            <td className="right" colSpan={3}>
+              <strong>{hits.length}</strong> on track / <strong>{misses.length}</strong> need attention
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  );
+}
