@@ -94,6 +94,26 @@ function getUrgencyStyle(urgency: string): { bg: string; border: string; badge: 
   }
 }
 
+/**
+ * Get attainment color based on percentage
+ */
+function getAttainmentColor(pct: number): string {
+  if (pct >= 90) return '#16a34a'; // green
+  if (pct >= 70) return '#ca8a04'; // yellow
+  return '#dc2626'; // red
+}
+
+/**
+ * Sort action items by attainment % (worst first)
+ */
+function sortByAttainment(items: ActionItem[]): ActionItem[] {
+  return [...items].sort((a, b) => {
+    const aAtt = a.attainmentPct ?? 100; // Default to 100 if no attainment
+    const bAtt = b.attainmentPct ?? 100;
+    return aAtt - bAtt; // Lowest attainment first
+  });
+}
+
 function ActionItemCard({
   item,
   quarterPctComplete
@@ -109,6 +129,7 @@ function ActionItemCard({
 
   const cleanedIssue = cleanIssueText(item.issue);
   const cleanedAction = cleanActionText(item.action);
+  const hasEnhancedData = item.reason || item.metric || item.recommendedAction;
 
   return (
     <div
@@ -126,16 +147,44 @@ function ActionItemCard({
           {adjustedSeverity}
           {adjusted && '*'}
         </span>
+        {item.attainmentPct !== undefined && (
+          <span
+            className="attainment-badge"
+            style={{ backgroundColor: getAttainmentColor(item.attainmentPct) }}
+          >
+            {item.attainmentPct.toFixed(0)}%
+          </span>
+        )}
         <span className="action-context">
           {item.product} {item.region ? `${item.region}` : ''} • {item.category.replace(/_/g, ' ')}
         </span>
       </div>
       <p className="action-issue">{cleanedIssue}</p>
-      {cleanedAction && (
+
+      {/* Enhanced fields */}
+      {item.reason && (
+        <p className="action-reason">
+          <strong>Why:</strong> {item.reason}
+        </p>
+      )}
+
+      {item.metric && item.metricValue !== undefined && item.metricTarget !== undefined && (
+        <p className="action-metric">
+          <strong>{item.metric}:</strong> {formatNumber(item.metricValue)} vs {formatNumber(item.metricTarget)} target
+        </p>
+      )}
+
+      {/* Show recommendedAction if available, otherwise fall back to cleaned action */}
+      {item.recommendedAction ? (
+        <div className="action-recommendation">
+          → {item.recommendedAction}
+        </div>
+      ) : cleanedAction ? (
         <div className="action-recommendation">
           → {cleanedAction}
         </div>
-      )}
+      ) : null}
+
       <style jsx>{`
         .action-card {
           border: 1px solid;
@@ -148,6 +197,7 @@ function ActionItemCard({
           align-items: center;
           gap: 8px;
           margin-bottom: 6px;
+          flex-wrap: wrap;
         }
         .severity-badge {
           padding: 2px 6px;
@@ -156,6 +206,13 @@ function ActionItemCard({
           font-size: 0.625rem;
           font-weight: bold;
           text-transform: uppercase;
+        }
+        .attainment-badge {
+          padding: 2px 6px;
+          border-radius: 3px;
+          color: white;
+          font-size: 0.625rem;
+          font-weight: bold;
         }
         .action-context {
           font-size: 0.7rem;
@@ -166,6 +223,18 @@ function ActionItemCard({
           color: #1f2937;
           margin: 0 0 6px 0;
           line-height: 1.35;
+        }
+        .action-reason {
+          font-size: 0.7rem;
+          color: #4b5563;
+          margin: 0 0 4px 0;
+          line-height: 1.3;
+        }
+        .action-metric {
+          font-size: 0.7rem;
+          color: #4b5563;
+          margin: 0 0 4px 0;
+          line-height: 1.3;
         }
         .action-recommendation {
           font-size: 0.7rem;
@@ -185,16 +254,20 @@ export default function ActionItemsDashboard({ actionItems, period }: ActionItem
     return null;
   }
 
+  // Sort each category by attainment % (worst first)
+  const sortedImmediate = sortByAttainment(immediate);
+  const sortedShortTerm = sortByAttainment(short_term);
+  const sortedStrategic = sortByAttainment(strategic);
+
   const showSampleSizeNote = quarterPct < 35;
 
   return (
     <section>
       <h2>Action Items</h2>
-      {showSampleSizeNote && (
-        <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
-          * Severity adjusted for early quarter ({quarterPct.toFixed(0)}% complete) - limited sample size
-        </p>
-      )}
+      <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
+        Sorted by attainment % (worst first)
+        {showSampleSizeNote && ` • * Severity adjusted for early quarter (${quarterPct.toFixed(0)}% complete)`}
+      </p>
       <div className="action-columns">
         {/* Immediate Column */}
         <div className="action-column">
@@ -202,11 +275,11 @@ export default function ActionItemsDashboard({ actionItems, period }: ActionItem
             IMMEDIATE ({immediate.length})
           </div>
           <div className="column-content">
-            {immediate.slice(0, 6).map((item, idx) => (
+            {sortedImmediate.slice(0, 6).map((item, idx) => (
               <ActionItemCard key={idx} item={item} quarterPctComplete={quarterPct} />
             ))}
-            {immediate.length > 6 && (
-              <div className="more-items">+{immediate.length - 6} more</div>
+            {sortedImmediate.length > 6 && (
+              <div className="more-items">+{sortedImmediate.length - 6} more</div>
             )}
           </div>
         </div>
@@ -217,11 +290,11 @@ export default function ActionItemsDashboard({ actionItems, period }: ActionItem
             SHORT TERM ({short_term.length})
           </div>
           <div className="column-content">
-            {short_term.slice(0, 6).map((item, idx) => (
+            {sortedShortTerm.slice(0, 6).map((item, idx) => (
               <ActionItemCard key={idx} item={item} quarterPctComplete={quarterPct} />
             ))}
-            {short_term.length > 6 && (
-              <div className="more-items">+{short_term.length - 6} more</div>
+            {sortedShortTerm.length > 6 && (
+              <div className="more-items">+{sortedShortTerm.length - 6} more</div>
             )}
           </div>
         </div>
@@ -232,11 +305,11 @@ export default function ActionItemsDashboard({ actionItems, period }: ActionItem
             STRATEGIC ({strategic.length})
           </div>
           <div className="column-content">
-            {strategic.slice(0, 6).map((item, idx) => (
+            {sortedStrategic.slice(0, 6).map((item, idx) => (
               <ActionItemCard key={idx} item={item} quarterPctComplete={quarterPct} />
             ))}
-            {strategic.length > 6 && (
-              <div className="more-items">+{strategic.length - 6} more</div>
+            {sortedStrategic.length > 6 && (
+              <div className="more-items">+{sortedStrategic.length - 6} more</div>
             )}
           </div>
         </div>

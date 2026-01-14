@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ReportData, DealDetail, Region, Category, Product } from '@/lib/types';
+import { ReportData, DealDetail, Region, Category, Product, Source } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatters';
 
 interface OpportunitiesTableProps {
@@ -10,16 +10,20 @@ interface OpportunitiesTableProps {
 }
 
 type StatusFilter = 'won' | 'lost' | 'pipeline';
-type SortField = 'opportunity_name' | 'acv' | 'close_date' | 'stage' | 'source' | 'owner_name';
+type SortField = 'opportunity_name' | 'acv' | 'close_date' | 'stage' | 'source' | 'owner_name' | 'attainment';
 type SortDirection = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 25;
+
+const ALL_SOURCES: Source[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];
 
 export default function OpportunitiesTable({ data, selectedRegions }: OpportunitiesTableProps) {
   // Filter states
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('won');
   const [categoryFilter, setCategoryFilter] = useState<Category | 'ALL'>('ALL');
   const [productFilter, setProductFilter] = useState<Product | 'ALL'>('ALL');
+  const [sourceFilter, setSourceFilter] = useState<Source | 'ALL'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<string | 'ALL'>('ALL');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,6 +55,15 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
     return [...porDeals, ...r360Deals];
   }, [data.won_deals, data.lost_deals, data.pipeline_deals, statusFilter]);
 
+  // Get unique deal types from all deals
+  const uniqueDealTypes = useMemo(() => {
+    const types = new Set<string>();
+    allDeals.forEach(d => {
+      if (d.deal_type) types.add(d.deal_type);
+    });
+    return Array.from(types).sort();
+  }, [allDeals]);
+
   // Apply filters
   const filteredDeals = useMemo(() => {
     let deals = allDeals;
@@ -70,8 +83,18 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
       deals = deals.filter(d => d.product === productFilter);
     }
 
+    // Filter by source
+    if (sourceFilter !== 'ALL') {
+      deals = deals.filter(d => d.source === sourceFilter);
+    }
+
+    // Filter by deal type
+    if (typeFilter !== 'ALL') {
+      deals = deals.filter(d => d.deal_type === typeFilter);
+    }
+
     return deals;
-  }, [allDeals, selectedRegions, categoryFilter, productFilter]);
+  }, [allDeals, selectedRegions, categoryFilter, productFilter, sourceFilter, typeFilter]);
 
   // Sort deals
   const sortedDeals = useMemo(() => {
@@ -208,6 +231,32 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
             <option value="ALL">All Products</option>
             <option value="POR">Point of Rental</option>
             <option value="R360">Record360</option>
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label>Source</label>
+          <select
+            value={sourceFilter}
+            onChange={(e) => handleFilterChange(setSourceFilter, e.target.value as Source | 'ALL')}
+          >
+            <option value="ALL">All Sources</option>
+            {ALL_SOURCES.map(source => (
+              <option key={source} value={source}>{source}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label>Deal Type</label>
+          <select
+            value={typeFilter}
+            onChange={(e) => handleFilterChange(setTypeFilter, e.target.value)}
+          >
+            <option value="ALL">All Types</option>
+            {uniqueDealTypes.map(type => (
+              <option key={type} value={type}>{type}</option>
+            ))}
           </select>
         </div>
 

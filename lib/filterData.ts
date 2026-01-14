@@ -1,6 +1,8 @@
 import type {
   Region,
   Product,
+  Category,
+  Source,
   ReportData,
   AttainmentRow,
   SourceAttainmentRow,
@@ -18,6 +20,8 @@ import type {
 } from './types';
 
 const ALL_PRODUCTS: Product[] = ['POR', 'R360'];
+const ALL_CATEGORIES: Category[] = ['NEW LOGO', 'EXPANSION', 'MIGRATION'];
+const ALL_SOURCES: Source[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];
 
 /**
  * Filter array by regions
@@ -30,6 +34,46 @@ function filterByRegion<T extends { region: Region }>(
     return items; // All regions selected
   }
   return items.filter(item => regions.includes(item.region));
+}
+
+/**
+ * Filter array by categories
+ */
+function filterByCategory<T extends { category: Category }>(
+  items: T[],
+  categories: Category[]
+): T[] {
+  if (categories.length === 0 || categories.length === 3) {
+    return items; // All categories selected
+  }
+  return items.filter(item => categories.includes(item.category));
+}
+
+/**
+ * Filter array by sources
+ */
+function filterBySource<T extends { source: Source }>(
+  items: T[],
+  sources: Source[]
+): T[] {
+  if (sources.length === 0 || sources.length === 6) {
+    return items; // All sources selected
+  }
+  return items.filter(item => sources.includes(item.source));
+}
+
+/**
+ * Check if all categories are selected
+ */
+function isAllCategories(categories: Category[]): boolean {
+  return categories.length === 0 || categories.length === 3;
+}
+
+/**
+ * Check if all sources are selected
+ */
+function isAllSources(sources: Source[]): boolean {
+  return sources.length === 0 || sources.length === 6;
 }
 
 /**
@@ -107,18 +151,22 @@ function isAllRegions(regions: Region[]): boolean {
 }
 
 /**
- * Filter all report data by selected regions and products
+ * Filter all report data by selected regions, products, categories, and sources
  */
 export function filterReportData(
   data: ReportData,
   regions: Region[],
-  products: Product[] = ALL_PRODUCTS
+  products: Product[] = ALL_PRODUCTS,
+  categories: Category[] = ALL_CATEGORIES,
+  sources: Source[] = ALL_SOURCES
 ): ReportData {
   const allRegions = isAllRegions(regions);
   const allProducts = isAllProducts(products);
+  const allCategories = isAllCategories(categories);
+  const allSources = isAllSources(sources);
 
-  // If all regions and all products selected, return original data
-  if (allRegions && allProducts) {
+  // If all filters selected, return original data
+  if (allRegions && allProducts && allCategories && allSources) {
     return data;
   }
 
@@ -134,9 +182,77 @@ export function filterReportData(
     return allRegions ? items : filterByRegion(items, regions);
   };
 
-  // Filter attainment detail by product and region
-  const filteredAttainmentPOR = filterProductRegion(data.attainment_detail.POR, includePOR);
-  const filteredAttainmentR360 = filterProductRegion(data.attainment_detail.R360, includeR360);
+  // Helper to apply region + category filter for attainment rows
+  const filterAttainmentRows = (
+    items: AttainmentRow[],
+    isIncluded: boolean
+  ): AttainmentRow[] => {
+    if (!isIncluded) return [];
+    let filtered = allRegions ? items : filterByRegion(items, regions);
+    if (!allCategories) {
+      filtered = filterByCategory(filtered, categories);
+    }
+    return filtered;
+  };
+
+  // Helper to apply region + source filter for source attainment rows
+  const filterSourceRows = (
+    items: SourceAttainmentRow[],
+    isIncluded: boolean
+  ): SourceAttainmentRow[] => {
+    if (!isIncluded) return [];
+    let filtered = allRegions ? items : filterByRegion(items, regions);
+    if (!allSources) {
+      filtered = filterBySource(filtered, sources);
+    }
+    return filtered;
+  };
+
+  // Helper to apply region + category filter for funnel rows
+  const filterFunnelCategoryRows = (
+    items: FunnelByCategoryRow[],
+    isIncluded: boolean
+  ): FunnelByCategoryRow[] => {
+    if (!isIncluded) return [];
+    let filtered = allRegions ? items : filterByRegion(items, regions);
+    if (!allCategories) {
+      filtered = filterByCategory(filtered, categories);
+    }
+    return filtered;
+  };
+
+  // Helper to apply region + source filter for funnel by source rows
+  const filterFunnelSourceRows = (
+    items: FunnelBySourceRow[],
+    isIncluded: boolean
+  ): FunnelBySourceRow[] => {
+    if (!isIncluded) return [];
+    let filtered = allRegions ? items : filterByRegion(items, regions);
+    if (!allSources) {
+      filtered = filterBySource(filtered, sources);
+    }
+    return filtered;
+  };
+
+  // Helper to filter deals by category and source
+  const filterDeals = <T extends { region: Region; category?: Category; source?: Source }>(
+    items: T[],
+    isIncluded: boolean
+  ): T[] => {
+    if (!isIncluded) return [];
+    let filtered = allRegions ? items : items.filter(item => regions.includes(item.region));
+    if (!allCategories) {
+      filtered = filtered.filter(item => !item.category || categories.includes(item.category));
+    }
+    if (!allSources) {
+      filtered = filtered.filter(item => !item.source || sources.includes(item.source));
+    }
+    return filtered;
+  };
+
+  // Filter attainment detail by product, region, and category
+  const filteredAttainmentPOR = filterAttainmentRows(data.attainment_detail.POR, includePOR);
+  const filteredAttainmentR360 = filterAttainmentRows(data.attainment_detail.R360, includeR360);
 
   // Recalculate product totals (only for included products)
   const emptyProductTotal: ProductTotal = {
@@ -172,7 +288,8 @@ export function filterReportData(
     ? grandTotal.total_pipeline_acv / totalRemaining
     : 0;
 
-  // Filter action items by product as well
+  // Filter action items by product and region
+  // Note: ActionItem.category is a string like "Pipeline Coverage", not the deal Category type
   const filterActionItemsByProduct = (items: ActionItem[]): ActionItem[] => {
     let filtered = allRegions ? items : filterActionItems(items, regions);
     if (!allProducts) {
@@ -181,11 +298,14 @@ export function filterReportData(
     return filtered;
   };
 
-  // Filter top risk pockets by product
+  // Filter top risk pockets by product and category
   const filterRiskPockets = (pockets: TopRiskPocket[]): TopRiskPocket[] => {
     let filtered = allRegions ? pockets : filterByRegion(pockets, regions);
     if (!allProducts) {
       filtered = filtered.filter(p => products.includes(p.product));
+    }
+    if (!allCategories) {
+      filtered = filtered.filter(p => categories.includes(p.category));
     }
     return filtered;
   };
@@ -202,16 +322,16 @@ export function filterReportData(
       R360: filteredAttainmentR360,
     },
     source_attainment: {
-      POR: filterProductRegion(data.source_attainment.POR, includePOR),
-      R360: filterProductRegion(data.source_attainment.R360, includeR360),
+      POR: filterSourceRows(data.source_attainment.POR, includePOR),
+      R360: filterSourceRows(data.source_attainment.R360, includeR360),
     },
     funnel_by_category: {
-      POR: filterProductRegion(data.funnel_by_category.POR, includePOR),
-      R360: filterProductRegion(data.funnel_by_category.R360, includeR360),
+      POR: filterFunnelCategoryRows(data.funnel_by_category.POR, includePOR),
+      R360: filterFunnelCategoryRows(data.funnel_by_category.R360, includeR360),
     },
     funnel_by_source: {
-      POR: filterProductRegion(data.funnel_by_source.POR, includePOR),
-      R360: filterProductRegion(data.funnel_by_source.R360, includeR360),
+      POR: filterFunnelSourceRows(data.funnel_by_source.POR, includePOR),
+      R360: filterFunnelSourceRows(data.funnel_by_source.R360, includeR360),
     },
     pipeline_rca: {
       POR: filterProductRegion(data.pipeline_rca.POR, includePOR),
@@ -229,18 +349,18 @@ export function filterReportData(
       POR: filterProductRegion(data.google_ads_rca.POR, includePOR),
       R360: filterProductRegion(data.google_ads_rca.R360, includeR360),
     },
-    // Deal lists for drill-down
+    // Deal lists for drill-down (filtered by region, category, and source)
     won_deals: data.won_deals ? {
-      POR: filterProductRegion(data.won_deals.POR || [], includePOR),
-      R360: filterProductRegion(data.won_deals.R360 || [], includeR360),
+      POR: filterDeals(data.won_deals.POR || [], includePOR),
+      R360: filterDeals(data.won_deals.R360 || [], includeR360),
     } : undefined,
     lost_deals: data.lost_deals ? {
-      POR: filterProductRegion(data.lost_deals.POR || [], includePOR),
-      R360: filterProductRegion(data.lost_deals.R360 || [], includeR360),
+      POR: filterDeals(data.lost_deals.POR || [], includePOR),
+      R360: filterDeals(data.lost_deals.R360 || [], includeR360),
     } : undefined,
     pipeline_deals: data.pipeline_deals ? {
-      POR: filterProductRegion(data.pipeline_deals.POR || [], includePOR),
-      R360: filterProductRegion(data.pipeline_deals.R360 || [], includeR360),
+      POR: filterDeals(data.pipeline_deals.POR || [], includePOR),
+      R360: filterDeals(data.pipeline_deals.R360 || [], includeR360),
     } : undefined,
     // Filter insight sections
     wins_bright_spots: data.wins_bright_spots ? {
@@ -316,9 +436,46 @@ export function parseProductsFromURL(searchParams: URLSearchParams): Product[] {
 }
 
 /**
- * Build URL search params from regions and products
+ * Parse categories from URL search params
  */
-export function buildFilterURL(regions: Region[], products: Product[]): string {
+export function parseCategoriesFromURL(searchParams: URLSearchParams): Category[] {
+  const categoryParam = searchParams.get('category');
+  if (!categoryParam || categoryParam === 'ALL') {
+    return ALL_CATEGORIES;
+  }
+
+  const categories = categoryParam.split(',').filter(c =>
+    ALL_CATEGORIES.includes(c as Category)
+  ) as Category[];
+
+  return categories.length > 0 ? categories : ALL_CATEGORIES;
+}
+
+/**
+ * Parse sources from URL search params
+ */
+export function parseSourcesFromURL(searchParams: URLSearchParams): Source[] {
+  const sourceParam = searchParams.get('source');
+  if (!sourceParam || sourceParam === 'ALL') {
+    return ALL_SOURCES;
+  }
+
+  const sources = sourceParam.split(',').filter(s =>
+    ALL_SOURCES.includes(s as Source)
+  ) as Source[];
+
+  return sources.length > 0 ? sources : ALL_SOURCES;
+}
+
+/**
+ * Build URL search params from all filters
+ */
+export function buildFilterURL(
+  regions: Region[],
+  products: Product[],
+  categories: Category[] = ALL_CATEGORIES,
+  sources: Source[] = ALL_SOURCES
+): string {
   const params = new URLSearchParams();
 
   // Add region param
@@ -333,6 +490,20 @@ export function buildFilterURL(regions: Region[], products: Product[]): string {
     params.set('product', 'ALL');
   } else {
     params.set('product', products.join(','));
+  }
+
+  // Add category param
+  if (categories.length === 0 || categories.length === 3) {
+    params.set('category', 'ALL');
+  } else {
+    params.set('category', categories.join(','));
+  }
+
+  // Add source param
+  if (sources.length === 0 || sources.length === 6) {
+    params.set('source', 'ALL');
+  } else {
+    params.set('source', sources.join(','));
   }
 
   return `?${params.toString()}`;
