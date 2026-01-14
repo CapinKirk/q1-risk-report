@@ -4,8 +4,5 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
-  "regions": ["iad1"],
-  "env": {
-    "REFRESH_API_KEY": "@refresh-api-key"
-  }
+  "regions": ["iad1"]
 }
