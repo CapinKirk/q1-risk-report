@@ -2,9 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { Region, ReportData } from '@/lib/types';
-import { filterReportData, parseRegionsFromURL } from '@/lib/filterData';
-import RegionFilter from '@/components/RegionFilter';
+import type { Region, Product, ReportData } from '@/lib/types';
+import { filterReportData, parseRegionsFromURL, parseProductsFromURL } from '@/lib/filterData';
+import ReportFilter from '@/components/ReportFilter';
 import UserMenu from '@/components/UserMenu';
 import ExecutiveKPICards from '@/components/ExecutiveKPICards';
 import ExecutiveSummary from '@/components/ExecutiveSummary';
@@ -26,6 +26,7 @@ import reportDataJson from '@/data/report-data.json';
 function ReportContent() {
   const searchParams = useSearchParams();
   const [selectedRegions, setSelectedRegions] = useState<Region[]>(['AMER', 'EMEA', 'APAC']);
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>(['POR', 'R360']);
   const [filteredData, setFilteredData] = useState<ReportData | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -61,19 +62,21 @@ function ReportContent() {
     }
   };
 
-  // Initialize regions from URL on mount
+  // Initialize filters from URL on mount
   useEffect(() => {
     const regions = parseRegionsFromURL(searchParams);
+    const products = parseProductsFromURL(searchParams);
     setSelectedRegions(regions);
+    setSelectedProducts(products);
   }, [searchParams]);
 
-  // Filter data when regions change
+  // Filter data when regions or products change
   useEffect(() => {
     if (rawData) {
-      const filtered = filterReportData(rawData, selectedRegions);
+      const filtered = filterReportData(rawData, selectedRegions, selectedProducts);
       setFilteredData(filtered);
     }
-  }, [selectedRegions, rawData]);
+  }, [selectedRegions, selectedProducts, rawData]);
 
   if (!filteredData) {
     return <div className="loading">Loading report data...</div>;
@@ -115,9 +118,11 @@ function ReportContent() {
         </div>
       )}
 
-      <RegionFilter
+      <ReportFilter
         selectedRegions={selectedRegions}
+        selectedProducts={selectedProducts}
         onRegionChange={setSelectedRegions}
+        onProductChange={setSelectedProducts}
       />
 
       {/* Executive KPI Overview Cards */}

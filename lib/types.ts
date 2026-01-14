@@ -135,18 +135,20 @@ export interface GoogleAdsData {
 
 // Google Ads data with region (for filtering)
 export interface GoogleAdsRegionalData extends GoogleAdsData {
-  product: Product;
   region: Region;
 }
 
-// Google Ads RCA
+// Google Ads RCA (now includes region for filtering)
 export interface GoogleAdsRCA {
+  product: Product;
+  region: Region;
   ctr_pct: number;
   ctr_performance: string;
   cpa_usd: number;
   cpa_performance: string;
   rca_commentary: string;
   recommended_action: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
 // Funnel RCA Insights
@@ -195,8 +197,8 @@ export interface ReportData {
     R360: GoogleAdsRegionalData[];
   };
   google_ads_rca: {
-    POR: GoogleAdsRCA;
-    R360: GoogleAdsRCA;
+    POR: GoogleAdsRCA[];
+    R360: GoogleAdsRCA[];
   };
   funnel_rca_insights: {
     POR: FunnelRCAInsight[];
@@ -319,4 +321,5 @@ export interface DealDetail {
 // Filter state
 export interface FilterState {
   regions: Region[];
+  products: Product[];
 }

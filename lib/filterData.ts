@@ -1,5 +1,6 @@
 import type {
   Region,
+  Product,
   ReportData,
   AttainmentRow,
   SourceAttainmentRow,
@@ -15,6 +16,8 @@ import type {
   MomentumIndicator,
   TopRiskPocket
 } from './types';
+
+const ALL_PRODUCTS: Product[] = ['POR', 'R360'];
 
 /**
  * Filter array by regions
@@ -90,26 +93,68 @@ function recalculateProductTotals(
 }
 
 /**
- * Filter all report data by selected regions
+ * Check if all products are selected
+ */
+function isAllProducts(products: Product[]): boolean {
+  return products.length === 0 || products.length === 2;
+}
+
+/**
+ * Check if all regions are selected
+ */
+function isAllRegions(regions: Region[]): boolean {
+  return regions.length === 0 || regions.length === 3;
+}
+
+/**
+ * Filter all report data by selected regions and products
  */
 export function filterReportData(
   data: ReportData,
-  regions: Region[]
+  regions: Region[],
+  products: Product[] = ALL_PRODUCTS
 ): ReportData {
-  // If all regions selected, return original data
-  if (regions.length === 0 || regions.length === 3) {
+  const allRegions = isAllRegions(regions);
+  const allProducts = isAllProducts(products);
+
+  // If all regions and all products selected, return original data
+  if (allRegions && allProducts) {
     return data;
   }
 
-  // Filter attainment detail
-  const filteredAttainmentPOR = filterByRegion(data.attainment_detail.POR, regions);
-  const filteredAttainmentR360 = filterByRegion(data.attainment_detail.R360, regions);
+  const includePOR = allProducts || products.includes('POR');
+  const includeR360 = allProducts || products.includes('R360');
 
-  // Recalculate product totals
-  const porTotals = recalculateProductTotals(filteredAttainmentPOR);
-  const r360Totals = recalculateProductTotals(filteredAttainmentR360);
+  // Helper to apply region filter, returning empty array if product not included
+  const filterProductRegion = <T extends { region: Region }>(
+    items: T[],
+    isIncluded: boolean
+  ): T[] => {
+    if (!isIncluded) return [];
+    return allRegions ? items : filterByRegion(items, regions);
+  };
 
-  // Calculate grand totals
+  // Filter attainment detail by product and region
+  const filteredAttainmentPOR = filterProductRegion(data.attainment_detail.POR, includePOR);
+  const filteredAttainmentR360 = filterProductRegion(data.attainment_detail.R360, includeR360);
+
+  // Recalculate product totals (only for included products)
+  const emptyProductTotal: ProductTotal = {
+    total_q1_target: 0,
+    total_qtd_target: 0,
+    total_qtd_acv: 0,
+    total_qtd_attainment_pct: 0,
+    total_pipeline_acv: 0,
+    total_pipeline_coverage_x: 0,
+    total_win_rate_pct: 0,
+    total_lost_deals: 0,
+    total_lost_acv: 0,
+  };
+
+  const porTotals = includePOR ? recalculateProductTotals(filteredAttainmentPOR) : emptyProductTotal;
+  const r360Totals = includeR360 ? recalculateProductTotals(filteredAttainmentR360) : emptyProductTotal;
+
+  // Calculate grand totals based on selected products
   const grandTotal: GrandTotal = {
     total_q1_target: porTotals.total_q1_target + r360Totals.total_q1_target,
     total_qtd_target: porTotals.total_qtd_target + r360Totals.total_qtd_target,
@@ -127,6 +172,24 @@ export function filterReportData(
     ? grandTotal.total_pipeline_acv / totalRemaining
     : 0;
 
+  // Filter action items by product as well
+  const filterActionItemsByProduct = (items: ActionItem[]): ActionItem[] => {
+    let filtered = allRegions ? items : filterActionItems(items, regions);
+    if (!allProducts) {
+      filtered = filtered.filter(item => products.includes(item.product));
+    }
+    return filtered;
+  };
+
+  // Filter top risk pockets by product
+  const filterRiskPockets = (pockets: TopRiskPocket[]): TopRiskPocket[] => {
+    let filtered = allRegions ? pockets : filterByRegion(pockets, regions);
+    if (!allProducts) {
+      filtered = filtered.filter(p => products.includes(p.product));
+    }
+    return filtered;
+  };
+
   return {
     ...data,
     grand_total: grandTotal,
@@ -139,69 +202,73 @@ export function filterReportData(
       R360: filteredAttainmentR360,
     },
     source_attainment: {
-      POR: filterByRegion(data.source_attainment.POR, regions),
-      R360: filterByRegion(data.source_attainment.R360, regions),
+      POR: filterProductRegion(data.source_attainment.POR, includePOR),
+      R360: filterProductRegion(data.source_attainment.R360, includeR360),
     },
     funnel_by_category: {
-      POR: filterByRegion(data.funnel_by_category.POR, regions),
-      R360: filterByRegion(data.funnel_by_category.R360, regions),
+      POR: filterProductRegion(data.funnel_by_category.POR, includePOR),
+      R360: filterProductRegion(data.funnel_by_category.R360, includeR360),
     },
     funnel_by_source: {
-      POR: filterByRegion(data.funnel_by_source.POR, regions),
-      R360: filterByRegion(data.funnel_by_source.R360, regions),
+      POR: filterProductRegion(data.funnel_by_source.POR, includePOR),
+      R360: filterProductRegion(data.funnel_by_source.R360, includeR360),
     },
     pipeline_rca: {
-      POR: filterByRegion(data.pipeline_rca.POR, regions),
-      R360: filterByRegion(data.pipeline_rca.R360, regions),
+      POR: filterProductRegion(data.pipeline_rca.POR, includePOR),
+      R360: filterProductRegion(data.pipeline_rca.R360, includeR360),
     },
     loss_reason_rca: {
-      POR: filterByRegion(data.loss_reason_rca.POR, regions),
-      R360: filterByRegion(data.loss_reason_rca.R360, regions),
+      POR: filterProductRegion(data.loss_reason_rca.POR, includePOR),
+      R360: filterProductRegion(data.loss_reason_rca.R360, includeR360),
     },
     google_ads: {
-      POR: filterByRegion(data.google_ads.POR, regions),
-      R360: filterByRegion(data.google_ads.R360, regions),
+      POR: filterProductRegion(data.google_ads.POR, includePOR),
+      R360: filterProductRegion(data.google_ads.R360, includeR360),
+    },
+    google_ads_rca: {
+      POR: filterProductRegion(data.google_ads_rca.POR, includePOR),
+      R360: filterProductRegion(data.google_ads_rca.R360, includeR360),
     },
     // Deal lists for drill-down
     won_deals: data.won_deals ? {
-      POR: filterByRegion(data.won_deals.POR || [], regions),
-      R360: filterByRegion(data.won_deals.R360 || [], regions),
+      POR: filterProductRegion(data.won_deals.POR || [], includePOR),
+      R360: filterProductRegion(data.won_deals.R360 || [], includeR360),
     } : undefined,
     lost_deals: data.lost_deals ? {
-      POR: filterByRegion(data.lost_deals.POR || [], regions),
-      R360: filterByRegion(data.lost_deals.R360 || [], regions),
+      POR: filterProductRegion(data.lost_deals.POR || [], includePOR),
+      R360: filterProductRegion(data.lost_deals.R360 || [], includeR360),
     } : undefined,
     pipeline_deals: data.pipeline_deals ? {
-      POR: filterByRegion(data.pipeline_deals.POR || [], regions),
-      R360: filterByRegion(data.pipeline_deals.R360 || [], regions),
+      POR: filterProductRegion(data.pipeline_deals.POR || [], includePOR),
+      R360: filterProductRegion(data.pipeline_deals.R360 || [], includeR360),
     } : undefined,
     // Filter insight sections
     wins_bright_spots: data.wins_bright_spots ? {
-      POR: filterByRegion(data.wins_bright_spots.POR || [], regions),
-      R360: filterByRegion(data.wins_bright_spots.R360 || [], regions),
+      POR: filterProductRegion(data.wins_bright_spots.POR || [], includePOR),
+      R360: filterProductRegion(data.wins_bright_spots.R360 || [], includeR360),
     } : undefined,
     momentum_indicators: data.momentum_indicators ? {
-      POR: filterByRegion(data.momentum_indicators.POR || [], regions),
-      R360: filterByRegion(data.momentum_indicators.R360 || [], regions),
+      POR: filterProductRegion(data.momentum_indicators.POR || [], includePOR),
+      R360: filterProductRegion(data.momentum_indicators.R360 || [], includeR360),
     } : undefined,
     top_risk_pockets: data.top_risk_pockets
-      ? filterByRegion(data.top_risk_pockets, regions)
+      ? filterRiskPockets(data.top_risk_pockets)
       : undefined,
     action_items: data.action_items ? {
-      immediate: filterActionItems(data.action_items.immediate || [], regions),
-      short_term: filterActionItems(data.action_items.short_term || [], regions),
-      strategic: filterActionItems(data.action_items.strategic || [], regions),
+      immediate: filterActionItemsByProduct(data.action_items.immediate || []),
+      short_term: filterActionItemsByProduct(data.action_items.short_term || []),
+      strategic: filterActionItemsByProduct(data.action_items.strategic || []),
     } : undefined,
     funnel_rca_insights: {
-      POR: filterByRegion(data.funnel_rca_insights.POR || [], regions),
-      R360: filterByRegion(data.funnel_rca_insights.R360 || [], regions),
+      POR: filterProductRegion(data.funnel_rca_insights.POR || [], includePOR),
+      R360: filterProductRegion(data.funnel_rca_insights.R360 || [], includeR360),
     },
     // Recalculate executive counts based on filtered data
     executive_counts: data.executive_counts ? recalculateExecutiveCounts(
       filteredAttainmentPOR,
       filteredAttainmentR360,
-      filterByRegion(data.momentum_indicators?.POR || [], regions),
-      filterByRegion(data.momentum_indicators?.R360 || [], regions)
+      filterProductRegion(data.momentum_indicators?.POR || [], includePOR),
+      filterProductRegion(data.momentum_indicators?.R360 || [], includeR360)
     ) : undefined,
   };
 }
@@ -230,4 +297,43 @@ export function buildRegionURL(regions: Region[]): string {
     return '?region=ALL';
   }
   return `?region=${regions.join(',')}`;
+}
+
+/**
+ * Parse products from URL search params
+ */
+export function parseProductsFromURL(searchParams: URLSearchParams): Product[] {
+  const productParam = searchParams.get('product');
+  if (!productParam || productParam === 'ALL') {
+    return ALL_PRODUCTS;
+  }
+
+  const products = productParam.split(',').filter(p =>
+    ['POR', 'R360'].includes(p)
+  ) as Product[];
+
+  return products.length > 0 ? products : ALL_PRODUCTS;
+}
+
+/**
+ * Build URL search params from regions and products
+ */
+export function buildFilterURL(regions: Region[], products: Product[]): string {
+  const params = new URLSearchParams();
+
+  // Add region param
+  if (regions.length === 0 || regions.length === 3) {
+    params.set('region', 'ALL');
+  } else {
+    params.set('region', regions.join(','));
+  }
+
+  // Add product param
+  if (products.length === 0 || products.length === 2) {
+    params.set('product', 'ALL');
+  } else {
+    params.set('product', products.join(','));
+  }
+
+  return `?${params.toString()}`;
 }

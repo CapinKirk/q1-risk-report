@@ -71,9 +71,9 @@ test.describe('Authenticated Report Tests', () => {
     await expect(page.locator('.meta')).toContainText('Report Date:');
     await expect(page.locator('.meta')).toContainText('Q1 Progress:');
 
-    // Check filter bar is present
-    await expect(page.locator('.filter-bar')).toBeVisible();
-    await expect(page.locator('.filter-btn').first()).toBeVisible();
+    // Check both filter bars are present (product and region)
+    await expect(page.locator('[data-testid="product-filter"]')).toBeVisible();
+    await expect(page.locator('[data-testid="region-filter"]')).toBeVisible();
   });
 
   test('region filter works', async ({ page }) => {
@@ -83,16 +83,107 @@ test.describe('Authenticated Report Tests', () => {
     await expect(page.locator('h1')).toHaveText('Q1 2026 Risk Analysis Report', { timeout: 10000 });
 
     // Click AMER filter
-    await page.locator('.filter-btn:has-text("AMER")').click();
+    await page.locator('[data-testid="region-amer"]').click();
 
     // Check URL updated
     await expect(page).toHaveURL(/region=AMER/);
 
     // Click All Regions
-    await page.locator('.filter-btn:has-text("All Regions")').click();
+    await page.locator('[data-testid="region-all"]').click();
 
     // Check URL updated
     await expect(page).toHaveURL(/region=ALL/);
+  });
+
+  test('product filter works - Point of Rental', async ({ page }) => {
+    await page.goto('http://localhost:3000');
+
+    // Wait for page load
+    await expect(page.locator('h1')).toHaveText('Q1 2026 Risk Analysis Report', { timeout: 10000 });
+
+    // Click POR filter
+    await page.locator('[data-testid="product-por"]').click();
+
+    // Check URL updated with product param
+    await expect(page).toHaveURL(/product=POR/);
+
+    // Verify POR button is active
+    await expect(page.locator('[data-testid="product-por"]')).toHaveClass(/active/);
+
+    // R360 sections should not be visible (empty data)
+    // Check the attainment table doesn't have R360 rows visible
+    await expect(page.locator('text=Point of Rental')).toBeVisible();
+  });
+
+  test('product filter works - Record360', async ({ page }) => {
+    await page.goto('http://localhost:3000');
+
+    // Wait for page load
+    await expect(page.locator('h1')).toHaveText('Q1 2026 Risk Analysis Report', { timeout: 10000 });
+
+    // Click R360 filter
+    await page.locator('[data-testid="product-r360"]').click();
+
+    // Check URL updated with product param
+    await expect(page).toHaveURL(/product=R360/);
+
+    // Verify R360 button is active
+    await expect(page.locator('[data-testid="product-r360"]')).toHaveClass(/active/);
+
+    // Check R360 content is visible
+    await expect(page.locator('text=Record360')).toBeVisible();
+  });
+
+  test('product filter toggle back to all', async ({ page }) => {
+    await page.goto('http://localhost:3000');
+
+    // Wait for page load
+    await expect(page.locator('h1')).toHaveText('Q1 2026 Risk Analysis Report', { timeout: 10000 });
+
+    // Click POR filter
+    await page.locator('[data-testid="product-por"]').click();
+    await expect(page).toHaveURL(/product=POR/);
+
+    // Click POR again should go back to all
+    await page.locator('[data-testid="product-por"]').click();
+    await expect(page).toHaveURL(/product=ALL/);
+
+    // All Products button should be active
+    await expect(page.locator('[data-testid="product-all"]')).toHaveClass(/active/);
+  });
+
+  test('combined product and region filters work', async ({ page }) => {
+    await page.goto('http://localhost:3000');
+
+    // Wait for page load
+    await expect(page.locator('h1')).toHaveText('Q1 2026 Risk Analysis Report', { timeout: 10000 });
+
+    // Click POR filter
+    await page.locator('[data-testid="product-por"]').click();
+    await expect(page).toHaveURL(/product=POR/);
+
+    // Click AMER filter
+    await page.locator('[data-testid="region-amer"]').click();
+
+    // Check both params in URL
+    await expect(page).toHaveURL(/product=POR/);
+    await expect(page).toHaveURL(/region=AMER/);
+
+    // Both should be active
+    await expect(page.locator('[data-testid="product-por"]')).toHaveClass(/active/);
+    await expect(page.locator('[data-testid="region-amer"]')).toHaveClass(/active/);
+  });
+
+  test('product filter URL persistence works', async ({ page }) => {
+    // Navigate directly to filtered URL
+    await page.goto('http://localhost:3000?product=R360&region=EMEA');
+
+    // Wait for page load
+    await expect(page.locator('h1')).toHaveText('Q1 2026 Risk Analysis Report', { timeout: 10000 });
+
+    // Check correct filters are active
+    await expect(page.locator('[data-testid="product-r360"]')).toHaveClass(/active/);
+    await expect(page.locator('[data-testid="region-emea"]')).toHaveClass(/active/);
   });
 
   test('all report sections are present', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { ReportData, GoogleAdsRegionalData, GoogleAdsData, Region } from '@/lib/types';
+import { ReportData, GoogleAdsRegionalData, GoogleAdsData, GoogleAdsRCA, Region } from '@/lib/types';
 import { formatCurrency, formatNumber, formatPercentDecimal } from '@/lib/formatters';
 
 interface GoogleAdsPerfProps {
@@ -115,31 +115,41 @@ export default function GoogleAdsPerf({ data }: GoogleAdsPerfProps) {
       </div>
 
       {/* Google Ads RCA */}
-      {google_ads_rca?.POR && (
+      {google_ads_rca?.POR && google_ads_rca.POR.length > 0 && (
         <div className="ads-card">
-          <strong>POR:</strong>
-          CTR {formatPercentDecimal(google_ads_rca.POR.ctr_pct)} ({google_ads_rca.POR.ctr_performance}) |
-          CPA ${Math.round(google_ads_rca.POR.cpa_usd || 0)} ({google_ads_rca.POR.cpa_performance})
-          {google_ads_rca.POR.rca_commentary && (
-            <div className="rca" style={{ marginTop: '5px' }}>{google_ads_rca.POR.rca_commentary}</div>
-          )}
-          {google_ads_rca.POR.recommended_action && (
-            <div className="action">→ {google_ads_rca.POR.recommended_action}</div>
-          )}
+          <strong>POR Ads Analysis:</strong>
+          {google_ads_rca.POR.map((rca: GoogleAdsRCA, index: number) => (
+            <div key={`por-rca-${rca.region}-${index}`} style={{ marginTop: index > 0 ? '10px' : '5px' }}>
+              <span style={{ fontWeight: 500 }}>{rca.region}:</span>{' '}
+              CTR {formatPercentDecimal(rca.ctr_pct)} ({rca.ctr_performance}) |{' '}
+              CPA ${Math.round(rca.cpa_usd || 0)} ({rca.cpa_performance})
+              {rca.rca_commentary && (
+                <div className="rca" style={{ marginTop: '3px', marginLeft: '10px' }}>{rca.rca_commentary}</div>
+              )}
+              {rca.recommended_action && (
+                <div className="action" style={{ marginLeft: '10px' }}>→ {rca.recommended_action}</div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {google_ads_rca?.R360 && (
+      {google_ads_rca?.R360 && google_ads_rca.R360.length > 0 && (
         <div className="ads-card">
-          <strong>R360:</strong>
-          CTR {formatPercentDecimal(google_ads_rca.R360.ctr_pct)} ({google_ads_rca.R360.ctr_performance}) |
-          CPA ${Math.round(google_ads_rca.R360.cpa_usd || 0)} ({google_ads_rca.R360.cpa_performance})
-          {google_ads_rca.R360.rca_commentary && (
-            <div className="rca" style={{ marginTop: '5px' }}>{google_ads_rca.R360.rca_commentary}</div>
-          )}
-          {google_ads_rca.R360.recommended_action && (
-            <div className="action">→ {google_ads_rca.R360.recommended_action}</div>
-          )}
+          <strong>R360 Ads Analysis:</strong>
+          {google_ads_rca.R360.map((rca: GoogleAdsRCA, index: number) => (
+            <div key={`r360-rca-${rca.region}-${index}`} style={{ marginTop: index > 0 ? '10px' : '5px' }}>
+              <span style={{ fontWeight: 500 }}>{rca.region}:</span>{' '}
+              CTR {formatPercentDecimal(rca.ctr_pct)} ({rca.ctr_performance}) |{' '}
+              CPA ${Math.round(rca.cpa_usd || 0)} ({rca.cpa_performance})
+              {rca.rca_commentary && (
+                <div className="rca" style={{ marginTop: '3px', marginLeft: '10px' }}>{rca.rca_commentary}</div>
+              )}
+              {rca.recommended_action && (
+                <div className="action" style={{ marginLeft: '10px' }}>→ {rca.recommended_action}</div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </section>

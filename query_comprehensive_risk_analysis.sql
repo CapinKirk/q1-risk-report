@@ -419,7 +419,7 @@ won_deals_detail AS (
   SELECT
     Id AS opportunity_id,
     AccountName AS account_name,
-    Name AS opportunity_name,
+    OpportunityName AS opportunity_name,
     CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
     CASE Division
       WHEN 'US' THEN 'AMER'
@@ -448,7 +448,7 @@ won_deals_detail AS (
       WHEN Type IN ('Existing Business', 'Renewal', 'Migration') THEN 'AM SOURCED'
       ELSE 'AE SOURCED'
     END AS source,
-    OwnerName AS owner_name,
+    Owner AS owner_name,
     OwnerId AS owner_id,
     CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url
   FROM `data-analytics-306119.sfdc.OpportunityViewTable`, dates d
@@ -465,7 +465,7 @@ lost_deals_detail AS (
   SELECT
     Id AS opportunity_id,
     AccountName AS account_name,
-    Name AS opportunity_name,
+    OpportunityName AS opportunity_name,
     CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
     CASE Division
       WHEN 'US' THEN 'AMER'
@@ -494,7 +494,7 @@ lost_deals_detail AS (
       WHEN Type IN ('Existing Business', 'Renewal', 'Migration') THEN 'AM SOURCED'
       ELSE 'AE SOURCED'
     END AS source,
-    OwnerName AS owner_name,
+    Owner AS owner_name,
     OwnerId AS owner_id,
     CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url
   FROM `data-analytics-306119.sfdc.OpportunityViewTable`, dates d
@@ -511,7 +511,7 @@ pipeline_deals_detail AS (
   SELECT
     Id AS opportunity_id,
     AccountName AS account_name,
-    Name AS opportunity_name,
+    OpportunityName AS opportunity_name,
     CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
     CASE Division
       WHEN 'US' THEN 'AMER'
@@ -540,7 +540,7 @@ pipeline_deals_detail AS (
       WHEN Type IN ('Existing Business', 'Renewal', 'Migration') THEN 'AM SOURCED'
       ELSE 'AE SOURCED'
     END AS source,
-    OwnerName AS owner_name,
+    Owner AS owner_name,
     OwnerId AS owner_id,
     CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url
   FROM `data-analytics-306119.sfdc.OpportunityViewTable`
@@ -1052,49 +1052,75 @@ funnel_attainment_by_source AS (
 --   UK Campaign, mm_search_competitors_uk → EMEA
 --   AU Campaign, mm_search_competitors_aus → APAC
 -- ============================================================================
+-- Deduplicated campaign names for POR (latest name per campaign)
+por_campaigns AS (
+  SELECT campaign_id, campaign_name
+  FROM (
+    SELECT campaign_id, campaign_name,
+           ROW_NUMBER() OVER (PARTITION BY campaign_id ORDER BY _DATA_DATE DESC) AS rn
+    FROM `data-analytics-306119.GoogleAds_POR_8275359090.ads_Campaign_8275359090`
+  )
+  WHERE rn = 1
+),
+
 por_ads_qtd AS (
   SELECT
     'POR' AS product,
     CASE
-      WHEN UPPER(campaign_name) LIKE 'US %' OR UPPER(campaign_name) LIKE '%_NA' OR UPPER(campaign_name) LIKE '%_NA_%' THEN 'AMER'
-      WHEN UPPER(campaign_name) LIKE 'UK %' OR UPPER(campaign_name) LIKE '%_UK' OR UPPER(campaign_name) LIKE '%_UK_%' THEN 'EMEA'
-      WHEN UPPER(campaign_name) LIKE 'AU %' OR UPPER(campaign_name) LIKE '%_AUS' OR UPPER(campaign_name) LIKE '%_AUS_%' OR UPPER(campaign_name) LIKE '%_AU_%' THEN 'APAC'
+      WHEN UPPER(c.campaign_name) LIKE 'US %' OR UPPER(c.campaign_name) LIKE '%_NA' OR UPPER(c.campaign_name) LIKE '%_NA_%' THEN 'AMER'
+      WHEN UPPER(c.campaign_name) LIKE 'UK %' OR UPPER(c.campaign_name) LIKE '%_UK' OR UPPER(c.campaign_name) LIKE '%_UK_%' THEN 'EMEA'
+      WHEN UPPER(c.campaign_name) LIKE 'AU %' OR UPPER(c.campaign_name) LIKE '%_AUS' OR UPPER(c.campaign_name) LIKE '%_AUS_%' OR UPPER(c.campaign_name) LIKE '%_AU_%' THEN 'APAC'
       ELSE 'AMER'  -- Default to AMER for unmatched campaigns
     END AS region,
-    SUM(metrics_impressions) AS impressions,
-    SUM(metrics_clicks) AS clicks,
-    ROUND(SUM(metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
-    SUM(metrics_conversions) AS conversions,
-    ROUND(SAFE_DIVIDE(SUM(metrics_clicks), NULLIF(SUM(metrics_impressions), 0)) * 100, 2) AS ctr_pct,
-    ROUND(SAFE_DIVIDE(SUM(metrics_cost_micros) / 1000000.0, NULLIF(SUM(metrics_clicks), 0)), 2) AS cpc_usd,
-    ROUND(SAFE_DIVIDE(SUM(metrics_cost_micros) / 1000000.0, NULLIF(SUM(metrics_conversions), 0)), 2) AS cpa_usd
-  FROM `data-analytics-306119.GoogleAds_POR_8275359090.ads_CampaignBasicStats_8275359090`, dates d
-  WHERE segments_date >= d.qtd_start
-    AND segments_date <= d.as_of_date
-    AND segments_ad_network_type = 'SEARCH'
+    SUM(s.metrics_impressions) AS impressions,
+    SUM(s.metrics_clicks) AS clicks,
+    ROUND(SUM(s.metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
+    SUM(s.metrics_conversions) AS conversions,
+    ROUND(SAFE_DIVIDE(SUM(s.metrics_clicks), NULLIF(SUM(s.metrics_impressions), 0)) * 100, 2) AS ctr_pct,
+    ROUND(SAFE_DIVIDE(SUM(s.metrics_cost_micros) / 1000000.0, NULLIF(SUM(s.metrics_clicks), 0)), 2) AS cpc_usd,
+    ROUND(SAFE_DIVIDE(SUM(s.metrics_cost_micros) / 1000000.0, NULLIF(SUM(s.metrics_conversions), 0)), 2) AS cpa_usd
+  FROM `data-analytics-306119.GoogleAds_POR_8275359090.ads_CampaignBasicStats_8275359090` s
+  JOIN por_campaigns c ON s.campaign_id = c.campaign_id
+  CROSS JOIN dates d
+  WHERE s.segments_date >= d.qtd_start
+    AND s.segments_date <= d.as_of_date
+    AND s.segments_ad_network_type = 'SEARCH'
   GROUP BY product, region
+),
+
+-- Deduplicated campaign names for R360 (latest name per campaign)
+r360_campaigns AS (
+  SELECT campaign_id, campaign_name
+  FROM (
+    SELECT campaign_id, campaign_name,
+           ROW_NUMBER() OVER (PARTITION BY campaign_id ORDER BY _DATA_DATE DESC) AS rn
+    FROM `data-analytics-306119.GoogleAds_Record360_3799591491.ads_Campaign_3799591491`
+  )
+  WHERE rn = 1
 ),
 
 r360_ads_qtd AS (
   SELECT
     'R360' AS product,
     CASE
-      WHEN UPPER(campaign_name) LIKE 'US %' OR UPPER(campaign_name) LIKE '%_NA' OR UPPER(campaign_name) LIKE '%_NA_%' THEN 'AMER'
-      WHEN UPPER(campaign_name) LIKE 'UK %' OR UPPER(campaign_name) LIKE '%_UK' OR UPPER(campaign_name) LIKE '%_UK_%' THEN 'EMEA'
-      WHEN UPPER(campaign_name) LIKE 'AU %' OR UPPER(campaign_name) LIKE '%_AUS' OR UPPER(campaign_name) LIKE '%_AUS_%' OR UPPER(campaign_name) LIKE '%_AU_%' THEN 'APAC'
+      WHEN UPPER(c.campaign_name) LIKE 'US %' OR UPPER(c.campaign_name) LIKE '%_NA' OR UPPER(c.campaign_name) LIKE '%_NA_%' THEN 'AMER'
+      WHEN UPPER(c.campaign_name) LIKE 'UK %' OR UPPER(c.campaign_name) LIKE '%_UK' OR UPPER(c.campaign_name) LIKE '%_UK_%' THEN 'EMEA'
+      WHEN UPPER(c.campaign_name) LIKE 'AU %' OR UPPER(c.campaign_name) LIKE '%_AUS' OR UPPER(c.campaign_name) LIKE '%_AUS_%' OR UPPER(c.campaign_name) LIKE '%_AU_%' THEN 'APAC'
       ELSE 'AMER'  -- Default to AMER for unmatched campaigns
     END AS region,
-    SUM(metrics_impressions) AS impressions,
-    SUM(metrics_clicks) AS clicks,
-    ROUND(SUM(metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
-    SUM(metrics_conversions) AS conversions,
-    ROUND(SAFE_DIVIDE(SUM(metrics_clicks), NULLIF(SUM(metrics_impressions), 0)) * 100, 2) AS ctr_pct,
-    ROUND(SAFE_DIVIDE(SUM(metrics_cost_micros) / 1000000.0, NULLIF(SUM(metrics_clicks), 0)), 2) AS cpc_usd,
-    ROUND(SAFE_DIVIDE(SUM(metrics_cost_micros) / 1000000.0, NULLIF(SUM(metrics_conversions), 0)), 2) AS cpa_usd
-  FROM `data-analytics-306119.GoogleAds_Record360_3799591491.ads_CampaignBasicStats_3799591491`, dates d
-  WHERE segments_date >= d.qtd_start
-    AND segments_date <= d.as_of_date
-    AND segments_ad_network_type = 'SEARCH'
+    SUM(s.metrics_impressions) AS impressions,
+    SUM(s.metrics_clicks) AS clicks,
+    ROUND(SUM(s.metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
+    SUM(s.metrics_conversions) AS conversions,
+    ROUND(SAFE_DIVIDE(SUM(s.metrics_clicks), NULLIF(SUM(s.metrics_impressions), 0)) * 100, 2) AS ctr_pct,
+    ROUND(SAFE_DIVIDE(SUM(s.metrics_cost_micros) / 1000000.0, NULLIF(SUM(s.metrics_clicks), 0)), 2) AS cpc_usd,
+    ROUND(SAFE_DIVIDE(SUM(s.metrics_cost_micros) / 1000000.0, NULLIF(SUM(s.metrics_conversions), 0)), 2) AS cpa_usd
+  FROM `data-analytics-306119.GoogleAds_Record360_3799591491.ads_CampaignBasicStats_3799591491` s
+  JOIN r360_campaigns c ON s.campaign_id = c.campaign_id
+  CROSS JOIN dates d
+  WHERE s.segments_date >= d.qtd_start
+    AND s.segments_date <= d.as_of_date
+    AND s.segments_ad_network_type = 'SEARCH'
   GROUP BY product, region
 ),
 
@@ -1754,6 +1780,7 @@ trend_rca AS (
 google_ads_rca AS (
   SELECT
     ga.product,
+    ga.region,
     ga.impressions,
     ga.clicks,
     ga.ad_spend_usd,
@@ -2217,12 +2244,10 @@ SELECT TO_JSON_STRING(STRUCT(
     LIMIT 10
   ) AS competitor_losses,
 
-  -- Google Ads Summary (Regional breakdown for filtering)
+  -- Google Ads Summary (by region)
   STRUCT(
-    ARRAY(SELECT AS STRUCT product, region, impressions, clicks, ctr_pct, ad_spend_usd, cpc_usd, conversions, cpa_usd
-          FROM google_ads_combined WHERE product = 'POR' ORDER BY region) AS POR,
-    ARRAY(SELECT AS STRUCT product, region, impressions, clicks, ctr_pct, ad_spend_usd, cpc_usd, conversions, cpa_usd
-          FROM google_ads_combined WHERE product = 'R360' ORDER BY region) AS R360
+    ARRAY(SELECT AS STRUCT * EXCEPT(product) FROM google_ads_combined WHERE product = 'POR' ORDER BY region) AS POR,
+    ARRAY(SELECT AS STRUCT * EXCEPT(product) FROM google_ads_combined WHERE product = 'R360' ORDER BY region) AS R360
   ) AS google_ads,
 
   -- ============================================================================
@@ -2275,14 +2300,14 @@ SELECT TO_JSON_STRING(STRUCT(
     ) AS R360
   ) AS trend_rca,
 
-  -- Google Ads RCA (NEW in v2.5.0)
+  -- Google Ads RCA (NEW in v2.5.0) - by region
   STRUCT(
-    (SELECT AS STRUCT product, ctr_pct, cpc_usd, cpa_usd, ctr_performance, cpa_performance,
+    ARRAY(SELECT AS STRUCT product, region, ctr_pct, cpc_usd, cpa_usd, ctr_performance, cpa_performance,
                       severity, rca_commentary, recommended_action
-     FROM google_ads_rca WHERE product = 'POR') AS POR,
-    (SELECT AS STRUCT product, ctr_pct, cpc_usd, cpa_usd, ctr_performance, cpa_performance,
+     FROM google_ads_rca WHERE product = 'POR' ORDER BY region) AS POR,
+    ARRAY(SELECT AS STRUCT product, region, ctr_pct, cpc_usd, cpa_usd, ctr_performance, cpa_performance,
                       severity, rca_commentary, recommended_action
-     FROM google_ads_rca WHERE product = 'R360') AS R360
+     FROM google_ads_rca WHERE product = 'R360' ORDER BY region) AS R360
   ) AS google_ads_rca,
 
   -- Consolidated Action Items (NEW in v2.5.0)
