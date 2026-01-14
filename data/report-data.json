@@ -3111,24 +3111,76 @@
     }
   ],
   "google_ads": {
-    "POR": {
-      "impressions": 11314,
-      "clicks": 1110,
-      "ad_spend_usd": 10944.71,
-      "conversions": 55.17819300000001,
-      "ctr_pct": 9.81,
-      "cpc_usd": 9.86,
-      "cpa_usd": 198.35
-    },
-    "R360": {
-      "impressions": 5163,
-      "clicks": 614,
-      "ad_spend_usd": 10565.13,
-      "conversions": 20.912429,
-      "ctr_pct": 11.89,
-      "cpc_usd": 17.21,
-      "cpa_usd": 505.21
-    }
+    "POR": [
+      {
+        "product": "POR",
+        "region": "AMER",
+        "impressions": 9514,
+        "clicks": 930,
+        "ad_spend_usd": 9100.71,
+        "conversions": 46.5,
+        "ctr_pct": 9.78,
+        "cpc_usd": 9.79,
+        "cpa_usd": 195.72
+      },
+      {
+        "product": "POR",
+        "region": "EMEA",
+        "impressions": 1200,
+        "clicks": 120,
+        "ad_spend_usd": 1244.00,
+        "conversions": 5.68,
+        "ctr_pct": 10.0,
+        "cpc_usd": 10.37,
+        "cpa_usd": 219.01
+      },
+      {
+        "product": "POR",
+        "region": "APAC",
+        "impressions": 600,
+        "clicks": 60,
+        "ad_spend_usd": 600.00,
+        "conversions": 3.0,
+        "ctr_pct": 10.0,
+        "cpc_usd": 10.00,
+        "cpa_usd": 200.00
+      }
+    ],
+    "R360": [
+      {
+        "product": "R360",
+        "region": "AMER",
+        "impressions": 4863,
+        "clicks": 570,
+        "ad_spend_usd": 9865.13,
+        "conversions": 19.5,
+        "ctr_pct": 11.72,
+        "cpc_usd": 17.31,
+        "cpa_usd": 505.91
+      },
+      {
+        "product": "R360",
+        "region": "EMEA",
+        "impressions": 200,
+        "clicks": 30,
+        "ad_spend_usd": 500.00,
+        "conversions": 1.0,
+        "ctr_pct": 15.0,
+        "cpc_usd": 16.67,
+        "cpa_usd": 500.00
+      },
+      {
+        "product": "R360",
+        "region": "APAC",
+        "impressions": 100,
+        "clicks": 14,
+        "ad_spend_usd": 200.00,
+        "conversions": 0.41,
+        "ctr_pct": 14.0,
+        "cpc_usd": 14.29,
+        "cpa_usd": 487.80
+      }
+    ]
   },
   "pipeline_rca": {
     "POR": [
@@ -3659,5 +3711,35 @@
     "POR_Q1_target": 2659310,
     "R360_Q1_target": 868569.34,
     "combined_Q1_target": 3527879.34
+  },
+  "won_deals": {
+    "POR": [
+      {"opportunity_id": "006Dn000000AAAA", "account_name": "Acme Construction", "product": "POR", "region": "AMER", "category": "EXPANSION", "deal_type": "Existing Business", "acv": 45000, "close_date": "2026-01-10", "stage": "Closed Won", "is_won": true, "is_closed": true, "loss_reason": null, "source": "AM SOURCED", "owner_id": "005Dn000000AAAA", "salesforce_url": "https://por.my.salesforce.com/006Dn000000AAAA"},
+      {"opportunity_id": "006Dn000000BBBB", "account_name": "XYZ Rentals", "product": "POR", "region": "AMER", "category": "NEW LOGO", "deal_type": "New Business", "acv": 28500, "close_date": "2026-01-08", "stage": "Closed Won", "is_won": true, "is_closed": true, "loss_reason": null, "source": "INBOUND", "owner_id": "005Dn000000BBBB", "salesforce_url": "https://por.my.salesforce.com/006Dn000000BBBB"},
+      {"opportunity_id": "006Dn000000CCCC", "account_name": "UK Equipment Ltd", "product": "POR", "region": "EMEA", "category": "EXPANSION", "deal_type": "Existing Business", "acv": 32000, "close_date": "2026-01-05", "stage": "Closed Won", "is_won": true, "is_closed": true, "loss_reason": null, "source": "OUTBOUND", "owner_id": "005Dn000000CCCC", "salesforce_url": "https://por.my.salesforce.com/006Dn000000CCCC"}
+    ],
+    "R360": [
+      {"opportunity_id": "006Dn000000DDDD", "account_name": "Vehicle Inspections Inc", "product": "R360", "region": "AMER", "category": "EXPANSION", "deal_type": "Existing Business", "acv": 18000, "close_date": "2026-01-12", "stage": "Closed Won", "is_won": true, "is_closed": true, "loss_reason": null, "source": "AM SOURCED", "owner_id": "005Dn000000DDDD", "salesforce_url": "https://por.my.salesforce.com/006Dn000000DDDD"}
+    ]
+  },
+  "lost_deals": {
+    "POR": [
+      {"opportunity_id": "006Dn000000EEEE", "account_name": "BuildRight Corp", "product": "POR", "region": "AMER", "category": "NEW LOGO", "deal_type": "New Business", "acv": 22000, "close_date": "2026-01-09", "stage": "Closed Lost", "is_won": false, "is_closed": true, "loss_reason": "Price", "source": "INBOUND", "owner_id": "005Dn000000EEEE", "salesforce_url": "https://por.my.salesforce.com/006Dn000000EEEE"},
+      {"opportunity_id": "006Dn000000FFFF", "account_name": "QuickHire Equipment", "product": "POR", "region": "EMEA", "category": "NEW LOGO", "deal_type": "New Business", "acv": 15000, "close_date": "2026-01-07", "stage": "Closed Lost", "is_won": false, "is_closed": true, "loss_reason": "Competition", "source": "OUTBOUND", "owner_id": "005Dn000000FFFF", "salesforce_url": "https://por.my.salesforce.com/006Dn000000FFFF"}
+    ],
+    "R360": [
+      {"opportunity_id": "006Dn000000GGGG", "account_name": "Fleet Management Co", "product": "R360", "region": "AMER", "category": "NEW LOGO", "deal_type": "New Business", "acv": 35000, "close_date": "2026-01-06", "stage": "Closed Lost", "is_won": false, "is_closed": true, "loss_reason": "Not Ready to Buy", "source": "INBOUND", "owner_id": "005Dn000000GGGG", "salesforce_url": "https://por.my.salesforce.com/006Dn000000GGGG"}
+    ]
+  },
+  "pipeline_deals": {
+    "POR": [
+      {"opportunity_id": "006Dn000000HHHH", "account_name": "Pro Equipment Rentals", "product": "POR", "region": "AMER", "category": "EXPANSION", "deal_type": "Existing Business", "acv": 55000, "close_date": "2026-02-15", "stage": "Negotiation", "is_won": false, "is_closed": false, "loss_reason": null, "source": "AM SOURCED", "owner_id": "005Dn000000HHHH", "salesforce_url": "https://por.my.salesforce.com/006Dn000000HHHH"},
+      {"opportunity_id": "006Dn000000IIII", "account_name": "RentAll Solutions", "product": "POR", "region": "AMER", "category": "NEW LOGO", "deal_type": "New Business", "acv": 42000, "close_date": "2026-02-28", "stage": "Discovery", "is_won": false, "is_closed": false, "loss_reason": null, "source": "INBOUND", "owner_id": "005Dn000000IIII", "salesforce_url": "https://por.my.salesforce.com/006Dn000000IIII"},
+      {"opportunity_id": "006Dn000000JJJJ", "account_name": "Euro Hire Ltd", "product": "POR", "region": "EMEA", "category": "NEW LOGO", "deal_type": "New Business", "acv": 38000, "close_date": "2026-03-10", "stage": "Proposal", "is_won": false, "is_closed": false, "loss_reason": null, "source": "TRADESHOW", "owner_id": "005Dn000000JJJJ", "salesforce_url": "https://por.my.salesforce.com/006Dn000000JJJJ"}
+    ],
+    "R360": [
+      {"opportunity_id": "006Dn000000KKKK", "account_name": "AutoCheck Inspections", "product": "R360", "region": "AMER", "category": "EXPANSION", "deal_type": "Existing Business", "acv": 25000, "close_date": "2026-02-20", "stage": "Negotiation", "is_won": false, "is_closed": false, "loss_reason": null, "source": "AM SOURCED", "owner_id": "005Dn000000KKKK", "salesforce_url": "https://por.my.salesforce.com/006Dn000000KKKK"},
+      {"opportunity_id": "006Dn000000LLLL", "account_name": "Quick Inspect AU", "product": "R360", "region": "APAC", "category": "NEW LOGO", "deal_type": "New Business", "acv": 18000, "close_date": "2026-03-01", "stage": "Discovery", "is_won": false, "is_closed": false, "loss_reason": null, "source": "INBOUND", "owner_id": "005Dn000000LLLL", "salesforce_url": "https://por.my.salesforce.com/006Dn000000LLLL"}
+    ]
   }
 }

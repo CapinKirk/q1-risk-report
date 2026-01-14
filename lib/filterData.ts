@@ -121,6 +121,23 @@ export function filterReportData(
       POR: filterByRegion(data.loss_reason_rca.POR, regions),
       R360: filterByRegion(data.loss_reason_rca.R360, regions),
     },
+    google_ads: {
+      POR: filterByRegion(data.google_ads.POR, regions),
+      R360: filterByRegion(data.google_ads.R360, regions),
+    },
+    // Deal lists for drill-down
+    won_deals: data.won_deals ? {
+      POR: filterByRegion(data.won_deals.POR || [], regions),
+      R360: filterByRegion(data.won_deals.R360 || [], regions),
+    } : undefined,
+    lost_deals: data.lost_deals ? {
+      POR: filterByRegion(data.lost_deals.POR || [], regions),
+      R360: filterByRegion(data.lost_deals.R360 || [], regions),
+    } : undefined,
+    pipeline_deals: data.pipeline_deals ? {
+      POR: filterByRegion(data.pipeline_deals.POR || [], regions),
+      R360: filterByRegion(data.pipeline_deals.R360 || [], regions),
+    } : undefined,
   };
 }
 

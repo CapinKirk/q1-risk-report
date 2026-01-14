@@ -133,6 +133,12 @@ export interface GoogleAdsData {
   cpa_usd: number;
 }
 
+// Google Ads data with region (for filtering)
+export interface GoogleAdsRegionalData extends GoogleAdsData {
+  product: Product;
+  region: Region;
+}
+
 // Google Ads RCA
 export interface GoogleAdsRCA {
   ctr_pct: number;
@@ -185,8 +191,8 @@ export interface ReportData {
     R360: LossReasonRow[];
   };
   google_ads: {
-    POR: GoogleAdsData;
-    R360: GoogleAdsData;
+    POR: GoogleAdsRegionalData[];
+    R360: GoogleAdsRegionalData[];
   };
   google_ads_rca: {
     POR: GoogleAdsRCA;
@@ -196,6 +202,116 @@ export interface ReportData {
     POR: FunnelRCAInsight[];
     R360: FunnelRCAInsight[];
   };
+  // New insight sections
+  executive_counts?: ExecutiveCounts;
+  wins_bright_spots?: {
+    POR: WinBrightSpot[];
+    R360: WinBrightSpot[];
+  };
+  action_items?: {
+    immediate: ActionItem[];
+    short_term: ActionItem[];
+    strategic: ActionItem[];
+  };
+  momentum_indicators?: {
+    POR: MomentumIndicator[];
+    R360: MomentumIndicator[];
+  };
+  top_risk_pockets?: TopRiskPocket[];
+  // Deal lists for drill-down
+  won_deals?: {
+    POR: DealDetail[];
+    R360: DealDetail[];
+  };
+  lost_deals?: {
+    POR: DealDetail[];
+    R360: DealDetail[];
+  };
+  pipeline_deals?: {
+    POR: DealDetail[];
+    R360: DealDetail[];
+  };
+}
+
+// Executive Summary Counts
+export interface ExecutiveCounts {
+  areas_exceeding_target: number;
+  areas_at_risk: number;
+  areas_needing_attention: number;
+  areas_with_momentum: number;
+}
+
+// Wins / Bright Spots
+export interface WinBrightSpot {
+  product: Product;
+  region: Region;
+  category: Category;
+  qtd_attainment_pct: number;
+  qtd_acv: number;
+  qtd_target: number;
+  performance_tier: 'EXCEPTIONAL' | 'ON_TRACK' | 'NEEDS_ATTENTION';
+  success_commentary: string;
+  contributing_factor: string;
+  pipeline_coverage_x: number;
+  win_rate_pct: number;
+}
+
+// Action Item
+export interface ActionItem {
+  urgency: 'IMMEDIATE' | 'SHORT_TERM' | 'STRATEGIC';
+  category: string;
+  product: Product;
+  region: Region | null;
+  issue: string;
+  action: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
+// Momentum Indicator
+export interface MomentumIndicator {
+  product: Product;
+  region: Region;
+  momentum_tier: 'STRONG_MOMENTUM' | 'MODERATE_MOMENTUM' | 'NO_MOMENTUM' | 'DECLINING';
+  positive_momentum_count: number;
+  momentum_commentary: string;
+  mql_trend: 'UP' | 'DOWN' | 'FLAT';
+  mql_wow_pct: number;
+  sql_trend: 'UP' | 'DOWN' | 'FLAT';
+  sql_wow_pct: number;
+}
+
+// Top Risk Pocket
+export interface TopRiskPocket {
+  product: Product;
+  region: Region;
+  category: Category;
+  qtd_target: number;
+  qtd_acv: number;
+  qtd_gap: number;
+  qtd_attainment_pct: number;
+  rag_status: RAGStatus;
+  win_rate_pct: number;
+  pipeline_acv: number;
+  pipeline_coverage_x: number;
+}
+
+// Deal Detail for drill-down
+export interface DealDetail {
+  opportunity_id: string;
+  account_name: string;
+  product: Product;
+  region: Region;
+  category: Category;
+  deal_type: string;
+  acv: number;
+  close_date: string;
+  stage: string;
+  is_won: boolean;
+  is_closed: boolean;
+  loss_reason: string | null;
+  source: Source;
+  owner_id: string;
+  salesforce_url: string;
 }
 
 // Filter state

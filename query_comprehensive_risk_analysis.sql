@@ -894,11 +894,21 @@ funnel_attainment_by_source AS (
 ),
 
 -- ============================================================================
--- GOOGLE ADS QTD
+-- GOOGLE ADS QTD - WITH REGIONAL BREAKDOWN
+-- Campaign naming convention:
+--   US Campaign, mm_search_competitors_na → AMER
+--   UK Campaign, mm_search_competitors_uk → EMEA
+--   AU Campaign, mm_search_competitors_aus → APAC
 -- ============================================================================
 por_ads_qtd AS (
   SELECT
     'POR' AS product,
+    CASE
+      WHEN UPPER(campaign_name) LIKE 'US %' OR UPPER(campaign_name) LIKE '%_NA' OR UPPER(campaign_name) LIKE '%_NA_%' THEN 'AMER'
+      WHEN UPPER(campaign_name) LIKE 'UK %' OR UPPER(campaign_name) LIKE '%_UK' OR UPPER(campaign_name) LIKE '%_UK_%' THEN 'EMEA'
+      WHEN UPPER(campaign_name) LIKE 'AU %' OR UPPER(campaign_name) LIKE '%_AUS' OR UPPER(campaign_name) LIKE '%_AUS_%' OR UPPER(campaign_name) LIKE '%_AU_%' THEN 'APAC'
+      ELSE 'AMER'  -- Default to AMER for unmatched campaigns
+    END AS region,
     SUM(metrics_impressions) AS impressions,
     SUM(metrics_clicks) AS clicks,
     ROUND(SUM(metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
@@ -910,11 +920,18 @@ por_ads_qtd AS (
   WHERE segments_date >= d.qtd_start
     AND segments_date <= d.as_of_date
     AND segments_ad_network_type = 'SEARCH'
+  GROUP BY product, region
 ),
 
 r360_ads_qtd AS (
   SELECT
     'R360' AS product,
+    CASE
+      WHEN UPPER(campaign_name) LIKE 'US %' OR UPPER(campaign_name) LIKE '%_NA' OR UPPER(campaign_name) LIKE '%_NA_%' THEN 'AMER'
+      WHEN UPPER(campaign_name) LIKE 'UK %' OR UPPER(campaign_name) LIKE '%_UK' OR UPPER(campaign_name) LIKE '%_UK_%' THEN 'EMEA'
+      WHEN UPPER(campaign_name) LIKE 'AU %' OR UPPER(campaign_name) LIKE '%_AUS' OR UPPER(campaign_name) LIKE '%_AUS_%' OR UPPER(campaign_name) LIKE '%_AU_%' THEN 'APAC'
+      ELSE 'AMER'  -- Default to AMER for unmatched campaigns
+    END AS region,
     SUM(metrics_impressions) AS impressions,
     SUM(metrics_clicks) AS clicks,
     ROUND(SUM(metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
@@ -926,6 +943,7 @@ r360_ads_qtd AS (
   WHERE segments_date >= d.qtd_start
     AND segments_date <= d.as_of_date
     AND segments_ad_network_type = 'SEARCH'
+  GROUP BY product, region
 ),
 
 google_ads_combined AS (
@@ -2047,10 +2065,12 @@ SELECT TO_JSON_STRING(STRUCT(
     LIMIT 10
   ) AS competitor_losses,
 
-  -- Google Ads Summary
+  -- Google Ads Summary (Regional breakdown for filtering)
   STRUCT(
-    (SELECT AS STRUCT * EXCEPT(product) FROM google_ads_combined WHERE product = 'POR') AS POR,
-    (SELECT AS STRUCT * EXCEPT(product) FROM google_ads_combined WHERE product = 'R360') AS R360
+    ARRAY(SELECT AS STRUCT product, region, impressions, clicks, ctr_pct, ad_spend_usd, cpc_usd, conversions, cpa_usd
+          FROM google_ads_combined WHERE product = 'POR' ORDER BY region) AS POR,
+    ARRAY(SELECT AS STRUCT product, region, impressions, clicks, ctr_pct, ad_spend_usd, cpc_usd, conversions, cpa_usd
+          FROM google_ads_combined WHERE product = 'R360' ORDER BY region) AS R360
   ) AS google_ads,
 
   -- ============================================================================

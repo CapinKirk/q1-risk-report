@@ -6,10 +6,14 @@ import type { Region, ReportData } from '@/lib/types';
 import { filterReportData, parseRegionsFromURL } from '@/lib/filterData';
 import RegionFilter from '@/components/RegionFilter';
 import UserMenu from '@/components/UserMenu';
+import ExecutiveKPICards from '@/components/ExecutiveKPICards';
 import ExecutiveSummary from '@/components/ExecutiveSummary';
+import BrightSpots from '@/components/BrightSpots';
+import MomentumTracker from '@/components/MomentumTracker';
 import AttainmentTable from '@/components/AttainmentTable';
 import SourceAttainment from '@/components/SourceAttainment';
 import HitsMisses from '@/components/HitsMisses';
+import ActionItemsDashboard from '@/components/ActionItemsDashboard';
 import PipelineCoverage from '@/components/PipelineCoverage';
 import LostOpportunities from '@/components/LostOpportunities';
 import GoogleAdsPerf from '@/components/GoogleAdsPerf';
@@ -64,10 +68,32 @@ function ReportContent() {
         onRegionChange={setSelectedRegions}
       />
 
+      {/* Executive KPI Overview Cards */}
+      {filteredData.executive_counts && (
+        <ExecutiveKPICards counts={filteredData.executive_counts} />
+      )}
+
       <ExecutiveSummary data={filteredData} />
+
+      {/* Bright Spots - Areas exceeding targets */}
+      {filteredData.wins_bright_spots && (
+        <BrightSpots wins={filteredData.wins_bright_spots} />
+      )}
+
+      {/* Momentum Tracker - WoW trend indicators */}
+      {filteredData.momentum_indicators && (
+        <MomentumTracker momentum={filteredData.momentum_indicators} />
+      )}
+
       <AttainmentTable data={filteredData} />
       <SourceAttainment data={filteredData} />
       <HitsMisses data={filteredData} />
+
+      {/* Action Items Dashboard */}
+      {filteredData.action_items && (
+        <ActionItemsDashboard actionItems={filteredData.action_items} />
+      )}
+
       <PipelineCoverage data={filteredData} />
       <LostOpportunities data={filteredData} />
       <GoogleAdsPerf data={filteredData} />

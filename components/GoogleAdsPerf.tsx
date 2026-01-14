@@ -1,15 +1,75 @@
-import { ReportData } from '@/lib/types';
+import { ReportData, GoogleAdsRegionalData, GoogleAdsData, Region } from '@/lib/types';
 import { formatCurrency, formatNumber, formatPercentDecimal } from '@/lib/formatters';
 
 interface GoogleAdsPerfProps {
   data: ReportData;
 }
 
+/**
+ * Aggregate multiple regional Google Ads rows into a single summary
+ */
+function aggregateAdsData(rows: GoogleAdsRegionalData[]): GoogleAdsData | null {
+  if (!rows || rows.length === 0) return null;
+
+  const impressions = rows.reduce((sum, r) => sum + (r.impressions || 0), 0);
+  const clicks = rows.reduce((sum, r) => sum + (r.clicks || 0), 0);
+  const ad_spend_usd = rows.reduce((sum, r) => sum + (r.ad_spend_usd || 0), 0);
+  const conversions = rows.reduce((sum, r) => sum + (r.conversions || 0), 0);
+
+  return {
+    impressions,
+    clicks,
+    ctr_pct: impressions > 0 ? (clicks / impressions) * 100 : 0,
+    ad_spend_usd,
+    cpc_usd: clicks > 0 ? ad_spend_usd / clicks : 0,
+    conversions,
+    cpa_usd: conversions > 0 ? ad_spend_usd / conversions : 0,
+  };
+}
+
+/**
+ * Get unique regions from ads data
+ */
+function getActiveRegions(porData: GoogleAdsRegionalData[], r360Data: GoogleAdsRegionalData[]): Region[] {
+  const regions = new Set<Region>();
+  porData.forEach(r => regions.add(r.region));
+  r360Data.forEach(r => regions.add(r.region));
+  return Array.from(regions).sort();
+}
+
 export default function GoogleAdsPerf({ data }: GoogleAdsPerfProps) {
   const { google_ads, google_ads_rca } = data;
 
-  const porAds = google_ads.POR;
-  const r360Ads = google_ads.R360;
+  // Get active regions from filtered data
+  const activeRegions = getActiveRegions(google_ads.POR || [], google_ads.R360 || []);
+  const showRegionalBreakdown = activeRegions.length > 1 || activeRegions.length === 1;
+
+  // Aggregate totals for each product
+  const porTotal = aggregateAdsData(google_ads.POR || []);
+  const r360Total = aggregateAdsData(google_ads.R360 || []);
+
+  // Helper to render a data row
+  const renderRow = (label: string, ads: GoogleAdsData | null, isSubRow = false) => {
+    if (!ads) return null;
+    return (
+      <tr className={isSubRow ? 'sub-row' : ''}>
+        <td style={isSubRow ? { paddingLeft: '20px', fontSize: '0.9em' } : {}}>{label}</td>
+        <td className="right">{formatNumber(ads.impressions)}</td>
+        <td className="right">{formatNumber(ads.clicks)}</td>
+        <td className="right">{formatPercentDecimal(ads.ctr_pct)}</td>
+        <td className="right">{formatCurrency(ads.ad_spend_usd)}</td>
+        <td className="right">${(ads.cpc_usd || 0).toFixed(2)}</td>
+        <td className="right">{Math.round(ads.conversions || 0)}</td>
+        <td className="right">${Math.round(ads.cpa_usd || 0)}</td>
+      </tr>
+    );
+  };
+
+  // Helper to get regional data for a product
+  const getRegionalData = (productData: GoogleAdsRegionalData[], region: Region): GoogleAdsData | null => {
+    const regionData = productData.find(r => r.region === region);
+    return regionData || null;
+  };
 
   return (
     <section>
@@ -18,7 +78,7 @@ export default function GoogleAdsPerf({ data }: GoogleAdsPerfProps) {
         <table>
           <thead>
             <tr>
-              <th>Prod</th>
+              <th>Product / Region</th>
               <th className="right">Impr</th>
               <th className="right">Clicks</th>
               <th className="right">CTR</th>
@@ -29,26 +89,27 @@ export default function GoogleAdsPerf({ data }: GoogleAdsPerfProps) {
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>POR</td>
-              <td className="right">{formatNumber(porAds?.impressions)}</td>
-              <td className="right">{formatNumber(porAds?.clicks)}</td>
-              <td className="right">{formatPercentDecimal(porAds?.ctr_pct)}</td>
-              <td className="right">{formatCurrency(porAds?.ad_spend_usd)}</td>
-              <td className="right">${(porAds?.cpc_usd || 0).toFixed(2)}</td>
-              <td className="right">{Math.round(porAds?.conversions || 0)}</td>
-              <td className="right">${Math.round(porAds?.cpa_usd || 0)}</td>
-            </tr>
-            <tr>
-              <td>R360</td>
-              <td className="right">{formatNumber(r360Ads?.impressions)}</td>
-              <td className="right">{formatNumber(r360Ads?.clicks)}</td>
-              <td className="right">{formatPercentDecimal(r360Ads?.ctr_pct)}</td>
-              <td className="right">{formatCurrency(r360Ads?.ad_spend_usd)}</td>
-              <td className="right">${(r360Ads?.cpc_usd || 0).toFixed(2)}</td>
-              <td className="right">{Math.round(r360Ads?.conversions || 0)}</td>
-              <td className="right">${Math.round(r360Ads?.cpa_usd || 0)}</td>
-            </tr>
+            {/* POR Section */}
+            {porTotal && (
+              <>
+                {renderRow('POR', porTotal)}
+                {showRegionalBreakdown && activeRegions.map(region => {
+                  const regionData = getRegionalData(google_ads.POR || [], region);
+                  return regionData ? renderRow(`↳ ${region}`, regionData, true) : null;
+                })}
+              </>
+            )}
+
+            {/* R360 Section */}
+            {r360Total && (
+              <>
+                {renderRow('R360', r360Total)}
+                {showRegionalBreakdown && activeRegions.map(region => {
+                  const regionData = getRegionalData(google_ads.R360 || [], region);
+                  return regionData ? renderRow(`↳ ${region}`, regionData, true) : null;
+                })}
+              </>
+            )}
           </tbody>
         </table>
       </div>
