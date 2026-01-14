@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import type { Region, ReportData } from '@/lib/types';
 import { filterReportData, parseRegionsFromURL } from '@/lib/filterData';
 import RegionFilter from '@/components/RegionFilter';
+import UserMenu from '@/components/UserMenu';
 import ExecutiveSummary from '@/components/ExecutiveSummary';
 import AttainmentTable from '@/components/AttainmentTable';
 import SourceAttainment from '@/components/SourceAttainment';
@@ -46,11 +47,16 @@ function ReportContent() {
 
   return (
     <div className="container">
-      <h1>Q1 2026 Risk Analysis Report</h1>
-      <div className="meta">
-        <span>Report Date: {period.as_of_date}</span>
-        <span>Q1 Progress: {period.quarter_pct_complete.toFixed(1)}% ({period.days_elapsed}/{period.total_days} days)</span>
-        <span>Version: {query_version || '2.7.0'}</span>
+      <div className="header-bar">
+        <div>
+          <h1>Q1 2026 Risk Analysis Report</h1>
+          <div className="meta">
+            <span>Report Date: {period.as_of_date}</span>
+            <span>Q1 Progress: {period.quarter_pct_complete.toFixed(1)}% ({period.days_elapsed}/{period.total_days} days)</span>
+            <span>Version: {query_version || '2.7.0'}</span>
+          </div>
+        </div>
+        <UserMenu />
       </div>
 
       <RegionFilter
