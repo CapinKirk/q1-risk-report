@@ -8,7 +8,12 @@ import type {
   PipelineRCARow,
   LossReasonRow,
   ProductTotal,
-  GrandTotal
+  GrandTotal,
+  ExecutiveCounts,
+  ActionItem,
+  WinBrightSpot,
+  MomentumIndicator,
+  TopRiskPocket
 } from './types';
 
 /**
@@ -22,6 +27,38 @@ function filterByRegion<T extends { region: Region }>(
     return items; // All regions selected
   }
   return items.filter(item => regions.includes(item.region));
+}
+
+/**
+ * Filter action items - include items with null region (product-wide) or matching region
+ */
+function filterActionItems(items: ActionItem[], regions: Region[]): ActionItem[] {
+  if (regions.length === 0 || regions.length === 3) {
+    return items;
+  }
+  return items.filter(item => item.region === null || regions.includes(item.region as Region));
+}
+
+/**
+ * Recalculate executive counts based on filtered attainment data
+ */
+function recalculateExecutiveCounts(
+  porRows: AttainmentRow[],
+  r360Rows: AttainmentRow[],
+  porMomentum: MomentumIndicator[],
+  r360Momentum: MomentumIndicator[]
+): ExecutiveCounts {
+  const allRows = [...porRows, ...r360Rows];
+  const allMomentum = [...porMomentum, ...r360Momentum];
+
+  return {
+    areas_exceeding_target: allRows.filter(r => r.qtd_attainment_pct >= 100).length,
+    areas_at_risk: allRows.filter(r => r.rag_status === 'RED').length,
+    areas_needing_attention: allRows.filter(r => r.rag_status === 'YELLOW').length,
+    areas_with_momentum: allMomentum.filter(m =>
+      m.momentum_tier === 'STRONG_MOMENTUM' || m.momentum_tier === 'MODERATE_MOMENTUM'
+    ).length,
+  };
 }
 
 /**
@@ -138,6 +175,34 @@ export function filterReportData(
       POR: filterByRegion(data.pipeline_deals.POR || [], regions),
       R360: filterByRegion(data.pipeline_deals.R360 || [], regions),
     } : undefined,
+    // Filter insight sections
+    wins_bright_spots: data.wins_bright_spots ? {
+      POR: filterByRegion(data.wins_bright_spots.POR || [], regions),
+      R360: filterByRegion(data.wins_bright_spots.R360 || [], regions),
+    } : undefined,
+    momentum_indicators: data.momentum_indicators ? {
+      POR: filterByRegion(data.momentum_indicators.POR || [], regions),
+      R360: filterByRegion(data.momentum_indicators.R360 || [], regions),
+    } : undefined,
+    top_risk_pockets: data.top_risk_pockets
+      ? filterByRegion(data.top_risk_pockets, regions)
+      : undefined,
+    action_items: data.action_items ? {
+      immediate: filterActionItems(data.action_items.immediate || [], regions),
+      short_term: filterActionItems(data.action_items.short_term || [], regions),
+      strategic: filterActionItems(data.action_items.strategic || [], regions),
+    } : undefined,
+    funnel_rca_insights: {
+      POR: filterByRegion(data.funnel_rca_insights.POR || [], regions),
+      R360: filterByRegion(data.funnel_rca_insights.R360 || [], regions),
+    },
+    // Recalculate executive counts based on filtered data
+    executive_counts: data.executive_counts ? recalculateExecutiveCounts(
+      filteredAttainmentPOR,
+      filteredAttainmentR360,
+      filterByRegion(data.momentum_indicators?.POR || [], regions),
+      filterByRegion(data.momentum_indicators?.R360 || [], regions)
+    ) : undefined,
   };
 }
 

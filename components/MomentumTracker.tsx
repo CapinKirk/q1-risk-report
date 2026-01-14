@@ -1,10 +1,11 @@
-import { MomentumIndicator } from '@/lib/types';
+import { MomentumIndicator, Period } from '@/lib/types';
 
 interface MomentumTrackerProps {
   momentum: {
     POR: MomentumIndicator[];
     R360: MomentumIndicator[];
   };
+  period: Period;
 }
 
 function getTrendArrow(trend: string): string {
@@ -16,7 +17,16 @@ function getTrendArrow(trend: string): string {
   }
 }
 
-function getTrendColor(trend: string): string {
+function getTrendColor(trend: string, isEarlyQuarter: boolean): string {
+  // Mute colors if early quarter (less reliable data)
+  if (isEarlyQuarter) {
+    switch (trend) {
+      case 'UP': return '#4ade80'; // lighter green
+      case 'DOWN': return '#f87171'; // lighter red
+      case 'FLAT': return '#9ca3af';
+      default: return '#9ca3af';
+    }
+  }
   switch (trend) {
     case 'UP': return '#16a34a';
     case 'DOWN': return '#dc2626';
@@ -40,8 +50,39 @@ function getMomentumTierStyle(tier: string): { bg: string; text: string; border:
   }
 }
 
-function TrendIndicator({ label, trend, wowPct }: { label: string; trend: string; wowPct: number }) {
-  const color = getTrendColor(trend);
+/**
+ * Improve commentary based on sample size
+ */
+function improveCommentary(commentary: string, quarterPct: number): string {
+  if (!commentary) return '';
+
+  // Clean up generic commentary
+  let improved = commentary
+    .replace(/showing positive momentum across multiple funnel stages\./gi, 'has positive funnel trends.')
+    .replace(/showing strong MQL momentum/gi, 'MQL trending up')
+    .replace(/Lead generation accelerating\./gi, '')
+    .trim();
+
+  // Add sample size caveat if early quarter
+  if (quarterPct < 25 && improved.length > 0) {
+    improved += ' (early quarter - monitor trends)';
+  }
+
+  return improved;
+}
+
+function TrendIndicator({
+  label,
+  trend,
+  wowPct,
+  isEarlyQuarter
+}: {
+  label: string;
+  trend: string;
+  wowPct: number;
+  isEarlyQuarter: boolean;
+}) {
+  const color = getTrendColor(trend, isEarlyQuarter);
   return (
     <div className="trend-indicator">
       <span className="trend-label">{label}</span>
@@ -53,16 +94,16 @@ function TrendIndicator({ label, trend, wowPct }: { label: string; trend: string
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 8px;
-          min-width: 60px;
+          padding: 6px;
+          min-width: 55px;
         }
         .trend-label {
-          font-size: 0.625rem;
+          font-size: 0.6rem;
           color: #6b7280;
           text-transform: uppercase;
         }
         .trend-value {
-          font-size: 0.875rem;
+          font-size: 0.8rem;
           font-weight: bold;
         }
       `}</style>
@@ -70,8 +111,10 @@ function TrendIndicator({ label, trend, wowPct }: { label: string; trend: string
   );
 }
 
-export default function MomentumTracker({ momentum }: MomentumTrackerProps) {
+export default function MomentumTracker({ momentum, period }: MomentumTrackerProps) {
   const allIndicators = [...(momentum.POR || []), ...(momentum.R360 || [])];
+  const quarterPct = period.quarter_pct_complete || 0;
+  const isEarlyQuarter = quarterPct < 25;
 
   if (allIndicators.length === 0) {
     return null;
@@ -86,10 +129,17 @@ export default function MomentumTracker({ momentum }: MomentumTrackerProps) {
 
   return (
     <section>
-      <h2>Momentum Tracker</h2>
+      <h2>Momentum Tracker (WoW)</h2>
+      {isEarlyQuarter && (
+        <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
+          Limited data ({quarterPct.toFixed(0)}% of quarter) - trends may not be statistically significant
+        </p>
+      )}
       <div className="momentum-grid">
         {sorted.map((indicator, idx) => {
           const style = getMomentumTierStyle(indicator.momentum_tier);
+          const improvedCommentary = improveCommentary(indicator.momentum_commentary, quarterPct);
+
           return (
             <div
               key={idx}
@@ -115,14 +165,18 @@ export default function MomentumTracker({ momentum }: MomentumTrackerProps) {
                   label="MQL"
                   trend={indicator.mql_trend}
                   wowPct={indicator.mql_wow_pct}
+                  isEarlyQuarter={isEarlyQuarter}
                 />
                 <TrendIndicator
                   label="SQL"
                   trend={indicator.sql_trend}
                   wowPct={indicator.sql_wow_pct}
+                  isEarlyQuarter={isEarlyQuarter}
                 />
               </div>
-              <p className="momentum-commentary">{indicator.momentum_commentary}</p>
+              {improvedCommentary && (
+                <p className="momentum-commentary">{improvedCommentary}</p>
+              )}
             </div>
           );
         })}
@@ -130,44 +184,46 @@ export default function MomentumTracker({ momentum }: MomentumTrackerProps) {
       <style jsx>{`
         .momentum-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 16px;
-          margin-top: 16px;
+          grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+          gap: 12px;
+          margin-top: 12px;
         }
         .momentum-card {
           border: 1px solid;
           border-radius: 8px;
-          padding: 16px;
+          padding: 12px;
         }
         .momentum-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 12px;
+          margin-bottom: 8px;
         }
         .region-label {
           font-weight: 600;
+          font-size: 0.85rem;
           color: #1f2937;
         }
         .momentum-tier {
-          font-size: 0.75rem;
+          font-size: 0.65rem;
           font-weight: bold;
           text-transform: uppercase;
         }
         .trend-row {
           display: flex;
           justify-content: center;
-          gap: 16px;
-          margin-bottom: 12px;
+          gap: 12px;
+          margin-bottom: 8px;
           background: rgba(255,255,255,0.5);
           border-radius: 6px;
-          padding: 8px;
+          padding: 6px;
         }
         .momentum-commentary {
-          font-size: 0.75rem;
+          font-size: 0.7rem;
           color: #4b5563;
           margin: 0;
           text-align: center;
+          line-height: 1.3;
         }
       `}</style>
     </section>

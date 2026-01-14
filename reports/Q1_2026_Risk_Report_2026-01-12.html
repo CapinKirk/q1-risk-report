@@ -1,0 +1,2419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q1 2026 Bookings Risk Analysis Report</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #333;
+            background: #f8f9fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #1a1a2e;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #4361ee;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            font-size: 18px;
+            color: #1a1a2e;
+            margin: 25px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        h3 {
+            font-size: 16px;
+            color: #495057;
+            margin: 20px 0 10px 0;
+        }
+
+        .metadata {
+            color: #6c757d;
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
+
+        .metadata span {
+            display: inline-block;
+            margin-right: 20px;
+            padding: 4px 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+
+        .note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 13px;
+        }
+
+        .filter-note {
+            background: #e7f5ff;
+            border: 1px solid #74c0fc;
+            color: #1c7ed6;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 8px 0;
+            font-size: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 10px 12px;
+            text-align: right;
+            border: 1px solid #dee2e6;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+
+        td:first-child, th:first-child {
+            text-align: left;
+        }
+
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        tr:hover {
+            background: #e9ecef;
+        }
+
+        .rag-green {
+            background-color: #d4edda !important;
+            color: #155724;
+            font-weight: 600;
+        }
+
+        .rag-yellow {
+            background-color: #fff3cd !important;
+            color: #856404;
+            font-weight: 600;
+        }
+
+        .rag-red {
+            background-color: #f8d7da !important;
+            color: #721c24;
+            font-weight: 600;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .summary-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .summary-card.green {
+            border-left: 4px solid #28a745;
+        }
+
+        .summary-card.yellow {
+            border-left: 4px solid #ffc107;
+        }
+
+        .summary-card.red {
+            border-left: 4px solid #dc3545;
+        }
+
+        .summary-card h4 {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .summary-card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a1a2e;
+        }
+
+        .summary-card .detail {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .product-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .product-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .product-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+
+        .product-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-por {
+            background: #4361ee;
+            color: white;
+        }
+
+        .badge-r360 {
+            background: #7209b7;
+            color: white;
+        }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .two-col {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            color: #6c757d;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        /* Copy-paste friendly styles */
+        table {
+            border-spacing: 0;
+        }
+
+        .copy-friendly {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+        }
+
+        /* Severity badges */
+        .severity-critical {
+            background: #dc3545;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .severity-high {
+            background: #fd7e14;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .severity-medium {
+            background: #ffc107;
+            color: #333;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .severity-low {
+            background: #28a745;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* RCA insights */
+        .rca-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .rca-item {
+            padding: 12px;
+            margin: 8px 0;
+            border-left: 4px solid #6c757d;
+            background: white;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .rca-item.critical {
+            border-left-color: #dc3545;
+        }
+
+        .rca-item.high {
+            border-left-color: #fd7e14;
+        }
+
+        .rca-item.medium {
+            border-left-color: #ffc107;
+        }
+
+        .rca-item.low {
+            border-left-color: #28a745;
+        }
+
+        .rca-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .rca-region {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .rca-bottleneck {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .rca-commentary {
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .rca-action {
+            font-size: 12px;
+            color: #0066cc;
+            font-style: italic;
+        }
+
+        /* Funnel health visual */
+        .funnel-stage {
+            display: inline-block;
+            padding: 4px 12px;
+            margin: 2px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .stage-green {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .stage-yellow {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .stage-red {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .funnel-visual {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+
+        .funnel-arrow {
+            color: #6c757d;
+            font-size: 16px;
+        }
+
+        /* NEW in v2.5.0 - Success/Wins styles */
+        .wins-section {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 5px solid #28a745;
+        }
+
+        .wins-section h2 {
+            color: #155724;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #28a745;
+            padding-bottom: 8px;
+        }
+
+        .win-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #28a745;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .win-card.exceptional {
+            border-left-color: #0d6efd;
+            background: linear-gradient(90deg, #e7f1ff 0%, white 100%);
+        }
+
+        .win-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .win-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #155724;
+        }
+
+        .win-pct {
+            font-size: 20px;
+            font-weight: 700;
+            color: #28a745;
+        }
+
+        .win-commentary {
+            font-size: 13px;
+            color: #333;
+            margin-top: 8px;
+        }
+
+        .momentum-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .momentum-strong {
+            background: #28a745;
+            color: white;
+        }
+
+        .momentum-moderate {
+            background: #20c997;
+            color: white;
+        }
+
+        .momentum-some {
+            background: #6c757d;
+            color: white;
+        }
+
+        /* Action Items styles */
+        .action-section {
+            margin: 20px 0;
+        }
+
+        .action-group {
+            margin: 15px 0;
+        }
+
+        .action-group h4 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+
+        .action-group.immediate h4 {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .action-group.short-term h4 {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .action-group.strategic h4 {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .action-item {
+            padding: 12px;
+            margin: 8px 0;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #6c757d;
+        }
+
+        .action-item.critical {
+            border-left-color: #dc3545;
+        }
+
+        .action-item.high {
+            border-left-color: #fd7e14;
+        }
+
+        .action-item.medium {
+            border-left-color: #ffc107;
+        }
+
+        .action-meta {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 6px;
+            font-size: 11px;
+            color: #6c757d;
+        }
+
+        .action-meta span {
+            padding: 2px 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+        }
+
+        .action-issue {
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 6px;
+        }
+
+        .action-text {
+            font-size: 12px;
+            color: #0066cc;
+            font-style: italic;
+        }
+
+        /* Executive summary enhancements */
+        .exec-summary-row {
+            display: flex;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .exec-stat {
+            flex: 1;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .exec-stat.wins {
+            background: #d4edda;
+            border: 1px solid #28a745;
+        }
+
+        .exec-stat.risks {
+            background: #f8d7da;
+            border: 1px solid #dc3545;
+        }
+
+        .exec-stat.attention {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+        }
+
+        .exec-stat.momentum {
+            background: #cce5ff;
+            border: 1px solid #0d6efd;
+        }
+
+        .exec-stat-value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .exec-stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+
+        .trend-arrow-up {
+            color: #28a745;
+        }
+
+        .trend-arrow-down {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Q1 2026 Bookings Risk Analysis Report</h1>
+
+        <div class="metadata">
+            <span>Generated: 2026-01-13 04:44:25 UTC</span>
+            <span>Report Date: 2026-01-13</span>
+            <span>Quarter Progress: 14.4% (13/90 days)</span>
+            <span>Percentile: P50</span>
+        </div>
+
+        <!-- Executive Summary (Enhanced in v2.5.0) -->
+        <h2>Executive Summary</h2>
+
+        <!-- NEW: Quick Status Indicators -->
+        <div class="exec-summary-row">
+            <div class="exec-stat wins">
+                <div class="exec-stat-value" style="color: #28a745;">4</div>
+                <div class="exec-stat-label">Areas Exceeding Target</div>
+            </div>
+            <div class="exec-stat risks">
+                <div class="exec-stat-value" style="color: #dc3545;">9</div>
+                <div class="exec-stat-label">Areas At Risk (RED)</div>
+            </div>
+            <div class="exec-stat attention">
+                <div class="exec-stat-value" style="color: #856404;">1</div>
+                <div class="exec-stat-label">Needs Attention (YELLOW)</div>
+            </div>
+            <div class="exec-stat momentum">
+                <div class="exec-stat-value" style="color: #0d6efd;">4</div>
+                <div class="exec-stat-label">Areas With Momentum</div>
+            </div>
+        </div>
+
+        <div class="summary-cards">
+            <div class="summary-card yellow">
+                <h4>Combined QTD Attainment</h4>
+                <div class="value">81.5%</div>
+                <div class="detail">$415,168 of $509,583 QTD Target</div>
+            </div>
+
+            <div class="summary-card">
+                <h4>Q1 Target</h4>
+                <div class="value">$3,527,879</div>
+                <div class="detail">POR: $2,659,310 | R360: $868,569</div>
+            </div>
+
+            <div class="summary-card">
+                <h4>QTD Gap</h4>
+                <div class="value" style="color: #dc3545">$-94,415</div>
+                <div class="detail">Behind pace</div>
+            </div>
+
+            <div class="summary-card">
+                <h4>Pipeline Coverage</h4>
+                <div class="value">2.1x</div>
+                <div class="detail">$6,389,870 open pipeline</div>
+            </div>
+
+            <div class="summary-card">
+                <h4>Win Rate</h4>
+                <div class="value">82.1%</div>
+                <div class="detail">87 won / 19 lost</div>
+            </div>
+
+            <div class="summary-card">
+                <h4>Lost ACV (QTD)</h4>
+                <div class="value" style="color: #dc3545">$153,325</div>
+                <div class="detail">19 deals lost this quarter</div>
+            </div>
+        </div>
+
+        <!-- Product Performance -->
+        <h2>Product Performance</h2>
+
+        <div class="two-col">
+
+            <div class="product-section">
+                <div class="product-header">
+                    <span class="product-title">Point of Rental (POR)</span>
+                    <span class="product-badge badge-por">POR</span>
+                </div>
+                <table>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                    <tr>
+                        <td>Q1 Target</td>
+                        <td>$2,659,310</td>
+                    </tr>
+                    <tr>
+                        <td>QTD Target</td>
+                        <td>$384,123</td>
+                    </tr>
+                    <tr>
+                        <td>QTD Actual</td>
+                        <td>$359,205</td>
+                    </tr>
+                    <tr class="rag-green">
+                        <td>QTD Attainment</td>
+                        <td>93.5%</td>
+                    </tr>
+                    <tr>
+                        <td>Q1 Progress</td>
+                        <td>13.5%</td>
+                    </tr>
+                    <tr>
+                        <td>QTD Gap</td>
+                        <td style="color: #dc3545">$-24,917</td>
+                    </tr>
+                    <tr>
+                        <td>Win Rate</td>
+                        <td>100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>Pipeline Coverage</td>
+                        <td>1.6x</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="product-section">
+                <div class="product-header">
+                    <span class="product-title">Record360 (R360)</span>
+                    <span class="product-badge badge-r360">R360</span>
+                </div>
+                <table>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                    <tr>
+                        <td>Q1 Target</td>
+                        <td>$868,569</td>
+                    </tr>
+                    <tr>
+                        <td>QTD Target</td>
+                        <td>$125,460</td>
+                    </tr>
+                    <tr>
+                        <td>QTD Actual</td>
+                        <td>$55,962</td>
+                    </tr>
+                    <tr class="rag-red">
+                        <td>QTD Attainment</td>
+                        <td>44.6%</td>
+                    </tr>
+                    <tr>
+                        <td>Q1 Progress</td>
+                        <td>6.4%</td>
+                    </tr>
+                    <tr>
+                        <td>QTD Gap</td>
+                        <td style="color: #dc3545">$-69,498</td>
+                    </tr>
+                    <tr>
+                        <td>Win Rate</td>
+                        <td>57.8%</td>
+                    </tr>
+                    <tr>
+                        <td>Pipeline Coverage</td>
+                        <td>3.4x</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="wins-section">
+            <h2>Wins & Bright Spots</h2>
+            <p style="color: #155724; margin-bottom: 15px;">Areas pacing at or above 100% of target - celebrating strong performance!</p>
+
+            <div class="win-card exceptional">
+                <div class="win-header">
+                    <span class="win-title">POR - APAC EXPANSION</span>
+                    <span class="win-pct">219%</span>
+                </div>
+                <div style="font-size: 12px; color: #6c757d;">
+                    $14,644 of $6,673 target |
+                    Win Rate: 100% |
+                    Pipeline: 0.3x
+                     | High win rate
+                </div>
+                <div class="win-commentary">APAC EXPANSION at 219% - exceptional performance, exceeding targets by 119%. Strong execution driving results.</div>
+            </div>
+
+            <div class="win-card exceptional">
+                <div class="win-header">
+                    <span class="win-title">POR - AMER EXPANSION</span>
+                    <span class="win-pct">150%</span>
+                </div>
+                <div style="font-size: 12px; color: #6c757d;">
+                    $180,075 of $120,178 target |
+                    Win Rate: 100% |
+                    Pipeline: 1.2x
+                     | High win rate
+                </div>
+                <div class="win-commentary">AMER EXPANSION at 150% - exceptional performance, exceeding targets by 50%. Strong execution driving results.</div>
+            </div>
+
+            <div class="win-card exceptional">
+                <div class="win-header">
+                    <span class="win-title">POR - EMEA EXPANSION</span>
+                    <span class="win-pct">143%</span>
+                </div>
+                <div style="font-size: 12px; color: #6c757d;">
+                    $62,891 of $44,027 target |
+                    Win Rate: 100% |
+                    Pipeline: 1.0x
+                     | High win rate
+                </div>
+                <div class="win-commentary">EMEA EXPANSION at 143% - exceptional performance, exceeding targets by 43%. Strong execution driving results.</div>
+            </div>
+
+            <div class="win-card ">
+                <div class="win-header">
+                    <span class="win-title">R360 - AMER EXPANSION</span>
+                    <span class="win-pct">101%</span>
+                </div>
+                <div style="font-size: 12px; color: #6c757d;">
+                    $30,600 of $30,333 target |
+                    Win Rate: 100% |
+                    Pipeline: 1.6x
+                     | High win rate
+                </div>
+                <div class="win-commentary">AMER EXPANSION at 101% - on track, meeting targets. Strong win rate supporting results.</div>
+            </div>
+
+        </div>
+
+        <h2>Momentum Indicators</h2>
+        <div class="note" style="background: #cce5ff; border-color: #0d6efd; color: #004085;">
+            <strong>Positive Trends:</strong> Areas showing improving week-over-week performance even if not yet at target.
+        </div>
+        <table>
+            <tr>
+                <th>Product</th>
+                <th>Region</th>
+                <th>Momentum</th>
+                <th>MQL Trend</th>
+                <th>SQL Trend</th>
+                <th>Commentary</th>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>EMEA</td>
+                <td><span class="momentum-badge momentum-strong">Strong Momentum</span></td>
+                <td style="color: #28a745; font-weight: bold;">↑ 17%</td>
+                <td style="color: #6c757d; font-weight: bold;">→ 0%</td>
+                <td style="font-size: 12px;">EMEA showing positive momentum across multiple funnel stages.</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>APAC</td>
+                <td><span class="momentum-badge momentum-moderate">Moderate Momentum</span></td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -83%</td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -50%</td>
+                <td style="font-size: 12px;">APAC showing positive momentum across multiple funnel stages.</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>AMER</td>
+                <td><span class="momentum-badge momentum-moderate">Moderate Momentum</span></td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -24%</td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -32%</td>
+                <td style="font-size: 12px;">AMER showing positive momentum across multiple funnel stages.</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>AMER</td>
+                <td><span class="momentum-badge momentum-strong">Strong Momentum</span></td>
+                <td style="color: #28a745; font-weight: bold;">↑ 10%</td>
+                <td style="color: #28a745; font-weight: bold;">↑ 100%</td>
+                <td style="font-size: 12px;">AMER showing strong SQL momentum (+100% WoW). SDR conversion improving.</td>
+            </tr>
+
+        </table>
+
+        <h2>Top Risk Pockets</h2>
+        <p class="note">Areas requiring immediate attention, sorted by gap to QTD target.</p>
+
+        <table>
+            <tr>
+                <th>Product</th>
+                <th>Region</th>
+                <th>Category</th>
+                <th>QTD Target</th>
+                <th>QTD Actual</th>
+                <th>Gap</th>
+                <th>Attainment</th>
+                <th>Win Rate</th>
+                <th>Pipeline</th>
+                <th>Coverage</th>
+                <th>Status</th>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>AMER</td>
+                <td>NEW LOGO</td>
+                <td>$75,851</td>
+                <td>$22,932</td>
+                <td style="color: #dc3545">$-52,919</td>
+                <td>30.2%</td>
+                <td>14.3%</td>
+                <td>$2,110,026</td>
+                <td>4.2x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>AMER</td>
+                <td>NEW LOGO</td>
+                <td>$75,726</td>
+                <td>$39,169</td>
+                <td style="color: #dc3545">$-36,557</td>
+                <td>51.7%</td>
+                <td>100.0%</td>
+                <td>$582,061</td>
+                <td>1.2x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>AMER</td>
+                <td>MIGRATION</td>
+                <td>$38,133</td>
+                <td>$6,789</td>
+                <td style="color: #dc3545">$-31,344</td>
+                <td>17.8%</td>
+                <td>100.0%</td>
+                <td>$392,157</td>
+                <td>1.5x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>EMEA</td>
+                <td>MIGRATION</td>
+                <td>$39,520</td>
+                <td>$24,652</td>
+                <td style="color: #dc3545">$-14,868</td>
+                <td>62.4%</td>
+                <td>100.0%</td>
+                <td>$784,265</td>
+                <td>3.2x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>EMEA</td>
+                <td>NEW LOGO</td>
+                <td>$16,207</td>
+                <td>$2,430</td>
+                <td style="color: #dc3545">$-13,776</td>
+                <td>15.0%</td>
+                <td>12.5%</td>
+                <td>$332,072</td>
+                <td>3.0x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>APAC</td>
+                <td>NEW LOGO</td>
+                <td>$13,578</td>
+                <td>$0</td>
+                <td style="color: #dc3545">$-13,578</td>
+                <td>0.0%</td>
+                <td>N/A</td>
+                <td>$398,810</td>
+                <td>4.2x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>APAC</td>
+                <td>MIGRATION</td>
+                <td>$8,472</td>
+                <td>$0</td>
+                <td style="color: #dc3545">$-8,472</td>
+                <td>0.0%</td>
+                <td>N/A</td>
+                <td>$110,761</td>
+                <td>1.9x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>EMEA</td>
+                <td>NEW LOGO</td>
+                <td>$37,816</td>
+                <td>$30,985</td>
+                <td style="color: #dc3545">$-6,831</td>
+                <td>81.9%</td>
+                <td>100.0%</td>
+                <td>$345,651</td>
+                <td>1.5x</td>
+                <td class="rag-yellow">YELLOW</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>APAC</td>
+                <td>NEW LOGO</td>
+                <td>$2,947</td>
+                <td>$0</td>
+                <td style="color: #dc3545">$-2,947</td>
+                <td>0.0%</td>
+                <td>N/A</td>
+                <td>$11,040</td>
+                <td>0.5x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>APAC</td>
+                <td>EXPANSION</td>
+                <td>$123</td>
+                <td>$0</td>
+                <td style="color: #dc3545">$-123</td>
+                <td>0.0%</td>
+                <td>N/A</td>
+                <td>$0</td>
+                <td>0.0x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+        </table>
+
+        <h2>Inbound Funnel Pacing</h2>
+        <div class="note">
+            <strong>Important:</strong> MQL targets are INBOUND channel only.
+            <ul style="margin-top: 8px; margin-left: 20px;">
+                <li>EMEA is OUTBOUND-heavy: only 22% of NEW LOGO ACV from INBOUND</li>
+                <li>APAC is INBOUND-heavy: 63% of NEW LOGO ACV from INBOUND</li>
+            </ul>
+        </div>
+
+        <h3>POR Funnel Pacing</h3>
+        <table>
+            <tr>
+                <th>Region</th>
+                <th>MQL Actual</th>
+                <th>MQL Target</th>
+                <th>MQL %</th>
+                <th>SQL Actual</th>
+                <th>SQL Target</th>
+                <th>SQL %</th>
+                <th>SAL Actual</th>
+                <th>SAL Target</th>
+                <th>SAL %</th>
+                <th>SQO Actual</th>
+                <th>SQO Target</th>
+                <th>SQO %</th>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td>58</td>
+                <td>60</td>
+                <td class="rag-green">97%</td>
+                <td>37</td>
+                <td>30</td>
+                <td class="rag-green">123%</td>
+                <td>24</td>
+                <td>23</td>
+                <td class="rag-green">104%</td>
+                <td>8</td>
+                <td>15</td>
+                <td class="rag-red">53%</td>
+            </tr>
+
+            <tr>
+                <td>APAC</td>
+                <td>7</td>
+                <td>18</td>
+                <td class="rag-red">39%</td>
+                <td>3</td>
+                <td>6</td>
+                <td class="rag-red">50%</td>
+                <td>2</td>
+                <td>4</td>
+                <td class="rag-red">50%</td>
+                <td>2</td>
+                <td>4</td>
+                <td class="rag-red">50%</td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td>13</td>
+                <td>8</td>
+                <td class="rag-green">163%</td>
+                <td>4</td>
+                <td>3</td>
+                <td class="rag-green">133%</td>
+                <td>1</td>
+                <td>2</td>
+                <td class="rag-red">50%</td>
+                <td>1</td>
+                <td>1</td>
+                <td class="rag-green">100%</td>
+            </tr>
+
+        </table>
+
+        <h3>R360 Funnel Pacing</h3>
+        <table>
+            <tr>
+                <th>Region</th>
+                <th>MQL Actual</th>
+                <th>MQL Target</th>
+                <th>MQL %</th>
+                <th>SQL Actual</th>
+                <th>SQL Target</th>
+                <th>SQL %</th>
+                <th>SAL Actual</th>
+                <th>SAL Target</th>
+                <th>SAL %</th>
+                <th>SQO Actual</th>
+                <th>SQO Target</th>
+                <th>SQO %</th>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td>21</td>
+                <td>63</td>
+                <td class="rag-red">33%</td>
+                <td>12</td>
+                <td>22</td>
+                <td class="rag-red">55%</td>
+                <td>5</td>
+                <td>22</td>
+                <td class="rag-red">23%</td>
+                <td>5</td>
+                <td>16</td>
+                <td class="rag-red">31%</td>
+            </tr>
+
+            <tr>
+                <td>APAC</td>
+                <td>0</td>
+                <td>1</td>
+                <td class="rag-red">0%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="rag-red">0%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="rag-red">0%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="rag-red">0%</td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td>6</td>
+                <td>8</td>
+                <td class="rag-yellow">75%</td>
+                <td>4</td>
+                <td>3</td>
+                <td class="rag-green">133%</td>
+                <td>3</td>
+                <td>3</td>
+                <td class="rag-green">100%</td>
+                <td>3</td>
+                <td>2</td>
+                <td class="rag-green">150%</td>
+            </tr>
+
+        </table>
+
+        <h2>Funnel Health Analysis</h2>
+        <div class="note">
+            <strong>NEW:</strong> Stage-by-stage gap analysis with target conversion rates. Identifies bottleneck at each funnel stage.
+        </div>
+
+        <h3>POR Funnel Health by Region</h3>
+        <table>
+            <tr>
+                <th>Region</th>
+                <th>MQL</th>
+                <th>MQL Gap</th>
+                <th>SQL</th>
+                <th>SQL Gap</th>
+                <th>SAL</th>
+                <th>SAL Gap</th>
+                <th>SQO</th>
+                <th>SQO Gap</th>
+                <th>Bottleneck</th>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td class="rag-green">58 / 60 (97%)</td>
+                <td style="color: #dc3545">-2</td>
+                <td class="rag-green">37 / 30 (123%)</td>
+                <td style="color: #28a745">+7</td>
+                <td class="rag-green">24 / 23 (104%)</td>
+                <td style="color: #28a745">+1</td>
+                <td class="rag-red">8 / 15 (53%)</td>
+                <td style="color: #dc3545">-7</td>
+                <td><strong>SQO</strong></td>
+            </tr>
+
+            <tr>
+                <td>APAC</td>
+                <td class="rag-red">7 / 18 (39%)</td>
+                <td style="color: #dc3545">-11</td>
+                <td class="rag-red">3 / 6 (50%)</td>
+                <td style="color: #dc3545">-3</td>
+                <td class="rag-red">2 / 4 (50%)</td>
+                <td style="color: #dc3545">-2</td>
+                <td class="rag-red">2 / 4 (50%)</td>
+                <td style="color: #dc3545">-2</td>
+                <td><strong>MQL</strong></td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td class="rag-green">13 / 8 (163%)</td>
+                <td style="color: #28a745">+5</td>
+                <td class="rag-green">4 / 3 (133%)</td>
+                <td style="color: #28a745">+1</td>
+                <td class="rag-red">1 / 2 (50%)</td>
+                <td style="color: #dc3545">-1</td>
+                <td class="rag-green">1 / 1 (100%)</td>
+                <td style="color: #28a745">+0</td>
+                <td><strong>SAL</strong></td>
+            </tr>
+
+        </table>
+
+        <h3>R360 Funnel Health by Region</h3>
+        <table>
+            <tr>
+                <th>Region</th>
+                <th>MQL</th>
+                <th>MQL Gap</th>
+                <th>SQL</th>
+                <th>SQL Gap</th>
+                <th>SAL</th>
+                <th>SAL Gap</th>
+                <th>SQO</th>
+                <th>SQO Gap</th>
+                <th>Bottleneck</th>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td class="rag-red">21 / 63 (33%)</td>
+                <td style="color: #dc3545">-42</td>
+                <td class="rag-red">12 / 22 (55%)</td>
+                <td style="color: #dc3545">-10</td>
+                <td class="rag-red">5 / 22 (23%)</td>
+                <td style="color: #dc3545">-17</td>
+                <td class="rag-red">5 / 16 (31%)</td>
+                <td style="color: #dc3545">-11</td>
+                <td><strong>SAL</strong></td>
+            </tr>
+
+            <tr>
+                <td>APAC</td>
+                <td class="rag-red">0 / 1 (0%)</td>
+                <td style="color: #dc3545">-1</td>
+                <td class="rag-red">0 / 0 (0%)</td>
+                <td style="color: #28a745">+0</td>
+                <td class="rag-red">0 / 0 (0%)</td>
+                <td style="color: #28a745">+0</td>
+                <td class="rag-red">0 / 0 (0%)</td>
+                <td style="color: #28a745">+0</td>
+                <td><strong>MQL</strong></td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td class="rag-yellow">6 / 8 (75%)</td>
+                <td style="color: #dc3545">-2</td>
+                <td class="rag-green">4 / 3 (133%)</td>
+                <td style="color: #28a745">+1</td>
+                <td class="rag-green">3 / 3 (100%)</td>
+                <td style="color: #28a745">+0</td>
+                <td class="rag-green">3 / 2 (150%)</td>
+                <td style="color: #28a745">+1</td>
+                <td><strong>MQL</strong></td>
+            </tr>
+
+        </table>
+
+        <h3>Conversion Rate Analysis: Actual vs Target</h3>
+        <table>
+            <tr>
+                <th>Product</th>
+                <th>Region</th>
+                <th>MQL→SQL Actual</th>
+                <th>MQL→SQL Target</th>
+                <th>Gap</th>
+                <th>SQL→SAL Actual</th>
+                <th>SQL→SAL Target</th>
+                <th>Gap</th>
+                <th>SAL→SQO Actual</th>
+                <th>SAL→SQO Target</th>
+                <th>Gap</th>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>AMER</td>
+                <td>63.8%</td>
+                <td>49.8%</td>
+                <td style="color: #28a745">+14.0%</td>
+                <td>64.9%</td>
+                <td>44.6%</td>
+                <td style="color: #28a745">+20.3%</td>
+                <td>33.3%</td>
+                <td>126.5%</td>
+                <td style="color: #dc3545">-93.2%</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>APAC</td>
+                <td>42.9%</td>
+                <td>34.0%</td>
+                <td style="color: #28a745">+8.9%</td>
+                <td>66.7%</td>
+                <td>72.9%</td>
+                <td style="color: #dc3545">-6.2%</td>
+                <td>100.0%</td>
+                <td>102.9%</td>
+                <td style="color: #333">-2.9%</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>EMEA</td>
+                <td>30.8%</td>
+                <td>38.9%</td>
+                <td style="color: #dc3545">-8.1%</td>
+                <td>25.0%</td>
+                <td>71.4%</td>
+                <td style="color: #dc3545">-46.4%</td>
+                <td>100.0%</td>
+                <td>86.7%</td>
+                <td style="color: #28a745">+13.3%</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>AMER</td>
+                <td>57.1%</td>
+                <td>34.9%</td>
+                <td style="color: #28a745">+22.2%</td>
+                <td>41.7%</td>
+                <td>69.0%</td>
+                <td style="color: #dc3545">-27.3%</td>
+                <td>100.0%</td>
+                <td>115.8%</td>
+                <td style="color: #dc3545">-15.8%</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>APAC</td>
+                <td>0.0%</td>
+                <td>27.3%</td>
+                <td style="color: #dc3545">-27.3%</td>
+                <td>0.0%</td>
+                <td>100.0%</td>
+                <td style="color: #dc3545">-100.0%</td>
+                <td>0.0%</td>
+                <td>100.0%</td>
+                <td style="color: #dc3545">-100.0%</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>EMEA</td>
+                <td>66.7%</td>
+                <td>41.9%</td>
+                <td style="color: #28a745">+24.8%</td>
+                <td>75.0%</td>
+                <td>100.0%</td>
+                <td style="color: #dc3545">-25.0%</td>
+                <td>100.0%</td>
+                <td>53.8%</td>
+                <td style="color: #28a745">+46.2%</td>
+            </tr>
+
+        </table>
+
+        <h2>Root Cause Analysis Commentary</h2>
+        <div class="note">
+            <strong>Auto-generated insights</strong> based on funnel gaps and conversion rate analysis. Sorted by severity.
+        </div>
+
+        <h3>POR Funnel RCA</h3>
+        <div class="rca-section">
+
+            <div class="rca-item critical">
+                <div class="rca-header">
+                    <span class="rca-region">APAC - Bottleneck: MQL</span>
+                    <span class="severity-critical">CRITICAL</span>
+                </div>
+                <div class="rca-commentary">APAC MQL pacing at 39% - top of funnel deficit will cascade to bookings. Increase marketing spend or lead gen activities.</div>
+                <div class="rca-action">→ Increase marketing spend, launch supplementary campaigns, or expand outbound efforts.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    Pacing: MQL 39% | SQL 50% | SAL 50% | SQO 50%
+                </div>
+            </div>
+
+            <div class="rca-item high">
+                <div class="rca-header">
+                    <span class="rca-region">AMER - Bottleneck: SQO</span>
+                    <span class="severity-high">HIGH</span>
+                </div>
+                <div class="rca-commentary">AMER SAL->SQO conversion 33% vs 127% target - deal progression or pricing issue.</div>
+                <div class="rca-action">→ Review proposal process, assess pricing competitiveness, coach on deal progression.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    Pacing: MQL 97% | SQL 123% | SAL 104% | SQO 53%
+                </div>
+            </div>
+
+            <div class="rca-item high">
+                <div class="rca-header">
+                    <span class="rca-region">EMEA - Bottleneck: SAL</span>
+                    <span class="severity-high">HIGH</span>
+                </div>
+                <div class="rca-commentary">EMEA SQL->SAL conversion 25% vs 71% target - qualification or discovery issue.</div>
+                <div class="rca-action">→ Coach AEs on discovery calls, review qualification criteria, assess demo effectiveness.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    Pacing: MQL 163% | SQL 133% | SAL 50% | SQO 100%
+                </div>
+            </div>
+
+        </div>
+
+        <h3>R360 Funnel RCA</h3>
+        <div class="rca-section">
+
+            <div class="rca-item critical">
+                <div class="rca-header">
+                    <span class="rca-region">AMER - Bottleneck: SAL</span>
+                    <span class="severity-critical">CRITICAL</span>
+                </div>
+                <div class="rca-commentary">AMER SQL->SAL conversion 42% vs 69% target - qualification or discovery issue.</div>
+                <div class="rca-action">→ Coach AEs on discovery calls, review qualification criteria, assess demo effectiveness.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    Pacing: MQL 33% | SQL 55% | SAL 23% | SQO 31%
+                </div>
+            </div>
+
+            <div class="rca-item critical">
+                <div class="rca-header">
+                    <span class="rca-region">APAC - Bottleneck: MQL</span>
+                    <span class="severity-critical">CRITICAL</span>
+                </div>
+                <div class="rca-commentary">APAC MQL pacing at 0% - top of funnel deficit will cascade to bookings. Increase marketing spend or lead gen activities.</div>
+                <div class="rca-action">→ Increase marketing spend, launch supplementary campaigns, or expand outbound efforts.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    Pacing: MQL 0% | SQL 0% | SAL 0% | SQO 0%
+                </div>
+            </div>
+
+            <div class="rca-item medium">
+                <div class="rca-header">
+                    <span class="rca-region">EMEA - Bottleneck: MQL</span>
+                    <span class="severity-medium">MEDIUM</span>
+                </div>
+                <div class="rca-commentary">EMEA MQL slightly behind at 75% - monitor closely, consider supplementary campaigns.</div>
+                <div class="rca-action">→ Increase marketing spend, launch supplementary campaigns, or expand outbound efforts.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    Pacing: MQL 75% | SQL 133% | SAL 100% | SQO 150%
+                </div>
+            </div>
+
+        </div>
+
+        <h2>Funnel Trend Analysis (Week-over-Week)</h2>
+        <div class="note">
+            <strong>Historical comparison:</strong> Current 7-day period vs prior 7-day period to identify momentum shifts.
+        </div>
+        <table>
+            <tr>
+                <th>Product</th>
+                <th>Region</th>
+                <th>MQL (7d)</th>
+                <th>MQL Prior</th>
+                <th>MQL WoW</th>
+                <th>SQL (7d)</th>
+                <th>SQL Prior</th>
+                <th>SQL WoW</th>
+                <th>SAL (7d)</th>
+                <th>SAL Prior</th>
+                <th>SAL WoW</th>
+                <th>SQO (7d)</th>
+                <th>SQO Prior</th>
+                <th>SQO WoW</th>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>AMER</td>
+                <td>28</td>
+                <td>37</td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -9 (-24%)</td>
+                <td>15</td>
+                <td>22</td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -7 (-32%)</td>
+                <td>19</td>
+                <td>5</td>
+                <td style="color: #28a745; font-weight: bold;">↑ +14 (280%)</td>
+                <td>6</td>
+                <td>2</td>
+                <td style="color: #28a745; font-weight: bold;">↑ +4 (200%)</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>APAC</td>
+                <td>1</td>
+                <td>6</td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -5 (-83%)</td>
+                <td>1</td>
+                <td>2</td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -1 (-50%)</td>
+                <td>2</td>
+                <td>0</td>
+                <td style="color: #28a745; font-weight: bold;">↑ +2 (0%)</td>
+                <td>2</td>
+                <td>0</td>
+                <td style="color: #28a745; font-weight: bold;">↑ +2 (0%)</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>EMEA</td>
+                <td>7</td>
+                <td>6</td>
+                <td style="color: #28a745; font-weight: bold;">↑ +1 (17%)</td>
+                <td>2</td>
+                <td>2</td>
+                <td style="color: #6c757d; font-weight: bold;">→ +0 (0%)</td>
+                <td>1</td>
+                <td>0</td>
+                <td style="color: #28a745; font-weight: bold;">↑ +1 (0%)</td>
+                <td>1</td>
+                <td>0</td>
+                <td style="color: #28a745; font-weight: bold;">↑ +1 (0%)</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>AMER</td>
+                <td>11</td>
+                <td>10</td>
+                <td style="color: #28a745; font-weight: bold;">↑ +1 (10%)</td>
+                <td>8</td>
+                <td>4</td>
+                <td style="color: #28a745; font-weight: bold;">↑ +4 (100%)</td>
+                <td>3</td>
+                <td>2</td>
+                <td style="color: #28a745; font-weight: bold;">↑ +1 (50%)</td>
+                <td>3</td>
+                <td>2</td>
+                <td style="color: #28a745; font-weight: bold;">↑ +1 (50%)</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>EMEA</td>
+                <td>2</td>
+                <td>4</td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -2 (-50%)</td>
+                <td>1</td>
+                <td>3</td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -2 (-67%)</td>
+                <td>0</td>
+                <td>3</td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -3 (-100%)</td>
+                <td>0</td>
+                <td>3</td>
+                <td style="color: #dc3545; font-weight: bold;">↓ -3 (-100%)</td>
+            </tr>
+
+        </table>
+
+        <h2>Loss Reason Root Cause Analysis</h2>
+        <div class="note">
+            <strong>Auto-generated insights</strong> based on top close-lost reasons by ACV. Sorted by severity.
+        </div>
+
+        <h3>POR Loss Reason RCA</h3>
+        <p>No significant loss reasons to analyze this quarter.</p>
+
+        <h3>R360 Loss Reason RCA</h3>
+        <div class="rca-section">
+
+            <div class="rca-item critical">
+                <div class="rca-header">
+                    <span class="rca-region">AMER - Pricing was too high</span>
+                    <span class="severity-critical">CRITICAL</span>
+                </div>
+                <div class="rca-commentary">Pricing was too high: $102504 (8 deals). Review and categorize for actionable insights.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    8 deals | $102,504 lost | 82.4% of regional losses | Action: PROCESS_REVIEW
+                </div>
+            </div>
+
+            <div class="rca-item medium">
+                <div class="rca-header">
+                    <span class="rca-region">AMER - Not Ready to Buy</span>
+                    <span class="severity-medium">MEDIUM</span>
+                </div>
+                <div class="rca-commentary">Not Ready to Buy: $14520 (2 deals). Review and categorize for actionable insights.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    2 deals | $14,520 lost | 11.7% of regional losses | Action: PROCESS_REVIEW
+                </div>
+            </div>
+
+            <div class="rca-item medium">
+                <div class="rca-header">
+                    <span class="rca-region">EMEA - Not Ready to Buy</span>
+                    <span class="severity-medium">MEDIUM</span>
+                </div>
+                <div class="rca-commentary">Not Ready to Buy: $14886 (4 deals). Review and categorize for actionable insights.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    4 deals | $14,886 lost | 57.6% of regional losses | Action: PROCESS_REVIEW
+                </div>
+            </div>
+
+            <div class="rca-item low">
+                <div class="rca-header">
+                    <span class="rca-region">AMER - Not Interested</span>
+                    <span class="severity-low">LOW</span>
+                </div>
+                <div class="rca-commentary">Not Interested: $7440 (2 deals). Review and categorize for actionable insights.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    2 deals | $7,440 lost | 6.0% of regional losses | Action: PROCESS_REVIEW
+                </div>
+            </div>
+
+            <div class="rca-item low">
+                <div class="rca-header">
+                    <span class="rca-region">EMEA - Timing</span>
+                    <span class="severity-low">LOW</span>
+                </div>
+                <div class="rca-commentary">Deal stall: Timing - $6380. Improve urgency creation and follow-up cadence.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    1 deals | $6,380 lost | 24.7% of regional losses | Action: SALES_PROCESS
+                </div>
+            </div>
+
+            <div class="rca-item low">
+                <div class="rca-header">
+                    <span class="rca-region">EMEA - Too expensive</span>
+                    <span class="severity-low">LOW</span>
+                </div>
+                <div class="rca-commentary">Too expensive: $4557 (1 deals). Review and categorize for actionable insights.</div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d;">
+                    1 deals | $4,557 lost | 17.6% of regional losses | Action: PROCESS_REVIEW
+                </div>
+            </div>
+
+        </div>
+
+        <h2>Pipeline Analysis</h2>
+        <div class="filter-note">
+            <strong>Filters Applied:</strong> Pipeline includes only opportunities created in last 6 months, owned by AE/AM roles (Account Executive, Account Manager, R360 Sales User).
+        </div>
+
+        <h3>POR Detailed Attainment by Region/Category</h3>
+        <table>
+            <tr>
+                <th>Region</th>
+                <th>Category</th>
+                <th>Q1 Target</th>
+                <th>QTD Target</th>
+                <th>QTD Actual</th>
+                <th>Attainment</th>
+                <th>Gap</th>
+                <th>Pipeline</th>
+                <th>Opps</th>
+                <th>Avg Age</th>
+                <th>Coverage</th>
+                <th>Status</th>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td>EXPANSION</td>
+                <td>$832,000</td>
+                <td>$120,178</td>
+                <td>$180,075</td>
+                <td class="rag-green">149.8%</td>
+                <td style="color: #28a745">$59,898</td>
+                <td>$798,582</td>
+                <td>61</td>
+                <td>34 days</td>
+                <td>1.2x</td>
+                <td class="rag-green">GREEN</td>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td>MIGRATION</td>
+                <td>$264,000</td>
+                <td>$38,133</td>
+                <td>$6,789</td>
+                <td class="rag-red">17.8%</td>
+                <td style="color: #dc3545">$-31,344</td>
+                <td>$392,157</td>
+                <td>28</td>
+                <td>137 days</td>
+                <td>1.5x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td>NEW LOGO</td>
+                <td>$524,260</td>
+                <td>$75,726</td>
+                <td>$39,169</td>
+                <td class="rag-red">51.7%</td>
+                <td style="color: #dc3545">$-36,557</td>
+                <td>$582,061</td>
+                <td>36</td>
+                <td>179 days</td>
+                <td>1.2x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>APAC</td>
+                <td>EXPANSION</td>
+                <td>$46,200</td>
+                <td>$6,673</td>
+                <td>$14,644</td>
+                <td class="rag-green">219.4%</td>
+                <td style="color: #28a745">$7,971</td>
+                <td>$9,985</td>
+                <td>10</td>
+                <td>58 days</td>
+                <td>0.3x</td>
+                <td class="rag-green">GREEN</td>
+            </tr>
+
+            <tr>
+                <td>APAC</td>
+                <td>MIGRATION</td>
+                <td>$58,650</td>
+                <td>$8,472</td>
+                <td>$0</td>
+                <td class="rag-red">0.0%</td>
+                <td style="color: #dc3545">$-8,472</td>
+                <td>$110,761</td>
+                <td>12</td>
+                <td>105 days</td>
+                <td>1.9x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>APAC</td>
+                <td>NEW LOGO</td>
+                <td>$94,000</td>
+                <td>$13,578</td>
+                <td>$0</td>
+                <td class="rag-red">0.0%</td>
+                <td style="color: #dc3545">$-13,578</td>
+                <td>$398,810</td>
+                <td>12</td>
+                <td>122 days</td>
+                <td>4.2x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td>EXPANSION</td>
+                <td>$304,800</td>
+                <td>$44,027</td>
+                <td>$62,891</td>
+                <td class="rag-green">142.8%</td>
+                <td style="color: #28a745">$18,864</td>
+                <td>$236,264</td>
+                <td>59</td>
+                <td>204 days</td>
+                <td>1.0x</td>
+                <td class="rag-green">GREEN</td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td>MIGRATION</td>
+                <td>$273,600</td>
+                <td>$39,520</td>
+                <td>$24,652</td>
+                <td class="rag-red">62.4%</td>
+                <td style="color: #dc3545">$-14,868</td>
+                <td>$784,265</td>
+                <td>41</td>
+                <td>67 days</td>
+                <td>3.2x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td>NEW LOGO</td>
+                <td>$261,800</td>
+                <td>$37,816</td>
+                <td>$30,985</td>
+                <td class="rag-yellow">81.9%</td>
+                <td style="color: #dc3545">$-6,831</td>
+                <td>$345,651</td>
+                <td>17</td>
+                <td>74 days</td>
+                <td>1.5x</td>
+                <td class="rag-yellow">YELLOW</td>
+            </tr>
+
+        </table>
+
+        <h3>R360 Detailed Attainment by Region/Category</h3>
+        <table>
+            <tr>
+                <th>Region</th>
+                <th>Category</th>
+                <th>Q1 Target</th>
+                <th>QTD Target</th>
+                <th>QTD Actual</th>
+                <th>Attainment</th>
+                <th>Gap</th>
+                <th>Pipeline</th>
+                <th>Opps</th>
+                <th>Avg Age</th>
+                <th>Coverage</th>
+                <th>Status</th>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td>EXPANSION</td>
+                <td>$210,000</td>
+                <td>$30,333</td>
+                <td>$30,600</td>
+                <td class="rag-green">100.9%</td>
+                <td style="color: #28a745">$267</td>
+                <td>$278,196</td>
+                <td>19</td>
+                <td>145 days</td>
+                <td>1.6x</td>
+                <td class="rag-green">GREEN</td>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td>NEW LOGO</td>
+                <td>$525,119</td>
+                <td>$75,851</td>
+                <td>$22,932</td>
+                <td class="rag-red">30.2%</td>
+                <td style="color: #dc3545">$-52,919</td>
+                <td>$2,110,026</td>
+                <td>190</td>
+                <td>131 days</td>
+                <td>4.2x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>APAC</td>
+                <td>EXPANSION</td>
+                <td>$850</td>
+                <td>$123</td>
+                <td>$0</td>
+                <td class="rag-red">0.0%</td>
+                <td style="color: #dc3545">$-123</td>
+                <td>$0</td>
+                <td>0</td>
+                <td>0 days</td>
+                <td>0.0x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>APAC</td>
+                <td>NEW LOGO</td>
+                <td>$20,400</td>
+                <td>$2,947</td>
+                <td>$0</td>
+                <td class="rag-red">0.0%</td>
+                <td style="color: #dc3545">$-2,947</td>
+                <td>$11,040</td>
+                <td>1</td>
+                <td>217 days</td>
+                <td>0.5x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td>NEW LOGO</td>
+                <td>$112,200</td>
+                <td>$16,207</td>
+                <td>$2,430</td>
+                <td class="rag-red">15.0%</td>
+                <td style="color: #dc3545">$-13,776</td>
+                <td>$332,072</td>
+                <td>44</td>
+                <td>50 days</td>
+                <td>3.0x</td>
+                <td class="rag-red">RED</td>
+            </tr>
+
+        </table>
+
+        <h2>Close Lost Analysis</h2>
+
+        <h3>R360 Loss Reasons (Top 5 by Region)</h3>
+        <table>
+            <tr>
+                <th>Region</th>
+                <th>Loss Reason</th>
+                <th>Deal Count</th>
+                <th>Lost ACV</th>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td>Pricing was too high</td>
+                <td>8</td>
+                <td>$102,504</td>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td>Not Ready to Buy</td>
+                <td>2</td>
+                <td>$14,520</td>
+            </tr>
+
+            <tr>
+                <td>AMER</td>
+                <td>Not Interested</td>
+                <td>2</td>
+                <td>$7,440</td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td>Not Ready to Buy</td>
+                <td>4</td>
+                <td>$14,886</td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td>Timing</td>
+                <td>1</td>
+                <td>$6,380</td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td>Too expensive</td>
+                <td>1</td>
+                <td>$4,557</td>
+            </tr>
+
+            <tr>
+                <td>EMEA</td>
+                <td>Unresponsive</td>
+                <td>1</td>
+                <td>$3,038</td>
+            </tr>
+
+        </table>
+
+        <h3>POR Loss Reasons</h3>
+        <p>No lost deals recorded for POR this quarter.</p>
+
+        <h2>Google Ads Performance (QTD)</h2>
+        <table>
+            <tr>
+                <th>Product</th>
+                <th>Impressions</th>
+                <th>Clicks</th>
+                <th>CTR</th>
+                <th>Ad Spend</th>
+                <th>CPC</th>
+                <th>Conversions</th>
+                <th>CPA</th>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>9,399</td>
+                <td>947</td>
+                <td>10.08%</td>
+                <td>$8,701</td>
+                <td>$9</td>
+                <td>44.6</td>
+                <td>$195</td>
+            </tr>
+            <tr>
+                <td>R360</td>
+                <td>4,518</td>
+                <td>530</td>
+                <td>11.73%</td>
+                <td>$9,243</td>
+                <td>$17</td>
+                <td>20.9</td>
+                <td>$442</td>
+            </tr>
+        </table>
+
+        <h2>Pipeline Coverage Analysis</h2>
+        <p class="note">Pipeline health and coverage analysis with root cause insights.</p>
+        <table>
+            <tr>
+                <th>Product</th>
+                <th>Region</th>
+                <th>Category</th>
+                <th>Pipeline</th>
+                <th>Coverage</th>
+                <th>Avg Age</th>
+                <th>Health</th>
+                <th>Severity</th>
+                <th>RCA Commentary</th>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>APAC</td>
+                <td>EXPANSION</td>
+                <td>$9,985</td>
+                <td>0.3x</td>
+                <td>58 days</td>
+                <td><span style="color: #dc3545; font-weight: bold;">CRITICAL</span></td>
+                <td><span style="color: #dc3545; font-weight: bold;">CRITICAL</span></td>
+                <td style="font-size: 11px;">APAC EXPANSION CRITICAL pipeline gap - only 0.3x coverage. Immediate action required to build pipeline.</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>AMER</td>
+                <td>EXPANSION</td>
+                <td>$798,582</td>
+                <td>1.2x</td>
+                <td>34 days</td>
+                <td><span style="color: #fd7e14; font-weight: bold;">AT_RISK</span></td>
+                <td><span style="color: #fd7e14; font-weight: bold;">HIGH</span></td>
+                <td style="font-size: 11px;">AMER EXPANSION pipeline AT RISK at only 1.2x. Urgent: Generate $1303849 additional pipeline.</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>AMER</td>
+                <td>MIGRATION</td>
+                <td>$392,157</td>
+                <td>1.5x</td>
+                <td>137 days</td>
+                <td><span style="color: #fd7e14; font-weight: bold;">AT_RISK</span></td>
+                <td><span style="color: #fd7e14; font-weight: bold;">HIGH</span></td>
+                <td style="font-size: 11px;">AMER MIGRATION pipeline AT RISK at only 1.5x. Urgent: Generate $514422 additional pipeline.</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>AMER</td>
+                <td>NEW LOGO</td>
+                <td>$582,061</td>
+                <td>1.2x</td>
+                <td>179 days</td>
+                <td><span style="color: #fd7e14; font-weight: bold;">AT_RISK</span></td>
+                <td><span style="color: #fd7e14; font-weight: bold;">HIGH</span></td>
+                <td style="font-size: 11px;">AMER NEW LOGO pipeline AT RISK at only 1.2x. Urgent: Generate $970181 additional pipeline.</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>APAC</td>
+                <td>MIGRATION</td>
+                <td>$110,761</td>
+                <td>1.9x</td>
+                <td>105 days</td>
+                <td><span style="color: #fd7e14; font-weight: bold;">AT_RISK</span></td>
+                <td><span style="color: #fd7e14; font-weight: bold;">HIGH</span></td>
+                <td style="font-size: 11px;">APAC MIGRATION pipeline AT RISK at only 1.9x. Urgent: Generate $117300 additional pipeline.</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>EMEA</td>
+                <td>EXPANSION</td>
+                <td>$236,264</td>
+                <td>1.0x</td>
+                <td>204 days</td>
+                <td><span style="color: #fd7e14; font-weight: bold;">AT_RISK</span></td>
+                <td><span style="color: #fd7e14; font-weight: bold;">HIGH</span></td>
+                <td style="font-size: 11px;">EMEA EXPANSION pipeline AT RISK at only 1x. Urgent: Generate $483818 additional pipeline.</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>EMEA</td>
+                <td>NEW LOGO</td>
+                <td>$345,651</td>
+                <td>1.5x</td>
+                <td>74 days</td>
+                <td><span style="color: #fd7e14; font-weight: bold;">AT_RISK</span></td>
+                <td><span style="color: #fd7e14; font-weight: bold;">HIGH</span></td>
+                <td style="font-size: 11px;">EMEA NEW LOGO pipeline AT RISK at only 1.5x. Urgent: Generate $461631 additional pipeline.</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>APAC</td>
+                <td>EXPANSION</td>
+                <td>$0</td>
+                <td>0.0x</td>
+                <td>0 days</td>
+                <td><span style="color: #dc3545; font-weight: bold;">CRITICAL</span></td>
+                <td><span style="color: #dc3545; font-weight: bold;">CRITICAL</span></td>
+                <td style="font-size: 11px;">APAC EXPANSION CRITICAL pipeline gap - only 0x coverage. Immediate action required to build pipeline.</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>APAC</td>
+                <td>NEW LOGO</td>
+                <td>$11,040</td>
+                <td>0.5x</td>
+                <td>217 days</td>
+                <td><span style="color: #dc3545; font-weight: bold;">CRITICAL</span></td>
+                <td><span style="color: #dc3545; font-weight: bold;">CRITICAL</span></td>
+                <td style="font-size: 11px;">APAC NEW LOGO CRITICAL pipeline gap - only 0.5x coverage. Immediate action required to build pipeline.</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>AMER</td>
+                <td>EXPANSION</td>
+                <td>$278,196</td>
+                <td>1.6x</td>
+                <td>145 days</td>
+                <td><span style="color: #fd7e14; font-weight: bold;">AT_RISK</span></td>
+                <td><span style="color: #fd7e14; font-weight: bold;">HIGH</span></td>
+                <td style="font-size: 11px;">AMER EXPANSION pipeline AT RISK at only 1.6x. Urgent: Generate $358800 additional pipeline.</td>
+            </tr>
+
+        </table>
+
+        <h2>Trend Analysis RCA</h2>
+        <p class="note" style="background: #f8d7da; border-color: #dc3545; color: #721c24;">
+            <strong>Alert:</strong> Areas showing declining week-over-week trends requiring investigation.
+        </p>
+        <table>
+            <tr>
+                <th>Product</th>
+                <th>Region</th>
+                <th>Declining Stages</th>
+                <th>MQL WoW</th>
+                <th>SQL WoW</th>
+                <th>Severity</th>
+                <th>RCA Commentary</th>
+                <th>Recommended Action</th>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>APAC</td>
+                <td>2 stages</td>
+                <td style="color: #dc3545;">-83%</td>
+                <td style="color: #dc3545;">-50%</td>
+                <td><span style="color: #dc3545; font-weight: bold;">CRITICAL</span></td>
+                <td style="font-size: 11px;">APAC MQL dropped 83% WoW - significant lead gen decline. Investigate: campaign spend changes, landing page issues, or seasonal factors.</td>
+                <td style="font-size: 11px; color: #0066cc;">Urgent: Audit ad campaigns, check website traffic, review lead source performance.</td>
+            </tr>
+
+            <tr>
+                <td>POR</td>
+                <td>AMER</td>
+                <td>2 stages</td>
+                <td style="color: #dc3545;">-24%</td>
+                <td style="color: #dc3545;">-32%</td>
+                <td><span style="color: #fd7e14; font-weight: bold;">HIGH</span></td>
+                <td style="font-size: 11px;">AMER showing top-of-funnel contraction (MQL -24%, SQL -32%). Review marketing campaigns and SDR capacity.</td>
+                <td style="font-size: 11px; color: #0066cc;">Investigate lead gen decline. Consider supplementary campaigns or outbound boost.</td>
+            </tr>
+
+            <tr>
+                <td>R360</td>
+                <td>EMEA</td>
+                <td>4 stages</td>
+                <td style="color: #dc3545;">-50%</td>
+                <td style="color: #dc3545;">-67%</td>
+                <td><span style="color: #dc3545; font-weight: bold;">CRITICAL</span></td>
+                <td style="font-size: 11px;">EMEA MQL dropped 50% WoW - significant lead gen decline. Investigate: campaign spend changes, landing page issues, or seasonal factors.</td>
+                <td style="font-size: 11px; color: #0066cc;">Urgent: Audit ad campaigns, check website traffic, review lead source performance.</td>
+            </tr>
+
+        </table>
+
+        <h2>Google Ads Performance RCA</h2>
+
+        <div class="rca-card" style="border-left: 4px solid #28a745; padding: 15px; margin: 10px 0; background: #f8f9fa; border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-weight: 600; font-size: 14px;">POR Google Ads</span>
+                <span class="severity low" style="padding: 3px 8px; border-radius: 3px; font-size: 11px; background: #d4edda; color: #155724;">LOW</span>
+            </div>
+            <div style="margin: 10px 0; font-size: 13px;">
+                <span style="margin-right: 15px;"><strong>CTR:</strong> <span style="color: #28a745;">10.08%</span> (STRONG)</span>
+                <span style="margin-right: 15px;"><strong>CPC:</strong> $9.19</span>
+                <span><strong>CPA:</strong> <span style="color: #28a745;">$195</span> (EFFICIENT)</span>
+            </div>
+            <div style="font-size: 13px; margin-top: 8px;">POR campaigns performing well - 10.08% CTR, $195 CPA. Consider scaling spend.</div>
+            <div style="font-size: 12px; color: #0066cc; margin-top: 8px; font-style: italic;">
+                → Scale budget for high-performing campaigns.
+            </div>
+        </div>
+
+        <div class="rca-card" style="border-left: 4px solid #dc3545; padding: 15px; margin: 10px 0; background: #f8f9fa; border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-weight: 600; font-size: 14px;">R360 Google Ads</span>
+                <span class="severity high" style="padding: 3px 8px; border-radius: 3px; font-size: 11px; background: #f8d7da; color: #721c24;">HIGH</span>
+            </div>
+            <div style="margin: 10px 0; font-size: 13px;">
+                <span style="margin-right: 15px;"><strong>CTR:</strong> <span style="color: #28a745;">11.73%</span> (STRONG)</span>
+                <span style="margin-right: 15px;"><strong>CPC:</strong> $17.44</span>
+                <span><strong>CPA:</strong> <span style="color: #dc3545;">$442</span> (EXPENSIVE)</span>
+            </div>
+            <div style="font-size: 13px; margin-top: 8px;">R360 CPA at $442 - above target. Optimize bidding strategy and negative keywords.</div>
+            <div style="font-size: 12px; color: #0066cc; margin-top: 8px; font-style: italic;">
+                → Optimize bidding, add negative keywords, improve landing page conversion.
+            </div>
+        </div>
+
+        <h2>Recommended Action Items</h2>
+        <p class="note">Consolidated action items from all analyses, grouped by urgency.</p>
+        <div class="action-section">
+
+            <div class="action-group immediate">
+                <h4>IMMEDIATE (This Week)</h4>
+
+                <div class="action-item critical">
+                    <div class="action-meta">
+                        <span>POR</span>
+                        <span>APAC</span>
+                        <span>TREND</span>
+                        <span style="background: #f8d7da;">CRITICAL</span>
+                    </div>
+                    <div class="action-issue">APAC MQL dropped 83% WoW - significant lead gen decline. Investigate: campaign spend changes, landing page issues, or seasonal factors.</div>
+                    <div class="action-text">→ Urgent: Audit ad campaigns, check website traffic, review lead source performance.</div>
+                </div>
+
+                <div class="action-item critical">
+                    <div class="action-meta">
+                        <span>POR</span>
+                        <span>APAC</span>
+                        <span>FUNNEL</span>
+                        <span style="background: #f8d7da;">CRITICAL</span>
+                    </div>
+                    <div class="action-issue">APAC MQL pacing at 39% - top of funnel deficit will cascade to bookings. Increase marketing spend or lead gen activities.</div>
+                    <div class="action-text">→ Increase marketing spend, launch supplementary campaigns, or expand outbound efforts.</div>
+                </div>
+
+                <div class="action-item critical">
+                    <div class="action-meta">
+                        <span>POR</span>
+                        <span>APAC</span>
+                        <span>PIPELINE</span>
+                        <span style="background: #f8d7da;">CRITICAL</span>
+                    </div>
+                    <div class="action-issue">APAC EXPANSION CRITICAL pipeline gap - only 0.3x coverage. Immediate action required to build pipeline.</div>
+                    <div class="action-text">→ Immediate pipeline generation needed. Deploy outbound, accelerate inbound campaigns.</div>
+                </div>
+
+                <div class="action-item critical">
+                    <div class="action-meta">
+                        <span>R360</span>
+                        <span>AMER</span>
+                        <span>FUNNEL</span>
+                        <span style="background: #f8d7da;">CRITICAL</span>
+                    </div>
+                    <div class="action-issue">AMER SQL->SAL conversion 42% vs 69% target - qualification or discovery issue.</div>
+                    <div class="action-text">→ Coach AEs on discovery calls, review qualification criteria, assess demo effectiveness.</div>
+                </div>
+
+                <div class="action-item critical">
+                    <div class="action-meta">
+                        <span>R360</span>
+                        <span>APAC</span>
+                        <span>FUNNEL</span>
+                        <span style="background: #f8d7da;">CRITICAL</span>
+                    </div>
+                    <div class="action-issue">APAC MQL pacing at 0% - top of funnel deficit will cascade to bookings. Increase marketing spend or lead gen activities.</div>
+                    <div class="action-text">→ Increase marketing spend, launch supplementary campaigns, or expand outbound efforts.</div>
+                </div>
+
+            </div>
+
+            <div class="action-group short-term">
+                <h4>SHORT-TERM (This Month)</h4>
+
+                <div class="action-item critical">
+                    <div class="action-meta">
+                        <span>R360</span>
+                        <span>AMER</span>
+                        <span>LOSS_REASON</span>
+                    </div>
+                    <div class="action-issue">Pricing was too high: $102504 (8 deals). Review and categorize for actionable insights.</div>
+                    <div class="action-text">→ Review and categorize for process improvement.</div>
+                </div>
+
+                <div class="action-item high">
+                    <div class="action-meta">
+                        <span>POR</span>
+                        <span>AMER</span>
+                        <span>TREND</span>
+                    </div>
+                    <div class="action-issue">AMER showing top-of-funnel contraction (MQL -24%, SQL -32%). Review marketing campaigns and SDR capacity.</div>
+                    <div class="action-text">→ Investigate lead gen decline. Consider supplementary campaigns or outbound boost.</div>
+                </div>
+
+                <div class="action-item high">
+                    <div class="action-meta">
+                        <span>POR</span>
+                        <span>AMER</span>
+                        <span>PIPELINE</span>
+                    </div>
+                    <div class="action-issue">AMER EXPANSION pipeline AT RISK at only 1.2x. Urgent: Generate $1303849 additional pipeline.</div>
+                    <div class="action-text">→ Increase prospecting activity. Review stalled deals for reactivation.</div>
+                </div>
+
+                <div class="action-item high">
+                    <div class="action-meta">
+                        <span>POR</span>
+                        <span>AMER</span>
+                        <span>PIPELINE</span>
+                    </div>
+                    <div class="action-issue">AMER MIGRATION pipeline AT RISK at only 1.5x. Urgent: Generate $514422 additional pipeline.</div>
+                    <div class="action-text">→ Increase prospecting activity. Review stalled deals for reactivation.</div>
+                </div>
+
+                <div class="action-item high">
+                    <div class="action-meta">
+                        <span>POR</span>
+                        <span>AMER</span>
+                        <span>PIPELINE</span>
+                    </div>
+                    <div class="action-issue">AMER NEW LOGO pipeline AT RISK at only 1.2x. Urgent: Generate $970181 additional pipeline.</div>
+                    <div class="action-text">→ Increase prospecting activity. Review stalled deals for reactivation.</div>
+                </div>
+
+            </div>
+
+            <div class="action-group strategic">
+                <h4>STRATEGIC (This Quarter)</h4>
+
+                <div class="action-item">
+                    <div class="action-meta">
+                        <span>R360</span>
+                        <span>AMER</span>
+                        <span>LOSS_REASON</span>
+                    </div>
+                    <div class="action-issue">Not Ready to Buy: $14520 (2 deals). Review and categorize for actionable insights.</div>
+                    <div class="action-text">→ Implement process improvements based on loss patterns.</div>
+                </div>
+
+                <div class="action-item">
+                    <div class="action-meta">
+                        <span>R360</span>
+                        <span>EMEA</span>
+                        <span>LOSS_REASON</span>
+                    </div>
+                    <div class="action-issue">Not Ready to Buy: $14886 (4 deals). Review and categorize for actionable insights.</div>
+                    <div class="action-text">→ Implement process improvements based on loss patterns.</div>
+                </div>
+
+                <div class="action-item">
+                    <div class="action-meta">
+                        <span>R360</span>
+                        <span>EMEA</span>
+                        <span>FUNNEL</span>
+                    </div>
+                    <div class="action-issue">EMEA MQL slightly behind at 75% - monitor closely, consider supplementary campaigns.</div>
+                    <div class="action-text">→ Increase marketing spend, launch supplementary campaigns, or expand outbound efforts.</div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="footer">
+            <p>Generated by Risk Analysis Report Generator v2.5.0</p>
+            <p>Data Source: BigQuery (sfdc.OpportunityViewTable, Staging.StrategicOperatingPlan, Staging.DailyRevenueFunnel)</p>
+            <p>Query Version: 2.5.0 | Features: Wins & Bright Spots, Momentum Indicators, Pipeline RCA, Trend RCA, Google Ads RCA, Consolidated Action Items</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,62 @@
+## TASK: Generate Q1 2026 Bookings Risk Analysis HTML Report
+
+Working directory: /Users/prestonharris/Risk Report
+
+### WHAT TO DO
+
+Run the Python script to generate the HTML report:
+
+```bash
+cd "/Users/prestonharris/Risk Report" && python3 generate_html_report.py
+```
+
+The script will:
+1. Execute the BigQuery query (query_comprehensive_risk_analysis.sql v2.1.0)
+2. Parse JSON output with all risk metrics
+3. Generate professional HTML report with RAG color coding
+4. Save to: /Users/prestonharris/Risk Report/reports/Q1_2026_Risk_Report_YYYY-MM-DD.html
+
+### REPORT SECTIONS
+
+The generated HTML includes:
+- **Executive Summary**: Combined QTD attainment, Q1 target, gap, pipeline coverage, win rate
+- **Product Performance**: POR and R360 side-by-side metrics
+- **Top Risk Pockets**: Areas requiring attention, sorted by gap (RED status items)
+- **Funnel Pacing**: MQL/SQL/SAL/SQO with RAG status (INBOUND channel only)
+- **Pipeline Analysis**: Detailed attainment by Region/Category with pipeline coverage
+- **Loss Analysis**: Close lost reasons by product/region
+- **Google Ads**: QTD ad performance metrics
+
+### KEY DATA NOTES
+
+1. **Q1 Targets (verified):**
+   - POR: $2,659,310
+   - R360: $868,569
+   - Combined: $3,527,879
+
+2. **Pipeline Filters Applied:**
+   - Only opportunities created in last 6 months
+   - Only AE/AM owned (Account Executive, Account Manager, R360 Sales User)
+
+3. **MQL Targets:**
+   - INBOUND channel only
+   - EMEA is outbound-heavy (22% from INBOUND)
+   - APAC is inbound-heavy (63% from INBOUND)
+
+### AFTER GENERATION
+
+1. Open the HTML file in browser to verify formatting
+2. Report is copy-paste friendly with clean table formatting
+3. RAG colors: Green (>=90%), Yellow (70-89%), Red (<70%)
+
+### FILES
+
+- Query: query_comprehensive_risk_analysis.sql (v2.1.0)
+- Script: generate_html_report.py
+- Output: reports/Q1_2026_Risk_Report_YYYY-MM-DD.html
+
+### QUICK START
+
+Just run this command:
+
+python3 "/Users/prestonharris/Risk Report/generate_html_report.py"

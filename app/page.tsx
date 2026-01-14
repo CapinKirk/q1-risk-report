@@ -82,7 +82,7 @@ function ReportContent() {
 
       {/* Momentum Tracker - WoW trend indicators */}
       {filteredData.momentum_indicators && (
-        <MomentumTracker momentum={filteredData.momentum_indicators} />
+        <MomentumTracker momentum={filteredData.momentum_indicators} period={period} />
       )}
 
       <AttainmentTable data={filteredData} />
@@ -91,7 +91,7 @@ function ReportContent() {
 
       {/* Action Items Dashboard */}
       {filteredData.action_items && (
-        <ActionItemsDashboard actionItems={filteredData.action_items} />
+        <ActionItemsDashboard actionItems={filteredData.action_items} period={period} />
       )}
 
       <PipelineCoverage data={filteredData} />
