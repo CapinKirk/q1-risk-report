@@ -63,6 +63,12 @@ function transformAPIResponse(apiData: any): ReportData {
     }
   }
 
+  // Transform Google Ads data (already grouped by product from API)
+  const googleAdsData = apiData.google_ads || { POR: [], R360: [] };
+
+  // Transform Pipeline RCA data (already grouped by product from API)
+  const pipelineRcaData = apiData.pipeline_rca || { POR: [], R360: [] };
+
   // Group funnel pacing by product
   const funnelByProduct: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
 
@@ -201,9 +207,9 @@ function transformAPIResponse(apiData: any): ReportData {
       total_qtd_target: apiData.grand_total?.total_qtd_target || 0,
       total_qtd_acv: apiData.grand_total?.total_qtd_acv || 0,
       total_qtd_attainment_pct: apiData.grand_total?.total_qtd_attainment_pct || 0,
-      total_pipeline_acv: 0,
-      total_pipeline_coverage_x: 0,
-      total_win_rate_pct: 0,
+      total_pipeline_acv: apiData.grand_total?.total_pipeline_acv || 0,
+      total_pipeline_coverage_x: apiData.grand_total?.total_pipeline_coverage_x || 0,
+      total_win_rate_pct: apiData.grand_total?.total_win_rate_pct || 0,
     },
     product_totals: {
       POR: {
@@ -211,31 +217,31 @@ function transformAPIResponse(apiData: any): ReportData {
         total_qtd_target: apiData.product_totals?.POR?.total_qtd_target || 0,
         total_qtd_acv: apiData.product_totals?.POR?.total_qtd_acv || 0,
         total_qtd_attainment_pct: apiData.product_totals?.POR?.total_qtd_attainment_pct || 0,
-        total_pipeline_acv: 0,
-        total_pipeline_coverage_x: 0,
-        total_win_rate_pct: 0,
-        total_lost_deals: 0,
-        total_lost_acv: 0,
+        total_pipeline_acv: apiData.product_totals?.POR?.total_pipeline_acv || 0,
+        total_pipeline_coverage_x: apiData.product_totals?.POR?.total_pipeline_coverage_x || 0,
+        total_win_rate_pct: apiData.product_totals?.POR?.total_win_rate_pct || 0,
+        total_lost_deals: apiData.product_totals?.POR?.total_lost_deals || 0,
+        total_lost_acv: apiData.product_totals?.POR?.total_lost_acv || 0,
       },
       R360: {
         total_q1_target: apiData.product_totals?.R360?.total_q1_target || 0,
         total_qtd_target: apiData.product_totals?.R360?.total_qtd_target || 0,
         total_qtd_acv: apiData.product_totals?.R360?.total_qtd_acv || 0,
         total_qtd_attainment_pct: apiData.product_totals?.R360?.total_qtd_attainment_pct || 0,
-        total_pipeline_acv: 0,
-        total_pipeline_coverage_x: 0,
-        total_win_rate_pct: 0,
-        total_lost_deals: 0,
-        total_lost_acv: 0,
+        total_pipeline_acv: apiData.product_totals?.R360?.total_pipeline_acv || 0,
+        total_pipeline_coverage_x: apiData.product_totals?.R360?.total_pipeline_coverage_x || 0,
+        total_win_rate_pct: apiData.product_totals?.R360?.total_win_rate_pct || 0,
+        total_lost_deals: apiData.product_totals?.R360?.total_lost_deals || 0,
+        total_lost_acv: apiData.product_totals?.R360?.total_lost_acv || 0,
       },
     },
     attainment_detail: attainmentByProduct,
-    source_attainment: { POR: [], R360: [] },
+    source_attainment: apiData.source_attainment || { POR: [], R360: [] },
     funnel_by_category: funnelByProduct,
     funnel_by_source: { POR: [], R360: [] },
-    pipeline_rca: { POR: [], R360: [] },
+    pipeline_rca: pipelineRcaData,
     loss_reason_rca: { POR: [], R360: [] },
-    google_ads: { POR: [], R360: [] },
+    google_ads: googleAdsData,
     google_ads_rca: { POR: [], R360: [] },
     funnel_rca_insights: { POR: [], R360: [] },
     won_deals: wonDealsByProduct,

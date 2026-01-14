@@ -14,6 +14,11 @@ export default function PipelineCoverage({ data }: PipelineCoverageProps) {
     ...pipeline_rca.R360.map(p => ({ ...p, product: 'R360' as const }))
   ];
 
+  // Don't render if no data
+  if (allPipeline.length === 0) {
+    return null;
+  }
+
   // Sort by region, then product
   allPipeline.sort((a, b) => {
     if (a.region !== b.region) return a.region.localeCompare(b.region);

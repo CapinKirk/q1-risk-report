@@ -61,6 +61,7 @@ function ProductAttainmentTable({
               const winRate = row.win_rate_pct || 0;
               const gap = row.qtd_gap || 0;
               const lostAcv = row.qtd_lost_acv || 0;
+              const ragBgColor = rag === 'GREEN' ? '#16a34a' : rag === 'YELLOW' ? '#ca8a04' : '#dc2626';
 
               return (
                 <tr key={`${row.region}-${row.category}-${idx}`}>
@@ -95,7 +96,19 @@ function ProductAttainmentTable({
                   </td>
                   <td className="right">{formatCoverage(coverage)}</td>
                   <td className="right">{formatPercent(winRate)}</td>
-                  <td className={`${getRAGClass(rag)} center`}>{rag}</td>
+                  <td className="center">
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: ragBgColor,
+                      color: 'white',
+                      fontWeight: 'bold',
+                      fontSize: '0.7rem',
+                    }}>
+                      {rag}
+                    </span>
+                  </td>
                 </tr>
               );
             })}
@@ -168,6 +181,14 @@ export default function AttainmentTable({ data }: AttainmentTableProps) {
       } Deals`
     : '';
 
+  const hasPORData = data.attainment_detail.POR.length > 0;
+  const hasR360Data = data.attainment_detail.R360.length > 0;
+
+  // Don't render if no data at all
+  if (!hasPORData && !hasR360Data) {
+    return null;
+  }
+
   return (
     <section>
       <h2>2. Attainment by Region & Product</h2>
@@ -176,18 +197,22 @@ export default function AttainmentTable({ data }: AttainmentTableProps) {
           Click on QTD Actual, Lost, or Pipeline values to view deal details
         </p>
       )}
-      <ProductAttainmentTable
-        product="POR"
-        rows={data.attainment_detail.POR}
-        onCellClick={handleCellClick}
-        hasDeals={hasDeals}
-      />
-      <ProductAttainmentTable
-        product="R360"
-        rows={data.attainment_detail.R360}
-        onCellClick={handleCellClick}
-        hasDeals={hasDeals}
-      />
+      {hasPORData && (
+        <ProductAttainmentTable
+          product="POR"
+          rows={data.attainment_detail.POR}
+          onCellClick={handleCellClick}
+          hasDeals={hasDeals}
+        />
+      )}
+      {hasR360Data && (
+        <ProductAttainmentTable
+          product="R360"
+          rows={data.attainment_detail.R360}
+          onCellClick={handleCellClick}
+          hasDeals={hasDeals}
+        />
+      )}
 
       {modalState && (
         <DealListModal

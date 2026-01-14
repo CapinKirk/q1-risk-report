@@ -193,8 +193,8 @@ async function getPORFunnelActuals(filters: ReportFilters) {
       'INBOUND' AS source,
       COUNT(DISTINCT CASE
         WHEN MQL_DT IS NOT NULL
-          AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
-          AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
+          AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
+          AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
         THEN COALESCE(LeadEmail, ContactEmail)
       END) AS actual_mql,
       COUNT(DISTINCT CASE
@@ -220,8 +220,8 @@ async function getPORFunnelActuals(filters: ReportFilters) {
       AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
       AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
       ${regionClause}
-    GROUP BY region
-    ORDER BY region
+    GROUP BY 1, 2
+    ORDER BY 2
   `;
 
   const [rows] = await getBigQuery().query({ query });
@@ -241,8 +241,8 @@ async function getR360FunnelActuals(filters: ReportFilters) {
       'INBOUND' AS source,
       COUNT(DISTINCT CASE
         WHEN MQL_DT IS NOT NULL
-          AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
-          AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
+          AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
+          AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
         THEN Email
       END) AS actual_mql,
       COUNT(DISTINCT CASE
@@ -262,8 +262,8 @@ async function getR360FunnelActuals(filters: ReportFilters) {
     WHERE MQL_Reverted = false
       AND Region IS NOT NULL
       ${regionClause}
-    GROUP BY region
-    ORDER BY region
+    GROUP BY 1, 2
+    ORDER BY 2
   `;
 
   const [rows] = await getBigQuery().query({ query });
@@ -440,6 +440,204 @@ async function getPipelineDeals(filters: ReportFilters) {
   return rows;
 }
 
+// Query for source attainment data - actuals from won deals
+async function getSourceActuals(filters: ReportFilters) {
+  const productClause = filters.products && filters.products.length > 0
+    ? `AND (
+        (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
+        (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
+      )`
+    : '';
+
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND Division IN (${filters.regions.map(r => {
+        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
+        return `'${map[r]}'`;
+      }).join(', ')})`
+    : '';
+
+  const query = `
+    SELECT
+      CASE WHEN por_record__c THEN 'POR' ELSE 'R360' END AS product,
+      CASE Division
+        WHEN 'US' THEN 'AMER'
+        WHEN 'UK' THEN 'EMEA'
+        WHEN 'AU' THEN 'APAC'
+      END AS region,
+      CASE
+        WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) IN ('INBOUND', 'INBOUND CALL', 'CHAT', 'WEBSITE', 'WEB FORM') THEN 'INBOUND'
+        WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) IN ('OUTBOUND', 'OUTBOUND CALL', 'COLD CALL', 'EMAIL CAMPAIGN') THEN 'OUTBOUND'
+        WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) IN ('AE SOURCED', 'AE', 'ACCOUNT EXECUTIVE') THEN 'AE SOURCED'
+        WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) IN ('AM SOURCED', 'AM', 'ACCOUNT MANAGER', 'CSM') THEN 'AM SOURCED'
+        WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) IN ('TRADESHOW', 'TRADE SHOW', 'EVENT', 'CONFERENCE') THEN 'TRADESHOW'
+        WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) IN ('PARTNER', 'PARTNERSHIP', 'REFERRAL', 'CHANNEL') THEN 'PARTNERSHIPS'
+        ELSE 'INBOUND'
+      END AS source,
+      COUNT(*) AS deal_count,
+      ROUND(SUM(ACV), 2) AS total_acv
+    FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
+    WHERE Won = true
+      AND CloseDate >= '${filters.startDate}'
+      AND CloseDate <= '${filters.endDate}'
+      AND Type NOT IN ('Renewal', 'Credit Card', 'Consulting')
+      AND ACV > 0
+      AND Division IN ('US', 'UK', 'AU')
+      ${productClause}
+      ${regionClause}
+    GROUP BY product, region, source
+    ORDER BY product, region, source
+  `;
+
+  try {
+    const [rows] = await getBigQuery().query({ query });
+    return rows;
+  } catch (error) {
+    console.warn('Source actuals query failed:', error);
+    return [];
+  }
+}
+
+// Query for source targets from StrategicOperatingPlan
+async function getSourceTargets(filters: ReportFilters) {
+  const productClause = filters.products && filters.products.length > 0
+    ? `AND RecordType IN (${filters.products.map(p => `'${p}'`).join(', ')})`
+    : '';
+
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+    : '';
+
+  const query = `
+    SELECT
+      RecordType AS product,
+      Region AS region,
+      CASE
+        WHEN UPPER(Source) IN ('INBOUND', 'INBOUND CALL', 'CHAT', 'WEBSITE') THEN 'INBOUND'
+        WHEN UPPER(Source) IN ('OUTBOUND', 'OUTBOUND CALL', 'SDR OUTBOUND') THEN 'OUTBOUND'
+        WHEN UPPER(Source) IN ('AE SOURCED', 'AE', 'ACCOUNT EXECUTIVE') THEN 'AE SOURCED'
+        WHEN UPPER(Source) IN ('AM SOURCED', 'AM', 'ACCOUNT MANAGER', 'CSM SOURCED') THEN 'AM SOURCED'
+        WHEN UPPER(Source) IN ('TRADESHOW', 'TRADE SHOW', 'EVENT') THEN 'TRADESHOW'
+        WHEN UPPER(Source) IN ('PARTNERSHIPS', 'PARTNER', 'REFERRAL', 'CHANNEL') THEN 'PARTNERSHIPS'
+        ELSE UPPER(Source)
+      END AS source,
+      ROUND(SUM(CASE
+        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
+        THEN Target_ACV ELSE 0
+      END), 2) AS q1_target,
+      ROUND(SUM(CASE
+        WHEN TargetDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
+        THEN Target_ACV ELSE 0
+      END), 2) AS qtd_target
+    FROM \`data-analytics-306119.Staging.StrategicOperatingPlan\`
+    WHERE Percentile = 'P50'
+      AND OpportunityType != 'RENEWAL'
+      AND RecordType IN ('POR', 'R360')
+      AND Region IN ('AMER', 'EMEA', 'APAC')
+      ${productClause}
+      ${regionClause}
+    GROUP BY product, region, source
+    HAVING q1_target > 0
+    ORDER BY product, region, source
+  `;
+
+  try {
+    const [rows] = await getBigQuery().query({ query });
+    return rows;
+  } catch (error) {
+    console.warn('Source targets query failed:', error);
+    return [];
+  }
+}
+
+// Query for Google Ads data
+async function getGoogleAds(filters: ReportFilters) {
+  const query = `
+    WITH por_campaigns AS (
+      SELECT campaign_id, campaign_name
+      FROM (
+        SELECT campaign_id, campaign_name,
+               ROW_NUMBER() OVER (PARTITION BY campaign_id ORDER BY _DATA_DATE DESC) AS rn
+        FROM \`data-analytics-306119.GoogleAds_POR_8275359090.ads_Campaign_8275359090\`
+      )
+      WHERE rn = 1
+    ),
+    por_ads AS (
+      SELECT
+        'POR' AS product,
+        CASE
+          WHEN UPPER(c.campaign_name) LIKE 'US %' OR UPPER(c.campaign_name) LIKE '%_NA' OR UPPER(c.campaign_name) LIKE '%_NA_%' THEN 'AMER'
+          WHEN UPPER(c.campaign_name) LIKE 'UK %' OR UPPER(c.campaign_name) LIKE '%_UK' OR UPPER(c.campaign_name) LIKE '%_UK_%' THEN 'EMEA'
+          WHEN UPPER(c.campaign_name) LIKE 'AU %' OR UPPER(c.campaign_name) LIKE '%_AUS' OR UPPER(c.campaign_name) LIKE '%_AUS_%' OR UPPER(c.campaign_name) LIKE '%_AU_%' THEN 'APAC'
+          ELSE 'AMER'
+        END AS region,
+        SUM(s.metrics_impressions) AS impressions,
+        SUM(s.metrics_clicks) AS clicks,
+        ROUND(SUM(s.metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
+        SUM(s.metrics_conversions) AS conversions
+      FROM \`data-analytics-306119.GoogleAds_POR_8275359090.ads_CampaignBasicStats_8275359090\` s
+      JOIN por_campaigns c ON s.campaign_id = c.campaign_id
+      WHERE s.segments_date >= '${filters.startDate}'
+        AND s.segments_date <= '${filters.endDate}'
+        AND s.segments_ad_network_type = 'SEARCH'
+      GROUP BY product, region
+    ),
+    r360_campaigns AS (
+      SELECT campaign_id, campaign_name
+      FROM (
+        SELECT campaign_id, campaign_name,
+               ROW_NUMBER() OVER (PARTITION BY campaign_id ORDER BY _DATA_DATE DESC) AS rn
+        FROM \`data-analytics-306119.GoogleAds_Record360_3799591491.ads_Campaign_3799591491\`
+      )
+      WHERE rn = 1
+    ),
+    r360_ads AS (
+      SELECT
+        'R360' AS product,
+        CASE
+          WHEN UPPER(c.campaign_name) LIKE 'US %' OR UPPER(c.campaign_name) LIKE '%_NA' OR UPPER(c.campaign_name) LIKE '%_NA_%' THEN 'AMER'
+          WHEN UPPER(c.campaign_name) LIKE 'UK %' OR UPPER(c.campaign_name) LIKE '%_UK' OR UPPER(c.campaign_name) LIKE '%_UK_%' THEN 'EMEA'
+          WHEN UPPER(c.campaign_name) LIKE 'AU %' OR UPPER(c.campaign_name) LIKE '%_AUS' OR UPPER(c.campaign_name) LIKE '%_AUS_%' OR UPPER(c.campaign_name) LIKE '%_AU_%' THEN 'APAC'
+          ELSE 'AMER'
+        END AS region,
+        SUM(s.metrics_impressions) AS impressions,
+        SUM(s.metrics_clicks) AS clicks,
+        ROUND(SUM(s.metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
+        SUM(s.metrics_conversions) AS conversions
+      FROM \`data-analytics-306119.GoogleAds_Record360_3799591491.ads_CampaignBasicStats_3799591491\` s
+      JOIN r360_campaigns c ON s.campaign_id = c.campaign_id
+      WHERE s.segments_date >= '${filters.startDate}'
+        AND s.segments_date <= '${filters.endDate}'
+        AND s.segments_ad_network_type = 'SEARCH'
+      GROUP BY product, region
+    ),
+    combined AS (
+      SELECT * FROM por_ads
+      UNION ALL
+      SELECT * FROM r360_ads
+    )
+    SELECT
+      product,
+      region,
+      impressions,
+      clicks,
+      ROUND(SAFE_DIVIDE(clicks, NULLIF(impressions, 0)) * 100, 2) AS ctr_pct,
+      ad_spend_usd,
+      ROUND(SAFE_DIVIDE(ad_spend_usd, NULLIF(clicks, 0)), 2) AS cpc_usd,
+      conversions,
+      ROUND(SAFE_DIVIDE(ad_spend_usd, NULLIF(conversions, 0)), 2) AS cpa_usd
+    FROM combined
+    ORDER BY product, region
+  `;
+
+  try {
+    const [rows] = await getBigQuery().query({ query });
+    return rows;
+  } catch (error) {
+    console.warn('Google Ads query failed, returning empty:', error);
+    return [];
+  }
+}
+
 // Calculate period info
 function calculatePeriodInfo(startDate: string, endDate: string) {
   const start = new Date(startDate);
@@ -493,6 +691,9 @@ export async function POST(request: Request) {
       wonDeals,
       lostDeals,
       pipelineDeals,
+      googleAds,
+      sourceActualsRaw,
+      sourceTargetsRaw,
     ] = await Promise.all([
       getRevenueActuals(filters),
       getTargets(filters),
@@ -505,6 +706,9 @@ export async function POST(request: Request) {
       getWonDeals(filters),
       getLostDeals(filters),
       getPipelineDeals(filters),
+      getGoogleAds(filters),
+      getSourceActuals(filters),
+      getSourceTargets(filters),
     ]);
 
     // Calculate period info
@@ -533,10 +737,34 @@ export async function POST(request: Request) {
       }
     }
 
+    // Group pipeline deals by segment
+    const pipelineMap = new Map<string, { acv: number; count: number }>();
+    for (const deal of pipelineDeals as any[]) {
+      const key = `${deal.product}-${deal.region}-${deal.category}`;
+      const existing = pipelineMap.get(key) || { acv: 0, count: 0 };
+      pipelineMap.set(key, {
+        acv: existing.acv + (parseFloat(deal.acv) || 0),
+        count: existing.count + 1,
+      });
+    }
+
+    // Group lost deals by segment
+    const lostMap = new Map<string, { acv: number; count: number }>();
+    for (const deal of lostDeals as any[]) {
+      const key = `${deal.product}-${deal.region}-${deal.category}`;
+      const existing = lostMap.get(key) || { acv: 0, count: 0 };
+      lostMap.set(key, {
+        acv: existing.acv + (parseFloat(deal.acv) || 0),
+        count: existing.count + 1,
+      });
+    }
+
     // Build attainment for each target
     for (const target of targets as any[]) {
       const key = `${target.product}-${target.region}-${target.category}`;
       const actual = revenueMap.get(key);
+      const pipeline = pipelineMap.get(key) || { acv: 0, count: 0 };
+      const lost = lostMap.get(key) || { acv: 0, count: 0 };
 
       const qtdAcv = actual ? actual.total_acv : 0;
       const qtdDeals = actual ? actual.deal_count : 0;
@@ -545,6 +773,14 @@ export async function POST(request: Request) {
       const attainmentPct = qtdTarget > 0 ? Math.round((qtdAcv / qtdTarget) * 1000) / 10 : 0;
       const gap = qtdAcv - qtdTarget;
       const progressPct = q1Target > 0 ? Math.round((qtdAcv / q1Target) * 1000) / 10 : 0;
+
+      // Calculate pipeline coverage (pipeline / remaining gap to Q1)
+      const remainingGap = Math.max(0, q1Target - qtdAcv);
+      const pipelineCoverage = remainingGap > 0 ? pipeline.acv / remainingGap : (pipeline.acv > 0 ? 99 : 0);
+
+      // Calculate win rate (won deals / (won + lost))
+      const totalClosed = qtdDeals + lost.count;
+      const winRate = totalClosed > 0 ? Math.round((qtdDeals / totalClosed) * 1000) / 10 : 0;
 
       attainmentDetail.push({
         product: target.product,
@@ -557,20 +793,37 @@ export async function POST(request: Request) {
         qtd_attainment_pct: attainmentPct,
         q1_progress_pct: progressPct,
         qtd_gap: gap,
+        pipeline_acv: pipeline.acv,
+        pipeline_coverage_x: Math.round(pipelineCoverage * 10) / 10,
+        win_rate_pct: winRate,
+        qtd_lost_deals: lost.count,
+        qtd_lost_acv: lost.acv,
         rag_status: calculateRAG(attainmentPct),
       });
     }
 
     // Calculate grand total
+    const totalPipelineAcv = attainmentDetail.reduce((sum, a) => sum + (a.pipeline_acv || 0), 0);
+    const totalQ1Target = attainmentDetail.reduce((sum, a) => sum + a.q1_target, 0);
+    const totalQtdAcv = attainmentDetail.reduce((sum, a) => sum + a.qtd_acv, 0);
+    const totalWonDeals = attainmentDetail.reduce((sum, a) => sum + a.qtd_deals, 0);
+    const totalLostDeals = attainmentDetail.reduce((sum, a) => sum + (a.qtd_lost_deals || 0), 0);
+    const totalRemainingGap = Math.max(0, totalQ1Target - totalQtdAcv);
+
     const grandTotal = {
       product: 'ALL',
-      total_q1_target: attainmentDetail.reduce((sum, a) => sum + a.q1_target, 0),
+      total_q1_target: totalQ1Target,
       total_qtd_target: attainmentDetail.reduce((sum, a) => sum + a.qtd_target, 0),
-      total_qtd_deals: attainmentDetail.reduce((sum, a) => sum + a.qtd_deals, 0),
-      total_qtd_acv: attainmentDetail.reduce((sum, a) => sum + a.qtd_acv, 0),
+      total_qtd_deals: totalWonDeals,
+      total_qtd_acv: totalQtdAcv,
       total_qtd_attainment_pct: 0,
       total_q1_progress_pct: 0,
       total_qtd_gap: 0,
+      total_pipeline_acv: totalPipelineAcv,
+      total_pipeline_coverage_x: totalRemainingGap > 0 ? Math.round((totalPipelineAcv / totalRemainingGap) * 10) / 10 : 0,
+      total_win_rate_pct: (totalWonDeals + totalLostDeals) > 0
+        ? Math.round((totalWonDeals / (totalWonDeals + totalLostDeals)) * 1000) / 10
+        : 0,
     };
     grandTotal.total_qtd_attainment_pct = grandTotal.total_qtd_target > 0
       ? Math.round((grandTotal.total_qtd_acv / grandTotal.total_qtd_target) * 1000) / 10
@@ -585,14 +838,29 @@ export async function POST(request: Request) {
     for (const product of ['POR', 'R360']) {
       const productDetails = attainmentDetail.filter(a => a.product === product);
       if (productDetails.length > 0) {
+        const prodPipelineAcv = productDetails.reduce((sum, a) => sum + (a.pipeline_acv || 0), 0);
+        const prodQ1Target = productDetails.reduce((sum, a) => sum + a.q1_target, 0);
+        const prodQtdAcv = productDetails.reduce((sum, a) => sum + a.qtd_acv, 0);
+        const prodWonDeals = productDetails.reduce((sum, a) => sum + a.qtd_deals, 0);
+        const prodLostDeals = productDetails.reduce((sum, a) => sum + (a.qtd_lost_deals || 0), 0);
+        const prodLostAcv = productDetails.reduce((sum, a) => sum + (a.qtd_lost_acv || 0), 0);
+        const prodRemainingGap = Math.max(0, prodQ1Target - prodQtdAcv);
+
         productTotals[product] = {
           product,
-          total_q1_target: productDetails.reduce((sum, a) => sum + a.q1_target, 0),
+          total_q1_target: prodQ1Target,
           total_qtd_target: productDetails.reduce((sum, a) => sum + a.qtd_target, 0),
-          total_qtd_deals: productDetails.reduce((sum, a) => sum + a.qtd_deals, 0),
-          total_qtd_acv: productDetails.reduce((sum, a) => sum + a.qtd_acv, 0),
+          total_qtd_deals: prodWonDeals,
+          total_qtd_acv: prodQtdAcv,
           total_qtd_attainment_pct: 0,
           total_qtd_gap: 0,
+          total_pipeline_acv: prodPipelineAcv,
+          total_pipeline_coverage_x: prodRemainingGap > 0 ? Math.round((prodPipelineAcv / prodRemainingGap) * 10) / 10 : 0,
+          total_win_rate_pct: (prodWonDeals + prodLostDeals) > 0
+            ? Math.round((prodWonDeals / (prodWonDeals + prodLostDeals)) * 1000) / 10
+            : 0,
+          total_lost_deals: prodLostDeals,
+          total_lost_acv: prodLostAcv,
         };
         const pt = productTotals[product];
         pt.total_qtd_attainment_pct = pt.total_qtd_target > 0
@@ -658,6 +926,111 @@ export async function POST(request: Request) {
       });
     }
 
+    // Build Google Ads data grouped by product
+    const googleAdsData: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
+    for (const ad of googleAds as any[]) {
+      const adData = {
+        region: ad.region,
+        impressions: parseInt(ad.impressions) || 0,
+        clicks: parseInt(ad.clicks) || 0,
+        ctr_pct: parseFloat(ad.ctr_pct) || 0,
+        ad_spend_usd: parseFloat(ad.ad_spend_usd) || 0,
+        cpc_usd: parseFloat(ad.cpc_usd) || 0,
+        conversions: parseFloat(ad.conversions) || 0,
+        cpa_usd: parseFloat(ad.cpa_usd) || 0,
+      };
+      if (ad.product === 'POR') {
+        googleAdsData.POR.push(adData);
+      } else if (ad.product === 'R360') {
+        googleAdsData.R360.push(adData);
+      }
+    }
+
+    // Build pipeline RCA data
+    const pipelineRca: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
+    for (const detail of attainmentDetail) {
+      if (detail.pipeline_acv > 0) {
+        const health = detail.pipeline_coverage_x >= 3 ? 'HEALTHY' : detail.pipeline_coverage_x >= 2 ? 'ADEQUATE' : 'AT RISK';
+        const rcaRow = {
+          region: detail.region,
+          category: detail.category,
+          pipeline_acv: detail.pipeline_acv,
+          pipeline_coverage_x: detail.pipeline_coverage_x,
+          pipeline_avg_age_days: 30, // Default - would need separate query for actual
+          pipeline_health: health,
+        };
+        if (detail.product === 'POR') {
+          pipelineRca.POR.push(rcaRow);
+        } else {
+          pipelineRca.R360.push(rcaRow);
+        }
+      }
+    }
+
+    // Build source attainment data by joining actuals with targets from StrategicOperatingPlan
+    // Create a map of source targets
+    const sourceTargetMap = new Map<string, { q1_target: number; qtd_target: number }>();
+    for (const t of sourceTargetsRaw as any[]) {
+      const key = `${t.product}-${t.region}-${t.source}`;
+      sourceTargetMap.set(key, {
+        q1_target: parseFloat(t.q1_target) || 0,
+        qtd_target: parseFloat(t.qtd_target) || 0,
+      });
+    }
+
+    // Also track all sources that have targets (even if no actuals)
+    const allSourceKeys = new Set<string>();
+    for (const t of sourceTargetsRaw as any[]) {
+      allSourceKeys.add(`${t.product}-${t.region}-${t.source}`);
+    }
+    for (const a of sourceActualsRaw as any[]) {
+      allSourceKeys.add(`${a.product}-${a.region}-${a.source}`);
+    }
+
+    // Create map of actuals
+    const sourceActualsMap = new Map<string, number>();
+    for (const a of sourceActualsRaw as any[]) {
+      const key = `${a.product}-${a.region}-${a.source}`;
+      sourceActualsMap.set(key, parseFloat(a.total_acv) || 0);
+    }
+
+    const sourceAttainment: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
+
+    // Process all source/region combinations
+    for (const key of Array.from(allSourceKeys)) {
+      const [product, region, source] = key.split('-');
+      const targets = sourceTargetMap.get(key) || { q1_target: 0, qtd_target: 0 };
+      const qtdAcv = sourceActualsMap.get(key) || 0;
+
+      const q1Target = targets.q1_target;
+      const qtdTarget = targets.qtd_target;
+
+      // Calculate attainment
+      const attainmentPct = qtdTarget > 0 ? (qtdAcv / qtdTarget) * 100 : (qtdAcv > 0 ? 100 : 0);
+      const gap = qtdAcv - qtdTarget;
+
+      const sourceRow = {
+        region,
+        source,
+        q1_target: Math.round(q1Target),
+        qtd_target: Math.round(qtdTarget),
+        qtd_acv: qtdAcv,
+        attainment_pct: Math.round(attainmentPct * 10) / 10,
+        gap: Math.round(gap),
+        rag_status: calculateRAG(attainmentPct),
+      };
+
+      if (product === 'POR') {
+        sourceAttainment.POR.push(sourceRow);
+      } else {
+        sourceAttainment.R360.push(sourceRow);
+      }
+    }
+
+    // Sort by attainment (worst first)
+    sourceAttainment.POR.sort((a, b) => a.attainment_pct - b.attainment_pct);
+    sourceAttainment.R360.sort((a, b) => a.attainment_pct - b.attainment_pct);
+
     // Build response
     const response = {
       generated_at_utc: new Date().toISOString(),
@@ -667,7 +1040,10 @@ export async function POST(request: Request) {
       grand_total: grandTotal,
       product_totals: productTotals,
       attainment_detail: attainmentDetail,
+      source_attainment: sourceAttainment,
       funnel_pacing: funnelPacing,
+      google_ads: googleAdsData,
+      pipeline_rca: pipelineRca,
       won_deals: wonDeals,
       lost_deals: lostDeals,
       pipeline_deals: pipelineDeals,

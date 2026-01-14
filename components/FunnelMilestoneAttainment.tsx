@@ -295,11 +295,13 @@ export default function FunnelMilestoneAttainment({ funnelData }: FunnelMileston
           text-align: center;
         }
         .milestone-table th {
-          background-color: #f3f4f6;
+          background-color: #1a1a2e;
+          color: white;
           font-weight: 600;
         }
         .sub-header th {
-          background-color: #f9fafb;
+          background-color: #2d2d44;
+          color: white;
           font-weight: 500;
           font-size: 0.65rem;
         }

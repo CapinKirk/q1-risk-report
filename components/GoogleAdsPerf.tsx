@@ -48,6 +48,11 @@ export default function GoogleAdsPerf({ data }: GoogleAdsPerfProps) {
   const porTotal = aggregateAdsData(google_ads.POR || []);
   const r360Total = aggregateAdsData(google_ads.R360 || []);
 
+  // Don't render if no data
+  if (!porTotal && !r360Total) {
+    return null;
+  }
+
   // Helper to render a data row
   const renderRow = (label: string, ads: GoogleAdsData | null, isSubRow = false) => {
     if (!ads) return null;
