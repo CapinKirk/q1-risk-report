@@ -323,3 +323,100 @@ export interface FilterState {
   regions: Region[];
   products: Product[];
 }
+
+// ============================================================================
+// TREND ANALYSIS TYPES
+// ============================================================================
+
+// Date range for trend analysis
+export interface DateRange {
+  startDate: string;  // ISO format: YYYY-MM-DD
+  endDate: string;    // ISO format: YYYY-MM-DD
+}
+
+// Period comparison metadata
+export interface TrendPeriodInfo {
+  current: DateRange;
+  previous: DateRange;
+  daysInPeriod: number;
+}
+
+// Single metric with period comparison
+export interface MetricComparison<T = number> {
+  current: T;
+  previous: T;
+  delta: T;           // current - previous
+  deltaPercent: number; // ((current - previous) / previous) * 100
+  trend: 'UP' | 'DOWN' | 'FLAT';
+}
+
+// Revenue trend data by dimension
+export interface RevenueTrendRow {
+  product: Product;
+  region: Region;
+  category: Category;
+  acv: MetricComparison<number>;
+  deals: MetricComparison<number>;
+  winRate: MetricComparison<number>;
+}
+
+// Funnel trend data by dimension
+export interface FunnelTrendRow {
+  product: Product;
+  region: Region;
+  mql: MetricComparison<number>;
+  sql: MetricComparison<number>;
+  sal: MetricComparison<number>;
+  sqo: MetricComparison<number>;
+}
+
+// Time series data point for charts
+export interface TimeSeriesDataPoint {
+  date: string;
+  value: number;
+  periodType: 'current' | 'previous';
+}
+
+// Chart data structure
+export interface TrendChartData {
+  metricName: string;
+  currentPeriod: TimeSeriesDataPoint[];
+  previousPeriod: TimeSeriesDataPoint[];
+}
+
+// Complete trend analysis response
+export interface TrendAnalysisData {
+  generatedAt: string;
+  periodInfo: TrendPeriodInfo;
+  filters: {
+    products: Product[];
+    regions: Region[];
+  };
+  revenueSummary: {
+    totalACV: MetricComparison<number>;
+    wonDeals: MetricComparison<number>;
+    pipelineACV: MetricComparison<number>;
+    avgDealSize: MetricComparison<number>;
+  };
+  funnelSummary: {
+    totalMQL: MetricComparison<number>;
+    totalSQL: MetricComparison<number>;
+    totalSAL: MetricComparison<number>;
+    totalSQO: MetricComparison<number>;
+  };
+  revenueByDimension: RevenueTrendRow[];
+  funnelByDimension: FunnelTrendRow[];
+  charts: {
+    acvTimeSeries: TrendChartData;
+    mqlTimeSeries: TrendChartData;
+    sqlTimeSeries: TrendChartData;
+  };
+}
+
+// API request parameters
+export interface TrendAnalysisRequest {
+  startDate: string;
+  endDate: string;
+  products: Product[];
+  regions: Region[];
+}
