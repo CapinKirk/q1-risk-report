@@ -17,6 +17,7 @@ import ActionItemsDashboard from '@/components/ActionItemsDashboard';
 import PipelineCoverage from '@/components/PipelineCoverage';
 import LostOpportunities from '@/components/LostOpportunities';
 import GoogleAdsPerf from '@/components/GoogleAdsPerf';
+import OpportunitiesTable from '@/components/OpportunitiesTable';
 
 // Import the pre-generated data
 import reportDataJson from '@/data/report-data.json';
@@ -96,6 +97,10 @@ function ReportContent() {
 
       <PipelineCoverage data={filteredData} />
       <LostOpportunities data={filteredData} />
+
+      {/* Opportunities Table with filtering and pagination */}
+      <OpportunitiesTable data={filteredData} selectedRegions={selectedRegions} />
+
       <GoogleAdsPerf data={filteredData} />
 
       <footer className="footer">
