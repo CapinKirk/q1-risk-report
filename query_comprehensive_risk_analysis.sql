@@ -412,6 +412,158 @@ open_pipeline AS (
 ),
 
 -- ============================================================================
+-- DEAL-LEVEL DETAIL VIEWS (for Opportunities table drill-down)
+-- Returns individual opportunity records with Salesforce links
+-- ============================================================================
+won_deals_detail AS (
+  SELECT
+    Id AS opportunity_id,
+    AccountName AS account_name,
+    Name AS opportunity_name,
+    CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
+    CASE Division
+      WHEN 'US' THEN 'AMER'
+      WHEN 'UK' THEN 'EMEA'
+      WHEN 'AU' THEN 'APAC'
+    END AS region,
+    CASE
+      WHEN Type = 'Existing Business' THEN 'EXPANSION'
+      WHEN Type = 'New Business' THEN 'NEW LOGO'
+      WHEN Type = 'Migration' THEN 'MIGRATION'
+      ELSE 'OTHER'
+    END AS category,
+    Type AS deal_type,
+    ROUND(ACV, 2) AS acv,
+    CAST(CloseDate AS STRING) AS close_date,
+    StageName AS stage,
+    true AS is_won,
+    true AS is_closed,
+    CAST(NULL AS STRING) AS loss_reason,
+    CASE
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'INBOUND' THEN 'INBOUND'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'OUTBOUND' THEN 'OUTBOUND'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'AE SOURCED' THEN 'AE SOURCED'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'AM SOURCED' THEN 'AM SOURCED'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'TRADESHOW' THEN 'TRADESHOW'
+      WHEN Type IN ('Existing Business', 'Renewal', 'Migration') THEN 'AM SOURCED'
+      ELSE 'AE SOURCED'
+    END AS source,
+    OwnerName AS owner_name,
+    OwnerId AS owner_id,
+    CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url
+  FROM `data-analytics-306119.sfdc.OpportunityViewTable`, dates d
+  WHERE Won = true
+    AND (por_record__c = true OR r360_record__c = true)
+    AND Type NOT IN ('Renewal', 'Consulting', 'Credit Card')
+    AND ACV > 0
+    AND Division IN ('US', 'UK', 'AU')
+    AND CloseDate >= d.qtd_start
+    AND CloseDate <= d.as_of_date
+),
+
+lost_deals_detail AS (
+  SELECT
+    Id AS opportunity_id,
+    AccountName AS account_name,
+    Name AS opportunity_name,
+    CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
+    CASE Division
+      WHEN 'US' THEN 'AMER'
+      WHEN 'UK' THEN 'EMEA'
+      WHEN 'AU' THEN 'APAC'
+    END AS region,
+    CASE
+      WHEN Type = 'Existing Business' THEN 'EXPANSION'
+      WHEN Type = 'New Business' THEN 'NEW LOGO'
+      WHEN Type = 'Migration' THEN 'MIGRATION'
+      ELSE 'OTHER'
+    END AS category,
+    Type AS deal_type,
+    ROUND(ACV, 2) AS acv,
+    CAST(CloseDate AS STRING) AS close_date,
+    StageName AS stage,
+    false AS is_won,
+    true AS is_closed,
+    COALESCE(ClosedLostReason, 'Not Specified') AS loss_reason,
+    CASE
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'INBOUND' THEN 'INBOUND'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'OUTBOUND' THEN 'OUTBOUND'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'AE SOURCED' THEN 'AE SOURCED'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'AM SOURCED' THEN 'AM SOURCED'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'TRADESHOW' THEN 'TRADESHOW'
+      WHEN Type IN ('Existing Business', 'Renewal', 'Migration') THEN 'AM SOURCED'
+      ELSE 'AE SOURCED'
+    END AS source,
+    OwnerName AS owner_name,
+    OwnerId AS owner_id,
+    CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url
+  FROM `data-analytics-306119.sfdc.OpportunityViewTable`, dates d
+  WHERE StageName = 'Closed Lost'
+    AND (por_record__c = true OR r360_record__c = true)
+    AND Type NOT IN ('Renewal', 'Consulting', 'Credit Card')
+    AND ACV > 0
+    AND Division IN ('US', 'UK', 'AU')
+    AND CloseDate >= d.qtd_start
+    AND CloseDate <= d.as_of_date
+),
+
+pipeline_deals_detail AS (
+  SELECT
+    Id AS opportunity_id,
+    AccountName AS account_name,
+    Name AS opportunity_name,
+    CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
+    CASE Division
+      WHEN 'US' THEN 'AMER'
+      WHEN 'UK' THEN 'EMEA'
+      WHEN 'AU' THEN 'APAC'
+    END AS region,
+    CASE
+      WHEN Type = 'Existing Business' THEN 'EXPANSION'
+      WHEN Type = 'New Business' THEN 'NEW LOGO'
+      WHEN Type = 'Migration' THEN 'MIGRATION'
+      ELSE 'OTHER'
+    END AS category,
+    Type AS deal_type,
+    ROUND(ACV, 2) AS acv,
+    CAST(CloseDate AS STRING) AS close_date,
+    StageName AS stage,
+    false AS is_won,
+    false AS is_closed,
+    CAST(NULL AS STRING) AS loss_reason,
+    CASE
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'INBOUND' THEN 'INBOUND'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'OUTBOUND' THEN 'OUTBOUND'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'AE SOURCED' THEN 'AE SOURCED'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'AM SOURCED' THEN 'AM SOURCED'
+      WHEN UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'TRADESHOW' THEN 'TRADESHOW'
+      WHEN Type IN ('Existing Business', 'Renewal', 'Migration') THEN 'AM SOURCED'
+      ELSE 'AE SOURCED'
+    END AS source,
+    OwnerName AS owner_name,
+    OwnerId AS owner_id,
+    CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url
+  FROM `data-analytics-306119.sfdc.OpportunityViewTable`
+  WHERE IsClosed = false
+    AND (por_record__c = true OR r360_record__c = true)
+    AND Type NOT IN ('Renewal', 'Consulting', 'Credit Card')
+    AND ACV > 0
+    AND Division IN ('US', 'UK', 'AU')
+    -- Pipeline filter: Created in last 6 months OR closing in next 6 months
+    AND (
+      CreatedDate >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
+      OR CloseDate <= DATE_ADD(CURRENT_DATE(), INTERVAL 6 MONTH)
+    )
+    -- Owner filter: AE/AM/Migration Specialist owned opportunities
+    AND (
+      OwnerRole LIKE '%Account Executive%'
+      OR OwnerRole LIKE '%Account Manager%'
+      OR OwnerRole = 'R360 Sales User'
+      OR OwnerRole = 'Migration Specialist'
+    )
+),
+
+-- ============================================================================
 -- FUNNEL ACTUALS FROM DAILYREVENUEFUNNEL (ALL CATEGORIES)
 -- Maps FunnelType to standardized category for matching with targets
 -- ============================================================================
@@ -2167,6 +2319,70 @@ SELECT TO_JSON_STRING(STRUCT(
     (SELECT SUM(q1_target) FROM q1_targets WHERE product = 'POR') AS POR_Q1_target,
     (SELECT SUM(q1_target) FROM q1_targets WHERE product = 'R360') AS R360_Q1_target,
     (SELECT SUM(q1_target) FROM q1_targets) AS combined_Q1_target
-  ) AS quarterly_targets
+  ) AS quarterly_targets,
+
+  -- ============================================================================
+  -- DEAL-LEVEL DATA (for Opportunities table)
+  -- ============================================================================
+
+  -- Won Deals (QTD)
+  STRUCT(
+    ARRAY(
+      SELECT AS STRUCT opportunity_id, account_name, opportunity_name, product, region, category,
+                       deal_type, acv, close_date, stage, is_won, is_closed, loss_reason,
+                       source, owner_name, owner_id, salesforce_url
+      FROM won_deals_detail
+      WHERE product = 'POR'
+      ORDER BY acv DESC
+    ) AS POR,
+    ARRAY(
+      SELECT AS STRUCT opportunity_id, account_name, opportunity_name, product, region, category,
+                       deal_type, acv, close_date, stage, is_won, is_closed, loss_reason,
+                       source, owner_name, owner_id, salesforce_url
+      FROM won_deals_detail
+      WHERE product = 'R360'
+      ORDER BY acv DESC
+    ) AS R360
+  ) AS won_deals,
+
+  -- Lost Deals (QTD)
+  STRUCT(
+    ARRAY(
+      SELECT AS STRUCT opportunity_id, account_name, opportunity_name, product, region, category,
+                       deal_type, acv, close_date, stage, is_won, is_closed, loss_reason,
+                       source, owner_name, owner_id, salesforce_url
+      FROM lost_deals_detail
+      WHERE product = 'POR'
+      ORDER BY acv DESC
+    ) AS POR,
+    ARRAY(
+      SELECT AS STRUCT opportunity_id, account_name, opportunity_name, product, region, category,
+                       deal_type, acv, close_date, stage, is_won, is_closed, loss_reason,
+                       source, owner_name, owner_id, salesforce_url
+      FROM lost_deals_detail
+      WHERE product = 'R360'
+      ORDER BY acv DESC
+    ) AS R360
+  ) AS lost_deals,
+
+  -- Pipeline Deals (Open)
+  STRUCT(
+    ARRAY(
+      SELECT AS STRUCT opportunity_id, account_name, opportunity_name, product, region, category,
+                       deal_type, acv, close_date, stage, is_won, is_closed, loss_reason,
+                       source, owner_name, owner_id, salesforce_url
+      FROM pipeline_deals_detail
+      WHERE product = 'POR'
+      ORDER BY acv DESC
+    ) AS POR,
+    ARRAY(
+      SELECT AS STRUCT opportunity_id, account_name, opportunity_name, product, region, category,
+                       deal_type, acv, close_date, stage, is_won, is_closed, loss_reason,
+                       source, owner_name, owner_id, salesforce_url
+      FROM pipeline_deals_detail
+      WHERE product = 'R360'
+      ORDER BY acv DESC
+    ) AS R360
+  ) AS pipeline_deals
 
 )) AS comprehensive_risk_analysis_json;

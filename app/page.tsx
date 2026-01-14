@@ -18,6 +18,7 @@ import PipelineCoverage from '@/components/PipelineCoverage';
 import LostOpportunities from '@/components/LostOpportunities';
 import GoogleAdsPerf from '@/components/GoogleAdsPerf';
 import OpportunitiesTable from '@/components/OpportunitiesTable';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 // Import the pre-generated data
 import reportDataJson from '@/data/report-data.json';
@@ -26,9 +27,39 @@ function ReportContent() {
   const searchParams = useSearchParams();
   const [selectedRegions, setSelectedRegions] = useState<Region[]>(['AMER', 'EMEA', 'APAC']);
   const [filteredData, setFilteredData] = useState<ReportData | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   // Load and parse data
   const rawData = reportDataJson as ReportData;
+
+  // Handle data refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    setRefreshError(null);
+
+    try {
+      const response = await fetch('/api/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.details || result.error || 'Failed to refresh data');
+      }
+
+      // Reload the page to get the new data
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Refresh error:', error);
+      setRefreshError(error.message || 'Failed to refresh data');
+      setIsRefreshing(false);
+    }
+  };
 
   // Initialize regions from URL on mount
   useEffect(() => {
@@ -52,6 +83,8 @@ function ReportContent() {
 
   return (
     <div className="container">
+      <LoadingOverlay isLoading={isRefreshing} />
+
       <div className="header-bar">
         <div>
           <h1>Q1 2026 Risk Analysis Report</h1>
@@ -61,8 +94,26 @@ function ReportContent() {
             <span>Version: {query_version || '2.7.0'}</span>
           </div>
         </div>
-        <UserMenu />
+        <div className="header-actions">
+          <button
+            className="refresh-button"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="Refresh data from BigQuery"
+          >
+            <span className="refresh-icon">↻</span>
+            Refresh Data
+          </button>
+          <UserMenu />
+        </div>
       </div>
+
+      {refreshError && (
+        <div className="refresh-error">
+          <strong>Refresh failed:</strong> {refreshError}
+          <button onClick={() => setRefreshError(null)}>×</button>
+        </div>
+      )}
 
       <RegionFilter
         selectedRegions={selectedRegions}

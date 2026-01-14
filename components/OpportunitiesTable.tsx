@@ -10,7 +10,7 @@ interface OpportunitiesTableProps {
 }
 
 type StatusFilter = 'won' | 'lost' | 'pipeline';
-type SortField = 'account_name' | 'acv' | 'close_date' | 'stage' | 'source';
+type SortField = 'opportunity_name' | 'acv' | 'close_date' | 'stage' | 'source' | 'owner_name';
 type SortDirection = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 25;
@@ -80,9 +80,9 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
       let bVal: string | number;
 
       switch (sortField) {
-        case 'account_name':
-          aVal = a.account_name.toLowerCase();
-          bVal = b.account_name.toLowerCase();
+        case 'opportunity_name':
+          aVal = (a.opportunity_name || a.account_name).toLowerCase();
+          bVal = (b.opportunity_name || b.account_name).toLowerCase();
           break;
         case 'acv':
           aVal = a.acv;
@@ -99,6 +99,10 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
         case 'source':
           aVal = a.source.toLowerCase();
           bVal = b.source.toLowerCase();
+          break;
+        case 'owner_name':
+          aVal = (a.owner_name || '').toLowerCase();
+          bVal = (b.owner_name || '').toLowerCase();
           break;
         default:
           return 0;
@@ -224,9 +228,9 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
             <tr>
               <th
                 className="sortable"
-                onClick={() => handleSort('account_name')}
+                onClick={() => handleSort('opportunity_name')}
               >
-                Opportunity{getSortIndicator('account_name')}
+                Opportunity{getSortIndicator('opportunity_name')}
               </th>
               <th>Product</th>
               <th>Region</th>
@@ -236,6 +240,12 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
                 onClick={() => handleSort('acv')}
               >
                 ACV{getSortIndicator('acv')}
+              </th>
+              <th
+                className="sortable"
+                onClick={() => handleSort('owner_name')}
+              >
+                Owner{getSortIndicator('owner_name')}
               </th>
               <th
                 className="sortable"
@@ -262,14 +272,16 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
           <tbody>
             {paginatedDeals.length === 0 ? (
               <tr>
-                <td colSpan={statusFilter === 'lost' ? 10 : 9} className="empty-row">
+                <td colSpan={statusFilter === 'lost' ? 11 : 10} className="empty-row">
                   No {statusFilter} deals found with current filters
                 </td>
               </tr>
             ) : (
               paginatedDeals.map((deal, idx) => (
                 <tr key={`${deal.opportunity_id}-${idx}`}>
-                  <td className="account-name">{deal.account_name}</td>
+                  <td className="opp-name" title={deal.opportunity_name || deal.account_name}>
+                    {deal.opportunity_name || deal.account_name}
+                  </td>
                   <td>
                     <span className={`product-badge ${deal.product.toLowerCase()}`}>
                       {deal.product}
@@ -278,6 +290,9 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
                   <td>{deal.region}</td>
                   <td className="category">{deal.category}</td>
                   <td className="right acv">{formatCurrency(deal.acv)}</td>
+                  <td className="owner-name" title={deal.owner_name || '-'}>
+                    {deal.owner_name || '-'}
+                  </td>
                   <td>{deal.close_date}</td>
                   <td>
                     <span className={`stage-badge ${getStageClass(deal.stage)}`}>
@@ -492,13 +507,21 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
           background: #f9fafb;
         }
 
-        .account-name {
+        .opp-name {
           font-weight: 500;
           color: #111827;
-          max-width: 200px;
+          max-width: 220px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+
+        .owner-name {
+          max-width: 120px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 0.75rem;
         }
 
         .product-badge {

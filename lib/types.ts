@@ -299,6 +299,7 @@ export interface TopRiskPocket {
 export interface DealDetail {
   opportunity_id: string;
   account_name: string;
+  opportunity_name: string;
   product: Product;
   region: Region;
   category: Category;
@@ -310,6 +311,7 @@ export interface DealDetail {
   is_closed: boolean;
   loss_reason: string | null;
   source: Source;
+  owner_name: string;
   owner_id: string;
   salesforce_url: string;
 }
