@@ -22,26 +22,14 @@ export default function RegionFilter({ selectedRegions, onRegionChange }: Region
   };
 
   const handleRegionClick = (region: Region) => {
-    let newRegions: Region[];
-
-    if (selectedRegions.includes(region)) {
-      // Remove region (unless it's the last one)
-      newRegions = selectedRegions.filter(r => r !== region);
-      if (newRegions.length === 0) {
-        newRegions = ALL_REGIONS;
-      }
-    } else {
-      // Add region
-      newRegions = [...selectedRegions.filter(r => ALL_REGIONS.includes(r)), region];
-    }
-
-    // If all regions are selected, show as ALL
-    if (newRegions.length === 3) {
+    // Simple single-select: clicking a region selects only that region
+    // If the region is already the only one selected, go back to all
+    if (selectedRegions.length === 1 && selectedRegions[0] === region) {
       onRegionChange(ALL_REGIONS);
       router.push('?region=ALL', { scroll: false });
     } else {
-      onRegionChange(newRegions);
-      router.push(`?region=${newRegions.join(',')}`, { scroll: false });
+      onRegionChange([region]);
+      router.push(`?region=${region}`, { scroll: false });
     }
   };
 
