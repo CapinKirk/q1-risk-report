@@ -22,6 +22,7 @@ import LostOpportunities from '@/components/LostOpportunities';
 import GoogleAdsPerf from '@/components/GoogleAdsPerf';
 import OpportunitiesTable from '@/components/OpportunitiesTable';
 import LoadingOverlay from '@/components/LoadingOverlay';
+import AIAnalysis from '@/components/AIAnalysis';
 
 // Import the pre-generated data as fallback
 import reportDataJson from '@/data/report-data.json';
@@ -537,6 +538,9 @@ function ReportContent() {
       <OpportunitiesTable data={filteredData} selectedRegions={selectedRegions} />
 
       <GoogleAdsPerf data={filteredData} />
+
+      {/* AI-Powered Analysis & Recommendations */}
+      <AIAnalysis reportData={filteredData} />
 
       <footer className="footer">
         <p>
