@@ -4,6 +4,8 @@ import { useState, useMemo } from 'react';
 import { DealDetail } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatters';
 
+const ITEMS_PER_PAGE = 25;
+
 interface DealListModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -24,6 +26,7 @@ export default function DealListModal({
 }: DealListModalProps) {
   const [sortField, setSortField] = useState<SortField>('acv');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const sortedDeals = useMemo(() => {
     return [...deals].sort((a, b) => {
@@ -47,7 +50,15 @@ export default function DealListModal({
     return deals.reduce((sum, d) => sum + (d.acv || 0), 0);
   }, [deals]);
 
+  // Pagination
+  const totalPages = Math.ceil(sortedDeals.length / ITEMS_PER_PAGE);
+  const paginatedDeals = sortedDeals.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   const handleSort = (field: SortField) => {
+    setCurrentPage(1); // Reset page when sorting changes
     if (field === sortField) {
       setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
     } else {
@@ -130,7 +141,7 @@ export default function DealListModal({
               </tr>
             </thead>
             <tbody>
-              {sortedDeals.map((deal, idx) => (
+              {paginatedDeals.map((deal, idx) => (
                 <tr key={idx}>
                   <td className="account-cell">{deal.account_name}</td>
                   <td className="right">{formatCurrency(deal.acv)}</td>
@@ -152,6 +163,39 @@ export default function DealListModal({
               ))}
             </tbody>
           </table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(1)}
+              >
+                « First
+              </button>
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              >
+                ‹ Prev
+              </button>
+              <span className="page-info">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              >
+                Next ›
+              </button>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+              >
+                Last »
+              </button>
+            </div>
+          )}
         </div>
 
         <style jsx>{`
@@ -283,6 +327,37 @@ export default function DealListModal({
           }
           .center {
             text-align: center;
+          }
+          .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            padding: 8px;
+            border-top: 1px solid #e5e7eb;
+          }
+          .pagination button {
+            padding: 4px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background: white;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.15s;
+          }
+          .pagination button:hover:not(:disabled) {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+          }
+          .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+          .page-info {
+            padding: 0 12px;
+            font-size: 0.7rem;
+            color: #6b7280;
           }
         `}</style>
       </div>

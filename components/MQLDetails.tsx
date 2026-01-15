@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import { MQLDetailRow, Product, Region } from '@/lib/types';
 
+const ITEMS_PER_PAGE = 25;
+
 interface MQLDetailsProps {
   mqlDetails: {
     POR: MQLDetailRow[];
@@ -15,6 +17,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
   const [selectedRegion, setSelectedRegion] = useState<Region | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Combine and filter MQL data
   const filteredMQLs = useMemo(() => {
@@ -61,6 +64,19 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
     const revertedRate = total > 0 ? (reverted / total) * 100 : 0;
     return { total, converted, reverted, stalled, active, conversionRate, revertedRate };
   }, [filteredMQLs]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredMQLs.length / ITEMS_PER_PAGE);
+  const paginatedMQLs = filteredMQLs.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset page when filters change
+  const handleFilterChange = (setter: (v: any) => void, value: any) => {
+    setter(value);
+    setCurrentPage(1);
+  };
 
   const hasPOR = mqlDetails.POR.length > 0;
   const hasR360 = mqlDetails.R360.length > 0;
@@ -123,7 +139,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
       <div className="mql-filters">
         <div className="filter-group">
           <label>Product:</label>
-          <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value as Product | 'ALL')}>
+          <select value={selectedProduct} onChange={(e) => handleFilterChange(setSelectedProduct, e.target.value as Product | 'ALL')}>
             <option value="ALL">All Products</option>
             {hasPOR && <option value="POR">POR</option>}
             {hasR360 && <option value="R360">R360</option>}
@@ -131,7 +147,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         </div>
         <div className="filter-group">
           <label>Region:</label>
-          <select value={selectedRegion} onChange={(e) => setSelectedRegion(e.target.value as Region | 'ALL')}>
+          <select value={selectedRegion} onChange={(e) => handleFilterChange(setSelectedRegion, e.target.value as Region | 'ALL')}>
             <option value="ALL">All Regions</option>
             <option value="AMER">AMER</option>
             <option value="EMEA">EMEA</option>
@@ -140,7 +156,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         </div>
         <div className="filter-group">
           <label>Status:</label>
-          <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+          <select value={selectedStatus} onChange={(e) => handleFilterChange(setSelectedStatus, e.target.value)}>
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
             <option value="CONVERTED">Converted to SQL</option>
@@ -154,8 +170,11 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
             type="text"
             placeholder="Company, email, or source..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleFilterChange(setSearchTerm, e.target.value)}
           />
+        </div>
+        <div className="filter-group count">
+          <span className="result-count">{filteredMQLs.length} records</span>
         </div>
       </div>
 
@@ -175,14 +194,14 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
             </tr>
           </thead>
           <tbody>
-            {filteredMQLs.length === 0 ? (
+            {paginatedMQLs.length === 0 ? (
               <tr>
                 <td colSpan={8} style={{ textAlign: 'center', padding: '20px', color: '#6b7280' }}>
                   No MQLs found matching the filters
                 </td>
               </tr>
             ) : (
-              filteredMQLs.slice(0, 50).map((mql, idx) => (
+              paginatedMQLs.map((mql, idx) => (
                 <tr key={`${mql.record_id}-${idx}`}>
                   <td>
                     <span className={`product-badge ${mql.product.toLowerCase()}`}>
@@ -223,12 +242,40 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
             )}
           </tbody>
         </table>
-        {filteredMQLs.length > 50 && (
-          <p style={{ fontSize: '10px', color: '#6b7280', marginTop: '8px', textAlign: 'center' }}>
-            Showing 50 of {filteredMQLs.length} MQLs
-          </p>
-        )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(1)}
+          >
+            « First
+          </button>
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+          >
+            ‹ Prev
+          </button>
+          <span className="page-info">
+            Page {currentPage} of {totalPages} ({filteredMQLs.length} total)
+          </span>
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+          >
+            Next ›
+          </button>
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(totalPages)}
+          >
+            Last »
+          </button>
+        </div>
+      )}
 
       <style jsx>{`
         .mql-details-section {
@@ -369,9 +416,49 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
           color: #2563eb;
           text-decoration: none;
           font-weight: 500;
+          padding: 2px 6px;
+          background: #eff6ff;
+          border-radius: 3px;
+          font-size: 0.65rem;
         }
         .sf-link:hover {
+          background: #dbeafe;
           text-decoration: underline;
+        }
+        .result-count {
+          font-size: 0.7rem;
+          color: #6b7280;
+          font-weight: 500;
+        }
+        .pagination {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 8px;
+          margin-top: 12px;
+          padding: 8px;
+        }
+        .pagination button {
+          padding: 4px 10px;
+          border: 1px solid #d1d5db;
+          border-radius: 4px;
+          background: white;
+          font-size: 0.7rem;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .pagination button:hover:not(:disabled) {
+          background: #f3f4f6;
+          border-color: #9ca3af;
+        }
+        .pagination button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        .page-info {
+          padding: 0 12px;
+          font-size: 0.7rem;
+          color: #6b7280;
         }
       `}</style>
         </>

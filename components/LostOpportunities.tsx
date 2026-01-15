@@ -1,11 +1,17 @@
+'use client';
+
+import { useState } from 'react';
 import { ReportData, LossReasonRow } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatters';
+
+const ITEMS_PER_PAGE = 15;
 
 interface LostOpportunitiesProps {
   data: ReportData;
 }
 
 export default function LostOpportunities({ data }: LostOpportunitiesProps) {
+  const [currentPage, setCurrentPage] = useState(1);
   const { product_totals, attainment_detail, loss_reason_rca } = data;
 
   // Lost by Product
@@ -46,8 +52,14 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
   ];
 
   const sortedLosses = [...allLosses]
-    .sort((a, b) => (b.lost_acv || 0) - (a.lost_acv || 0))
-    .slice(0, 15);
+    .sort((a, b) => (b.lost_acv || 0) - (a.lost_acv || 0));
+
+  // Pagination for loss reasons
+  const totalPages = Math.ceil(sortedLosses.length / ITEMS_PER_PAGE);
+  const paginatedLosses = sortedLosses.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const getSeverityClass = (severity: string) => {
     if (severity === 'CRITICAL') return 'red';
@@ -124,7 +136,7 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
       </div>
 
       {/* Top Loss Reasons */}
-      <h3>Top Loss Reasons (sorted by ACV impact)</h3>
+      <h3>Loss Reasons (sorted by ACV impact) - {sortedLosses.length} total</h3>
       <div className="table-wrap">
         <table>
           <thead>
@@ -138,7 +150,7 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
             </tr>
           </thead>
           <tbody>
-            {sortedLosses.map((row, idx) => {
+            {paginatedLosses.map((row, idx) => {
               const reason = (row.loss_reason || 'Unknown').length > 25
                 ? row.loss_reason?.substring(0, 22) + '...'
                 : row.loss_reason || 'Unknown';
@@ -147,7 +159,7 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
                 <tr key={`loss-${idx}`}>
                   <td>{row.product}</td>
                   <td>{row.region}</td>
-                  <td>{reason}</td>
+                  <td title={row.loss_reason || 'Unknown'}>{reason}</td>
                   <td className="right">{Math.round(row.deal_count || 0)}</td>
                   <td className="right red">{formatCurrency(row.lost_acv)}</td>
                   <td className={`${getSeverityClass(row.severity || 'LOW')} center`}>{row.severity || 'LOW'}</td>
@@ -156,6 +168,82 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
             })}
           </tbody>
         </table>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '12px',
+            padding: '8px'
+          }}>
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(1)}
+              style={{
+                padding: '4px 10px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                background: 'white',
+                fontSize: '0.75rem',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                opacity: currentPage === 1 ? 0.5 : 1
+              }}
+            >
+              « First
+            </button>
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              style={{
+                padding: '4px 10px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                background: 'white',
+                fontSize: '0.75rem',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                opacity: currentPage === 1 ? 0.5 : 1
+              }}
+            >
+              ‹ Prev
+            </button>
+            <span style={{ padding: '0 12px', fontSize: '0.75rem', color: '#6b7280' }}>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              style={{
+                padding: '4px 10px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                background: 'white',
+                fontSize: '0.75rem',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                opacity: currentPage === totalPages ? 0.5 : 1
+              }}
+            >
+              Next ›
+            </button>
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              style={{
+                padding: '4px 10px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                background: 'white',
+                fontSize: '0.75rem',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                opacity: currentPage === totalPages ? 0.5 : 1
+              }}
+            >
+              Last »
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

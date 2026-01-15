@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import { SQLDetailRow, Product, Region } from '@/lib/types';
 
+const ITEMS_PER_PAGE = 25;
+
 interface SQLDetailsProps {
   sqlDetails: {
     POR: SQLDetailRow[];
@@ -15,6 +17,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
   const [selectedRegion, setSelectedRegion] = useState<Region | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Combine and filter SQL data
   const filteredSQLs = useMemo(() => {
@@ -72,6 +75,19 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
     const uniqueStatuses = Array.from(new Set(allSQLs.map(s => s.sql_status))).filter(Boolean);
     return uniqueStatuses.sort();
   }, [sqlDetails]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredSQLs.length / ITEMS_PER_PAGE);
+  const paginatedSQLs = filteredSQLs.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset page when filters change
+  const handleFilterChange = (setter: (v: any) => void, value: any) => {
+    setter(value);
+    setCurrentPage(1);
+  };
 
   const hasPOR = sqlDetails.POR.length > 0;
   const hasR360 = sqlDetails.R360.length > 0;
@@ -143,7 +159,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
       <div className="sql-filters">
         <div className="filter-group">
           <label>Product:</label>
-          <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value as Product | 'ALL')}>
+          <select value={selectedProduct} onChange={(e) => handleFilterChange(setSelectedProduct, e.target.value as Product | 'ALL')}>
             <option value="ALL">All Products</option>
             {hasPOR && <option value="POR">POR</option>}
             {hasR360 && <option value="R360">R360</option>}
@@ -151,7 +167,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
         </div>
         <div className="filter-group">
           <label>Region:</label>
-          <select value={selectedRegion} onChange={(e) => setSelectedRegion(e.target.value as Region | 'ALL')}>
+          <select value={selectedRegion} onChange={(e) => handleFilterChange(setSelectedRegion, e.target.value as Region | 'ALL')}>
             <option value="ALL">All Regions</option>
             <option value="AMER">AMER</option>
             <option value="EMEA">EMEA</option>
@@ -160,7 +176,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
         </div>
         <div className="filter-group">
           <label>Status:</label>
-          <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+          <select value={selectedStatus} onChange={(e) => handleFilterChange(setSelectedStatus, e.target.value)}>
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
             <option value="CONVERTED_SAL">Converted to SAL</option>
@@ -176,8 +192,11 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
             type="text"
             placeholder="Company, email, opp name, or loss reason..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleFilterChange(setSearchTerm, e.target.value)}
           />
+        </div>
+        <div className="filter-group count">
+          <span className="result-count">{filteredSQLs.length} records</span>
         </div>
       </div>
 
@@ -199,15 +218,16 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
             </tr>
           </thead>
           <tbody>
-            {filteredSQLs.length === 0 ? (
+            {paginatedSQLs.length === 0 ? (
               <tr>
                 <td colSpan={10} style={{ textAlign: 'center', padding: '20px', color: '#6b7280' }}>
                   No SQLs found matching the filters
                 </td>
               </tr>
             ) : (
-              filteredSQLs.slice(0, 100).map((sql, idx) => {
+              paginatedSQLs.map((sql, idx) => {
                 const statusStyle = getStatusColor(sql.sql_status);
+                const hasOpp = sql.has_opportunity === 'Yes' || (sql.opportunity_id && sql.opportunity_id !== '');
                 return (
                   <tr key={`${sql.record_id}-${idx}`}>
                     <td>
@@ -237,10 +257,9 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
                       </span>
                     </td>
                     <td className="opp-cell">
-                      {sql.has_opportunity === 'Yes' ? (
-                        <span title={sql.opportunity_name || ''}>
-                          {sql.opportunity_stage || 'Yes'}
-                          {sql.opportunity_acv ? ` ($${(sql.opportunity_acv / 1000).toFixed(0)}K)` : ''}
+                      {hasOpp ? (
+                        <span title={sql.opportunity_name || ''} style={{ color: '#16a34a' }}>
+                          {sql.opportunity_name ? (sql.opportunity_name.length > 18 ? sql.opportunity_name.substring(0, 18) + '...' : sql.opportunity_name) : 'Yes'}
                         </span>
                       ) : (
                         <span style={{ color: '#9ca3af' }}>No Opp</span>
@@ -264,10 +283,10 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
                         href={sql.salesforce_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="sf-link"
-                        title="Open in Salesforce"
+                        className={`sf-link ${hasOpp ? 'opp-link' : ''}`}
+                        title={hasOpp ? `Open Opportunity: ${sql.opportunity_name || 'View'}` : 'Open Lead in Salesforce'}
                       >
-                        View
+                        {hasOpp ? 'Opp' : 'Lead'}
                       </a>
                     </td>
                   </tr>
@@ -276,12 +295,40 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
             )}
           </tbody>
         </table>
-        {filteredSQLs.length > 100 && (
-          <p style={{ fontSize: '10px', color: '#6b7280', marginTop: '8px', textAlign: 'center' }}>
-            Showing 100 of {filteredSQLs.length} SQLs
-          </p>
-        )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(1)}
+          >
+            « First
+          </button>
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+          >
+            ‹ Prev
+          </button>
+          <span className="page-info">
+            Page {currentPage} of {totalPages} ({filteredSQLs.length} total)
+          </span>
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+          >
+            Next ›
+          </button>
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(totalPages)}
+          >
+            Last »
+          </button>
+        </div>
+      )}
 
       {/* Loss Reason Summary */}
       {stats.lost > 0 && (
@@ -447,9 +494,55 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
           text-decoration: none;
           font-weight: 500;
           font-size: 0.65rem;
+          padding: 2px 6px;
+          background: #eff6ff;
+          border-radius: 3px;
         }
         .sf-link:hover {
+          background: #dbeafe;
           text-decoration: underline;
+        }
+        .sf-link.opp-link {
+          background: #dcfce7;
+          color: #166534;
+        }
+        .sf-link.opp-link:hover {
+          background: #bbf7d0;
+        }
+        .result-count {
+          font-size: 0.7rem;
+          color: #6b7280;
+          font-weight: 500;
+        }
+        .pagination {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 8px;
+          margin-top: 12px;
+          padding: 8px;
+        }
+        .pagination button {
+          padding: 4px 10px;
+          border: 1px solid #d1d5db;
+          border-radius: 4px;
+          background: white;
+          font-size: 0.7rem;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .pagination button:hover:not(:disabled) {
+          background: #f3f4f6;
+          border-color: #9ca3af;
+        }
+        .pagination button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        .page-info {
+          padding: 0 12px;
+          font-size: 0.7rem;
+          color: #6b7280;
         }
         .loss-summary {
           margin-top: 16px;

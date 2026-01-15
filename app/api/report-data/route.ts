@@ -860,7 +860,7 @@ async function getSQLDetails(filters: ReportFilters) {
       }).join(', ')})`
     : '';
 
-  // POR SQL details query - simplified without opportunity join
+  // POR SQL details query - includes opportunity info from InboundFunnel
   const porQuery = `
     SELECT
       'POR' AS product,
@@ -870,7 +870,9 @@ async function getSQLDetails(filters: ReportFilters) {
         WHEN 'AU' THEN 'APAC'
       END AS region,
       COALESCE(LeadId, ContactId) AS record_id,
+      -- Link to opportunity if available, otherwise lead/contact
       CASE
+        WHEN OpportunityID IS NOT NULL AND OpportunityID != '' THEN OpportunityLink
         WHEN LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', LeadId)
         ELSE CONCAT('https://por.my.salesforce.com/', ContactId)
       END AS salesforce_url,
@@ -882,15 +884,15 @@ async function getSQLDetails(filters: ReportFilters) {
       DATE_DIFF(CAST(SQL_DT AS DATE), CAST(MQL_DT AS DATE), DAY) AS days_mql_to_sql,
       CASE WHEN SAL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
       CASE WHEN SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-      'No' AS has_opportunity,
+      CASE WHEN OpportunityID IS NOT NULL AND OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
       CASE
         WHEN SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
         WHEN SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
         WHEN DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
         ELSE 'ACTIVE'
       END AS sql_status,
-      CAST(NULL AS STRING) AS opportunity_id,
-      CAST(NULL AS STRING) AS opportunity_name,
+      OpportunityID AS opportunity_id,
+      OpportunityName AS opportunity_name,
       CAST(NULL AS STRING) AS opportunity_stage,
       CAST(NULL AS FLOAT64) AS opportunity_acv,
       'N/A' AS loss_reason,
@@ -904,10 +906,9 @@ async function getSQLDetails(filters: ReportFilters) {
       AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
       ${regionClause}
     ORDER BY SQL_DT DESC
-    LIMIT 200
   `;
 
-  // R360 SQL details query - simplified without opportunity join
+  // R360 SQL details query - includes opportunity info from R360InboundFunnel
   const r360RegionClause = filters.regions && filters.regions.length > 0
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
@@ -917,7 +918,11 @@ async function getSQLDetails(filters: ReportFilters) {
       'R360' AS product,
       Region AS region,
       LeadId AS record_id,
-      CONCAT('https://por.my.salesforce.com/', LeadId) AS salesforce_url,
+      -- Link to opportunity if available, otherwise lead
+      CASE
+        WHEN OpportunityID IS NOT NULL AND OpportunityID != '' THEN OpportunityLink
+        ELSE COALESCE(LeadLink, CONCAT('https://por.my.salesforce.com/', LeadId))
+      END AS salesforce_url,
       COALESCE(Company, 'Unknown') AS company_name,
       Email AS email,
       SDRSource AS source,
@@ -926,14 +931,14 @@ async function getSQLDetails(filters: ReportFilters) {
       DATE_DIFF(CAST(SQL_DT AS DATE), CAST(MQL_DT AS DATE), DAY) AS days_mql_to_sql,
       'N/A' AS converted_to_sal,
       CASE WHEN SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-      'No' AS has_opportunity,
+      CASE WHEN OpportunityID IS NOT NULL AND OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
       CASE
         WHEN SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
         WHEN DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
         ELSE 'ACTIVE'
       END AS sql_status,
-      CAST(NULL AS STRING) AS opportunity_id,
-      CAST(NULL AS STRING) AS opportunity_name,
+      OpportunityID AS opportunity_id,
+      OpportunityName AS opportunity_name,
       CAST(NULL AS STRING) AS opportunity_stage,
       CAST(NULL AS FLOAT64) AS opportunity_acv,
       'N/A' AS loss_reason,
@@ -946,7 +951,6 @@ async function getSQLDetails(filters: ReportFilters) {
       AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
       ${r360RegionClause}
     ORDER BY SQL_DT DESC
-    LIMIT 200
   `;
 
   try {
