@@ -8,6 +8,16 @@ interface AnalysisRequest {
   analysisType: 'bookings_miss' | 'pipeline_risk' | 'full_report';
 }
 
+// Normalize attainment_detail to flat array (handles both API and frontend formats)
+function normalizeAttainmentDetail(attainment_detail: any): any[] {
+  if (!attainment_detail) return [];
+  if (Array.isArray(attainment_detail)) return attainment_detail;
+  // Handle {POR: [], R360: []} format from frontend
+  const porData = attainment_detail.POR || [];
+  const r360Data = attainment_detail.R360 || [];
+  return [...porData, ...r360Data];
+}
+
 // Build the analysis prompt based on report data
 function buildAnalysisPrompt(reportData: any, analysisType: string): string {
   const { period, grand_total, product_totals, attainment_detail, funnel_by_category, pipeline_rca, loss_reason_rca } = reportData;
@@ -16,8 +26,11 @@ function buildAnalysisPrompt(reportData: any, analysisType: string): string {
   const porTotal = product_totals?.POR || {};
   const r360Total = product_totals?.R360 || {};
 
+  // Normalize attainment data to flat array
+  const allAttainment = normalizeAttainmentDetail(attainment_detail);
+
   // Identify misses (segments below 90% attainment)
-  const misses = (attainment_detail || []).filter((row: any) => row.qtd_attainment_pct < 90);
+  const misses = allAttainment.filter((row: any) => row.qtd_attainment_pct < 90);
   const criticalMisses = misses.filter((row: any) => row.qtd_attainment_pct < 70);
 
   // Get funnel bottlenecks
@@ -62,7 +75,7 @@ function buildAnalysisPrompt(reportData: any, analysisType: string): string {
 - Lost Deals: ${r360Total.total_lost_deals || 0} worth $${(r360Total.total_lost_acv || 0).toLocaleString()}
 
 ## Segment-Level Attainment (All Segments)
-${(attainment_detail || []).map((row: any) =>
+${allAttainment.map((row: any) =>
   `- ${row.product} ${row.region} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
 ).join('\n')}
 
