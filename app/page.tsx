@@ -248,7 +248,7 @@ function transformAPIResponse(apiData: any): ReportData {
     funnel_by_category: funnelByProduct,
     funnel_by_source: { POR: [], R360: [] },
     pipeline_rca: pipelineRcaData,
-    loss_reason_rca: { POR: [], R360: [] },
+    loss_reason_rca: apiData.loss_reason_rca || { POR: [], R360: [] },
     google_ads: googleAdsData,
     google_ads_rca: { POR: [], R360: [] },
     funnel_rca_insights: { POR: [], R360: [] },

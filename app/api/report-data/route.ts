@@ -549,6 +549,105 @@ async function getSourceTargets(filters: ReportFilters) {
   }
 }
 
+// Query for pipeline age by product/region/category
+async function getPipelineAge(filters: ReportFilters) {
+  const productClause = filters.products && filters.products.length > 0
+    ? `AND (
+        (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
+        (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
+      )`
+    : '';
+
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND Division IN (${filters.regions.map(r => {
+        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
+        return `'${map[r]}'`;
+      }).join(', ')})`
+    : '';
+
+  const query = `
+    SELECT
+      CASE WHEN por_record__c THEN 'POR' ELSE 'R360' END AS product,
+      CASE Division
+        WHEN 'US' THEN 'AMER'
+        WHEN 'UK' THEN 'EMEA'
+        WHEN 'AU' THEN 'APAC'
+      END AS region,
+      CASE Type
+        WHEN 'Existing Business' THEN 'EXPANSION'
+        WHEN 'New Business' THEN 'NEW LOGO'
+        WHEN 'Migration' THEN 'MIGRATION'
+        ELSE 'OTHER'
+      END AS category,
+      ROUND(AVG(DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY)), 0) AS avg_age_days
+    FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
+    WHERE IsClosed = false
+      AND Type NOT IN ('Renewal', 'Credit Card', 'Consulting')
+      AND ACV > 0
+      AND Division IN ('US', 'UK', 'AU')
+      ${productClause}
+      ${regionClause}
+    GROUP BY 1, 2, 3
+    ORDER BY 1, 2, 3
+  `;
+
+  try {
+    const [rows] = await getBigQuery().query({ query });
+    return rows;
+  } catch (error) {
+    console.warn('Pipeline age query failed:', error);
+    return [];
+  }
+}
+
+// Query for loss reason RCA - aggregate lost deals by reason
+async function getLossReasonRCA(filters: ReportFilters) {
+  const productClause = filters.products && filters.products.length > 0
+    ? `AND (
+        (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
+        (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
+      )`
+    : '';
+
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND Division IN (${filters.regions.map(r => {
+        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
+        return `'${map[r]}'`;
+      }).join(', ')})`
+    : '';
+
+  const query = `
+    SELECT
+      CASE WHEN por_record__c THEN 'POR' ELSE 'R360' END AS product,
+      CASE Division
+        WHEN 'US' THEN 'AMER'
+        WHEN 'UK' THEN 'EMEA'
+        WHEN 'AU' THEN 'APAC'
+      END AS region,
+      COALESCE(ClosedLostReason, 'Not Specified') AS loss_reason,
+      COUNT(*) AS deal_count,
+      ROUND(SUM(ACV), 2) AS lost_acv
+    FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
+    WHERE StageName = 'Closed Lost'
+      AND CloseDate >= '${filters.startDate}'
+      AND CloseDate <= '${filters.endDate}'
+      AND Type NOT IN ('Renewal', 'Credit Card', 'Consulting')
+      AND Division IN ('US', 'UK', 'AU')
+      ${productClause}
+      ${regionClause}
+    GROUP BY 1, 2, 3
+    ORDER BY lost_acv DESC
+  `;
+
+  try {
+    const [rows] = await getBigQuery().query({ query });
+    return rows;
+  } catch (error) {
+    console.warn('Loss reason RCA query failed:', error);
+    return [];
+  }
+}
+
 // Query for Google Ads data
 async function getGoogleAds(filters: ReportFilters) {
   const query = `
@@ -694,6 +793,8 @@ export async function POST(request: Request) {
       googleAds,
       sourceActualsRaw,
       sourceTargetsRaw,
+      pipelineAgeData,
+      lossReasonData,
     ] = await Promise.all([
       getRevenueActuals(filters),
       getTargets(filters),
@@ -709,6 +810,8 @@ export async function POST(request: Request) {
       getGoogleAds(filters),
       getSourceActuals(filters),
       getSourceTargets(filters),
+      getPipelineAge(filters),
+      getLossReasonRCA(filters),
     ]);
 
     // Calculate period info
@@ -946,17 +1049,26 @@ export async function POST(request: Request) {
       }
     }
 
+    // Build pipeline age map from query results
+    const pipelineAgeMap = new Map<string, number>();
+    for (const ageRow of pipelineAgeData as any[]) {
+      const key = `${ageRow.product}-${ageRow.region}-${ageRow.category}`;
+      pipelineAgeMap.set(key, parseInt(ageRow.avg_age_days) || 0);
+    }
+
     // Build pipeline RCA data
     const pipelineRca: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
     for (const detail of attainmentDetail) {
       if (detail.pipeline_acv > 0) {
         const health = detail.pipeline_coverage_x >= 3 ? 'HEALTHY' : detail.pipeline_coverage_x >= 2 ? 'ADEQUATE' : 'AT RISK';
+        const ageKey = `${detail.product}-${detail.region}-${detail.category}`;
+        const avgAge = pipelineAgeMap.get(ageKey) || 0;
         const rcaRow = {
           region: detail.region,
           category: detail.category,
           pipeline_acv: detail.pipeline_acv,
           pipeline_coverage_x: detail.pipeline_coverage_x,
-          pipeline_avg_age_days: 30, // Default - would need separate query for actual
+          pipeline_avg_age_days: avgAge,
           pipeline_health: health,
         };
         if (detail.product === 'POR') {
@@ -964,6 +1076,33 @@ export async function POST(request: Request) {
         } else {
           pipelineRca.R360.push(rcaRow);
         }
+      }
+    }
+
+    // Build loss reason RCA data
+    const lossReasonRca: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
+    for (const lossRow of lossReasonData as any[]) {
+      const lostAcv = parseFloat(lossRow.lost_acv) || 0;
+      const dealCount = parseInt(lossRow.deal_count) || 0;
+
+      // Determine severity based on ACV impact
+      let severity = 'LOW';
+      if (lostAcv >= 50000) severity = 'CRITICAL';
+      else if (lostAcv >= 20000) severity = 'HIGH';
+      else if (lostAcv >= 5000) severity = 'MEDIUM';
+
+      const rcaRow = {
+        region: lossRow.region,
+        loss_reason: lossRow.loss_reason,
+        deal_count: dealCount,
+        lost_acv: lostAcv,
+        severity,
+      };
+
+      if (lossRow.product === 'POR') {
+        lossReasonRca.POR.push(rcaRow);
+      } else {
+        lossReasonRca.R360.push(rcaRow);
       }
     }
 
@@ -1044,6 +1183,7 @@ export async function POST(request: Request) {
       funnel_pacing: funnelPacing,
       google_ads: googleAdsData,
       pipeline_rca: pipelineRca,
+      loss_reason_rca: lossReasonRca,
       won_deals: wonDeals,
       lost_deals: lostDeals,
       pipeline_deals: pipelineDeals,
