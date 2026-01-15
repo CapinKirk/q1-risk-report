@@ -6,55 +6,43 @@ Interactive web dashboard for Q1 2026 Bookings Risk Analysis with real-time BigQ
 
 ## Features
 
-- **Executive Summary**: Key metrics at a glance (Q1 targets, QTD actuals, pipeline coverage)
-- **Attainment by Region & Product**: POR and R360 breakdown with RAG status
-- **Source Attainment**: Channel performance (Inbound, Outbound, AE/AM Sourced)
-- **Full Funnel Analysis**: MQL → SQL → SAL → SQO progression with Salesforce links
-- **Trend Analysis**: Period-over-period comparison with charts
+- **Executive Summary**: Q1 targets, QTD actuals, pipeline coverage
+- **Attainment by Region & Product**: POR and R360 with RAG status
+- **Source Attainment**: Inbound, Outbound, AE/AM Sourced
+- **Full Funnel Analysis**: MQL → SQL → SAL → SQO with Salesforce links
+- **Google Ads Performance**: Impressions, clicks, CTR, CPC, CPA by product
+- **Trend Analysis**: Period-over-period comparison charts
 - **Pipeline Coverage**: Health analysis by region
-- **Lost Opportunities**: Loss reasons and impact analysis
-- **Google Ads Performance**: Marketing metrics
-
-### Filtering
-
-- **Products**: POR, R360, or both
-- **Regions**: AMER, EMEA, APAC
-- **Date Range**: Custom date selection
+- **Lost Opportunities**: Loss reasons and impact
 
 ## Quick Start
 
 ```bash
 npm install          # Install dependencies
-npm run dev          # Start dev server (localhost:3000)
+npm run dev          # Dev server (localhost:3000)
 npm run build        # Production build
-npm run lint         # Check code style
+npx playwright test  # Run E2E tests
 ```
 
 ## Project Structure
 
 ```
 q1-risk-report/
-├── .claude/            # AI agent configuration
-│   ├── CLAUDE.md       # Main AI context
-│   └── rules/          # Code style, BigQuery patterns
-├── app/                # Next.js App Router
-│   ├── api/            # API routes (BigQuery)
-│   ├── analysis/       # Trend analysis page
-│   └── auth/           # Authentication
-├── components/         # React components
-├── lib/                # Utilities and types
-├── types/              # TypeScript definitions
-├── sql/                # SQL queries (organized)
-│   ├── reports/        # Report generation
-│   └── diagnostics/    # Validation queries
-├── scripts/            # Python scripts
-├── data/               # Generated data
-├── docs/               # Documentation
-│   ├── architecture/   # System design
-│   ├── reports/        # Analysis reports
-│   └── qa/             # QA documentation
-├── tests/              # Playwright tests
-└── archive/            # Historical reference
+├── CLAUDE.md               # AI agent context
+├── .claude/rules/          # Path-scoped rules (bigquery.md, code-style.md)
+├── app/                    # Next.js App Router
+│   ├── api/                # API routes (BigQuery)
+│   ├── analysis/           # Trend analysis page
+│   └── auth/               # Authentication
+├── components/             # React components (25 files)
+├── lib/                    # Utilities and types
+├── sql/                    # SQL queries
+│   ├── reports/            # Report generation
+│   ├── diagnostics/        # Validation queries
+│   └── schemas/            # Data lineage docs
+├── scripts/                # Python scripts
+├── tests/                  # Playwright tests
+└── archive/                # Historical files
 ```
 
 ## Tech Stack
@@ -71,31 +59,26 @@ q1-risk-report/
 
 ## Data Sources
 
-- **OpportunityViewTable**: Won/Lost deals, ACV
-- **InboundFunnel**: POR MQL/SQL/SAL/SQO
-- **R360InboundFunnel**: R360 funnel metrics
-- **StrategicOperatingPlan**: Q1 targets (P50)
-- **GoogleAds**: Ad performance
-
-## Authentication
-
-Access restricted to `@pointofrental.com` and `@record360.com` emails via Google OAuth.
+| Dataset | Table | Purpose |
+|---------|-------|---------|
+| sfdc | OpportunityViewTable | Won/Lost deals, ACV |
+| sfdc | StrategicOperatingPlan | Q1 targets (P50) |
+| MarketingFunnel | InboundFunnel | POR MQL/SQL/SAL/SQO |
+| MarketingFunnel | R360InboundFunnel | R360 funnel metrics |
+| GoogleAds_POR_* | ads_CampaignBasicStats | POR ad performance |
+| GoogleAds_Record360_* | ads_CampaignBasicStats | R360 ad performance |
 
 ## Environment Variables
 
 ```bash
-GOOGLE_CREDENTIALS_JSON={"type":"service_account",...}
-GOOGLE_CLOUD_PROJECT=data-analytics-306119
-NEXTAUTH_SECRET=your-secret
-NEXTAUTH_URL=https://your-domain.vercel.app
+GOOGLE_CREDENTIALS_JSON    # BigQuery service account
+GOOGLE_CLOUD_PROJECT       # data-analytics-306119
+NEXTAUTH_SECRET            # Auth secret
+NEXTAUTH_URL               # Deployed URL
 ```
 
 ## Documentation
 
-- [AI Agent Context](.claude/CLAUDE.md) - For AI-assisted development
-- [SQL Queries](sql/README.md) - BigQuery documentation
-- [Architecture](docs/architecture/) - System design
-
-## Development
-
-See [.claude/CLAUDE.md](.claude/CLAUDE.md) for detailed development guidelines.
+- [CLAUDE.md](CLAUDE.md) - AI agent context
+- [sql/schemas/](sql/schemas/) - Data lineage
+- [sql/](sql/) - BigQuery queries

@@ -371,6 +371,47 @@ async function getR360FunnelActuals(filters: ReportFilters) {
   return rows;
 }
 
+// Query for funnel actuals BY CATEGORY (NEW LOGO, EXPANSION) from DailyRevenueFunnel
+async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R360') {
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+    : '';
+
+  const query = `
+    SELECT
+      RecordType AS product,
+      Region AS region,
+      CASE
+        WHEN UPPER(FunnelType) IN ('INBOUND', 'R360 INBOUND', 'NEW LOGO', 'R360 NEW LOGO') THEN 'NEW LOGO'
+        WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
+        WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
+        ELSE 'OTHER'
+      END AS category,
+      COALESCE(SUM(MQL), 0) AS actual_mql,
+      COALESCE(SUM(SQL), 0) AS actual_sql,
+      COALESCE(SUM(SAL), 0) AS actual_sal,
+      COALESCE(SUM(SQO), 0) AS actual_sqo
+    FROM \`data-analytics-306119.Staging.DailyRevenueFunnel\`
+    WHERE RecordType = '${product}'
+      AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
+      AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
+      AND Region IN ('AMER', 'EMEA', 'APAC')
+      AND UPPER(FunnelType) NOT IN ('RENEWAL', 'R360 RENEWAL')
+      ${regionClause}
+    GROUP BY RecordType, Region,
+      CASE
+        WHEN UPPER(FunnelType) IN ('INBOUND', 'R360 INBOUND', 'NEW LOGO', 'R360 NEW LOGO') THEN 'NEW LOGO'
+        WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
+        WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
+        ELSE 'OTHER'
+      END
+    ORDER BY region, category
+  `;
+
+  const [rows] = await getBigQuery().query({ query });
+  return rows;
+}
+
 // Query for deal details (won)
 async function getWonDeals(filters: ReportFilters) {
   const productClause = filters.products && filters.products.length > 0
@@ -1126,6 +1167,8 @@ export async function POST(request: Request) {
       lossReasonData,
       mqlDetailsData,
       sqlDetailsData,
+      porFunnelByCategory,
+      r360FunnelByCategory,
     ] = await Promise.all([
       getRevenueActuals(filters),
       getTargets(filters),
@@ -1151,6 +1194,12 @@ export async function POST(request: Request) {
       getLossReasonRCA(filters),
       getMQLDetails(filters),
       getSQLDetails(filters),
+      filters.products.length === 0 || filters.products.includes('POR')
+        ? getFunnelByCategory(filters, 'POR')
+        : Promise.resolve([]),
+      filters.products.length === 0 || filters.products.includes('R360')
+        ? getFunnelByCategory(filters, 'R360')
+        : Promise.resolve([]),
     ]);
 
     // Calculate period info
@@ -1585,6 +1634,116 @@ export async function POST(request: Request) {
       funnelBySource.R360.push(funnelSourceRow);
     }
 
+    // Build funnel by category data
+    const funnelByCategory: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
+
+    // Get category-level targets from the targets data
+    const categoryTargetMap = new Map<string, any>();
+    for (const t of targets as any[]) {
+      const key = `${t.product}-${t.region}-${t.category}`;
+      if (!categoryTargetMap.has(key)) {
+        categoryTargetMap.set(key, {
+          q1_target_mql: 0, target_mql: 0,
+          q1_target_sql: 0, target_sql: 0,
+          q1_target_sal: 0, target_sal: 0,
+          q1_target_sqo: 0, target_sqo: 0,
+        });
+      }
+      const existing = categoryTargetMap.get(key)!;
+      existing.q1_target_mql += parseFloat(t.q1_target_mql) || 0;
+      existing.target_mql += parseFloat(t.target_mql) || 0;
+      existing.q1_target_sql += parseFloat(t.q1_target_sql) || 0;
+      existing.target_sql += parseFloat(t.target_sql) || 0;
+      existing.q1_target_sal += parseFloat(t.q1_target_sal) || 0;
+      existing.target_sal += parseFloat(t.target_sal) || 0;
+      existing.q1_target_sqo += parseFloat(t.q1_target_sqo) || 0;
+      existing.target_sqo += parseFloat(t.target_sqo) || 0;
+    }
+
+    // Process POR funnel by category
+    for (const row of porFunnelByCategory as any[]) {
+      const key = `${row.product}-${row.region}-${row.category}`;
+      const catTargets = categoryTargetMap.get(key) || {
+        q1_target_mql: 0, target_mql: 0,
+        q1_target_sql: 0, target_sql: 0,
+        q1_target_sal: 0, target_sal: 0,
+        q1_target_sqo: 0, target_sqo: 0,
+      };
+
+      const mqlPacing = catTargets.target_mql > 0 ? Math.round((parseInt(row.actual_mql) / catTargets.target_mql) * 100) : 0;
+      const sqlPacing = catTargets.target_sql > 0 ? Math.round((parseInt(row.actual_sql) / catTargets.target_sql) * 100) : 0;
+      const salPacing = catTargets.target_sal > 0 ? Math.round((parseInt(row.actual_sal) / catTargets.target_sal) * 100) : 0;
+      const sqoPacing = catTargets.target_sqo > 0 ? Math.round((parseInt(row.actual_sqo) / catTargets.target_sqo) * 100) : 0;
+
+      funnelByCategory.POR.push({
+        category: row.category,
+        region: row.region,
+        actual_mql: parseInt(row.actual_mql) || 0,
+        q1_target_mql: Math.round(catTargets.q1_target_mql),
+        qtd_target_mql: Math.round(catTargets.target_mql),
+        mql_pacing_pct: mqlPacing,
+        mql_gap: (parseInt(row.actual_mql) || 0) - Math.round(catTargets.target_mql),
+        actual_sql: parseInt(row.actual_sql) || 0,
+        q1_target_sql: Math.round(catTargets.q1_target_sql),
+        qtd_target_sql: Math.round(catTargets.target_sql),
+        sql_pacing_pct: sqlPacing,
+        sql_gap: (parseInt(row.actual_sql) || 0) - Math.round(catTargets.target_sql),
+        actual_sal: parseInt(row.actual_sal) || 0,
+        q1_target_sal: Math.round(catTargets.q1_target_sal),
+        qtd_target_sal: Math.round(catTargets.target_sal),
+        sal_pacing_pct: salPacing,
+        sal_gap: (parseInt(row.actual_sal) || 0) - Math.round(catTargets.target_sal),
+        actual_sqo: parseInt(row.actual_sqo) || 0,
+        q1_target_sqo: Math.round(catTargets.q1_target_sqo),
+        qtd_target_sqo: Math.round(catTargets.target_sqo),
+        sqo_pacing_pct: sqoPacing,
+        sqo_gap: (parseInt(row.actual_sqo) || 0) - Math.round(catTargets.target_sqo),
+        weighted_tof_score: Math.round((mqlPacing * 0.1 + sqlPacing * 0.2 + salPacing * 0.3 + sqoPacing * 0.4)),
+      });
+    }
+
+    // Process R360 funnel by category
+    for (const row of r360FunnelByCategory as any[]) {
+      const key = `${row.product}-${row.region}-${row.category}`;
+      const catTargets = categoryTargetMap.get(key) || {
+        q1_target_mql: 0, target_mql: 0,
+        q1_target_sql: 0, target_sql: 0,
+        q1_target_sal: 0, target_sal: 0,
+        q1_target_sqo: 0, target_sqo: 0,
+      };
+
+      const mqlPacing = catTargets.target_mql > 0 ? Math.round((parseInt(row.actual_mql) / catTargets.target_mql) * 100) : 0;
+      const sqlPacing = catTargets.target_sql > 0 ? Math.round((parseInt(row.actual_sql) / catTargets.target_sql) * 100) : 0;
+      const salPacing = catTargets.target_sal > 0 ? Math.round((parseInt(row.actual_sal) / catTargets.target_sal) * 100) : 0;
+      const sqoPacing = catTargets.target_sqo > 0 ? Math.round((parseInt(row.actual_sqo) / catTargets.target_sqo) * 100) : 0;
+
+      funnelByCategory.R360.push({
+        category: row.category,
+        region: row.region,
+        actual_mql: parseInt(row.actual_mql) || 0,
+        q1_target_mql: Math.round(catTargets.q1_target_mql),
+        qtd_target_mql: Math.round(catTargets.target_mql),
+        mql_pacing_pct: mqlPacing,
+        mql_gap: (parseInt(row.actual_mql) || 0) - Math.round(catTargets.target_mql),
+        actual_sql: parseInt(row.actual_sql) || 0,
+        q1_target_sql: Math.round(catTargets.q1_target_sql),
+        qtd_target_sql: Math.round(catTargets.target_sql),
+        sql_pacing_pct: sqlPacing,
+        sql_gap: (parseInt(row.actual_sql) || 0) - Math.round(catTargets.target_sql),
+        actual_sal: parseInt(row.actual_sal) || 0,
+        q1_target_sal: Math.round(catTargets.q1_target_sal),
+        qtd_target_sal: Math.round(catTargets.target_sal),
+        sal_pacing_pct: salPacing,
+        sal_gap: (parseInt(row.actual_sal) || 0) - Math.round(catTargets.target_sal),
+        actual_sqo: parseInt(row.actual_sqo) || 0,
+        q1_target_sqo: Math.round(catTargets.q1_target_sqo),
+        qtd_target_sqo: Math.round(catTargets.target_sqo),
+        sqo_pacing_pct: sqoPacing,
+        sqo_gap: (parseInt(row.actual_sqo) || 0) - Math.round(catTargets.target_sqo),
+        weighted_tof_score: Math.round((mqlPacing * 0.1 + sqlPacing * 0.2 + salPacing * 0.3 + sqoPacing * 0.4)),
+      });
+    }
+
     // Build response
     const response = {
       generated_at_utc: new Date().toISOString(),
@@ -1596,6 +1755,7 @@ export async function POST(request: Request) {
       attainment_detail: attainmentDetail,
       source_attainment: sourceAttainment,
       funnel_pacing: funnelPacing,
+      funnel_by_category: funnelByCategory,
       funnel_by_source: funnelBySource,
       google_ads: googleAdsData,
       pipeline_rca: pipelineRca,
