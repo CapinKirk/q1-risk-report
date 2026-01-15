@@ -1,5 +1,5 @@
 import { ReportData, Product, SourceAttainmentRow, FunnelByCategoryRow, FunnelBySourceRow } from '@/lib/types';
-import { formatCurrency, formatPercent, getRAGClass, getGapColor, getPctClass } from '@/lib/formatters';
+import { formatCurrency, formatPercent, getRAGClass, getGapColor, getPctClass, getAttainmentColor, getRAGBadgeColor } from '@/lib/formatters';
 
 interface SourceAttainmentProps {
   data: ReportData;
@@ -41,9 +41,11 @@ function SourceACVTable({ product, rows, period }: { product: Product; rows: Sou
                   <td className="right">{formatCurrency(row.q1_target)}</td>
                   <td className="right">{formatCurrency(row.qtd_target)}</td>
                   <td className="right">{formatCurrency(row.qtd_acv)}</td>
-                  <td className={`${getPctClass(attPct)} right`}>{formatPercent(attPct)}</td>
+                  <td className="right" style={{ color: getAttainmentColor(attPct), fontWeight: 600 }}>{formatPercent(attPct)}</td>
                   <td className="right" style={{ color: getGapColor(gap) }}>{formatCurrency(gap)}</td>
-                  <td className={`${getRAGClass(rag)} center`}>{rag}</td>
+                  <td className="center">
+                    <span className="rag-tile" style={{ backgroundColor: getRAGBadgeColor(rag) }}>{rag}</span>
+                  </td>
                 </tr>
               );
             })}
@@ -108,8 +110,10 @@ function FunnelByCategoryTable({ product, rows }: { product: Product; rows: Funn
                     <>
                       <td rowSpan={stages.length}><strong>{category}</strong></td>
                       <td rowSpan={stages.length}>{row.region}</td>
-                      <td rowSpan={stages.length} className={`${getPctClass(row.weighted_tof_score)} right`}>
-                        <strong>{formatPercent(row.weighted_tof_score)}</strong>
+                      <td rowSpan={stages.length} className="right">
+                        <span className="tof-score-tile" style={{ backgroundColor: getAttainmentColor(row.weighted_tof_score) }}>
+                          {formatPercent(row.weighted_tof_score)}
+                        </span>
                       </td>
                     </>
                   )}
@@ -117,7 +121,7 @@ function FunnelByCategoryTable({ product, rows }: { product: Product; rows: Funn
                   <td className="right">{Math.round(stage.q1 || 0)}</td>
                   <td className="right">{Math.round(stage.qtd || 0)}</td>
                   <td className="right">{Math.round(stage.actual || 0)}</td>
-                  <td className={`${getPctClass(stage.pct)} right`}>{formatPercent(stage.pct)}</td>
+                  <td className="right" style={{ color: getAttainmentColor(stage.pct), fontWeight: 600 }}>{formatPercent(stage.pct)}</td>
                   <td className="right" style={{ color: getGapColor(stage.gap) }}>
                     {stage.gap >= 0 ? '+' : ''}{Math.round(stage.gap || 0)}
                   </td>

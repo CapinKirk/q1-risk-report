@@ -1,5 +1,5 @@
 import { ReportData, AttainmentRow } from '@/lib/types';
-import { formatCurrency, formatPercent, formatCoverage, getRAGColor } from '@/lib/formatters';
+import { formatCurrency, formatPercent, formatCoverage, getRAGColor, getAttainmentColor } from '@/lib/formatters';
 
 interface ExecutiveSummaryProps {
   data: ReportData;
@@ -21,18 +21,18 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
   const misses = allAttainment.filter(a => a.rag_status === 'RED' || a.rag_status === 'YELLOW');
 
   const qtdAtt = grand_total.total_qtd_attainment_pct || 0;
-  const attColor = qtdAtt >= 90 ? '#28a745' : qtdAtt >= 70 ? '#ffc107' : '#dc3545';
+  const attColor = getAttainmentColor(qtdAtt);
 
   const cov = grand_total.total_pipeline_coverage_x || 0;
-  const covColor = cov >= 3 ? '#28a745' : cov >= 2 ? '#ffc107' : '#dc3545';
+  const covColor = cov >= 3 ? '#16a34a' : cov >= 2 ? '#ca8a04' : '#dc2626';
 
   const por = product_totals.POR;
   const porAtt = por?.total_qtd_attainment_pct || 0;
-  const porColor = porAtt >= 90 ? '#28a745' : porAtt >= 70 ? '#ffc107' : '#dc3545';
+  const porColor = getAttainmentColor(porAtt);
 
   const r360 = product_totals.R360;
   const r360Att = r360?.total_qtd_attainment_pct || 0;
-  const r360Color = r360Att >= 90 ? '#28a745' : r360Att >= 70 ? '#ffc107' : '#dc3545';
+  const r360Color = getAttainmentColor(r360Att);
 
   return (
     <section>

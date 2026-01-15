@@ -73,29 +73,37 @@ function transformAPIResponse(apiData: any): ReportData {
   const funnelByProduct: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
 
   for (const row of apiData.funnel_pacing || []) {
+    const mqlPct = row.mql_pacing_pct || 0;
+    const sqlPct = row.sql_pacing_pct || 0;
+    const salPct = row.sal_pacing_pct || 0;
+    const sqoPct = row.sqo_pacing_pct || 0;
+
+    // Calculate weighted TOF score: MQL=10%, SQL=20%, SAL=30%, SQO=40%
+    const weightedTofScore = (mqlPct * 0.10) + (sqlPct * 0.20) + (salPct * 0.30) + (sqoPct * 0.40);
+
     const funnelRow = {
       category: 'NEW LOGO' as Category,
       region: row.region,
-      weighted_tof_score: 0,
+      weighted_tof_score: Math.round(weightedTofScore * 10) / 10,
       q1_target_mql: row.target_mql || 0,
       qtd_target_mql: row.target_mql || 0,
       actual_mql: row.actual_mql || 0,
-      mql_pacing_pct: row.mql_pacing_pct || 0,
+      mql_pacing_pct: mqlPct,
       mql_gap: (row.actual_mql || 0) - (row.target_mql || 0),
       q1_target_sql: row.target_sql || 0,
       qtd_target_sql: row.target_sql || 0,
       actual_sql: row.actual_sql || 0,
-      sql_pacing_pct: row.sql_pacing_pct || 0,
+      sql_pacing_pct: sqlPct,
       sql_gap: (row.actual_sql || 0) - (row.target_sql || 0),
       q1_target_sal: row.target_sal || 0,
       qtd_target_sal: row.target_sal || 0,
       actual_sal: row.actual_sal || 0,
-      sal_pacing_pct: row.sal_pacing_pct || 0,
+      sal_pacing_pct: salPct,
       sal_gap: (row.actual_sal || 0) - (row.target_sal || 0),
       q1_target_sqo: row.target_sqo || 0,
       qtd_target_sqo: row.target_sqo || 0,
       actual_sqo: row.actual_sqo || 0,
-      sqo_pacing_pct: row.sqo_pacing_pct || 0,
+      sqo_pacing_pct: sqoPct,
       sqo_gap: (row.actual_sqo || 0) - (row.target_sqo || 0),
     };
 

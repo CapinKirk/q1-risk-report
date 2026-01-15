@@ -474,6 +474,46 @@ tr:hover {
   border: 1px solid #ccc;
 }
 
+/* RAG Status Tiles */
+.rag-tile {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 45px;
+  text-align: center;
+}
+
+/* TOF Score Tiles */
+.tof-score-tile {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Attainment coloring for numbers */
+.attainment-green {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.attainment-yellow {
+  color: #ca8a04;
+  font-weight: 600;
+}
+
+.attainment-red {
+  color: #dc2626;
+  font-weight: 600;
+}
+
 /* Footer */
 .footer {
   margin-top: 20px;

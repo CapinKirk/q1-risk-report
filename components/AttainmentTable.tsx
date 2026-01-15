@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { ReportData, AttainmentRow, Product, DealDetail, Region, Category } from '@/lib/types';
-import { formatCurrency, formatPercent, formatCoverage, getRAGClass, getGapColor } from '@/lib/formatters';
+import { formatCurrency, formatPercent, formatCoverage, getRAGClass, getGapColor, getAttainmentColor, getRAGBadgeColor } from '@/lib/formatters';
 import DealListModal from './DealListModal';
 
 interface AttainmentTableProps {
@@ -76,7 +76,9 @@ function ProductAttainmentTable({
                     {formatCurrency(row.qtd_acv)}
                     {hasDeals && ' 📋'}
                   </td>
-                  <td className={`${getRAGClass(rag)} right`}>{formatPercent(row.qtd_attainment_pct)}</td>
+                  <td className="right" style={{ color: getAttainmentColor(row.qtd_attainment_pct), fontWeight: 600 }}>
+                    {formatPercent(row.qtd_attainment_pct)}
+                  </td>
                   <td className="right" style={{ color: getGapColor(gap) }}>{formatCurrency(gap)}</td>
                   <td
                     className={`right ${hasDeals && lostAcv > 0 ? 'clickable' : ''}`}
@@ -95,17 +97,11 @@ function ProductAttainmentTable({
                     {hasDeals && ' 📋'}
                   </td>
                   <td className="right">{formatCoverage(coverage)}</td>
-                  <td className="right">{formatPercent(winRate)}</td>
+                  <td className="right" style={{ color: getAttainmentColor(winRate), fontWeight: 600 }}>
+                    {formatPercent(winRate)}
+                  </td>
                   <td className="center">
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      backgroundColor: ragBgColor,
-                      color: 'white',
-                      fontWeight: 'bold',
-                      fontSize: '0.7rem',
-                    }}>
+                    <span className="rag-tile" style={{ backgroundColor: getRAGBadgeColor(rag) }}>
                       {rag}
                     </span>
                   </td>

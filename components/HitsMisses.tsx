@@ -1,5 +1,5 @@
 import { ReportData, AttainmentRow } from '@/lib/types';
-import { formatCurrency, formatPercent, formatCoverage, getRAGClass } from '@/lib/formatters';
+import { formatCurrency, formatPercent, formatCoverage, getRAGClass, getAttainmentColor, getRAGBadgeColor } from '@/lib/formatters';
 
 interface HitsMissesProps {
   data: ReportData;
@@ -94,10 +94,14 @@ export default function HitsMisses({ data }: HitsMissesProps) {
                     <td>{h.product}</td>
                     <td>{h.region}</td>
                     <td>{h.category}</td>
-                    <td className="right green"><strong>{formatPercent(h.qtd_attainment_pct)}</strong></td>
+                    <td className="right" style={{ color: getAttainmentColor(h.qtd_attainment_pct), fontWeight: 700 }}>
+                      {formatPercent(h.qtd_attainment_pct)}
+                    </td>
                     <td className="right">{formatCurrency(h.qtd_acv)}</td>
                     <td className="right">{formatCoverage(h.pipeline_coverage_x)}</td>
-                    <td className="right">{formatPercent(h.win_rate_pct)}</td>
+                    <td className="right" style={{ color: getAttainmentColor(h.win_rate_pct), fontWeight: 600 }}>
+                      {formatPercent(h.win_rate_pct)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -127,7 +131,6 @@ export default function HitsMisses({ data }: HitsMissesProps) {
                 {sortedMisses.map((m, idx) => {
                   const rag = m.rag_status || 'RED';
                   const rowClass = rag === 'YELLOW' ? 'miss-row yellow' : 'miss-row';
-                  const attClass = rag === 'YELLOW' ? 'yellow' : 'red';
                   const { rca, action } = generateRCA(m);
 
                   return (
@@ -135,8 +138,10 @@ export default function HitsMisses({ data }: HitsMissesProps) {
                       <td>{m.product}</td>
                       <td>{m.region}</td>
                       <td>{m.category}</td>
-                      <td className={`right ${attClass}`}><strong>{formatPercent(m.qtd_attainment_pct)}</strong></td>
-                      <td className="right" style={{ color: '#dc3545' }}>{formatCurrency(m.qtd_gap)}</td>
+                      <td className="right" style={{ color: getAttainmentColor(m.qtd_attainment_pct), fontWeight: 700 }}>
+                        {formatPercent(m.qtd_attainment_pct)}
+                      </td>
+                      <td className="right" style={{ color: '#dc2626' }}>{formatCurrency(m.qtd_gap)}</td>
                       <td className="right">{formatCoverage(m.pipeline_coverage_x)}</td>
                       <td style={{ fontSize: '10px' }}>{rca} → {action}</td>
                     </tr>

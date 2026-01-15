@@ -94,3 +94,30 @@ export function getGapColor(gap: number | null | undefined): string {
   if (gap == null || gap < 0) return '#dc3545';
   return '#28a745';
 }
+
+/**
+ * Get attainment color based on percentage (for inline styling)
+ */
+export function getAttainmentColor(pct: number | null | undefined): string {
+  if (pct == null) return '#dc2626'; // red
+  if (pct >= 90) return '#16a34a';   // green
+  if (pct >= 70) return '#ca8a04';   // yellow/amber
+  return '#dc2626';                   // red
+}
+
+/**
+ * Get RAG status badge background color
+ */
+export function getRAGBadgeColor(rag: string | null | undefined): string {
+  if (!rag) return '#dc2626';
+  switch (rag.toUpperCase()) {
+    case 'GREEN':
+      return '#16a34a';
+    case 'YELLOW':
+      return '#ca8a04';
+    case 'RED':
+      return '#dc2626';
+    default:
+      return '#dc2626';
+  }
+}
