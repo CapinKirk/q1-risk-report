@@ -514,6 +514,22 @@ tr:hover {
   font-weight: 600;
 }
 
+/* AI Analysis Section */
+.ai-analysis-section {
+  background: #ffffff;
+  padding: 15px;
+  margin: 18px 0;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.ai-analysis-section h2 {
+  margin-top: 0;
+  border-bottom: 2px solid #2563eb;
+  color: #1e40af;
+}
+
 /* Footer */
 .footer {
   margin-top: 20px;
