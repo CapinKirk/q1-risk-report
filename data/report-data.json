@@ -16043,5 +16043,13 @@
         "salesforce_url": "https://por.my.salesforce.com/006an00000RzEg9AAF"
       }
     ]
+  },
+  "mql_details": {
+    "POR": [],
+    "R360": []
+  },
+  "sql_details": {
+    "POR": [],
+    "R360": []
   }
 }

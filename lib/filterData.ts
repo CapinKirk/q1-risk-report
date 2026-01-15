@@ -10,6 +10,8 @@ import type {
   FunnelBySourceRow,
   PipelineRCARow,
   LossReasonRow,
+  MQLDetailRow,
+  SQLDetailRow,
   ProductTotal,
   GrandTotal,
   ExecutiveCounts,
@@ -361,6 +363,16 @@ export function filterReportData(
     pipeline_deals: data.pipeline_deals ? {
       POR: filterDeals(data.pipeline_deals.POR || [], includePOR),
       R360: filterDeals(data.pipeline_deals.R360 || [], includeR360),
+    } : undefined,
+    // MQL details (filter by product and region only)
+    mql_details: data.mql_details ? {
+      POR: filterProductRegion(data.mql_details.POR || [], includePOR),
+      R360: filterProductRegion(data.mql_details.R360 || [], includeR360),
+    } : undefined,
+    // SQL details (filter by product and region only)
+    sql_details: data.sql_details ? {
+      POR: filterProductRegion(data.sql_details.POR || [], includePOR),
+      R360: filterProductRegion(data.sql_details.R360 || [], includeR360),
     } : undefined,
     // Filter insight sections
     wins_bright_spots: data.wins_bright_spots ? {

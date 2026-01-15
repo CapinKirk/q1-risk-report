@@ -143,17 +143,33 @@ async function getTargets(filters: ReportFilters) {
         THEN Target_ACV ELSE 0
       END), 2) AS qtd_target,
       ROUND(SUM(CASE
+        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
+        THEN Target_MQL ELSE 0
+      END), 0) AS q1_target_mql,
+      ROUND(SUM(CASE
         WHEN TargetDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
         THEN Target_MQL ELSE 0
       END), 0) AS target_mql,
+      ROUND(SUM(CASE
+        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
+        THEN Target_SQL ELSE 0
+      END), 0) AS q1_target_sql,
       ROUND(SUM(CASE
         WHEN TargetDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
         THEN Target_SQL ELSE 0
       END), 0) AS target_sql,
       ROUND(SUM(CASE
+        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
+        THEN Target_SAL ELSE 0
+      END), 0) AS q1_target_sal,
+      ROUND(SUM(CASE
         WHEN TargetDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
         THEN Target_SAL ELSE 0
       END), 0) AS target_sal,
+      ROUND(SUM(CASE
+        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
+        THEN Target_SQO ELSE 0
+      END), 0) AS q1_target_sqo,
       ROUND(SUM(CASE
         WHEN TargetDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
         THEN Target_SQO ELSE 0
@@ -173,7 +189,7 @@ async function getTargets(filters: ReportFilters) {
   return rows;
 }
 
-// Query for funnel actuals (POR)
+// Query for funnel actuals (POR) - aggregated
 async function getPORFunnelActuals(filters: ReportFilters) {
   const regionClause = filters.regions && filters.regions.length > 0
     ? `AND Division IN (${filters.regions.map(r => {
@@ -228,7 +244,92 @@ async function getPORFunnelActuals(filters: ReportFilters) {
   return rows;
 }
 
-// Query for funnel actuals (R360)
+// Query for funnel actuals by source (POR) - broken down by SDRSource
+// Query for funnel actuals by source using DailyRevenueFunnel table
+// This table has all sources (INBOUND, OUTBOUND, AE SOURCED, etc.)
+async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360') {
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+    : '';
+
+  // Query actuals from DailyRevenueFunnel
+  const actualsQuery = `
+    SELECT
+      RecordType AS product,
+      Region AS region,
+      UPPER(Source) AS source,
+      COALESCE(SUM(MQL), 0) AS actual_mql,
+      COALESCE(SUM(SQL), 0) AS actual_sql,
+      COALESCE(SUM(SAL), 0) AS actual_sal,
+      COALESCE(SUM(SQO), 0) AS actual_sqo
+    FROM \`data-analytics-306119.Staging.DailyRevenueFunnel\`
+    WHERE RecordType = '${product}'
+      AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
+      AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
+      AND Source IS NOT NULL
+      ${regionClause}
+    GROUP BY RecordType, Region, UPPER(Source)
+  `;
+
+  // Query targets from StrategicOperatingPlan
+  const targetsQuery = `
+    SELECT
+      RecordType AS product,
+      Region AS region,
+      UPPER(Source) AS source,
+      ROUND(SUM(Target_MQL), 0) AS target_mql,
+      ROUND(SUM(Target_SQL), 0) AS target_sql,
+      ROUND(SUM(Target_SAL), 0) AS target_sal,
+      ROUND(SUM(Target_SQO), 0) AS target_sqo
+    FROM \`data-analytics-306119.Staging.StrategicOperatingPlan\`
+    WHERE Percentile = 'P50'
+      AND RecordType = '${product}'
+      AND TargetDate >= '${filters.startDate}'
+      AND TargetDate <= '${filters.endDate}'
+      AND OpportunityType != 'RENEWAL'
+      AND Source IS NOT NULL
+      ${regionClause}
+    GROUP BY RecordType, Region, UPPER(Source)
+  `;
+
+  // Combined query joining actuals and targets
+  const query = `
+    WITH actuals AS (${actualsQuery}),
+    targets AS (${targetsQuery})
+    SELECT
+      COALESCE(a.product, t.product) AS product,
+      COALESCE(a.region, t.region) AS region,
+      COALESCE(a.source, t.source) AS source,
+      COALESCE(a.actual_mql, 0) AS actual_mql,
+      COALESCE(t.target_mql, 0) AS target_mql,
+      COALESCE(a.actual_sql, 0) AS actual_sql,
+      COALESCE(t.target_sql, 0) AS target_sql,
+      COALESCE(a.actual_sal, 0) AS actual_sal,
+      COALESCE(t.target_sal, 0) AS target_sal,
+      COALESCE(a.actual_sqo, 0) AS actual_sqo,
+      COALESCE(t.target_sqo, 0) AS target_sqo,
+      -- Pacing percentages
+      ROUND(SAFE_DIVIDE(COALESCE(a.actual_mql, 0), NULLIF(t.target_mql, 0)) * 100, 0) AS mql_pacing_pct,
+      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sql, 0), NULLIF(t.target_sql, 0)) * 100, 0) AS sql_pacing_pct,
+      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sal, 0), NULLIF(t.target_sal, 0)) * 100, 0) AS sal_pacing_pct,
+      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sqo, 0), NULLIF(t.target_sqo, 0)) * 100, 0) AS sqo_pacing_pct,
+      -- Conversion rates
+      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sql, 0), NULLIF(a.actual_mql, 0)) * 100, 1) AS mql_to_sql_rate,
+      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sal, 0), NULLIF(a.actual_sql, 0)) * 100, 1) AS sql_to_sal_rate,
+      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sqo, 0), NULLIF(a.actual_sal, 0)) * 100, 1) AS sal_to_sqo_rate
+    FROM actuals a
+    FULL OUTER JOIN targets t
+      ON a.product = t.product
+      AND a.region = t.region
+      AND a.source = t.source
+    ORDER BY region, source
+  `;
+
+  const [rows] = await getBigQuery().query({ query });
+  return rows;
+}
+
+// Query for funnel actuals (R360) - aggregated
 async function getR360FunnelActuals(filters: ReportFilters) {
   const regionClause = filters.regions && filters.regions.length > 0
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
@@ -648,6 +749,228 @@ async function getLossReasonRCA(filters: ReportFilters) {
   }
 }
 
+// Query for MQL details with Salesforce links, company name, source, and disqualification status
+async function getMQLDetails(filters: ReportFilters) {
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND Division IN (${filters.regions.map(r => {
+        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
+        return `'${map[r]}'`;
+      }).join(', ')})`
+    : '';
+
+  // POR MQL details query - includes ALL MQLs (including reverted)
+  const porQuery = `
+    SELECT
+      'POR' AS product,
+      CASE Division
+        WHEN 'US' THEN 'AMER'
+        WHEN 'UK' THEN 'EMEA'
+        WHEN 'AU' THEN 'APAC'
+      END AS region,
+      COALESCE(LeadId, ContactId) AS record_id,
+      CASE
+        WHEN LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', LeadId)
+        ELSE CONCAT('https://por.my.salesforce.com/', ContactId)
+      END AS salesforce_url,
+      COALESCE(Company, 'Unknown') AS company_name,
+      COALESCE(LeadEmail, ContactEmail, 'N/A') AS email,
+      SDRSource AS source,
+      CAST(MQL_DT AS STRING) AS mql_date,
+      CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
+      -- Disqualification status
+      CASE
+        WHEN MQL_Reverted = true THEN 'REVERTED'
+        WHEN SQL_DT IS NOT NULL THEN 'CONVERTED'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) > 30 THEN 'STALLED'
+        ELSE 'ACTIVE'
+      END AS mql_status,
+      COALESCE(MQL_Reverted, false) AS was_reverted,
+      DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage
+    FROM \`data-analytics-306119.MarketingFunnel.InboundFunnel\`
+    WHERE Division IN ('US', 'UK', 'AU')
+      AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
+      AND MQL_DT IS NOT NULL
+      AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
+      AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
+      ${regionClause}
+    ORDER BY MQL_DT DESC
+    LIMIT 200
+  `;
+
+  // R360 MQL details query - includes ALL MQLs (including reverted)
+  const r360RegionClause = filters.regions && filters.regions.length > 0
+    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+    : '';
+
+  const r360Query = `
+    SELECT
+      'R360' AS product,
+      Region AS region,
+      LeadId AS record_id,
+      CONCAT('https://por.my.salesforce.com/', LeadId) AS salesforce_url,
+      COALESCE(Company, 'Unknown') AS company_name,
+      Email AS email,
+      SDRSource AS source,
+      CAST(MQL_DT AS STRING) AS mql_date,
+      CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
+      -- Disqualification status
+      CASE
+        WHEN MQL_Reverted = true THEN 'REVERTED'
+        WHEN SQL_DT IS NOT NULL THEN 'CONVERTED'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) > 30 THEN 'STALLED'
+        ELSE 'ACTIVE'
+      END AS mql_status,
+      COALESCE(MQL_Reverted, false) AS was_reverted,
+      DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage
+    FROM \`data-analytics-306119.MarketingFunnel.R360InboundFunnel\`
+    WHERE Region IS NOT NULL
+      AND MQL_DT IS NOT NULL
+      AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
+      AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
+      ${r360RegionClause}
+    ORDER BY MQL_DT DESC
+    LIMIT 200
+  `;
+
+  try {
+    const shouldFetchPOR = filters.products.length === 0 || filters.products.includes('POR');
+    const shouldFetchR360 = filters.products.length === 0 || filters.products.includes('R360');
+
+    const [porRows, r360Rows] = await Promise.all([
+      shouldFetchPOR ? getBigQuery().query({ query: porQuery }).then(r => r[0]) : Promise.resolve([]),
+      shouldFetchR360 ? getBigQuery().query({ query: r360Query }).then(r => r[0]) : Promise.resolve([]),
+    ]);
+
+    return {
+      POR: porRows as any[],
+      R360: r360Rows as any[],
+    };
+  } catch (error) {
+    console.warn('MQL details query failed:', error);
+    return { POR: [], R360: [] };
+  }
+}
+
+// Query for SQL details with opportunity info and disqualification/loss reasons
+async function getSQLDetails(filters: ReportFilters) {
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND Division IN (${filters.regions.map(r => {
+        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
+        return `'${map[r]}'`;
+      }).join(', ')})`
+    : '';
+
+  // POR SQL details query - simplified without opportunity join
+  const porQuery = `
+    SELECT
+      'POR' AS product,
+      CASE Division
+        WHEN 'US' THEN 'AMER'
+        WHEN 'UK' THEN 'EMEA'
+        WHEN 'AU' THEN 'APAC'
+      END AS region,
+      COALESCE(LeadId, ContactId) AS record_id,
+      CASE
+        WHEN LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', LeadId)
+        ELSE CONCAT('https://por.my.salesforce.com/', ContactId)
+      END AS salesforce_url,
+      COALESCE(Company, 'Unknown') AS company_name,
+      COALESCE(LeadEmail, ContactEmail, 'N/A') AS email,
+      SDRSource AS source,
+      CAST(SQL_DT AS STRING) AS sql_date,
+      CAST(MQL_DT AS STRING) AS mql_date,
+      DATE_DIFF(CAST(SQL_DT AS DATE), CAST(MQL_DT AS DATE), DAY) AS days_mql_to_sql,
+      CASE WHEN SAL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
+      CASE WHEN SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+      'No' AS has_opportunity,
+      CASE
+        WHEN SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+        WHEN SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
+        ELSE 'ACTIVE'
+      END AS sql_status,
+      CAST(NULL AS STRING) AS opportunity_id,
+      CAST(NULL AS STRING) AS opportunity_name,
+      CAST(NULL AS STRING) AS opportunity_stage,
+      CAST(NULL AS FLOAT64) AS opportunity_acv,
+      'N/A' AS loss_reason,
+      DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) AS days_in_stage
+    FROM \`data-analytics-306119.MarketingFunnel.InboundFunnel\`
+    WHERE Division IN ('US', 'UK', 'AU')
+      AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
+      AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
+      AND SQL_DT IS NOT NULL
+      AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
+      AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
+      ${regionClause}
+    ORDER BY SQL_DT DESC
+    LIMIT 200
+  `;
+
+  // R360 SQL details query - simplified without opportunity join
+  const r360RegionClause = filters.regions && filters.regions.length > 0
+    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+    : '';
+
+  const r360Query = `
+    SELECT
+      'R360' AS product,
+      Region AS region,
+      LeadId AS record_id,
+      CONCAT('https://por.my.salesforce.com/', LeadId) AS salesforce_url,
+      COALESCE(Company, 'Unknown') AS company_name,
+      Email AS email,
+      SDRSource AS source,
+      CAST(SQL_DT AS STRING) AS sql_date,
+      CAST(MQL_DT AS STRING) AS mql_date,
+      DATE_DIFF(CAST(SQL_DT AS DATE), CAST(MQL_DT AS DATE), DAY) AS days_mql_to_sql,
+      'N/A' AS converted_to_sal,
+      CASE WHEN SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+      'No' AS has_opportunity,
+      CASE
+        WHEN SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
+        ELSE 'ACTIVE'
+      END AS sql_status,
+      CAST(NULL AS STRING) AS opportunity_id,
+      CAST(NULL AS STRING) AS opportunity_name,
+      CAST(NULL AS STRING) AS opportunity_stage,
+      CAST(NULL AS FLOAT64) AS opportunity_acv,
+      'N/A' AS loss_reason,
+      DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) AS days_in_stage
+    FROM \`data-analytics-306119.MarketingFunnel.R360InboundFunnel\`
+    WHERE MQL_Reverted = false
+      AND Region IS NOT NULL
+      AND SQL_DT IS NOT NULL
+      AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
+      AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
+      ${r360RegionClause}
+    ORDER BY SQL_DT DESC
+    LIMIT 200
+  `;
+
+  try {
+    const shouldFetchPOR = filters.products.length === 0 || filters.products.includes('POR');
+    const shouldFetchR360 = filters.products.length === 0 || filters.products.includes('R360');
+
+    const [porRows, r360Rows] = await Promise.all([
+      shouldFetchPOR ? getBigQuery().query({ query: porQuery }).then(r => r[0]) : Promise.resolve([]),
+      shouldFetchR360 ? getBigQuery().query({ query: r360Query }).then(r => r[0]) : Promise.resolve([]),
+    ]);
+
+    console.log('SQL details - POR count:', (porRows as any[]).length);
+    console.log('SQL details - R360 count:', (r360Rows as any[]).length);
+
+    return {
+      POR: porRows as any[],
+      R360: r360Rows as any[],
+    };
+  } catch (error) {
+    console.warn('SQL details query failed:', error);
+    return { POR: [], R360: [] };
+  }
+}
+
 // Query for Google Ads data
 async function getGoogleAds(filters: ReportFilters) {
   const query = `
@@ -787,6 +1110,8 @@ export async function POST(request: Request) {
       targets,
       porFunnel,
       r360Funnel,
+      porFunnelBySource,
+      r360FunnelBySource,
       wonDeals,
       lostDeals,
       pipelineDeals,
@@ -795,6 +1120,8 @@ export async function POST(request: Request) {
       sourceTargetsRaw,
       pipelineAgeData,
       lossReasonData,
+      mqlDetailsData,
+      sqlDetailsData,
     ] = await Promise.all([
       getRevenueActuals(filters),
       getTargets(filters),
@@ -804,6 +1131,12 @@ export async function POST(request: Request) {
       filters.products.length === 0 || filters.products.includes('R360')
         ? getR360FunnelActuals(filters)
         : Promise.resolve([]),
+      filters.products.length === 0 || filters.products.includes('POR')
+        ? getFunnelBySource(filters, 'POR')
+        : Promise.resolve([]),
+      filters.products.length === 0 || filters.products.includes('R360')
+        ? getFunnelBySource(filters, 'R360')
+        : Promise.resolve([]),
       getWonDeals(filters),
       getLostDeals(filters),
       getPipelineDeals(filters),
@@ -812,6 +1145,8 @@ export async function POST(request: Request) {
       getSourceTargets(filters),
       getPipelineAge(filters),
       getLossReasonRCA(filters),
+      getMQLDetails(filters),
+      getSQLDetails(filters),
     ]);
 
     // Calculate period info
@@ -983,23 +1318,36 @@ export async function POST(request: Request) {
         const key = `${t.product}-${t.region}`;
         if (!funnelTargetMap.has(key)) {
           funnelTargetMap.set(key, {
+            q1_target_mql: 0,
             target_mql: 0,
+            q1_target_sql: 0,
             target_sql: 0,
+            q1_target_sal: 0,
             target_sal: 0,
+            q1_target_sqo: 0,
             target_sqo: 0,
           });
         }
         const existing = funnelTargetMap.get(key)!;
+        existing.q1_target_mql += parseFloat(t.q1_target_mql) || 0;
         existing.target_mql += parseFloat(t.target_mql) || 0;
+        existing.q1_target_sql += parseFloat(t.q1_target_sql) || 0;
         existing.target_sql += parseFloat(t.target_sql) || 0;
+        existing.q1_target_sal += parseFloat(t.q1_target_sal) || 0;
         existing.target_sal += parseFloat(t.target_sal) || 0;
+        existing.q1_target_sqo += parseFloat(t.q1_target_sqo) || 0;
         existing.target_sqo += parseFloat(t.target_sqo) || 0;
       }
     }
 
     for (const f of allFunnel) {
       const key = `${f.product}-${f.region}`;
-      const targets = funnelTargetMap.get(key) || { target_mql: 0, target_sql: 0, target_sal: 0, target_sqo: 0 };
+      const targets = funnelTargetMap.get(key) || {
+        q1_target_mql: 0, target_mql: 0,
+        q1_target_sql: 0, target_sql: 0,
+        q1_target_sal: 0, target_sal: 0,
+        q1_target_sqo: 0, target_sqo: 0,
+      };
 
       const mqlPacing = targets.target_mql > 0 ? Math.round((parseInt(f.actual_mql) / targets.target_mql) * 100) : 0;
       const sqlPacing = targets.target_sql > 0 ? Math.round((parseInt(f.actual_sql) / targets.target_sql) * 100) : 0;
@@ -1011,18 +1359,22 @@ export async function POST(request: Request) {
         region: f.region,
         source_channel: 'INBOUND',
         actual_mql: parseInt(f.actual_mql),
+        q1_target_mql: targets.q1_target_mql,
         target_mql: targets.target_mql,
         mql_pacing_pct: mqlPacing,
         mql_rag: calculateRAG(mqlPacing),
         actual_sql: parseInt(f.actual_sql),
+        q1_target_sql: targets.q1_target_sql,
         target_sql: targets.target_sql,
         sql_pacing_pct: sqlPacing,
         sql_rag: calculateRAG(sqlPacing),
         actual_sal: parseInt(f.actual_sal),
+        q1_target_sal: targets.q1_target_sal,
         target_sal: targets.target_sal,
         sal_pacing_pct: salPacing,
         sal_rag: salPacing !== null ? calculateRAG(salPacing) : 'RED',
         actual_sqo: parseInt(f.actual_sqo),
+        q1_target_sqo: targets.q1_target_sqo,
         target_sqo: targets.target_sqo,
         sqo_pacing_pct: sqoPacing,
         sqo_rag: calculateRAG(sqoPacing),
@@ -1170,6 +1522,65 @@ export async function POST(request: Request) {
     sourceAttainment.POR.sort((a, b) => a.attainment_pct - b.attainment_pct);
     sourceAttainment.R360.sort((a, b) => a.attainment_pct - b.attainment_pct);
 
+    // Build funnel by source data with targets and pacing
+    const funnelBySource: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
+
+    // Process POR funnel by source (now includes targets from StrategicOperatingPlan)
+    for (const row of porFunnelBySource as any[]) {
+      const funnelSourceRow = {
+        region: row.region,
+        source: row.source,
+        // Actuals
+        actual_mql: parseInt(row.actual_mql) || 0,
+        actual_sql: parseInt(row.actual_sql) || 0,
+        actual_sal: parseInt(row.actual_sal) || 0,
+        actual_sqo: parseInt(row.actual_sqo) || 0,
+        // Targets
+        target_mql: parseInt(row.target_mql) || 0,
+        target_sql: parseInt(row.target_sql) || 0,
+        target_sal: parseInt(row.target_sal) || 0,
+        target_sqo: parseInt(row.target_sqo) || 0,
+        // Pacing percentages
+        mql_pacing_pct: parseInt(row.mql_pacing_pct) || 0,
+        sql_pacing_pct: parseInt(row.sql_pacing_pct) || 0,
+        sal_pacing_pct: parseInt(row.sal_pacing_pct) || 0,
+        sqo_pacing_pct: parseInt(row.sqo_pacing_pct) || 0,
+        // Conversion rates
+        mql_to_sql_rate: parseFloat(row.mql_to_sql_rate) || 0,
+        sql_to_sal_rate: parseFloat(row.sql_to_sal_rate) || 0,
+        sal_to_sqo_rate: parseFloat(row.sal_to_sqo_rate) || 0,
+      };
+      funnelBySource.POR.push(funnelSourceRow);
+    }
+
+    // Process R360 funnel by source (now includes targets from StrategicOperatingPlan)
+    for (const row of r360FunnelBySource as any[]) {
+      const funnelSourceRow = {
+        region: row.region,
+        source: row.source,
+        // Actuals
+        actual_mql: parseInt(row.actual_mql) || 0,
+        actual_sql: parseInt(row.actual_sql) || 0,
+        actual_sal: parseInt(row.actual_sal) || 0,
+        actual_sqo: parseInt(row.actual_sqo) || 0,
+        // Targets
+        target_mql: parseInt(row.target_mql) || 0,
+        target_sql: parseInt(row.target_sql) || 0,
+        target_sal: parseInt(row.target_sal) || 0,
+        target_sqo: parseInt(row.target_sqo) || 0,
+        // Pacing percentages
+        mql_pacing_pct: parseInt(row.mql_pacing_pct) || 0,
+        sql_pacing_pct: parseInt(row.sql_pacing_pct) || 0,
+        sal_pacing_pct: parseInt(row.sal_pacing_pct) || 0,
+        sqo_pacing_pct: parseInt(row.sqo_pacing_pct) || 0,
+        // Conversion rates
+        mql_to_sql_rate: parseFloat(row.mql_to_sql_rate) || 0,
+        sql_to_sal_rate: parseFloat(row.sql_to_sal_rate) || 0,
+        sal_to_sqo_rate: parseFloat(row.sal_to_sqo_rate) || 0,
+      };
+      funnelBySource.R360.push(funnelSourceRow);
+    }
+
     // Build response
     const response = {
       generated_at_utc: new Date().toISOString(),
@@ -1181,9 +1592,12 @@ export async function POST(request: Request) {
       attainment_detail: attainmentDetail,
       source_attainment: sourceAttainment,
       funnel_pacing: funnelPacing,
+      funnel_by_source: funnelBySource,
       google_ads: googleAdsData,
       pipeline_rca: pipelineRca,
       loss_reason_rca: lossReasonRca,
+      mql_details: mqlDetailsData,
+      sql_details: sqlDetailsData,
       won_deals: wonDeals,
       lost_deals: lostDeals,
       pipeline_deals: pipelineDeals,

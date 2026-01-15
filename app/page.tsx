@@ -15,6 +15,8 @@ import SourceAttainment from '@/components/SourceAttainment';
 import HitsMisses from '@/components/HitsMisses';
 import ActionItemsDashboard from '@/components/ActionItemsDashboard';
 import FunnelMilestoneAttainment from '@/components/FunnelMilestoneAttainment';
+import MQLDetails from '@/components/MQLDetails';
+import SQLDetails from '@/components/SQLDetails';
 import PipelineCoverage from '@/components/PipelineCoverage';
 import LostOpportunities from '@/components/LostOpportunities';
 import GoogleAdsPerf from '@/components/GoogleAdsPerf';
@@ -63,6 +65,15 @@ function transformAPIResponse(apiData: any): ReportData {
     }
   }
 
+  // Calculate executive counts from attainment data
+  const allAttainmentRows = [...attainmentByProduct.POR, ...attainmentByProduct.R360];
+  const executiveCounts = {
+    areas_exceeding_target: allAttainmentRows.filter(r => r.qtd_attainment_pct >= 100).length,
+    areas_at_risk: allAttainmentRows.filter(r => r.rag_status === 'RED').length,
+    areas_needing_attention: allAttainmentRows.filter(r => r.rag_status === 'YELLOW').length,
+    areas_with_momentum: 0, // Will be recalculated if momentum_indicators exist
+  };
+
   // Transform Google Ads data (already grouped by product from API)
   const googleAdsData = apiData.google_ads || { POR: [], R360: [] };
 
@@ -85,22 +96,22 @@ function transformAPIResponse(apiData: any): ReportData {
       category: 'NEW LOGO' as Category,
       region: row.region,
       weighted_tof_score: Math.round(weightedTofScore * 10) / 10,
-      q1_target_mql: row.target_mql || 0,
+      q1_target_mql: row.q1_target_mql || 0,
       qtd_target_mql: row.target_mql || 0,
       actual_mql: row.actual_mql || 0,
       mql_pacing_pct: mqlPct,
       mql_gap: (row.actual_mql || 0) - (row.target_mql || 0),
-      q1_target_sql: row.target_sql || 0,
+      q1_target_sql: row.q1_target_sql || 0,
       qtd_target_sql: row.target_sql || 0,
       actual_sql: row.actual_sql || 0,
       sql_pacing_pct: sqlPct,
       sql_gap: (row.actual_sql || 0) - (row.target_sql || 0),
-      q1_target_sal: row.target_sal || 0,
+      q1_target_sal: row.q1_target_sal || 0,
       qtd_target_sal: row.target_sal || 0,
       actual_sal: row.actual_sal || 0,
       sal_pacing_pct: salPct,
       sal_gap: (row.actual_sal || 0) - (row.target_sal || 0),
-      q1_target_sqo: row.target_sqo || 0,
+      q1_target_sqo: row.q1_target_sqo || 0,
       qtd_target_sqo: row.target_sqo || 0,
       actual_sqo: row.actual_sqo || 0,
       sqo_pacing_pct: sqoPct,
@@ -247,6 +258,7 @@ function transformAPIResponse(apiData: any): ReportData {
     source_attainment: apiData.source_attainment || { POR: [], R360: [] },
     funnel_by_category: funnelByProduct,
     funnel_by_source: { POR: [], R360: [] },
+    funnel_by_source_actuals: apiData.funnel_by_source || { POR: [], R360: [] },
     pipeline_rca: pipelineRcaData,
     loss_reason_rca: apiData.loss_reason_rca || { POR: [], R360: [] },
     google_ads: googleAdsData,
@@ -255,6 +267,10 @@ function transformAPIResponse(apiData: any): ReportData {
     won_deals: wonDealsByProduct,
     lost_deals: lostDealsByProduct,
     pipeline_deals: pipelineDealsByProduct,
+    mql_details: apiData.mql_details || { POR: [], R360: [] },
+    sql_details: apiData.sql_details || { POR: [], R360: [] },
+    // Include executive counts so filterReportData can recalculate them
+    executive_counts: executiveCounts,
   };
 }
 
@@ -332,23 +348,6 @@ function ReportContent() {
       const filtered = filterReportData(liveData, selectedRegions, selectedProducts, selectedCategories, selectedSources);
       setFilteredData(filtered);
       setUseLiveData(true);
-    }
-  };
-
-  // Handle date range change
-  const handleDateChange = (newStart: string, newEnd: string) => {
-    setStartDate(newStart);
-    setEndDate(newEnd);
-    // Automatically fetch new data when dates change
-    if (useLiveData && !fetchInProgress.current) {
-      fetchInProgress.current = true;
-      fetchLiveData(selectedProducts, selectedRegions, newStart, newEnd).then(liveData => {
-        fetchInProgress.current = false;
-        if (liveData) {
-          const filtered = filterReportData(liveData, selectedRegions, selectedProducts, selectedCategories, selectedSources);
-          setFilteredData(filtered);
-        }
-      });
     }
   };
 
@@ -486,59 +485,6 @@ function ReportContent() {
         onSourceChange={setSelectedSources}
       />
 
-      {/* Date Range Selector */}
-      <div className="date-range-bar" data-testid="date-range-bar">
-        <span className="filter-label">Date Range:</span>
-        <div className="date-inputs">
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => handleDateChange(e.target.value, endDate)}
-            className="date-input"
-            data-testid="start-date"
-          />
-          <span className="date-separator">to</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => handleDateChange(startDate, e.target.value)}
-            className="date-input"
-            data-testid="end-date"
-          />
-        </div>
-        <div className="date-presets">
-          <button
-            className="preset-btn"
-            onClick={() => handleDateChange('2026-01-01', new Date().toISOString().split('T')[0])}
-            data-testid="preset-qtd"
-          >
-            QTD
-          </button>
-          <button
-            className="preset-btn"
-            onClick={() => {
-              const today = new Date();
-              const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-              handleDateChange(weekAgo.toISOString().split('T')[0], today.toISOString().split('T')[0]);
-            }}
-            data-testid="preset-7d"
-          >
-            Last 7 Days
-          </button>
-          <button
-            className="preset-btn"
-            onClick={() => {
-              const today = new Date();
-              const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-              handleDateChange(monthAgo.toISOString().split('T')[0], today.toISOString().split('T')[0]);
-            }}
-            data-testid="preset-30d"
-          >
-            Last 30 Days
-          </button>
-        </div>
-      </div>
-
       {/* Executive KPI Overview Cards */}
       {filteredData.executive_counts && (
         <ExecutiveKPICards counts={filteredData.executive_counts} />
@@ -561,7 +507,20 @@ function ReportContent() {
 
       {/* Pipeline Milestone Attainment - MQL/SQL/SAL/SQO with Funnel Score */}
       {filteredData.funnel_by_category && (
-        <FunnelMilestoneAttainment funnelData={filteredData.funnel_by_category} />
+        <FunnelMilestoneAttainment
+          funnelData={filteredData.funnel_by_category}
+          funnelBySource={filteredData.funnel_by_source_actuals}
+        />
+      )}
+
+      {/* MQL Details with Salesforce links */}
+      {filteredData.mql_details && (
+        <MQLDetails mqlDetails={filteredData.mql_details} />
+      )}
+
+      {/* SQL Details with disqualification reasons */}
+      {filteredData.sql_details && (
+        <SQLDetails sqlDetails={filteredData.sql_details} />
       )}
 
       <HitsMisses data={filteredData} />

@@ -94,9 +94,34 @@ export interface FunnelByCategoryRow {
   sqo_gap: number;
 }
 
-// Funnel by source row
+// Funnel by source row (extends category row)
 export interface FunnelBySourceRow extends FunnelByCategoryRow {
   source: Source;
+}
+
+// Funnel by source with actuals, targets, and pacing
+export interface FunnelBySourceActuals {
+  region: Region;
+  source: string;
+  // Actuals
+  actual_mql: number;
+  actual_sql: number;
+  actual_sal: number;
+  actual_sqo: number;
+  // Targets (from StrategicOperatingPlan)
+  target_mql: number;
+  target_sql: number;
+  target_sal: number;
+  target_sqo: number;
+  // Pacing percentages (actual vs target)
+  mql_pacing_pct: number;
+  sql_pacing_pct: number;
+  sal_pacing_pct: number;
+  sqo_pacing_pct: number;
+  // Conversion rates
+  mql_to_sql_rate: number;
+  sql_to_sal_rate: number;
+  sal_to_sqo_rate: number;
 }
 
 // Pipeline RCA row
@@ -184,6 +209,10 @@ export interface ReportData {
     POR: FunnelBySourceRow[];
     R360: FunnelBySourceRow[];
   };
+  funnel_by_source_actuals?: {
+    POR: FunnelBySourceActuals[];
+    R360: FunnelBySourceActuals[];
+  };
   pipeline_rca: {
     POR: PipelineRCARow[];
     R360: PipelineRCARow[];
@@ -232,6 +261,16 @@ export interface ReportData {
   pipeline_deals?: {
     POR: DealDetail[];
     R360: DealDetail[];
+  };
+  // MQL details for funnel drill-down
+  mql_details?: {
+    POR: MQLDetailRow[];
+    R360: MQLDetailRow[];
+  };
+  // SQL details for funnel drill-down
+  sql_details?: {
+    POR: SQLDetailRow[];
+    R360: SQLDetailRow[];
   };
 }
 
@@ -302,6 +341,48 @@ export interface TopRiskPocket {
   win_rate_pct: number;
   pipeline_acv: number;
   pipeline_coverage_x: number;
+}
+
+// MQL Detail row for drill-down
+export interface MQLDetailRow {
+  product: Product;
+  region: Region;
+  record_id: string;
+  salesforce_url: string;
+  company_name: string;
+  email: string;
+  source: string;
+  mql_date: string;
+  converted_to_sql: 'Yes' | 'No';
+  // Enhanced disqualification fields
+  mql_status?: 'ACTIVE' | 'CONVERTED' | 'REVERTED' | 'STALLED';
+  was_reverted?: boolean;
+  days_in_stage?: number;
+}
+
+// SQL Detail row for drill-down
+export interface SQLDetailRow {
+  product: Product;
+  region: Region;
+  record_id: string;
+  salesforce_url: string;
+  company_name: string;
+  email: string;
+  source: string;
+  sql_date: string;
+  mql_date: string;
+  days_mql_to_sql: number;
+  converted_to_sal: 'Yes' | 'No';
+  converted_to_sqo: 'Yes' | 'No';
+  has_opportunity: 'Yes' | 'No';
+  // Disqualification fields
+  sql_status: 'ACTIVE' | 'CONVERTED_SAL' | 'CONVERTED_SQO' | 'WON' | 'STALLED' | 'LOST';
+  opportunity_id?: string;
+  opportunity_name?: string;
+  opportunity_stage?: string;
+  opportunity_acv?: number;
+  loss_reason?: string;
+  days_in_stage?: number;
 }
 
 // Deal Detail for drill-down
