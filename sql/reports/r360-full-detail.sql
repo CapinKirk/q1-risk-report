@@ -1,5 +1,5 @@
 -- Full Detail Report: All Segments with Status and Bottleneck Analysis
--- Outputs all POR segments (not just top 3 risks)
+-- Outputs all R360 segments (not just top 3 risks)
 -- Includes: QTD pacing, status classification, bottleneck stage, issue type
 -- Created: 2026-01-11
 --
@@ -15,7 +15,7 @@
 --
 WITH
   params AS (
-    SELECT DATE('2026-01-10') AS as_of_date, 'P50' AS percentile, 'POR' AS product_filter
+    SELECT DATE('2026-01-10') AS as_of_date, 'P50' AS percentile, 'R360' AS product_filter
   ),
 
   -- Date window calculations
@@ -37,30 +37,46 @@ WITH
         WHEN 'AU' THEN 'APAC'
       END AS region,
       CASE
-        WHEN Type = 'Existing Business' THEN 'EXPANSION'
-        WHEN Type = 'New Business' AND (POR_SDRSource = 'Inbound' OR SDRSource = 'Inbound') THEN 'INBOUND'
-        WHEN Type = 'New Business' THEN 'NEW LOGO'
-        WHEN Type = 'Migration' THEN 'MIGRATION'
-        WHEN Type = 'Renewal' THEN 'RENEWAL'
-        ELSE 'OTHER'
+        WHEN Type = 'Existing Business' THEN 'R360 EXPANSION'
+        WHEN Type = 'New Business' AND (POR_SDRSource = 'Inbound' OR SDRSource = 'Inbound') THEN 'R360 INBOUND'
+        WHEN Type = 'New Business' THEN 'R360 NEW LOGO'
+        WHEN Type = 'Migration' THEN 'R360 MIGRATION'
+        WHEN Type = 'Renewal' THEN 'R360 RENEWAL'
+        ELSE 'R360 OTHER'
       END AS funnel_type,
+      -- SOURCE MAPPING: SDRSource -> POR_SDRSource -> LeadSource -> Default
+      -- Updated 2026-01-14: Added LeadSource as third-level fallback for N/A values
       CASE
         WHEN Type = 'Renewal' THEN 'AM SOURCED'
         -- MIGRATION FIX 2026-01-11: SOP only has AM SOURCED and INBOUND for Migration
-        WHEN Type = 'Migration' AND UPPER(COALESCE(SDRSource, POR_SDRSource, '')) = 'INBOUND' THEN 'INBOUND'
+        WHEN Type = 'Migration' AND UPPER(COALESCE(SDRSource, POR_SDRSource, LeadSource, '')) = 'INBOUND' THEN 'INBOUND'
         WHEN Type = 'Migration' THEN 'AM SOURCED'
+        -- Primary: SDRSource field
         WHEN UPPER(SDRSource) = 'INBOUND' THEN 'INBOUND'
         WHEN UPPER(SDRSource) = 'OUTBOUND' THEN 'OUTBOUND'
         WHEN UPPER(SDRSource) = 'AE SOURCED' THEN 'AE SOURCED'
         WHEN UPPER(SDRSource) = 'AM SOURCED' THEN 'AM SOURCED'
         WHEN UPPER(SDRSource) = 'TRADESHOW' THEN 'TRADESHOW'
-        WHEN SDRSource = 'N/A' OR SDRSource IS NULL THEN
+        -- Fallback 1: POR_SDRSource when SDRSource is N/A or NULL
+        WHEN SDRSource = 'N/A' OR SDRSource IS NULL OR TRIM(SDRSource) = '' THEN
           CASE
             WHEN UPPER(POR_SDRSource) = 'INBOUND' THEN 'INBOUND'
             WHEN UPPER(POR_SDRSource) = 'OUTBOUND' THEN 'OUTBOUND'
             WHEN UPPER(POR_SDRSource) = 'AE SOURCED' THEN 'AE SOURCED'
             WHEN UPPER(POR_SDRSource) = 'AM SOURCED' THEN 'AM SOURCED'
             WHEN UPPER(POR_SDRSource) = 'TRADESHOW' THEN 'TRADESHOW'
+            -- Fallback 2: LeadSource when POR_SDRSource is also N/A or NULL
+            WHEN POR_SDRSource = 'N/A' OR POR_SDRSource IS NULL OR TRIM(POR_SDRSource) = '' THEN
+              CASE
+                WHEN UPPER(LeadSource) IN ('INBOUND', 'WEB', 'WEBSITE', 'ORGANIC', 'MARKETING') THEN 'INBOUND'
+                WHEN UPPER(LeadSource) IN ('OUTBOUND', 'COLD CALL', 'SDR', 'BDR') THEN 'OUTBOUND'
+                WHEN UPPER(LeadSource) IN ('AE SOURCED', 'AE', 'SALES') THEN 'AE SOURCED'
+                WHEN UPPER(LeadSource) IN ('AM SOURCED', 'AM', 'ACCOUNT MANAGER', 'CSM') THEN 'AM SOURCED'
+                WHEN UPPER(LeadSource) IN ('TRADESHOW', 'TRADE SHOW', 'EVENT', 'CONFERENCE') THEN 'TRADESHOW'
+                WHEN UPPER(LeadSource) LIKE '%PARTNER%' OR UPPER(LeadSource) LIKE '%REFERRAL%' THEN 'AE SOURCED'
+                WHEN Type IN ('Existing Business', 'Renewal', 'Migration') THEN 'AM SOURCED'
+                ELSE 'AE SOURCED'
+              END
             WHEN Type IN ('Existing Business', 'Renewal', 'Migration') THEN 'AM SOURCED'
             ELSE 'AE SOURCED'
           END
@@ -80,7 +96,7 @@ WITH
       ACV AS actual_acv
     FROM `data-analytics-306119.sfdc.OpportunityViewTable`
     WHERE Won = true
-      AND por_record__c = true
+      AND r360_record__c = true
       AND Type NOT IN ('Consulting', 'Credit Card')
       AND ACV > 0
       AND Division IN ('US', 'UK', 'AU')
