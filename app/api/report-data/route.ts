@@ -313,7 +313,7 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
   try {
     const query = `
       SELECT
-        CASE WHEN c.r360_record__c = true OR c.r360_record__c = 'true' THEN 'R360' ELSE 'POR' END AS product,
+        CASE WHEN CAST(c.r360_record__c AS STRING) = 'true' THEN 'R360' ELSE 'POR' END AS product,
         CASE c.account_division__c
           WHEN 'US' THEN 'AMER'
           WHEN 'UK' THEN 'EMEA'
@@ -342,9 +342,12 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
 
     for (const row of rows as any[]) {
       const key = `${row.product}-${row.region}-RENEWAL`;
-      upliftMap.set(key, row.total_expected_increase_usd || 0);
+      const upliftValue = parseFloat(row.total_expected_increase_usd) || 0;
+      upliftMap.set(key, upliftValue);
+      console.log(`RenewalUplift: ${key} = ${upliftValue}`);
     }
 
+    console.log(`RenewalUpliftMap size: ${upliftMap.size}`);
     return upliftMap;
   } catch (error: any) {
     console.error('Error fetching renewal uplift:', error.message);
@@ -1334,7 +1337,16 @@ export async function POST(request: Request) {
         ? (q1Target > 0 ? Math.round((q1Forecast / q1Target) * 1000) / 10 : (q1Forecast > 0 ? 100 : 0))
         : attainmentPct;
 
-      const gap = qtdAcv - qtdTarget;
+      // Gap is difference between actual and target
+      // For RENEWAL: use Q1 forecast vs Q1 target (consistent with attainment %)
+      // For others: use QTD actual vs QTD target
+      // If target is $0, gap is $0 (no gap to measure against)
+      let gap: number;
+      if (target.category === 'RENEWAL') {
+        gap = q1Target > 0 ? q1Forecast - q1Target : 0;
+      } else {
+        gap = qtdTarget > 0 ? qtdAcv - qtdTarget : 0;
+      }
       const progressPct = q1Target > 0 ? Math.round((qtdAcv / q1Target) * 1000) / 10 : 0;
       // FY target is 4x Q1 for simplicity (adjust if actual data available)
       const fyTarget = q1Target * 4;

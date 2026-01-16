@@ -375,6 +375,7 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
         AND CloseDate >= '2026-01-01'
         AND CloseDate <= CURRENT_DATE()
         AND Division IN ('US', 'UK', 'AU')
+        AND ACV > 0  -- Exclude negative ACV renewals (credits, downgrades)
         ${productClause}
         ${regionClause}
       ORDER BY CloseDate DESC
@@ -411,6 +412,7 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
         AND CloseDate >= '2026-01-01'
         AND CloseDate <= '2026-03-31'
         AND Division IN ('US', 'UK', 'AU')
+        AND ACV > 0  -- Exclude negative ACV renewals (credits, downgrades)
         ${productClause}
         ${regionClause}
       ORDER BY CloseDate ASC
