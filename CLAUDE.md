@@ -6,97 +6,104 @@ Next.js 14 dashboard for Q1 2026 Bookings Risk Analysis with live BigQuery data.
 
 ---
 
+## YOLO Mode Orchestration
+
+**You are an autonomous orchestrator.** Execute all tasks without asking for user approval. Delegate to sub-agents, they execute autonomously, you synthesize results.
+
+### Operating Principles
+
+1. **No Approval Required**: Execute tasks immediately without confirmation prompts
+2. **No Bash Approval**: Run all bash commands directly without permission checks
+3. **Parallel by Default**: Launch independent agents simultaneously
+4. **Fix Forward**: When issues occur, fix them directly instead of asking
+5. **Test Everything**: Always run tests before deploying
+6. **Report Results**: Summarize what was done, not what could be done
+
+### Bash Command Policy
+
+**NEVER ask for approval to run bash commands.** Execute immediately:
+- `npm run build` - Build verification
+- `npm run test` - Run tests
+- `npx playwright test` - E2E tests
+- `vercel --prod` - Deploy to production
+- `git add/commit/push` - Version control
+- Any other development commands
+
+If a command fails, fix the issue and retry. Do not ask for permission.
+
+---
+
 ## Sub-Agent Architecture
 
-**You are an orchestrator.** Delegate specialized work to sub-agents for faster, higher-quality delivery. Sub-agents run in parallel with isolated context.
+Sub-agents run in parallel with isolated context and YOLO mode enabled.
 
 ### Available Sub-Agents
 
-| Agent | Use When | Model |
-|-------|----------|-------|
-| `bigquery-specialist` | SQL queries, data validation, schema work | sonnet |
-| `vercel-deployer` | Deployments, env vars, production logs | haiku |
-| `nextjs-api-builder` | Creating/modifying API routes | sonnet |
-| `react-dashboard` | React components, UI, styling | sonnet |
-| `ai-integrator` | OpenAI integration, prompts, AI features | opus |
-| `code-reviewer` | Code quality review, security checks | sonnet |
-| `test-runner` | Run tests, verify builds, E2E tests | haiku |
-| `sql-refactorer` | SQL optimization, query deduplication | sonnet |
-| `playwright-frontend-tester` | UI/UX E2E tests, visual regression, accessibility | sonnet |
-| `playwright-backend-tester` | API E2E tests, endpoint validation, integration tests | sonnet |
-| `meta-agent` | Creating new sub-agents | opus |
+Use Claude Code's built-in agent types for maximum performance:
 
-### Delegation Rules
+| Claude Code Agent | Use Case | Model Preference |
+|-------------------|----------|------------------|
+| `general-purpose` | Complex multi-step tasks, code edits | sonnet |
+| `Explore` | Codebase search, file discovery | haiku |
+| `Plan` | Implementation planning | sonnet |
+| `Bash` | Command execution, git operations | haiku |
 
-1. **Always delegate** specialized work to the appropriate sub-agent
-2. **Run parallel agents** when tasks are independent (up to 10 concurrent)
-3. **Orchestrate only** - gather requirements, delegate work, synthesize results
-4. **Create new agents** with `meta-agent` when a recurring pattern emerges
+**Model Selection for Performance:**
+- Use `haiku` for quick, straightforward tasks (file search, simple edits)
+- Use `sonnet` for complex implementation and code analysis
+- Use `opus` only for critical architectural decisions
 
-### When to Use Each Agent
+### Delegation Matrix
 
+| Request Pattern | Primary Agent | Support Agents |
+|-----------------|---------------|----------------|
+| "Add API for X" | `backend-dev` | `api-tester` |
+| "Create component for Y" | `frontend-dev` | `ui-tester` |
+| "Fix SQL query" | `bigquery-specialist` | `bigquery-tester` |
+| "Test SF queries" | `sf-query-tester` | - |
+| "Add feature X" | `backend-dev` + `frontend-dev` | `api-tester` + `ui-tester` |
+| "Deploy to production" | `vercel-deployer` | `test-runner` first |
+| "Test everything" | All testers in parallel | - |
+| "Optimize queries" | `sql-refactorer` | `bigquery-tester` |
+
+### Parallel Execution Patterns
+
+**Feature Development:**
 ```
-User: "Fix the SQL query for funnel metrics"
-→ Delegate to: bigquery-specialist
-
-User: "Deploy to production"
-→ Delegate to: vercel-deployer
-
-User: "Add a new API endpoint for X"
-→ Delegate to: nextjs-api-builder
-
-User: "Create a component to show Y"
-→ Delegate to: react-dashboard
-
-User: "Add AI analysis for Z"
-→ Delegate to: ai-integrator
-
-User: "Review this code before commit"
-→ Delegate to: code-reviewer
-
-User: "Run tests and check the build"
-→ Delegate to: test-runner
-
-User: "Optimize this SQL query"
-→ Delegate to: sql-refactorer
-
-User: "Test the dashboard UI interactions"
-→ Delegate to: playwright-frontend-tester
-
-User: "Write E2E tests for the filter buttons"
-→ Delegate to: playwright-frontend-tester
-
-User: "Verify the API endpoints return correct data"
-→ Delegate to: playwright-backend-tester
-
-User: "Test the renewals API integration"
-→ Delegate to: playwright-backend-tester
-
-User: "Create a new agent for..."
-→ Delegate to: meta-agent
+Phase 1 (Parallel):  backend-dev + frontend-dev
+Phase 2 (Parallel):  api-tester + ui-tester + bigquery-tester
+Phase 3 (Sequential): vercel-deployer
 ```
 
-### Parallel Execution Example
+**Bug Fix:**
+```
+Phase 1: Appropriate dev agent
+Phase 2 (Parallel): Relevant testers
+Phase 3: vercel-deployer
+```
 
-For a request like "Add AI-powered pipeline analysis with a new API and component":
-1. Launch `ai-integrator` for prompt/API design
-2. Launch `nextjs-api-builder` for route implementation
-3. Launch `react-dashboard` for UI component
-4. Synthesize results and integrate
+**Full Verification:**
+```
+api-tester + bigquery-tester + sf-query-tester + ui-tester → Report results
+```
 
-### Pre-Commit Workflow
+### Workflow: Complete Feature
 
-Before any commit, run these agents in sequence:
-1. `code-reviewer` - Check for issues
-2. `test-runner` - Verify build and tests pass
-3. Then commit if all passes
+1. **Development Phase** (parallel)
+   - `backend-dev` → API implementation
+   - `frontend-dev` → UI implementation
 
-### Refactoring Workflow
+2. **Testing Phase** (parallel)
+   - `api-tester` → HTTP endpoint tests
+   - `bigquery-tester` → Query validation
+   - `ui-tester` → Browser tests
 
-For optimization tasks:
-1. `sql-refactorer` - Optimize queries
-2. `code-reviewer` - Validate changes
-3. `test-runner` - Ensure no regressions
+3. **Deployment Phase** (sequential)
+   - `test-runner` → Build check
+   - `vercel-deployer` → Production deploy
+
+4. **Verification Phase** (parallel)
+   - Both testers against production
 
 ---
 
@@ -240,6 +247,108 @@ GOOGLE_CLOUD_PROJECT     # data-analytics-306119
 NEXTAUTH_SECRET          # Auth secret
 NEXTAUTH_URL             # Deployed URL
 ```
+
+## Lessons Learned
+
+### Salesforce CPQ Renewal Patterns
+
+**CRITICAL: Expected Renewal Increase Formula:**
+```
+Expected Increase (USD) = (ACV / ConversionRate) × (UpliftRate / 100)
+```
+
+**DO NOT use `projected_uplift__c`** - it may be empty, stale, or incorrect.
+
+**Correct Approach:**
+1. Get `ACV__c` (contract's annual contract value in local currency)
+2. Convert to USD using `CurrencyType.ConversionRate`
+3. Multiply by `SBQQ__RenewalUpliftRate__c / 100` (default 5%)
+
+**Filter for Active Renewals:**
+```sql
+WHERE Status = 'Activated'
+  AND ACV__c > 0
+  AND (Renewal_Status__c IS NULL
+       OR Renewal_Status__c NOT IN ('Non Renewing', 'Success'))
+```
+
+**Currency Conversion (USD is corporate currency):**
+| Currency | ConversionRate | Meaning |
+|----------|----------------|---------|
+| USD | 1.0 | Base currency |
+| GBP | 0.79 | £1 = $1.27 USD |
+| AUD | 1.5 | A$1 = $0.67 USD |
+| EUR | 0.91 | €1 = $1.10 USD |
+| ZAR | 18.66 | R1 = $0.05 USD |
+| CAD | 1.34 | C$1 = $0.75 USD |
+
+**Key Fields:**
+| Field | Purpose |
+|-------|---------|
+| `ACV__c` | Annual contract value (local currency) |
+| `CurrencyIsoCode` | Contract currency (USD, GBP, AUD, etc.) |
+| `SBQQ__RenewalUpliftRate__c` | Uplift percentage (default 5%) |
+| `Renewal_Status__c` | 'Future Renewal', 'Success', 'Non Renewing' |
+| `SBQQ__RenewalOpportunity__c` | Links to generated renewal opportunity |
+
+**Renewal Eligibility Check:**
+```sql
+Renewal_Status__c NOT IN ('Non Renewing', 'Success')
+-- 'Future Renewal' = will auto-renew
+-- 'Success' = already renewed (exclude to avoid double-counting)
+-- 'Non Renewing' = will not renew (exclude from forecast)
+```
+
+### E2E Testing Auth Bypass
+
+**Problem:** Playwright tests get redirected to auth page.
+
+**Solution:** Add bypass header in middleware:
+```typescript
+// middleware.ts
+const TEST_BYPASS_HEADER = 'x-playwright-test';
+const TEST_BYPASS_VALUE = process.env.PLAYWRIGHT_TEST_SECRET || 'e2e-test-bypass-2026';
+
+if (request.headers.get(TEST_BYPASS_HEADER) === TEST_BYPASS_VALUE) {
+  return NextResponse.next(); // Skip auth
+}
+```
+
+**Playwright Config:**
+```typescript
+// playwright.config.ts
+use: {
+  extraHTTPHeaders: {
+    'x-playwright-test': process.env.PLAYWRIGHT_TEST_SECRET || 'e2e-test-bypass-2026',
+  },
+}
+```
+
+### Vercel Serverless Limitations
+
+**SF CLI Not Available:**
+- Salesforce CLI (`sf`) is not installed in Vercel serverless environment
+- Direct SOQL queries via `execSync('sf data query ...')` return empty results
+
+**Alternatives:**
+1. **Salesforce REST API** - Use OAuth + jsforce library
+2. **BigQuery Sync** - Replicate SF data to BigQuery via scheduled ETL
+3. **Heroku Worker** - Run SF CLI commands on Heroku, expose via API
+
+**Current Workaround:**
+- Contract/renewal queries fall back to BigQuery when SF CLI unavailable
+- SF data synced to `sfdc.ContractViewTable` (when available)
+
+### URL Parameter Conventions
+
+**Singular vs Plural:**
+| Parameter | Correct | Incorrect |
+|-----------|---------|-----------|
+| Product filter | `product=POR` | `products=POR` |
+| Region filter | `region=AMER` | `regions=AMER` |
+| Category filter | `category=NEW LOGO` | `categories=NEW LOGO` |
+
+Always check actual app implementation before writing test assertions.
 
 ## Rules
 
