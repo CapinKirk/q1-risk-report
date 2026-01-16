@@ -181,7 +181,7 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
           WHEN 'UK' THEN 'EMEA'
           WHEN 'AU' THEN 'APAC'
         END AS region,
-        ROUND(ACV, 2) AS acv,
+        ROUND(COALESCE(ACV, 0), 2) AS acv,
         CAST(CloseDate AS STRING) AS close_date,
         StageName AS stage,
         Won AS is_won,
@@ -189,17 +189,17 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
         ClosedLostReason AS loss_reason,
         Owner AS owner_name,
         CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url,
-        SBQQ__RenewedContract__c AS contract_id,
-        ROUND(ACV - COALESCE(PriorYearACV, 0), 2) AS uplift_amount,
-        ROUND(COALESCE(PriorYearACV, 0), 2) AS prior_acv
+        '' AS contract_id,
+        0 AS uplift_amount,
+        0 AS prior_acv
       FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
       WHERE Type = 'Renewal'
         AND CloseDate >= '2026-01-01'
-        AND CloseDate <= CURRENT_DATE()
         AND Division IN ('US', 'UK', 'AU')
         ${productClause}
         ${regionClause}
       ORDER BY CloseDate DESC
+      LIMIT 500
     `;
 
     const [rows] = await bigquery.query({ query });
