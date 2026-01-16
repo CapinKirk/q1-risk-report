@@ -1,9 +1,115 @@
 // Region and Product types
 export type Region = 'AMER' | 'EMEA' | 'APAC';
 export type Product = 'POR' | 'R360';
-export type Category = 'NEW LOGO' | 'EXPANSION' | 'MIGRATION';
+export type Category = 'NEW LOGO' | 'EXPANSION' | 'MIGRATION' | 'RENEWAL';
 export type Source = 'INBOUND' | 'OUTBOUND' | 'AE SOURCED' | 'AM SOURCED' | 'TRADESHOW' | 'PARTNERSHIPS';
 export type RAGStatus = 'GREEN' | 'YELLOW' | 'RED';
+
+// ============================================================================
+// RENEWALS TYPES (Salesforce Contract + BQ Renewal Opportunities)
+// ============================================================================
+
+// Salesforce Contract (from real-time SF CLI query)
+export interface SalesforceContract {
+  Id: string;
+  ContractNumber: string;
+  AccountId: string;
+  AccountName: string;
+  StartDate: string;
+  EndDate: string;
+  ContractTerm: number;
+  Status: string;
+  AutoRenewal: boolean;
+  CurrentACV: number;
+  EndingACV: number;
+  UpliftAmount: number;
+  UpliftPct: number;
+  Product: Product;
+  Region: Region;
+  DaysUntilRenewal: number;
+  IsAtRisk: boolean;
+  RenewalOpportunityId?: string;
+}
+
+// Renewal Opportunity (from BigQuery Type='Renewal')
+export interface RenewalOpportunity {
+  opportunity_id: string;
+  account_id: string;
+  account_name: string;
+  opportunity_name: string;
+  product: Product;
+  region: Region;
+  acv: number;
+  close_date: string;
+  stage: string;
+  is_won: boolean;
+  is_closed: boolean;
+  loss_reason: string | null;
+  owner_name: string;
+  salesforce_url: string;
+  contract_id?: string;
+  uplift_amount?: number;
+  prior_acv?: number;
+}
+
+// Renewal summary metrics
+export interface RenewalSummary {
+  renewalCount: number;
+  renewalACV: number;
+  autoRenewalCount: number;
+  autoRenewalACV: number;
+  manualRenewalCount: number;
+  manualRenewalACV: number;
+  avgUpliftPct: number;
+  totalUpliftAmount: number;
+  atRiskCount: number;
+  atRiskACV: number;
+  upcomingRenewals30: number;
+  upcomingRenewals30ACV: number;
+  upcomingRenewals60: number;
+  upcomingRenewals60ACV: number;
+  upcomingRenewals90: number;
+  upcomingRenewals90ACV: number;
+  wonRenewalCount: number;
+  wonRenewalACV: number;
+  lostRenewalCount: number;
+  lostRenewalACV: number;
+  pipelineRenewalCount: number;
+  pipelineRenewalACV: number;
+}
+
+// Full renewals data structure
+export interface RenewalsData {
+  summary: { POR: RenewalSummary; R360: RenewalSummary };
+  wonRenewals: { POR: RenewalOpportunity[]; R360: RenewalOpportunity[] };
+  lostRenewals: { POR: RenewalOpportunity[]; R360: RenewalOpportunity[] };
+  pipelineRenewals: { POR: RenewalOpportunity[]; R360: RenewalOpportunity[] };
+  upcomingContracts: { POR: SalesforceContract[]; R360: SalesforceContract[] };
+  atRiskContracts: { POR: SalesforceContract[]; R360: SalesforceContract[] };
+  sfAvailable: boolean; // Whether real-time SF data was fetched
+  bqDataOnly: boolean;  // Fallback flag if SF unavailable
+}
+
+// ============================================================================
+// AI ANALYSIS TILE TYPES
+// ============================================================================
+
+// AI Analysis tile state (for tile-based UI)
+export interface AIAnalysisTile {
+  id: string;
+  product: Product;
+  region: Region;
+  loading: boolean;
+  analysis: string | null;
+  error: string | null;
+  generatedAt: string | null;
+}
+
+// AI Analysis filter state (local to AI component)
+export interface AIAnalysisFilterState {
+  products: Product[];
+  regions: Region[];
+}
 
 // Period information
 export interface Period {

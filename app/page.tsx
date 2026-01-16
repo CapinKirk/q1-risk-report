@@ -23,6 +23,7 @@ import GoogleAdsPerf from '@/components/GoogleAdsPerf';
 import OpportunitiesTable from '@/components/OpportunitiesTable';
 import LoadingOverlay from '@/components/LoadingOverlay';
 import AIAnalysis from '@/components/AIAnalysis';
+import RenewalsSection from '@/components/RenewalsSection';
 
 // Import the pre-generated data as fallback
 import reportDataJson from '@/data/report-data.json';
@@ -505,6 +506,12 @@ function ReportContent() {
 
       <AttainmentTable data={filteredData} />
       <SourceAttainment data={filteredData} />
+
+      {/* Renewals Overview Section */}
+      <RenewalsSection
+        products={selectedProducts}
+        regions={selectedRegions}
+      />
 
       {/* Pipeline Milestone Attainment - MQL/SQL/SAL/SQO with Funnel Score */}
       {filteredData.funnel_by_category && (

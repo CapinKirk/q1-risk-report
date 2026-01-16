@@ -17,7 +17,7 @@ interface ReportFilterProps {
 
 const ALL_REGIONS: Region[] = ['AMER', 'EMEA', 'APAC'];
 const ALL_PRODUCTS: Product[] = ['POR', 'R360'];
-const ALL_CATEGORIES: Category[] = ['NEW LOGO', 'EXPANSION', 'MIGRATION'];
+const ALL_CATEGORIES: Category[] = ['NEW LOGO', 'EXPANSION', 'MIGRATION', 'RENEWAL'];
 const ALL_SOURCES: Source[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];
 
 export default function ReportFilter({
@@ -34,7 +34,7 @@ export default function ReportFilter({
 
   const isAllRegions = selectedRegions.length === 3 || selectedRegions.length === 0;
   const isAllProducts = selectedProducts.length === 2 || selectedProducts.length === 0;
-  const isAllCategories = selectedCategories.length === 3 || selectedCategories.length === 0;
+  const isAllCategories = selectedCategories.length === 4 || selectedCategories.length === 0;
   const isAllSources = selectedSources.length === 6 || selectedSources.length === 0;
 
   // Update URL with all filters
