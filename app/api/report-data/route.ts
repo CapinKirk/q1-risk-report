@@ -35,6 +35,55 @@ function getBigQuery() {
   return getBigQueryClient();
 }
 
+/**
+ * Get renewal targets from RAW_2026_Plan_by_Month using Q1_Actual_2025
+ * RATIONALE: Renewal targets use prior year actuals as the baseline, not planned targets
+ * This matches the 2026 Bookings Plan where Q1_Actual_2025 represents the renewal baseline
+ */
+async function getRenewalTargetsFromRawPlan(): Promise<Map<string, number>> {
+  try {
+    const query = `
+      SELECT
+        Division,
+        Booking_Type,
+        ROUND(COALESCE(Q1_Actual_2025, 0), 2) AS q1_target
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RAW_2026_Plan_by_Month\`
+      WHERE LOWER(Booking_Type) = 'renewal'
+    `;
+
+    const [rows] = await getBigQuery().query({ query });
+    const renewalTargetMap = new Map<string, number>();
+
+    // Division format: "AMER POR", "EMEA POR", "APAC POR", "AMER R360"
+    for (const row of rows as any[]) {
+      const division = (row.Division || '').toUpperCase();
+      const q1Target = parseFloat(row.q1_target) || 0;
+
+      // Parse Division to extract region and product
+      let region: string | null = null;
+      let product: string | null = null;
+
+      if (division.includes('AMER')) region = 'AMER';
+      else if (division.includes('EMEA')) region = 'EMEA';
+      else if (division.includes('APAC')) region = 'APAC';
+
+      if (division.includes('R360')) product = 'R360';
+      else if (division.includes('POR')) product = 'POR';
+
+      if (product && region) {
+        const key = `${product}-${region}-RENEWAL`;
+        renewalTargetMap.set(key, q1Target);
+      }
+    }
+
+    console.log('Renewal targets from RAW_2026_Plan_by_Month (Q1_Actual_2025):', Object.fromEntries(renewalTargetMap));
+    return renewalTargetMap;
+  } catch (error: any) {
+    console.error('Failed to fetch renewal targets from RAW_2026_Plan_by_Month:', error.message);
+    return new Map();
+  }
+}
+
 // Build filter clauses for RevOpsReport queries
 function buildRevOpsFilterClause(filters: ReportFilters): string {
   const conditions: string[] = [];
@@ -1059,6 +1108,7 @@ export async function POST(request: Request) {
       porFunnelByCategory,
       r360FunnelByCategory,
       renewalUpliftMap,
+      renewalTargetsMap,
     ] = await Promise.all([
       getRevOpsQTDData(filters),
       getRevenueActuals(filters),
@@ -1090,6 +1140,7 @@ export async function POST(request: Request) {
         ? getFunnelByCategory(filters, 'R360')
         : Promise.resolve([]),
       getUpcomingRenewalUplift(),
+      getRenewalTargetsFromRawPlan(),
     ]);
 
     // Calculate period info
@@ -1100,6 +1151,39 @@ export async function POST(request: Request) {
     for (const row of revOpsData) {
       const key = `${row.product}-${row.region}-${row.category}`;
       revOpsTargetMap.set(key, row);
+    }
+
+    // CRITICAL: Override RENEWAL targets with Q1_Actual_2025 from RAW_2026_Plan_by_Month
+    // Renewal targets use prior year actuals as the baseline, not planned targets
+    for (const [key, correctTarget] of Array.from(renewalTargetsMap.entries())) {
+      if (revOpsTargetMap.has(key)) {
+        const existingRow = revOpsTargetMap.get(key);
+        const oldTarget = existingRow.q1_target;
+        existingRow.q1_target = correctTarget;
+        console.log(`RENEWAL target override: ${key} = $${correctTarget} (was $${oldTarget} from RevOpsReport)`);
+      } else {
+        // Create a new entry for renewals not in RevOpsReport
+        const [product, region] = key.split('-');
+        revOpsTargetMap.set(key, {
+          product,
+          region,
+          category: 'RENEWAL',
+          opportunity_type: 'Renewal',
+          q1_target: correctTarget,
+          qtd_actual: 0,
+          attainment_pct: 0,
+          target_mql: 0, actual_mql: 0,
+          target_sql: 0, actual_sql: 0,
+          target_sal: 0, actual_sal: 0,
+          target_sqo: 0, actual_sqo: 0,
+          target_won: 0, actual_won: 0,
+          mql_to_sql_leakage: 0,
+          sql_to_sal_leakage: 0,
+          sal_to_sqo_leakage: 0,
+          risk_profile: 'P75',
+        });
+        console.log(`RENEWAL target added: ${key} = $${correctTarget}`);
+      }
     }
 
     // Group revenue by product/region/category from won deals
