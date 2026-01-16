@@ -137,6 +137,10 @@ async function getTargets(filters: ReportFilters) {
         ELSE FunnelType
       END AS category,
       ROUND(SUM(CASE
+        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-12-31'
+        THEN Target_ACV ELSE 0
+      END), 2) AS fy_target,
+      ROUND(SUM(CASE
         WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
         THEN Target_ACV ELSE 0
       END), 2) AS q1_target,
@@ -188,6 +192,53 @@ async function getTargets(filters: ReportFilters) {
 
   const [rows] = await getBigQuery().query({ query });
   return rows;
+}
+
+// Query for Q1 renewal uplift by product/region from Contract table
+// CRITICAL: Only count contracts renewing within Q1 (by March 31, 2026)
+// This aligns the uplift forecast with the Q1 target period
+// IMPORTANT: All amounts are converted to USD using CurrencyType conversion rates
+async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
+  try {
+    // Join with CurrencyType to convert all amounts to USD
+    // Salesforce formula: local_amount / conversionrate = USD_amount
+    // USD has implied rate of 1.0
+    const query = `
+      SELECT
+        CASE WHEN c.r360_record__c = true OR c.r360_record__c = 'true' THEN 'R360' ELSE 'POR' END AS product,
+        CASE c.account_division__c
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        -- Convert to USD by dividing by conversion rate
+        SUM(ROUND(COALESCE(CAST(c.projected_uplift__c AS FLOAT64), 0) / COALESCE(ct.conversionrate, 1), 2)) AS total_uplift_usd
+      FROM \`data-analytics-306119.sfdc.Contract\` c
+      LEFT JOIN \`data-analytics-306119.sfdc.CurrencyType\` ct
+        ON LOWER(c.currencyisocode) = LOWER(ct.isocode)
+      WHERE c.Status = 'Activated'
+        AND DATE(c.EndDate) >= CURRENT_DATE()
+        AND DATE(c.EndDate) <= '2026-03-31'
+        AND c.account_division__c IN ('US', 'UK', 'AU')
+        AND (c.neo_automaticrenewal__c = true OR c.neo_automaticrenewal__c = 'true'
+             OR c.sbqq__evergreen__c = true OR c.sbqq__evergreen__c = 'true')
+      GROUP BY 1, 2
+    `;
+
+    const [rows] = await getBigQuery().query({ query });
+    const upliftMap = new Map<string, number>();
+
+    for (const row of rows as any[]) {
+      const key = `${row.product}-${row.region}-RENEWAL`;
+      upliftMap.set(key, row.total_uplift_usd || 0);
+    }
+
+    console.log('Q1 Renewal uplift (USD) by product/region (thru Mar 31):', Object.fromEntries(upliftMap));
+    return upliftMap;
+  } catch (error: any) {
+    console.error('Error fetching renewal uplift:', error.message);
+    return new Map();
+  }
 }
 
 // Query for funnel actuals (POR) - aggregated
@@ -1173,6 +1224,7 @@ export async function POST(request: Request) {
       sqlDetailsData,
       porFunnelByCategory,
       r360FunnelByCategory,
+      renewalUpliftMap,
     ] = await Promise.all([
       getRevenueActuals(filters),
       getTargets(filters),
@@ -1204,6 +1256,7 @@ export async function POST(request: Request) {
       filters.products.length === 0 || filters.products.includes('R360')
         ? getFunnelByCategory(filters, 'R360')
         : Promise.resolve([]),
+      getUpcomingRenewalUplift(),
     ]);
 
     // Calculate period info
@@ -1261,13 +1314,27 @@ export async function POST(request: Request) {
       const pipeline = pipelineMap.get(key) || { acv: 0, count: 0 };
       const lost = lostMap.get(key) || { acv: 0, count: 0 };
 
-      const qtdAcv = actual ? actual.total_acv : 0;
+      const wonAcv = actual ? actual.total_acv : 0;
       const qtdDeals = actual ? actual.deal_count : 0;
       const qtdTarget = parseFloat(target.qtd_target) || 0;
       const q1Target = parseFloat(target.q1_target) || 0;
-      const attainmentPct = qtdTarget > 0 ? Math.round((qtdAcv / qtdTarget) * 1000) / 10 : 0;
+      const fyTarget = parseFloat(target.fy_target) || 0;
+
+      // For RENEWAL category: add upcoming uplift to calculate forecasted bookings
+      // This makes RAG consistent with the Renewal Bookings Forecast card
+      let qtdAcv = wonAcv;
+      if (target.category === 'RENEWAL') {
+        const upliftKey = `${target.product}-${target.region}-RENEWAL`;
+        const uplift = (renewalUpliftMap as unknown as Map<string, number>).get(upliftKey) || 0;
+        qtdAcv = wonAcv + uplift; // Forecasted bookings = Won + Expected uplift
+        console.log(`RENEWAL ${target.product}-${target.region}: Won=${wonAcv}, Uplift=${uplift}, Forecasted=${qtdAcv}, Target=${qtdTarget}`);
+      }
+
+      // When target is 0: if you have actuals, you've exceeded expectations (100%)
+      const attainmentPct = qtdTarget > 0 ? Math.round((qtdAcv / qtdTarget) * 1000) / 10 : (qtdAcv > 0 ? 100 : 100);
       const gap = qtdAcv - qtdTarget;
       const progressPct = q1Target > 0 ? Math.round((qtdAcv / q1Target) * 1000) / 10 : 0;
+      const fyProgressPct = fyTarget > 0 ? Math.round((qtdAcv / fyTarget) * 1000) / 10 : 0;
 
       // Calculate pipeline coverage (pipeline / remaining gap to Q1)
       const remainingGap = Math.max(0, q1Target - qtdAcv);
@@ -1281,12 +1348,14 @@ export async function POST(request: Request) {
         product: target.product,
         region: target.region,
         category: target.category,
+        fy_target: fyTarget,
         q1_target: q1Target,
         qtd_target: qtdTarget,
         qtd_deals: qtdDeals,
         qtd_acv: qtdAcv,
         qtd_attainment_pct: attainmentPct,
         q1_progress_pct: progressPct,
+        fy_progress_pct: fyProgressPct,
         qtd_gap: gap,
         pipeline_acv: pipeline.acv,
         pipeline_coverage_x: Math.round(pipelineCoverage * 10) / 10,
@@ -1299,6 +1368,7 @@ export async function POST(request: Request) {
 
     // Calculate grand total
     const totalPipelineAcv = attainmentDetail.reduce((sum, a) => sum + (a.pipeline_acv || 0), 0);
+    const totalFyTarget = attainmentDetail.reduce((sum, a) => sum + a.fy_target, 0);
     const totalQ1Target = attainmentDetail.reduce((sum, a) => sum + a.q1_target, 0);
     const totalQtdAcv = attainmentDetail.reduce((sum, a) => sum + a.qtd_acv, 0);
     const totalWonDeals = attainmentDetail.reduce((sum, a) => sum + a.qtd_deals, 0);
@@ -1307,12 +1377,14 @@ export async function POST(request: Request) {
 
     const grandTotal = {
       product: 'ALL',
+      total_fy_target: totalFyTarget,
       total_q1_target: totalQ1Target,
       total_qtd_target: attainmentDetail.reduce((sum, a) => sum + a.qtd_target, 0),
       total_qtd_deals: totalWonDeals,
       total_qtd_acv: totalQtdAcv,
       total_qtd_attainment_pct: 0,
       total_q1_progress_pct: 0,
+      total_fy_progress_pct: 0,
       total_qtd_gap: 0,
       total_pipeline_acv: totalPipelineAcv,
       total_pipeline_coverage_x: totalRemainingGap > 0 ? Math.round((totalPipelineAcv / totalRemainingGap) * 10) / 10 : 0,
@@ -1326,6 +1398,9 @@ export async function POST(request: Request) {
     grandTotal.total_q1_progress_pct = grandTotal.total_q1_target > 0
       ? Math.round((grandTotal.total_qtd_acv / grandTotal.total_q1_target) * 1000) / 10
       : 0;
+    grandTotal.total_fy_progress_pct = grandTotal.total_fy_target > 0
+      ? Math.round((grandTotal.total_qtd_acv / grandTotal.total_fy_target) * 1000) / 10
+      : 0;
     grandTotal.total_qtd_gap = grandTotal.total_qtd_acv - grandTotal.total_qtd_target;
 
     // Calculate product totals
@@ -1334,6 +1409,7 @@ export async function POST(request: Request) {
       const productDetails = attainmentDetail.filter(a => a.product === product);
       if (productDetails.length > 0) {
         const prodPipelineAcv = productDetails.reduce((sum, a) => sum + (a.pipeline_acv || 0), 0);
+        const prodFyTarget = productDetails.reduce((sum, a) => sum + a.fy_target, 0);
         const prodQ1Target = productDetails.reduce((sum, a) => sum + a.q1_target, 0);
         const prodQtdAcv = productDetails.reduce((sum, a) => sum + a.qtd_acv, 0);
         const prodWonDeals = productDetails.reduce((sum, a) => sum + a.qtd_deals, 0);
@@ -1343,11 +1419,13 @@ export async function POST(request: Request) {
 
         productTotals[product] = {
           product,
+          total_fy_target: prodFyTarget,
           total_q1_target: prodQ1Target,
           total_qtd_target: productDetails.reduce((sum, a) => sum + a.qtd_target, 0),
           total_qtd_deals: prodWonDeals,
           total_qtd_acv: prodQtdAcv,
           total_qtd_attainment_pct: 0,
+          total_fy_progress_pct: 0,
           total_qtd_gap: 0,
           total_pipeline_acv: prodPipelineAcv,
           total_pipeline_coverage_x: prodRemainingGap > 0 ? Math.round((prodPipelineAcv / prodRemainingGap) * 10) / 10 : 0,
@@ -1360,6 +1438,9 @@ export async function POST(request: Request) {
         const pt = productTotals[product];
         pt.total_qtd_attainment_pct = pt.total_qtd_target > 0
           ? Math.round((pt.total_qtd_acv / pt.total_qtd_target) * 1000) / 10
+          : 0;
+        pt.total_fy_progress_pct = pt.total_fy_target > 0
+          ? Math.round((pt.total_qtd_acv / pt.total_fy_target) * 1000) / 10
           : 0;
         pt.total_qtd_gap = pt.total_qtd_acv - pt.total_qtd_target;
       }

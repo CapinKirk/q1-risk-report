@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { getBigQueryClient } from '@/lib/bigquery-client';
 import {
   RenewalsData,
@@ -10,8 +8,6 @@ import {
   Product,
   Region,
 } from '@/lib/types';
-
-const execAsync = promisify(exec);
 
 // Empty summary for fallback
 function getEmptySummary(): RenewalSummary {
@@ -38,6 +34,20 @@ function getEmptySummary(): RenewalSummary {
     lostRenewalACV: 0,
     pipelineRenewalCount: 0,
     pipelineRenewalACV: 0,
+    expectedRenewalACV: 0,
+    expectedRenewalACVWithUplift: 0,
+    renewalRiskGap: 0,
+    renewalRiskPct: 0,
+    // New target/RAG fields
+    q1Target: 0,
+    qtdTarget: 0,
+    qtdAttainmentPct: 0,
+    forecastedBookings: 0,
+    ragStatus: 'RED',
+    // Missing uplift tracking
+    missingUpliftCount: 0,
+    missingUpliftACV: 0,
+    potentialLostUplift: 0,
   };
 }
 
@@ -50,37 +60,87 @@ function getEmptyRenewalsData(): RenewalsData {
     pipelineRenewals: { POR: [], R360: [] },
     upcomingContracts: { POR: [], R360: [] },
     atRiskContracts: { POR: [], R360: [] },
+    missingUpliftContracts: { POR: [], R360: [] },
     sfAvailable: false,
     bqDataOnly: false,
   };
 }
 
-// SF CLI query for Contract data
-const SF_CONTRACT_SOQL = `
-SELECT
-  Id,
-  ContractNumber,
-  AccountId,
-  Account.Name,
-  StartDate,
-  EndDate,
-  ContractTerm,
-  Status,
-  SBQQ__AutoRenewal__c,
-  SBQQ__RenewalOpportunity__c,
-  por_record__c,
-  Division
-FROM Contract
-WHERE Status = 'Activated'
-  AND EndDate >= TODAY
-  AND Division IN ('US', 'UK', 'AU')
-ORDER BY EndDate ASC
-LIMIT 500
-`;
+// Standard renewal uplift percentage (from CPQ config)
+const DEFAULT_RENEWAL_UPLIFT_PCT = 5;
 
 interface RequestFilters {
   products?: string[];
   regions?: string[];
+}
+
+// Renewal targets from StrategicOperatingPlan
+interface RenewalTargets {
+  POR: { q1Target: number; qtdTarget: number };
+  R360: { q1Target: number; qtdTarget: number };
+}
+
+// Calculate RAG status based on attainment percentage
+function calculateRAG(attainmentPct: number): 'GREEN' | 'YELLOW' | 'RED' {
+  if (attainmentPct >= 90) return 'GREEN';
+  if (attainmentPct >= 70) return 'YELLOW';
+  return 'RED';
+}
+
+// Query renewal targets from StrategicOperatingPlan
+async function getRenewalTargets(): Promise<RenewalTargets> {
+  try {
+    const bigquery = getBigQueryClient();
+
+    // Get current date to calculate QTD target proportionally
+    const today = new Date();
+    const quarterStart = new Date('2026-01-01');
+    const quarterEnd = new Date('2026-03-31');
+
+    const query = `
+      SELECT
+        RecordType AS product,
+        ROUND(SUM(CASE
+          WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
+          THEN Target_ACV ELSE 0
+        END), 2) AS q1_target,
+        ROUND(SUM(CASE
+          WHEN TargetDate BETWEEN '2026-01-01' AND CURRENT_DATE()
+          THEN Target_ACV ELSE 0
+        END), 2) AS qtd_target
+      FROM \`data-analytics-306119.Staging.StrategicOperatingPlan\`
+      WHERE Percentile = 'P50'
+        AND RecordType IN ('POR', 'R360')
+        AND FunnelType IN ('RENEWAL', 'R360 RENEWAL')
+      GROUP BY product
+    `;
+
+    const [rows] = await bigquery.query({ query });
+
+    const targets: RenewalTargets = {
+      POR: { q1Target: 0, qtdTarget: 0 },
+      R360: { q1Target: 0, qtdTarget: 0 },
+    };
+
+    for (const row of rows as any[]) {
+      const product = row.product as Product;
+      if (product === 'POR' || product === 'R360') {
+        targets[product] = {
+          q1Target: row.q1_target || 0,
+          qtdTarget: row.qtd_target || 0,
+        };
+      }
+    }
+
+    console.log('Renewal targets:', targets);
+    return targets;
+  } catch (error: any) {
+    console.error('Failed to fetch renewal targets:', error.message);
+    return {
+      POR: { q1Target: 0, qtdTarget: 0 },
+      R360: { q1Target: 0, qtdTarget: 0 },
+    };
+  }
 }
 
 // Map Division to Region
@@ -89,58 +149,116 @@ function divisionToRegion(division: string): Region {
   return map[division] || 'AMER';
 }
 
-// Execute Salesforce CLI query
-async function querySalesforceContracts(): Promise<SalesforceContract[]> {
+// Query Contract data from BigQuery (SF data is synced there)
+// IMPORTANT: All amounts are converted to USD using CurrencyType conversion rates
+async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
   try {
-    const soql = SF_CONTRACT_SOQL.replace(/\n/g, ' ').trim();
-    const command = `sf data query --query "${soql}" --target-org por-prod --json`;
+    const bigquery = getBigQueryClient();
 
-    console.log('Executing SF CLI query for contracts...');
-    const { stdout, stderr } = await execAsync(command, { timeout: 30000 });
+    // Join with CurrencyType to convert all amounts to USD
+    // Salesforce formula: local_amount / conversionrate = USD_amount
+    // USD has implied rate of 1.0
+    const query = `
+      SELECT
+        c.Id,
+        c.ContractNumber,
+        c.AccountId,
+        c.StartDate,
+        DATE(c.EndDate) as EndDate,
+        c.ContractTerm,
+        c.Status,
+        c.neo_automaticrenewal__c,
+        c.manual_renewal__c,
+        c.sbqq__evergreen__c,
+        c.currencyisocode,
+        -- Original values (local currency)
+        c.acv__c as acv_local,
+        c.starting_acv__c as starting_acv_local,
+        c.ending_acv__c as ending_acv_local,
+        c.projected_uplift__c as projected_uplift_local,
+        -- USD converted values (divide by conversion rate)
+        ROUND(COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) as acv_usd,
+        ROUND(COALESCE(c.starting_acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) as starting_acv_usd,
+        ROUND(COALESCE(c.ending_acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) as ending_acv_usd,
+        ROUND(COALESCE(c.projected_uplift__c, 0) / COALESCE(ct.conversionrate, 1), 2) as projected_uplift_usd,
+        COALESCE(ct.conversionrate, 1) as conversion_rate,
+        c.sbqq__renewalupliftrate__c,
+        c.sbqq__renewalopportunity__c,
+        c.r360_record__c,
+        c.account_division__c
+      FROM \`data-analytics-306119.sfdc.Contract\` c
+      LEFT JOIN \`data-analytics-306119.sfdc.CurrencyType\` ct
+        ON LOWER(c.currencyisocode) = LOWER(ct.isocode)
+      WHERE c.Status = 'Activated'
+        AND DATE(c.EndDate) >= CURRENT_DATE()
+        AND DATE(c.EndDate) <= DATE_ADD(CURRENT_DATE(), INTERVAL 90 DAY)
+        AND c.account_division__c IN ('US', 'UK', 'AU')
+      ORDER BY c.EndDate ASC
+      LIMIT 500
+    `;
 
-    if (stderr) {
-      console.warn('SF CLI stderr:', stderr);
-    }
-
-    const result = JSON.parse(stdout);
-
-    if (result.status !== 0 || !result.result?.records) {
-      console.error('SF CLI query failed:', result);
-      return [];
-    }
+    console.log('Querying Contract data from BigQuery with USD conversion...');
+    const [rows] = await bigquery.query({ query });
 
     const today = new Date();
 
-    return result.result.records.map((record: any) => {
-      const endDate = new Date(record.EndDate);
+    return (rows as any[]).map((record: any) => {
+      const endDate = new Date(record.EndDate.value || record.EndDate);
       const daysUntilRenewal = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      const product: Product = record.por_record__c ? 'POR' : 'R360';
-      const region = divisionToRegion(record.Division);
+
+      // Product: r360_record__c = true means R360, otherwise POR
+      const isR360 = record.r360_record__c === true || record.r360_record__c === 'true';
+      const product: Product = isR360 ? 'R360' : 'POR';
+
+      // Region: account_division__c contains US/UK/AU
+      const region = divisionToRegion(record.account_division__c);
+
+      // Use USD-converted values (already converted in query)
+      const currentACV = parseFloat(record.acv_usd) || parseFloat(record.starting_acv_usd) || 0;
+      const endingACV = parseFloat(record.ending_acv_usd) || currentACV;
+
+      // CRITICAL: projected_uplift_usd is the USD-converted uplift amount
+      const upliftAmount = parseFloat(record.projected_uplift_usd) || 0;
+      const upliftPct = parseFloat(record.sbqq__renewalupliftrate__c) || DEFAULT_RENEWAL_UPLIFT_PCT;
+
+      // Log currency conversion for debugging
+      if (record.currencyisocode !== 'USD' && record.projected_uplift_local > 0) {
+        console.log(`Currency conversion: ${record.currencyisocode} ${record.projected_uplift_local} / ${record.conversion_rate} = USD ${upliftAmount}`);
+      }
+
+      // Check if auto-renewing
+      const isAutoRenewalFlag = record.neo_automaticrenewal__c === true || record.neo_automaticrenewal__c === 'true';
+      const isEvergreen = record.sbqq__evergreen__c === true || record.sbqq__evergreen__c === 'true';
+      const isAutoRenewal = isAutoRenewalFlag || isEvergreen;
+      const isManualRenewal = record.manual_renewal__c === true || record.manual_renewal__c === 'true';
+
+      // A contract is at risk if expiring within 30 days and NOT auto-renewing
+      const isAtRisk = daysUntilRenewal <= 30 && !isAutoRenewal;
 
       return {
         Id: record.Id,
         ContractNumber: record.ContractNumber,
         AccountId: record.AccountId,
-        AccountName: record.Account?.Name || 'Unknown',
-        StartDate: record.StartDate,
-        EndDate: record.EndDate,
+        AccountName: 'Unknown', // Account name not in Contract table directly
+        StartDate: record.StartDate?.value || record.StartDate,
+        EndDate: record.EndDate?.value || record.EndDate,
         ContractTerm: record.ContractTerm || 12,
         Status: record.Status,
-        AutoRenewal: record.SBQQ__AutoRenewal__c || false,
-        CurrentACV: 0, // Would need additional query to get ACV
-        EndingACV: 0,
-        UpliftAmount: 0,
-        UpliftPct: 0,
+        AutoRenewal: isAutoRenewal,
+        CurrentACV: Math.round(currentACV * 100) / 100,
+        EndingACV: Math.round(endingACV * 100) / 100,
+        UpliftAmount: Math.round(upliftAmount * 100) / 100,
+        UpliftPct: upliftPct,
         Product: product,
         Region: region,
         DaysUntilRenewal: daysUntilRenewal,
-        IsAtRisk: daysUntilRenewal <= 30 && !record.SBQQ__AutoRenewal__c,
-        RenewalOpportunityId: record.SBQQ__RenewalOpportunity__c,
+        IsAtRisk: isAtRisk,
+        RenewalOpportunityId: record.sbqq__renewalopportunity__c,
+        RenewalOpportunityName: '',
       };
     });
   } catch (error: any) {
-    console.error('SF CLI query error:', error.message);
-    // Return empty array - we'll fall back to BQ-only data
+    console.error('BigQuery Contract query error:', error.message);
     return [];
   }
 }
@@ -311,11 +429,13 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
 }
 
 // Calculate renewal summary from opportunities and contracts
+// IMPORTANT: For bookings forecast, only UPLIFT counts as new bookings, not full ACV!
 function calculateRenewalSummary(
   wonOpps: RenewalOpportunity[],
   lostOpps: RenewalOpportunity[],
   pipelineOpps: RenewalOpportunity[],
-  contracts: SalesforceContract[]
+  contracts: SalesforceContract[],
+  targets: { q1Target: number; qtdTarget: number }
 ): RenewalSummary {
   const wonRenewalACV = wonOpps.reduce((sum, o) => sum + (o.acv || 0), 0);
   const lostRenewalACV = lostOpps.reduce((sum, o) => sum + (o.acv || 0), 0);
@@ -329,34 +449,108 @@ function calculateRenewalSummary(
   const upcoming60 = contracts.filter(c => c.DaysUntilRenewal <= 60);
   const upcoming90 = contracts.filter(c => c.DaysUntilRenewal <= 90);
 
-  // Calculate average uplift from won renewals
-  const totalUplift = wonOpps.reduce((sum, o) => sum + (o.uplift_amount || 0), 0);
-  const totalPriorACV = wonOpps.reduce((sum, o) => sum + (o.prior_acv || 0), 0);
-  const avgUpliftPct = totalPriorACV > 0 ? Math.round((totalUplift / totalPriorACV) * 100) : 0;
+  // CRITICAL FIX: Filter contracts that renew within Q1 (by March 31, 2026)
+  // This ensures we only count uplift that will book in Q1
+  const q1EndDate = new Date('2026-03-31');
+  const today = new Date();
+  const daysUntilQ1End = Math.ceil((q1EndDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Contracts renewing within Q1 (EndDate <= March 31, 2026)
+  const q1Contracts = autoRenewalContracts.filter(c => c.DaysUntilRenewal <= daysUntilQ1End);
+  const q1ExpectedUplift = q1Contracts.reduce((sum, c) => sum + (c.UpliftAmount || 0), 0);
+
+  // All 90-day uplift (for display purposes)
+  const autoRenewalUplift = autoRenewalContracts.reduce((sum, c) => sum + (c.UpliftAmount || 0), 0);
+  const totalContractUplift = contracts.reduce((sum, c) => sum + (c.UpliftAmount || 0), 0);
+
+  // Use default uplift percentage
+  const avgUpliftPct = DEFAULT_RENEWAL_UPLIFT_PCT;
+
+  // Calculate upcoming ACV values (for display)
+  const autoRenewalACV = autoRenewalContracts.reduce((sum, c) => sum + (c.CurrentACV || 0), 0);
+  const manualRenewalACV = manualRenewalContracts.reduce((sum, c) => sum + (c.CurrentACV || 0), 0);
+  const atRiskACV = atRiskContracts.reduce((sum, c) => sum + (c.CurrentACV || 0), 0);
+  const upcoming30ACV = upcoming30.reduce((sum, c) => sum + (c.CurrentACV || 0), 0);
+  const upcoming60ACV = upcoming60.reduce((sum, c) => sum + (c.CurrentACV || 0), 0);
+  const upcoming90ACV = upcoming90.reduce((sum, c) => sum + (c.CurrentACV || 0), 0);
+
+  // CRITICAL: For bookings forecast, only UPLIFT from auto-renewing contracts counts!
+  // expectedRenewalACV = base ACV (not new bookings)
+  // expectedRenewalACVWithUplift = base + uplift (uplift is the new bookings)
+  const expectedRenewalACV = autoRenewalContracts.reduce((sum, c) => sum + (c.CurrentACV || 0), 0);
+  const expectedRenewalACVWithUplift = autoRenewalContracts.reduce((sum, c) => sum + (c.EndingACV || c.CurrentACV || 0), 0);
+
+  // BOOKINGS FORECAST = Sum of UpliftAmount from Q1-renewing auto-renewal contracts only
+  // This is the actual new revenue expected to book in Q1
+  const expectedUpliftBookings = q1ExpectedUplift;
+
+  // FORECASTED BOOKINGS = Won renewal ACV + expected Q1 uplift from upcoming contracts
+  // This is what we compare against Q1 target for RAG status
+  const forecastedBookings = wonRenewalACV + expectedUpliftBookings;
+
+  // Risk gap: Expected uplift bookings vs any lost renewal value
+  // Positive = ahead of plan, Negative = behind
+  const renewalRiskGap = expectedUpliftBookings - (lostRenewalACV * 0.05); // Lost ACV * 5% = lost uplift
+
+  // Risk percentage: What % of potential uplift is from auto-renewing contracts?
+  const totalPotentialUplift = totalContractUplift;
+  const renewalRiskPct = totalPotentialUplift > 0
+    ? Math.round((autoRenewalUplift / totalPotentialUplift) * 100)
+    : 0;
+
+  // CALCULATE RAG STATUS based on Q1 forecast vs Q1 target (NOT QTD!)
+  // Q1 Attainment = (Won + Q1 Expected Uplift) / Q1 Target
+  const qtdAttainmentPct = targets.q1Target > 0
+    ? Math.round((forecastedBookings / targets.q1Target) * 1000) / 10
+    : (forecastedBookings > 0 ? 100 : 100); // No target = 100%
+
+  const ragStatus = calculateRAG(qtdAttainmentPct);
+
+  console.log(`Renewal Forecast: Won=${wonRenewalACV}, Q1 Uplift=${q1ExpectedUplift}, Total Forecast=${forecastedBookings}, Q1 Target=${targets.q1Target}, Attainment=${qtdAttainmentPct}%, RAG=${ragStatus}`);
+
+  // Track contracts with ACV but missing uplift - these are revenue leakage!
+  const missingUpliftContracts = contracts.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0);
+  const missingUpliftCount = missingUpliftContracts.length;
+  const missingUpliftACV = missingUpliftContracts.reduce((sum, c) => sum + c.CurrentACV, 0);
+  const potentialLostUplift = Math.round(missingUpliftACV * (DEFAULT_RENEWAL_UPLIFT_PCT / 100) * 100) / 100;
 
   return {
     renewalCount: wonOpps.length + pipelineOpps.length,
     renewalACV: wonRenewalACV + pipelineRenewalACV,
     autoRenewalCount: autoRenewalContracts.length,
-    autoRenewalACV: autoRenewalContracts.reduce((sum, c) => sum + (c.CurrentACV || 0), 0),
+    autoRenewalACV,
     manualRenewalCount: manualRenewalContracts.length,
-    manualRenewalACV: manualRenewalContracts.reduce((sum, c) => sum + (c.CurrentACV || 0), 0),
+    manualRenewalACV,
     avgUpliftPct,
-    totalUpliftAmount: totalUplift,
+    totalUpliftAmount: expectedUpliftBookings, // This is the bookings forecast!
     atRiskCount: atRiskContracts.length,
-    atRiskACV: atRiskContracts.reduce((sum, c) => sum + (c.CurrentACV || 0), 0),
+    atRiskACV,
     upcomingRenewals30: upcoming30.length,
-    upcomingRenewals30ACV: upcoming30.reduce((sum, c) => sum + (c.CurrentACV || 0), 0),
+    upcomingRenewals30ACV: upcoming30ACV,
     upcomingRenewals60: upcoming60.length,
-    upcomingRenewals60ACV: upcoming60.reduce((sum, c) => sum + (c.CurrentACV || 0), 0),
+    upcomingRenewals60ACV: upcoming60ACV,
     upcomingRenewals90: upcoming90.length,
-    upcomingRenewals90ACV: upcoming90.reduce((sum, c) => sum + (c.CurrentACV || 0), 0),
+    upcomingRenewals90ACV: upcoming90ACV,
     wonRenewalCount: wonOpps.length,
     wonRenewalACV,
     lostRenewalCount: lostOpps.length,
     lostRenewalACV,
     pipelineRenewalCount: pipelineOpps.length,
     pipelineRenewalACV,
+    expectedRenewalACV,
+    expectedRenewalACVWithUplift,
+    renewalRiskGap,
+    renewalRiskPct,
+    // New target/RAG fields
+    q1Target: targets.q1Target,
+    qtdTarget: targets.qtdTarget,
+    qtdAttainmentPct,
+    forecastedBookings,
+    ragStatus,
+    // Missing uplift tracking
+    missingUpliftCount,
+    missingUpliftACV,
+    potentialLostUplift,
   };
 }
 
@@ -382,23 +576,25 @@ export async function GET(request: Request) {
 
     console.log('Renewals API called with filters:', filters);
 
-    // Fetch data in parallel
-    const [sfContracts, bqRenewals] = await Promise.all([
-      querySalesforceContracts(),
+    // Fetch data in parallel - Contract data from BigQuery (synced from SF), plus targets
+    const [contracts, bqRenewals, renewalTargets] = await Promise.all([
+      queryContractsFromBigQuery(),
       getRenewalOpportunities(filters),
+      getRenewalTargets(),
     ]);
 
-    const sfAvailable = sfContracts.length > 0;
-    console.log(`SF Contracts: ${sfContracts.length}, BQ Renewals: won=${bqRenewals.won.length}, lost=${bqRenewals.lost.length}, pipeline=${bqRenewals.pipeline.length}`);
+    const sfAvailable = contracts.length > 0;
+    console.log(`Contracts from BQ: ${contracts.length}, BQ Renewals: won=${bqRenewals.won.length}, lost=${bqRenewals.lost.length}, pipeline=${bqRenewals.pipeline.length}`);
+    console.log('Renewal targets:', renewalTargets);
 
     // Split by product
     const wonByProduct = splitByProduct(bqRenewals.won);
     const lostByProduct = splitByProduct(bqRenewals.lost);
     const pipelineByProduct = splitByProduct(bqRenewals.pipeline);
-    const contractsByProduct = splitByProduct(sfContracts);
+    const contractsByProduct = splitByProduct(contracts);
 
     // Apply filters to contracts
-    let filteredContracts = sfContracts;
+    let filteredContracts = contracts;
     if (filters.products && filters.products.length === 1) {
       filteredContracts = filteredContracts.filter(c => c.Product === filters.products![0]);
     }
@@ -408,19 +604,21 @@ export async function GET(request: Request) {
 
     const filteredContractsByProduct = splitByProduct(filteredContracts);
 
-    // Calculate summaries
+    // Calculate summaries with targets for RAG status
     const porSummary = calculateRenewalSummary(
       wonByProduct.POR,
       lostByProduct.POR,
       pipelineByProduct.POR,
-      filteredContractsByProduct.POR
+      filteredContractsByProduct.POR,
+      renewalTargets.POR
     );
 
     const r360Summary = calculateRenewalSummary(
       wonByProduct.R360,
       lostByProduct.R360,
       pipelineByProduct.R360,
-      filteredContractsByProduct.R360
+      filteredContractsByProduct.R360,
+      renewalTargets.R360
     );
 
     // Build response
@@ -437,6 +635,10 @@ export async function GET(request: Request) {
         POR: filteredContractsByProduct.POR.filter(c => c.IsAtRisk),
         R360: filteredContractsByProduct.R360.filter(c => c.IsAtRisk),
       },
+      missingUpliftContracts: {
+        POR: filteredContractsByProduct.POR.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0),
+        R360: filteredContractsByProduct.R360.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0),
+      },
       sfAvailable,
       bqDataOnly: !sfAvailable,
     };
@@ -449,7 +651,7 @@ export async function GET(request: Request) {
       data: renewalsData,
       metadata: {
         sfAvailable,
-        contractCount: sfContracts.length,
+        contractCount: contracts.length,
         wonRenewalsCount: bqRenewals.won.length,
         lostRenewalsCount: bqRenewals.lost.length,
         pipelineRenewalsCount: bqRenewals.pipeline.length,
