@@ -22,11 +22,18 @@ const PRODUCT_COLORS: Record<Product, { bg: string; border: string; text: string
   R360: { bg: '#f0fdf4', border: '#22c55e', text: '#15803d' },
 };
 
+// RAG colors
+const RAG_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  GREEN: { bg: '#dcfce7', border: '#16a34a', text: '#166534' },
+  YELLOW: { bg: '#fef3c7', border: '#ca8a04', text: '#92400e' },
+  RED: { bg: '#fef2f2', border: '#dc2626', text: '#dc2626' },
+};
+
 export default function RenewalsSection({ products, regions }: RenewalsSectionProps) {
   const [renewalsData, setRenewalsData] = useState<RenewalsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'won' | 'pipeline' | 'upcoming' | 'atrisk'>('won');
+  const [activeTab, setActiveTab] = useState<'won' | 'pipeline' | 'upcoming' | 'atrisk' | 'missinguplift'>('won');
 
   // Fetch renewals data
   useEffect(() => {
@@ -61,6 +68,13 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
     fetchRenewals();
   }, [products, regions]);
 
+  // Calculate RAG from attainment
+  const getRAG = (attainmentPct: number): 'GREEN' | 'YELLOW' | 'RED' => {
+    if (attainmentPct >= 90) return 'GREEN';
+    if (attainmentPct >= 70) return 'YELLOW';
+    return 'RED';
+  };
+
   // Calculate combined summary based on selected products
   const getCombinedSummary = (): RenewalSummary | null => {
     if (!renewalsData) return null;
@@ -71,6 +85,13 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
     if (summaries.length === 1) return summaries[0];
 
     // Combine summaries
+    const q1Target = summaries.reduce((sum, s) => sum + (s.q1Target || 0), 0);
+    const qtdTarget = summaries.reduce((sum, s) => sum + (s.qtdTarget || 0), 0);
+    const forecastedBookings = summaries.reduce((sum, s) => sum + (s.forecastedBookings || 0), 0);
+    const qtdAttainmentPct = qtdTarget > 0
+      ? Math.round((forecastedBookings / qtdTarget) * 1000) / 10
+      : 100;
+
     return {
       renewalCount: summaries.reduce((sum, s) => sum + s.renewalCount, 0),
       renewalACV: summaries.reduce((sum, s) => sum + s.renewalACV, 0),
@@ -94,6 +115,20 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
       lostRenewalACV: summaries.reduce((sum, s) => sum + s.lostRenewalACV, 0),
       pipelineRenewalCount: summaries.reduce((sum, s) => sum + s.pipelineRenewalCount, 0),
       pipelineRenewalACV: summaries.reduce((sum, s) => sum + s.pipelineRenewalACV, 0),
+      expectedRenewalACV: summaries.reduce((sum, s) => sum + (s.expectedRenewalACV || 0), 0),
+      expectedRenewalACVWithUplift: summaries.reduce((sum, s) => sum + (s.expectedRenewalACVWithUplift || 0), 0),
+      renewalRiskGap: summaries.reduce((sum, s) => sum + (s.renewalRiskGap || 0), 0),
+      renewalRiskPct: summaries.length > 0 ? Math.round(summaries.reduce((sum, s) => sum + (s.renewalRiskPct || 0), 0) / summaries.length) : 0,
+      // New RAG fields
+      q1Target,
+      qtdTarget,
+      qtdAttainmentPct,
+      forecastedBookings,
+      ragStatus: getRAG(qtdAttainmentPct),
+      // Missing uplift tracking
+      missingUpliftCount: summaries.reduce((sum, s) => sum + (s.missingUpliftCount || 0), 0),
+      missingUpliftACV: summaries.reduce((sum, s) => sum + (s.missingUpliftACV || 0), 0),
+      potentialLostUplift: summaries.reduce((sum, s) => sum + (s.potentialLostUplift || 0), 0),
     };
   };
 
@@ -115,7 +150,7 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
     return opps.filter(o => selectedRegions.includes(o.region));
   };
 
-  const getFilteredContracts = (type: 'upcoming' | 'atrisk'): SalesforceContract[] => {
+  const getFilteredContracts = (type: 'upcoming' | 'atrisk' | 'missinguplift'): SalesforceContract[] => {
     if (!renewalsData) return [];
 
     const selectedProducts = products.length > 0 ? products : ['POR', 'R360'] as Product[];
@@ -123,7 +158,14 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
 
     let contracts: SalesforceContract[] = [];
     for (const p of selectedProducts) {
-      const data = type === 'upcoming' ? renewalsData.upcomingContracts[p] : renewalsData.atRiskContracts[p];
+      let data: SalesforceContract[];
+      if (type === 'upcoming') {
+        data = renewalsData.upcomingContracts[p];
+      } else if (type === 'atrisk') {
+        data = renewalsData.atRiskContracts[p];
+      } else {
+        data = renewalsData.missingUpliftContracts?.[p] || [];
+      }
       contracts = [...contracts, ...data];
     }
 
@@ -191,10 +233,23 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
     atRiskACV: 0,
     lostRenewalCount: 0,
     lostRenewalACV: 0,
+    // RAG fields
+    q1Target: 0,
+    qtdTarget: 0,
+    qtdAttainmentPct: 0,
+    forecastedBookings: 0,
+    ragStatus: 'RED' as const,
+    // Missing uplift fields
+    missingUpliftCount: 0,
+    missingUpliftACV: 0,
+    potentialLostUplift: 0,
   };
 
+  // Get RAG color for display
+  const ragColor = RAG_COLORS[safeSummary.ragStatus] || RAG_COLORS.RED;
+
   return (
-    <section className="renewals-section">
+    <section className="renewals-section" data-testid="renewals-section">
       <div className="section-header">
         <h2>
           <span className="section-icon">🔄</span>
@@ -209,6 +264,58 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
         {isEmpty && (
           <span className="empty-badge">No Data Available</span>
         )}
+      </div>
+
+      {/* RENEWAL BOOKINGS FORECAST - Prominent RAG Display */}
+      <div
+        className="renewal-forecast-card"
+        style={{
+          backgroundColor: ragColor.bg,
+          borderColor: ragColor.border,
+        }}
+      >
+        <div className="forecast-header">
+          <h3>Q1 Renewal Bookings Forecast</h3>
+          <span
+            className="rag-badge-large"
+            style={{
+              backgroundColor: ragColor.border,
+              color: 'white',
+            }}
+          >
+            {safeSummary.ragStatus}
+          </span>
+        </div>
+        <div className="forecast-metrics">
+          <div className="forecast-metric">
+            <span className="metric-label">Q1 Forecast</span>
+            <span className="metric-value" style={{ color: ragColor.text }}>
+              {formatCurrency(safeSummary.forecastedBookings || 0)}
+            </span>
+            <span className="metric-sub">
+              Won ({formatCurrency(safeSummary.wonRenewalACV || 0)}) + Q1 Uplift ({formatCurrency(safeSummary.totalUpliftAmount || 0)})
+            </span>
+          </div>
+          <div className="forecast-metric">
+            <span className="metric-label">Q1 Target</span>
+            <span className="metric-value">{formatCurrency(safeSummary.q1Target || 0)}</span>
+            <span className="metric-sub">Full quarter target</span>
+          </div>
+          <div className="forecast-metric">
+            <span className="metric-label">Q1 Attainment</span>
+            <span className="metric-value" style={{ color: ragColor.text }}>
+              {safeSummary.qtdAttainmentPct?.toFixed(1) || 0}%
+            </span>
+            <span className="metric-sub">
+              Gap: {formatCurrency((safeSummary.forecastedBookings || 0) - (safeSummary.q1Target || 0))}
+            </span>
+          </div>
+          <div className="forecast-metric">
+            <span className="metric-label">Q1 Contracts</span>
+            <span className="metric-value">{safeSummary.upcomingRenewals90 || 0}</span>
+            <span className="metric-sub">{formatCurrency(safeSummary.totalUpliftAmount || 0)} uplift (thru Mar 31)</span>
+          </div>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -245,6 +352,31 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
         </div>
       </div>
 
+      {/* Missing Uplift Warning - only show if there are contracts missing uplift */}
+      {(safeSummary.missingUpliftCount || 0) > 0 && (
+        <div className="missing-uplift-warning">
+          <div className="warning-icon">⚠️</div>
+          <div className="warning-content">
+            <div className="warning-title">
+              Revenue Leakage: {safeSummary.missingUpliftCount} Contracts Missing Uplift
+            </div>
+            <div className="warning-details">
+              <span>{formatCurrency(safeSummary.missingUpliftACV || 0)} ACV without configured uplift</span>
+              <span className="separator">•</span>
+              <span className="lost-revenue">
+                {formatCurrency(safeSummary.potentialLostUplift || 0)} potential lost bookings (5% uplift)
+              </span>
+            </div>
+            <button
+              className="view-contracts-btn"
+              onClick={() => setActiveTab('missinguplift')}
+            >
+              View Contracts →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="tabs">
         <button
@@ -271,6 +403,14 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
         >
           At Risk ({safeSummary.atRiskCount})
         </button>
+        {(safeSummary.missingUpliftCount || 0) > 0 && (
+          <button
+            className={`tab warning-tab ${activeTab === 'missinguplift' ? 'active' : ''}`}
+            onClick={() => setActiveTab('missinguplift')}
+          >
+            ⚠️ Missing Uplift ({safeSummary.missingUpliftCount})
+          </button>
+        )}
       </div>
 
       {/* Table Content */}
@@ -329,6 +469,7 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           <table className="renewals-table">
             <thead>
               <tr>
+                <th>Contract</th>
                 <th>Account</th>
                 <th>Product</th>
                 <th>Region</th>
@@ -341,6 +482,15 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
             <tbody>
               {getFilteredContracts(activeTab).slice(0, 20).map((contract, i) => (
                 <tr key={i}>
+                  <td>
+                    <a
+                      href={contract.SalesforceUrl || `https://por.my.salesforce.com/${contract.Id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {contract.ContractNumber}
+                    </a>
+                  </td>
                   <td>{contract.AccountName}</td>
                   <td>
                     <span
@@ -372,10 +522,74 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
               ))}
               {getFilteredContracts(activeTab).length === 0 && (
                 <tr>
-                  <td colSpan={7} className="empty-row">
+                  <td colSpan={8} className="empty-row">
                     {safeData.sfAvailable
                       ? `No ${activeTab === 'upcoming' ? 'upcoming' : 'at-risk'} contracts found`
                       : 'Salesforce data unavailable - showing BigQuery data only'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+
+        {activeTab === 'missinguplift' && (
+          <table className="renewals-table">
+            <thead>
+              <tr>
+                <th>Contract #</th>
+                <th>Account</th>
+                <th>Product</th>
+                <th>Region</th>
+                <th>Current ACV</th>
+                <th>Uplift Configured</th>
+                <th>Potential Lost</th>
+                <th>End Date</th>
+                <th>Days Until</th>
+              </tr>
+            </thead>
+            <tbody>
+              {getFilteredContracts('missinguplift').map((contract, i) => (
+                <tr key={i} className="warning-row">
+                  <td>
+                    <a
+                      href={contract.SalesforceUrl || `https://por.my.salesforce.com/${contract.Id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {contract.ContractNumber}
+                    </a>
+                  </td>
+                  <td>{contract.AccountName}</td>
+                  <td>
+                    <span
+                      className="product-badge"
+                      style={{
+                        backgroundColor: PRODUCT_COLORS[contract.Product].bg,
+                        color: PRODUCT_COLORS[contract.Product].text,
+                      }}
+                    >
+                      {contract.Product}
+                    </span>
+                  </td>
+                  <td>{contract.Region}</td>
+                  <td className="money">{formatCurrency(contract.CurrentACV)}</td>
+                  <td className="warning-cell">
+                    {formatCurrency(contract.UpliftAmount)} ({contract.UpliftPct}%)
+                  </td>
+                  <td className="lost-revenue">
+                    {formatCurrency(contract.CurrentACV * 0.05)}
+                  </td>
+                  <td>{new Date(contract.EndDate).toLocaleDateString()}</td>
+                  <td className={contract.DaysUntilRenewal <= 30 ? 'urgent' : ''}>
+                    {contract.DaysUntilRenewal}d
+                  </td>
+                </tr>
+              ))}
+              {getFilteredContracts('missinguplift').length === 0 && (
+                <tr>
+                  <td colSpan={9} className="empty-row">
+                    No contracts with missing uplift found
                   </td>
                 </tr>
               )}
@@ -424,6 +638,64 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
         }
         .empty-badge {
           background: #f1f5f9;
+          color: #64748b;
+        }
+        /* Renewal Forecast Card - Prominent RAG Display */
+        .renewal-forecast-card {
+          padding: 20px 24px;
+          border-radius: 12px;
+          border: 2px solid;
+          margin-bottom: 20px;
+        }
+        .forecast-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 16px;
+        }
+        .forecast-header h3 {
+          margin: 0;
+          font-size: 1.1em;
+          font-weight: 600;
+          color: #1e293b;
+        }
+        .rag-badge-large {
+          padding: 6px 16px;
+          border-radius: 20px;
+          font-size: 0.85em;
+          font-weight: 700;
+          letter-spacing: 0.5px;
+        }
+        .forecast-metrics {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 20px;
+        }
+        @media (max-width: 1000px) {
+          .forecast-metrics { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 600px) {
+          .forecast-metrics { grid-template-columns: 1fr; }
+        }
+        .forecast-metric {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .forecast-metric .metric-label {
+          font-size: 0.75em;
+          color: #64748b;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+        }
+        .forecast-metric .metric-value {
+          font-size: 1.4em;
+          font-weight: 700;
+          color: #1e293b;
+        }
+        .forecast-metric .metric-sub {
+          font-size: 0.75em;
           color: #64748b;
         }
         .kpi-grid {
@@ -554,6 +826,81 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           text-align: center;
           color: #94a3b8;
           padding: 30px !important;
+        }
+        /* Missing Uplift Warning Styles */
+        .missing-uplift-warning {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 16px;
+          background: linear-gradient(135deg, #fef3c7 0%, #fef2f2 100%);
+          border: 2px solid #f59e0b;
+          border-radius: 10px;
+          margin-bottom: 20px;
+        }
+        .warning-icon {
+          font-size: 24px;
+        }
+        .warning-content {
+          flex: 1;
+        }
+        .warning-title {
+          font-size: 1em;
+          font-weight: 700;
+          color: #92400e;
+          margin-bottom: 6px;
+        }
+        .warning-details {
+          font-size: 0.85em;
+          color: #78350f;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          align-items: center;
+        }
+        .warning-details .separator {
+          color: #d97706;
+        }
+        .warning-details .lost-revenue {
+          color: #dc2626;
+          font-weight: 600;
+        }
+        .view-contracts-btn {
+          margin-top: 10px;
+          padding: 6px 14px;
+          background: #f59e0b;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          font-size: 0.8em;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.15s ease;
+        }
+        .view-contracts-btn:hover {
+          background: #d97706;
+        }
+        .tab.warning-tab {
+          color: #dc2626;
+        }
+        .tab.warning-tab.active {
+          color: #dc2626;
+          border-bottom-color: #dc2626;
+        }
+        .warning-row {
+          background: #fffbeb;
+        }
+        .warning-row:hover {
+          background: #fef3c7;
+        }
+        .warning-cell {
+          color: #dc2626;
+          font-weight: 600;
+        }
+        .lost-revenue {
+          color: #dc2626;
+          font-weight: 600;
+          font-family: monospace;
         }
       `}</style>
     </section>

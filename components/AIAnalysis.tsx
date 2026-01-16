@@ -1,67 +1,62 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { ReportData, Product, Region, AIAnalysisTile as AITileType } from '@/lib/types';
-import { ALL_PRODUCTS, ALL_REGIONS } from '@/lib/constants/dimensions';
+import { useState } from 'react';
+import { ReportData, Product, Region } from '@/lib/types';
 
 interface AIAnalysisProps {
   reportData: ReportData | null;
+  selectedProducts: Product[];
+  selectedRegions: Region[];
 }
 
-interface TileState {
+interface AnalysisState {
   loading: boolean;
   analysis: string | null;
   error: string | null;
   generatedAt: string | null;
 }
 
-// Product colors
-const PRODUCT_COLORS: Record<Product, { bg: string; border: string; text: string; active: string }> = {
-  POR: { bg: '#eff6ff', border: '#3b82f6', text: '#1d4ed8', active: '#2563eb' },
-  R360: { bg: '#f0fdf4', border: '#22c55e', text: '#15803d', active: '#16a34a' },
-};
-
-// Region colors
-const REGION_COLORS: Record<Region, { bg: string; text: string; active: string }> = {
-  AMER: { bg: '#fef3c7', text: '#92400e', active: '#f59e0b' },
-  EMEA: { bg: '#e0e7ff', text: '#3730a3', active: '#6366f1' },
-  APAC: { bg: '#fce7f3', text: '#9d174d', active: '#ec4899' },
-};
-
-// Filter report data by product and region
-function filterReportData(reportData: ReportData, product: Product, region: Region): ReportData {
+// Filter report data by products and regions
+function filterReportData(
+  reportData: ReportData,
+  products: Product[],
+  regions: Region[]
+): ReportData {
   const filterByRegion = <T extends { region?: Region }>(arr: T[] | undefined): T[] =>
-    arr?.filter(item => item.region === region) || [];
+    arr?.filter(item => !item.region || regions.length === 0 || regions.includes(item.region)) || [];
+
+  const filterByProduct = (product: Product) =>
+    products.length === 0 || products.includes(product);
 
   return {
     ...reportData,
     attainment_detail: {
-      POR: product === 'POR' ? filterByRegion(reportData.attainment_detail?.POR) : [],
-      R360: product === 'R360' ? filterByRegion(reportData.attainment_detail?.R360) : [],
+      POR: filterByProduct('POR') ? filterByRegion(reportData.attainment_detail?.POR) : [],
+      R360: filterByProduct('R360') ? filterByRegion(reportData.attainment_detail?.R360) : [],
     },
     source_attainment: {
-      POR: product === 'POR' ? filterByRegion(reportData.source_attainment?.POR) : [],
-      R360: product === 'R360' ? filterByRegion(reportData.source_attainment?.R360) : [],
+      POR: filterByProduct('POR') ? filterByRegion(reportData.source_attainment?.POR) : [],
+      R360: filterByProduct('R360') ? filterByRegion(reportData.source_attainment?.R360) : [],
     },
     funnel_by_category: {
-      POR: product === 'POR' ? filterByRegion(reportData.funnel_by_category?.POR) : [],
-      R360: product === 'R360' ? filterByRegion(reportData.funnel_by_category?.R360) : [],
+      POR: filterByProduct('POR') ? filterByRegion(reportData.funnel_by_category?.POR) : [],
+      R360: filterByProduct('R360') ? filterByRegion(reportData.funnel_by_category?.R360) : [],
     },
     funnel_by_source: {
-      POR: product === 'POR' ? filterByRegion(reportData.funnel_by_source?.POR) : [],
-      R360: product === 'R360' ? filterByRegion(reportData.funnel_by_source?.R360) : [],
+      POR: filterByProduct('POR') ? filterByRegion(reportData.funnel_by_source?.POR) : [],
+      R360: filterByProduct('R360') ? filterByRegion(reportData.funnel_by_source?.R360) : [],
     },
     pipeline_rca: {
-      POR: product === 'POR' ? filterByRegion(reportData.pipeline_rca?.POR) : [],
-      R360: product === 'R360' ? filterByRegion(reportData.pipeline_rca?.R360) : [],
+      POR: filterByProduct('POR') ? filterByRegion(reportData.pipeline_rca?.POR) : [],
+      R360: filterByProduct('R360') ? filterByRegion(reportData.pipeline_rca?.R360) : [],
     },
     loss_reason_rca: {
-      POR: product === 'POR' ? filterByRegion(reportData.loss_reason_rca?.POR) : [],
-      R360: product === 'R360' ? filterByRegion(reportData.loss_reason_rca?.R360) : [],
+      POR: filterByProduct('POR') ? filterByRegion(reportData.loss_reason_rca?.POR) : [],
+      R360: filterByProduct('R360') ? filterByRegion(reportData.loss_reason_rca?.R360) : [],
     },
     google_ads: {
-      POR: product === 'POR' ? filterByRegion(reportData.google_ads?.POR) : [],
-      R360: product === 'R360' ? filterByRegion(reportData.google_ads?.R360) : [],
+      POR: filterByProduct('POR') ? filterByRegion(reportData.google_ads?.POR) : [],
+      R360: filterByProduct('R360') ? filterByRegion(reportData.google_ads?.R360) : [],
     },
   };
 }
@@ -70,18 +65,18 @@ function filterReportData(reportData: ReportData, product: Product, region: Regi
 function formatAnalysis(text: string) {
   return text.split('\n').map((line, i) => {
     if (line.startsWith('## ')) {
-      return <h3 key={i} className="tile-h3">{line.replace('## ', '')}</h3>;
+      return <h3 key={i} className="analysis-h3">{line.replace('## ', '')}</h3>;
     }
     if (line.startsWith('### ')) {
-      return <h4 key={i} className="tile-h4">{line.replace('### ', '')}</h4>;
+      return <h4 key={i} className="analysis-h4">{line.replace('### ', '')}</h4>;
     }
     if (line.startsWith('**') && line.endsWith('**')) {
-      return <p key={i} className="tile-bold">{line.replace(/\*\*/g, '')}</p>;
+      return <p key={i} className="analysis-bold">{line.replace(/\*\*/g, '')}</p>;
     }
     if (line.includes('**')) {
       const parts = line.split(/(\*\*[^*]+\*\*)/g);
       return (
-        <p key={i} className="tile-p">
+        <p key={i} className="analysis-p">
           {parts.map((part, j) =>
             part.startsWith('**') && part.endsWith('**')
               ? <strong key={j}>{part.replace(/\*\*/g, '')}</strong>
@@ -90,63 +85,46 @@ function formatAnalysis(text: string) {
         </p>
       );
     }
-    if (line.startsWith('- ') || line.startsWith('• ')) {
-      return <li key={i} className="tile-li">{line.replace(/^[-•]\s/, '')}</li>;
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      return <li key={i} className="analysis-li">{line.replace(/^[-*]\s/, '')}</li>;
     }
     if (/^\d+\.\s/.test(line)) {
-      return <li key={i} className="tile-li-num">{line.replace(/^\d+\.\s/, '')}</li>;
+      return <li key={i} className="analysis-li-num">{line.replace(/^\d+\.\s/, '')}</li>;
     }
     if (line.trim() === '') {
       return <br key={i} />;
     }
-    return <p key={i} className="tile-p">{line}</p>;
+    return <p key={i} className="analysis-p">{line}</p>;
   });
 }
 
-export default function AIAnalysis({ reportData }: AIAnalysisProps) {
-  // Local filters for AI tiles
-  const [selectedProducts, setSelectedProducts] = useState<Product[]>(['POR', 'R360']);
-  const [selectedRegions, setSelectedRegions] = useState<Region[]>(['AMER', 'EMEA']);
+// Get display label for current filter selection
+function getFilterLabel(products: Product[], regions: Region[]): string {
+  const productLabel = products.length === 0 || products.length === 2
+    ? 'All Products'
+    : products[0];
+  const regionLabel = regions.length === 0 || regions.length === 3
+    ? 'All Regions'
+    : regions.join(', ');
+  return `${productLabel} • ${regionLabel}`;
+}
 
-  // Tile states
-  const [tileStates, setTileStates] = useState<Record<string, TileState>>({});
-  const [generatingAll, setGeneratingAll] = useState(false);
+export default function AIAnalysis({ reportData, selectedProducts, selectedRegions }: AIAnalysisProps) {
+  const [state, setState] = useState<AnalysisState>({
+    loading: false,
+    analysis: null,
+    error: null,
+    generatedAt: null,
+  });
 
-  const getTileKey = (product: Product, region: Region) => `${product}-${region}`;
-
-  const isTileActive = (product: Product, region: Region) =>
-    selectedProducts.includes(product) && selectedRegions.includes(region);
-
-  // Toggle product filter
-  const toggleProduct = (product: Product) => {
-    setSelectedProducts(prev =>
-      prev.includes(product)
-        ? prev.filter(p => p !== product)
-        : [...prev, product]
-    );
-  };
-
-  // Toggle region filter
-  const toggleRegion = (region: Region) => {
-    setSelectedRegions(prev =>
-      prev.includes(region)
-        ? prev.filter(r => r !== region)
-        : [...prev, region]
-    );
-  };
-
-  // Generate analysis for a single tile
-  const generateForTile = async (product: Product, region: Region) => {
+  // Generate analysis based on current filter selection
+  const generateAnalysis = async () => {
     if (!reportData) return;
 
-    const key = getTileKey(product, region);
-    setTileStates(prev => ({
-      ...prev,
-      [key]: { loading: true, analysis: null, error: null, generatedAt: null },
-    }));
+    setState({ loading: true, analysis: null, error: null, generatedAt: null });
 
     try {
-      const filteredData = filterReportData(reportData, product, region);
+      const filteredData = filterReportData(reportData, selectedProducts, selectedRegions);
 
       const response = await fetch('/api/ai-analysis', {
         method: 'POST',
@@ -163,459 +141,420 @@ export default function AIAnalysis({ reportData }: AIAnalysisProps) {
         throw new Error(data.error || 'Failed to generate analysis');
       }
 
-      setTileStates(prev => ({
-        ...prev,
-        [key]: {
-          loading: false,
-          analysis: data.analysis,
-          error: null,
-          generatedAt: data.generated_at,
-        },
-      }));
+      setState({
+        loading: false,
+        analysis: data.analysis,
+        error: null,
+        generatedAt: data.generated_at,
+      });
     } catch (error: any) {
-      setTileStates(prev => ({
-        ...prev,
-        [key]: {
-          loading: false,
-          analysis: null,
-          error: error.message || 'Failed to generate analysis',
-          generatedAt: null,
-        },
-      }));
+      setState({
+        loading: false,
+        analysis: null,
+        error: error.message || 'Failed to generate analysis',
+        generatedAt: null,
+      });
     }
   };
 
-  // Generate all active tiles
-  const generateAll = async () => {
-    if (!reportData) return;
-
-    setGeneratingAll(true);
-
-    const activeTiles: { product: Product; region: Region }[] = [];
-    for (const product of selectedProducts) {
-      for (const region of selectedRegions) {
-        activeTiles.push({ product, region });
-      }
-    }
-
-    // Generate sequentially to avoid rate limits
-    for (const tile of activeTiles) {
-      await generateForTile(tile.product, tile.region);
-    }
-
-    setGeneratingAll(false);
+  // Clear analysis
+  const clearAnalysis = () => {
+    setState({ loading: false, analysis: null, error: null, generatedAt: null });
   };
 
-  // Clear all analysis
-  const clearAll = () => {
-    setTileStates({});
-  };
-
-  // Get active tile count
-  const activeTileCount = selectedProducts.length * selectedRegions.length;
+  const filterLabel = getFilterLabel(selectedProducts, selectedRegions);
 
   return (
-    <section className="ai-analysis-section">
+    <section className="ai-analysis-section" data-testid="ai-analysis">
       {/* Header */}
       <div className="ai-header">
-        <h2>
-          <span className="ai-icon">🤖</span>
-          AI Analysis & Recommendations
-        </h2>
+        <div className="ai-title">
+          <span className="ai-icon">AI</span>
+          <h2>Analysis & Recommendations</h2>
+        </div>
         <div className="header-actions">
           <button
-            onClick={generateAll}
-            disabled={generatingAll || !reportData || activeTileCount === 0}
+            onClick={generateAnalysis}
+            disabled={state.loading || !reportData}
             className="btn btn-primary"
           >
-            {generatingAll ? (
+            {state.loading ? (
               <>
                 <span className="spinner-small" />
-                Generating...
+                Analyzing...
               </>
             ) : (
-              <>Generate All ({activeTileCount})</>
+              <>Generate Analysis</>
             )}
           </button>
-          <button onClick={clearAll} className="btn btn-secondary">
-            Clear All
-          </button>
+          {state.analysis && (
+            <button onClick={clearAnalysis} className="btn btn-ghost">
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Local Filters */}
-      <div className="ai-filters">
-        <div className="filter-group">
-          <span className="filter-label">Products:</span>
-          <div className="filter-buttons">
-            {ALL_PRODUCTS.map(product => (
-              <button
-                key={product}
-                onClick={() => toggleProduct(product)}
-                className={`filter-btn ${selectedProducts.includes(product) ? 'active' : ''}`}
-                style={{
-                  backgroundColor: selectedProducts.includes(product)
-                    ? PRODUCT_COLORS[product].active
-                    : PRODUCT_COLORS[product].bg,
-                  color: selectedProducts.includes(product)
-                    ? 'white'
-                    : PRODUCT_COLORS[product].text,
-                  borderColor: PRODUCT_COLORS[product].border,
-                }}
-              >
-                {product}
-              </button>
-            ))}
-          </div>
+      {/* Content Panel */}
+      <div className="content-panel">
+        {/* Filter Context */}
+        <div className="filter-context">
+          <span className="filter-label">Analyzing:</span>
+          <span className="filter-value">{filterLabel}</span>
+          {state.generatedAt && (
+            <span className="timestamp">
+              Generated: {new Date(state.generatedAt).toLocaleString()}
+            </span>
+          )}
         </div>
-        <div className="filter-group">
-          <span className="filter-label">Regions:</span>
-          <div className="filter-buttons">
-            {ALL_REGIONS.map(region => (
-              <button
-                key={region}
-                onClick={() => toggleRegion(region)}
-                className={`filter-btn ${selectedRegions.includes(region) ? 'active' : ''}`}
-                style={{
-                  backgroundColor: selectedRegions.includes(region)
-                    ? REGION_COLORS[region].active
-                    : REGION_COLORS[region].bg,
-                  color: selectedRegions.includes(region)
-                    ? 'white'
-                    : REGION_COLORS[region].text,
-                }}
-              >
-                {region}
-              </button>
-            ))}
-          </div>
+
+        {/* Content */}
+        <div className="panel-content">
+          {state.error && (
+            <div className="error-message">
+              <span className="error-icon">!</span>
+              {state.error}
+            </div>
+          )}
+
+          {!state.analysis && !state.loading && !state.error && (
+            <div className="placeholder">
+              <div className="placeholder-icon">AI</div>
+              <p className="placeholder-text">
+                Click <strong>Generate Analysis</strong> to get AI-powered insights and recommendations
+                for the current filter selection.
+              </p>
+              <p className="placeholder-hint">
+                Use the filters above to narrow down to specific products or regions before generating.
+              </p>
+            </div>
+          )}
+
+          {state.loading && (
+            <div className="loading-state">
+              <div className="spinner" />
+              <p>Analyzing {filterLabel}...</p>
+            </div>
+          )}
+
+          {state.analysis && (
+            <div className="analysis-content">
+              {formatAnalysis(state.analysis)}
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* Tiles Grid */}
-      <div className="tiles-grid">
-        {ALL_PRODUCTS.map(product =>
-          ALL_REGIONS.map(region => {
-            const key = getTileKey(product, region);
-            const state = tileStates[key] || { loading: false, analysis: null, error: null, generatedAt: null };
-            const active = isTileActive(product, region);
-
-            return (
-              <div
-                key={key}
-                className={`ai-tile ${!active ? 'inactive' : ''}`}
-                style={{
-                  border: `2px solid ${active ? PRODUCT_COLORS[product].border : '#e5e7eb'}`,
-                  opacity: active ? 1 : 0.4,
-                }}
-              >
-                {/* Tile Header */}
-                <div className="tile-header">
-                  <div className="tile-badges">
-                    <span
-                      className="badge"
-                      style={{ backgroundColor: PRODUCT_COLORS[product].bg, color: PRODUCT_COLORS[product].text }}
-                    >
-                      {product}
-                    </span>
-                    <span
-                      className="badge"
-                      style={{ backgroundColor: REGION_COLORS[region].bg, color: REGION_COLORS[region].text }}
-                    >
-                      {region}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => generateForTile(product, region)}
-                    disabled={state.loading || !reportData || !active}
-                    className="tile-btn"
-                  >
-                    {state.loading ? <span className="spinner-small" /> : 'Generate'}
-                  </button>
-                </div>
-
-                {/* Tile Content */}
-                <div className="tile-content">
-                  {state.error && (
-                    <div className="tile-error">{state.error}</div>
-                  )}
-
-                  {!state.analysis && !state.loading && !state.error && (
-                    <div className="tile-placeholder">
-                      <p>Click Generate for AI insights</p>
-                    </div>
-                  )}
-
-                  {state.loading && (
-                    <div className="tile-loading">
-                      <div className="spinner" />
-                      <p>Analyzing...</p>
-                    </div>
-                  )}
-
-                  {state.analysis && (
-                    <div className="tile-analysis">
-                      {state.generatedAt && (
-                        <div className="tile-timestamp">
-                          {new Date(state.generatedAt).toLocaleString()}
-                        </div>
-                      )}
-                      <div className="analysis-text">
-                        {formatAnalysis(state.analysis)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })
-        )}
       </div>
 
       <style jsx>{`
         .ai-analysis-section {
-          margin-top: 24px;
+          margin-top: 32px;
+          margin-bottom: 32px;
         }
+
         .ai-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-bottom: 16px;
+          margin-bottom: 20px;
           flex-wrap: wrap;
-          gap: 12px;
+          gap: 16px;
         }
-        .ai-header h2 {
+
+        .ai-title {
           display: flex;
           align-items: center;
-          gap: 8px;
-          margin: 0;
-          font-size: 1.25em;
+          gap: 12px;
         }
+
         .ai-icon {
-          font-size: 1.2em;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 36px;
+          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+          color: white;
+          font-weight: 700;
+          font-size: 0.85em;
+          border-radius: 8px;
+          letter-spacing: -0.5px;
         }
+
+        .ai-header h2 {
+          margin: 0;
+          font-size: 1.35em;
+          font-weight: 600;
+          color: #1f2937;
+        }
+
         .header-actions {
           display: flex;
-          gap: 8px;
+          gap: 10px;
         }
+
         .btn {
-          padding: 8px 16px;
+          padding: 10px 18px;
           border: none;
-          border-radius: 6px;
+          border-radius: 8px;
           font-size: 0.9em;
           font-weight: 500;
           cursor: pointer;
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
+          transition: all 0.15s ease;
         }
+
         .btn-primary {
           background: #2563eb;
           color: white;
         }
+
+        .btn-primary:hover:not(:disabled) {
+          background: #1d4ed8;
+        }
+
         .btn-primary:disabled {
           background: #9ca3af;
           cursor: not-allowed;
         }
-        .btn-secondary {
+
+        .btn-ghost {
+          background: transparent;
+          color: #64748b;
+        }
+
+        .btn-ghost:hover {
           background: #f1f5f9;
-          color: #475569;
-          border: 1px solid #e2e8f0;
+          color: #374151;
         }
-        .btn-secondary:hover {
-          background: #e2e8f0;
+
+        /* Content Panel */
+        .content-panel {
+          background: white;
+          border: 2px solid #e5e7eb;
+          border-radius: 12px;
+          min-height: 200px;
         }
-        .ai-filters {
+
+        .filter-context {
           display: flex;
-          gap: 24px;
-          margin-bottom: 20px;
-          padding: 12px 16px;
-          background: #f8fafc;
-          border-radius: 8px;
+          align-items: center;
+          gap: 12px;
+          padding: 16px 24px;
+          border-bottom: 1px solid #f1f5f9;
+          background: #fafafa;
+          border-radius: 10px 10px 0 0;
           flex-wrap: wrap;
         }
-        .filter-group {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
+
         .filter-label {
-          font-size: 0.85em;
-          color: #64748b;
-          font-weight: 500;
+          font-size: 0.9em;
+          color: #6b7280;
         }
-        .filter-buttons {
-          display: flex;
-          gap: 6px;
-        }
-        .filter-btn {
-          padding: 6px 14px;
-          border: 1px solid transparent;
+
+        .filter-value {
+          font-size: 0.95em;
+          font-weight: 600;
+          color: #1f2937;
+          padding: 4px 12px;
+          background: #e0e7ff;
           border-radius: 6px;
-          font-size: 0.8em;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.15s ease;
         }
-        .filter-btn:hover {
-          transform: translateY(-1px);
+
+        .timestamp {
+          font-size: 0.85em;
+          color: #94a3b8;
+          margin-left: auto;
         }
-        .tiles-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 16px;
+
+        .panel-content {
+          padding: 28px 32px;
         }
-        @media (max-width: 1200px) {
-          .tiles-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-        @media (max-width: 768px) {
-          .tiles-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-        .ai-tile {
-          background: white;
-          border-radius: 10px;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-          min-height: 200px;
-          transition: opacity 0.2s ease;
-        }
-        .ai-tile.inactive {
-          pointer-events: none;
-        }
-        .tile-header {
-          padding: 12px 16px;
-          border-bottom: 1px solid #f1f5f9;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          background: #fafafa;
-        }
-        .tile-badges {
-          display: flex;
-          gap: 8px;
-        }
-        .badge {
-          padding: 4px 10px;
-          border-radius: 12px;
-          font-size: 0.7em;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-        .tile-btn {
-          padding: 5px 12px;
-          background: #2563eb;
-          color: white;
-          border: none;
-          border-radius: 5px;
-          font-size: 0.75em;
-          font-weight: 500;
-          cursor: pointer;
+
+        /* Error State */
+        .error-message {
           display: flex;
           align-items: center;
-          gap: 4px;
-        }
-        .tile-btn:disabled {
-          background: #9ca3af;
-          cursor: not-allowed;
-        }
-        .tile-content {
-          flex: 1;
-          padding: 14px;
-          overflow-y: auto;
-          max-height: 350px;
-        }
-        .tile-error {
-          padding: 10px;
+          gap: 12px;
+          padding: 16px 20px;
           background: #fef2f2;
           border: 1px solid #fecaca;
-          border-radius: 6px;
+          border-radius: 8px;
           color: #dc2626;
-          font-size: 0.8em;
+          font-size: 0.95em;
         }
-        .tile-placeholder {
+
+        .error-icon {
           display: flex;
           align-items: center;
           justify-content: center;
-          height: 100%;
-          min-height: 100px;
-          color: #9ca3af;
-          text-align: center;
+          width: 24px;
+          height: 24px;
+          background: #dc2626;
+          color: white;
+          border-radius: 50%;
+          font-weight: 700;
           font-size: 0.85em;
         }
-        .tile-loading {
+
+        /* Placeholder State */
+        .placeholder {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          height: 100%;
-          min-height: 100px;
+          padding: 48px 24px;
+          text-align: center;
+        }
+
+        .placeholder-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 64px;
+          height: 64px;
+          background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+          color: #6366f1;
+          font-weight: 700;
+          font-size: 1.2em;
+          border-radius: 16px;
+          margin-bottom: 20px;
+        }
+
+        .placeholder-text {
+          font-size: 1em;
+          color: #374151;
+          max-width: 450px;
+          line-height: 1.6;
+          margin-bottom: 8px;
+        }
+
+        .placeholder-hint {
+          font-size: 0.9em;
+          color: #9ca3af;
+        }
+
+        /* Loading State */
+        .loading-state {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 48px 24px;
           color: #64748b;
         }
+
+        .loading-state p {
+          font-size: 1em;
+          margin-top: 16px;
+        }
+
         .spinner {
-          width: 24px;
-          height: 24px;
-          border: 3px solid #e2e8f0;
+          width: 40px;
+          height: 40px;
+          border: 4px solid #e2e8f0;
           border-top-color: #2563eb;
           border-radius: 50%;
           animation: spin 1s linear infinite;
-          margin-bottom: 10px;
         }
+
         .spinner-small {
-          width: 14px;
-          height: 14px;
+          width: 16px;
+          height: 16px;
           border: 2px solid rgba(255,255,255,0.3);
           border-top-color: white;
           border-radius: 50%;
           animation: spin 1s linear infinite;
           display: inline-block;
         }
-        .tile-analysis {
-          font-size: 0.8em;
-          line-height: 1.5;
-        }
-        .tile-timestamp {
-          font-size: 0.7em;
-          color: #94a3b8;
-          margin-bottom: 8px;
-          padding-bottom: 8px;
-          border-bottom: 1px solid #f1f5f9;
-        }
-        .analysis-text :global(.tile-h3) {
-          font-size: 0.95em;
-          font-weight: 600;
-          margin: 10px 0 5px;
-          color: #1e40af;
-        }
-        .analysis-text :global(.tile-h4) {
-          font-size: 0.9em;
-          font-weight: 600;
-          margin: 8px 0 4px;
-          color: #374151;
-        }
-        .analysis-text :global(.tile-bold) {
-          font-weight: 600;
-          margin: 6px 0 3px;
-        }
-        .analysis-text :global(.tile-p) {
-          margin: 3px 0;
-        }
-        .analysis-text :global(.tile-li),
-        .analysis-text :global(.tile-li-num) {
-          margin-left: 14px;
-          margin-bottom: 3px;
-        }
-        .analysis-text :global(.tile-li-num) {
-          list-style-type: decimal;
-        }
+
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+
+        /* Analysis Content */
+        .analysis-content {
+          font-size: 1em;
+          line-height: 1.75;
+          color: #374151;
+        }
+
+        .analysis-content :global(.analysis-h3) {
+          font-size: 1.25em;
+          font-weight: 600;
+          margin: 28px 0 14px;
+          color: #1e40af;
+          padding-bottom: 8px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .analysis-content :global(.analysis-h3:first-child) {
+          margin-top: 0;
+        }
+
+        .analysis-content :global(.analysis-h4) {
+          font-size: 1.1em;
+          font-weight: 600;
+          margin: 22px 0 12px;
+          color: #374151;
+        }
+
+        .analysis-content :global(.analysis-bold) {
+          font-weight: 600;
+          margin: 14px 0 8px;
+          color: #1f2937;
+        }
+
+        .analysis-content :global(.analysis-p) {
+          margin: 10px 0;
+        }
+
+        .analysis-content :global(.analysis-li),
+        .analysis-content :global(.analysis-li-num) {
+          margin-left: 24px;
+          margin-bottom: 10px;
+          padding-left: 8px;
+        }
+
+        .analysis-content :global(.analysis-li) {
+          list-style-type: disc;
+        }
+
+        .analysis-content :global(.analysis-li-num) {
+          list-style-type: decimal;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+          .ai-header {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .header-actions {
+            width: 100%;
+          }
+
+          .btn {
+            flex: 1;
+            justify-content: center;
+          }
+
+          .filter-context {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+          }
+
+          .timestamp {
+            margin-left: 0;
+          }
+
+          .panel-content {
+            padding: 20px 16px;
+          }
         }
       `}</style>
     </section>

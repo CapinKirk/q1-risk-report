@@ -29,6 +29,8 @@ export interface SalesforceContract {
   DaysUntilRenewal: number;
   IsAtRisk: boolean;
   RenewalOpportunityId?: string;
+  RenewalOpportunityName?: string;
+  SalesforceUrl?: string;
 }
 
 // Renewal Opportunity (from BigQuery Type='Renewal')
@@ -76,6 +78,21 @@ export interface RenewalSummary {
   lostRenewalACV: number;
   pipelineRenewalCount: number;
   pipelineRenewalACV: number;
+  // Renewal Risk Calculation: (Expected Renewal ACV with uplift) vs Target
+  expectedRenewalACV: number;       // Upcoming ACV with 5% uplift applied
+  expectedRenewalACVWithUplift: number; // Same but explicitly named
+  renewalRiskGap: number;           // Expected - Target (negative = at risk)
+  renewalRiskPct: number;           // Pacing percentage vs target
+  // NEW: Target-based RAG assessment
+  q1Target: number;                 // Full Q1 renewal bookings target
+  qtdTarget: number;                // QTD renewal bookings target (prorated)
+  qtdAttainmentPct: number;         // (Won renewals + Expected uplift) / QTD Target * 100
+  forecastedBookings: number;       // Won ACV + Expected uplift from upcoming contracts
+  ragStatus: RAGStatus;             // GREEN/YELLOW/RED based on attainment
+  // NEW: Missing uplift tracking
+  missingUpliftCount: number;       // Contracts with ACV > 0 but UpliftAmount = 0
+  missingUpliftACV: number;         // Total ACV of contracts missing uplift
+  potentialLostUplift: number;      // ACV * 5% that should have been booked
 }
 
 // Full renewals data structure
@@ -86,6 +103,7 @@ export interface RenewalsData {
   pipelineRenewals: { POR: RenewalOpportunity[]; R360: RenewalOpportunity[] };
   upcomingContracts: { POR: SalesforceContract[]; R360: SalesforceContract[] };
   atRiskContracts: { POR: SalesforceContract[]; R360: SalesforceContract[] };
+  missingUpliftContracts: { POR: SalesforceContract[]; R360: SalesforceContract[] };
   sfAvailable: boolean; // Whether real-time SF data was fetched
   bqDataOnly: boolean;  // Fallback flag if SF unavailable
 }

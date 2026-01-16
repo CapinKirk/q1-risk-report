@@ -140,10 +140,11 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     // Calculate attainment and funnel score for each region
     const result: RegionMilestoneData[] = [];
     regionMap.forEach((data, region) => {
-      const mqlAttainmentPct = data.mqlTarget > 0 ? (data.mqlActual / data.mqlTarget) * 100 : 0;
-      const sqlAttainmentPct = data.sqlTarget > 0 ? (data.sqlActual / data.sqlTarget) * 100 : 0;
-      const salAttainmentPct = data.salTarget > 0 ? (data.salActual / data.salTarget) * 100 : 0;
-      const sqoAttainmentPct = data.sqoTarget > 0 ? (data.sqoActual / data.sqoTarget) * 100 : 0;
+      // When target is 0: if you have actuals, you've exceeded expectations (100%); otherwise 100% (nothing required)
+      const mqlAttainmentPct = data.mqlTarget > 0 ? (data.mqlActual / data.mqlTarget) * 100 : 100;
+      const sqlAttainmentPct = data.sqlTarget > 0 ? (data.sqlActual / data.sqlTarget) * 100 : 100;
+      const salAttainmentPct = data.salTarget > 0 ? (data.salActual / data.salTarget) * 100 : 100;
+      const sqoAttainmentPct = data.sqoTarget > 0 ? (data.sqoActual / data.sqoTarget) * 100 : 100;
 
       result.push({
         region,
@@ -284,10 +285,11 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     }[] = [];
 
     sourceMap.forEach((data, source) => {
-      const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : 0;
-      const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : 0;
-      const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 0;
-      const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 0;
+      // When target is 0: treat as 100% (no target = fully achieved)
+      const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : 100;
+      const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : 100;
+      const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 100;
+      const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 100;
 
       result.push({
         source,
@@ -303,8 +305,13 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       });
     });
 
+    // Filter out sources with 0 targets (all stages)
+    const filtered = result.filter(row =>
+      row.mqlTarget > 0 || row.sqlTarget > 0 || row.salTarget > 0 || row.sqoTarget > 0
+    );
+
     // Sort by funnel score (worst first)
-    return result.sort((a, b) => a.funnelScore - b.funnelScore);
+    return filtered.sort((a, b) => a.funnelScore - b.funnelScore);
   }, [sourceData]);
 
   // Calculate totals
@@ -325,10 +332,11 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       sqoActual: 0, sqoTarget: 0,
     });
 
-    const mqlPct = total.mqlTarget > 0 ? (total.mqlActual / total.mqlTarget) * 100 : 0;
-    const sqlPct = total.sqlTarget > 0 ? (total.sqlActual / total.sqlTarget) * 100 : 0;
-    const salPct = total.salTarget > 0 ? (total.salActual / total.salTarget) * 100 : 0;
-    const sqoPct = total.sqoTarget > 0 ? (total.sqoActual / total.sqoTarget) * 100 : 0;
+    // When target is 0: treat as 100% (no target = fully achieved)
+    const mqlPct = total.mqlTarget > 0 ? (total.mqlActual / total.mqlTarget) * 100 : 100;
+    const sqlPct = total.sqlTarget > 0 ? (total.sqlActual / total.sqlTarget) * 100 : 100;
+    const salPct = total.salTarget > 0 ? (total.salActual / total.salTarget) * 100 : 100;
+    const sqoPct = total.sqoTarget > 0 ? (total.sqoActual / total.sqoTarget) * 100 : 100;
 
     return {
       mqlPct,
@@ -359,10 +367,11 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       mqlTarget: 0, sqlTarget: 0, salTarget: 0, sqoTarget: 0,
     });
 
-    const mqlPacingPct = totals.mqlTarget > 0 ? Math.round((totals.mqlActual / totals.mqlTarget) * 100) : 0;
-    const sqlPacingPct = totals.sqlTarget > 0 ? Math.round((totals.sqlActual / totals.sqlTarget) * 100) : 0;
-    const salPacingPct = totals.salTarget > 0 ? Math.round((totals.salActual / totals.salTarget) * 100) : 0;
-    const sqoPacingPct = totals.sqoTarget > 0 ? Math.round((totals.sqoActual / totals.sqoTarget) * 100) : 0;
+    // When target is 0: treat as 100% (no target = fully achieved)
+    const mqlPacingPct = totals.mqlTarget > 0 ? Math.round((totals.mqlActual / totals.mqlTarget) * 100) : 100;
+    const sqlPacingPct = totals.sqlTarget > 0 ? Math.round((totals.sqlActual / totals.sqlTarget) * 100) : 100;
+    const salPacingPct = totals.salTarget > 0 ? Math.round((totals.salActual / totals.salTarget) * 100) : 100;
+    const sqoPacingPct = totals.sqoTarget > 0 ? Math.round((totals.sqoActual / totals.sqoTarget) * 100) : 100;
 
     return {
       ...totals,

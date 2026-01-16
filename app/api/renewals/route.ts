@@ -157,6 +157,7 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
     const bigquery = getBigQueryClient();
 
     // Join with CurrencyType to convert all amounts to USD
+    // Join with Account to get AccountName
     // Salesforce formula: local_amount / conversionrate = USD_amount
     // CORRECT UPLIFT FORMULA: ACV_USD × (uplift_rate / 100)
     const query = `
@@ -164,6 +165,7 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
         c.Id,
         c.ContractNumber,
         c.AccountId,
+        COALESCE(a.Name, 'Unknown') as AccountName,
         c.StartDate,
         DATE(c.EndDate) as EndDate,
         c.ContractTerm,
@@ -188,10 +190,14 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
         c.sbqq__renewalupliftrate__c,
         c.sbqq__renewalopportunity__c,
         c.r360_record__c,
-        c.account_division__c
+        c.account_division__c,
+        -- Salesforce URL for linking
+        CONCAT('https://por.my.salesforce.com/', c.Id) as SalesforceUrl
       FROM \`data-analytics-306119.sfdc.Contract\` c
       LEFT JOIN \`data-analytics-306119.sfdc.CurrencyType\` ct
         ON LOWER(c.currencyisocode) = LOWER(ct.isocode)
+      LEFT JOIN \`data-analytics-306119.sfdc.Account\` a
+        ON c.AccountId = a.Id
       WHERE c.Status = 'Activated'
         AND DATE(c.EndDate) >= CURRENT_DATE()
         -- Q1 2026 ends March 31 - include all contracts through that date
@@ -245,7 +251,7 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
         Id: record.Id,
         ContractNumber: record.ContractNumber,
         AccountId: record.AccountId,
-        AccountName: 'Unknown', // Account name not in Contract table directly
+        AccountName: record.AccountName || 'Unknown',
         StartDate: record.StartDate?.value || record.StartDate,
         EndDate: record.EndDate?.value || record.EndDate,
         ContractTerm: record.ContractTerm || 12,
@@ -261,6 +267,7 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
         IsAtRisk: isAtRisk,
         RenewalOpportunityId: record.sbqq__renewalopportunity__c,
         RenewalOpportunityName: '',
+        SalesforceUrl: record.SalesforceUrl || `https://por.my.salesforce.com/${record.Id}`,
       };
     });
   } catch (error: any) {

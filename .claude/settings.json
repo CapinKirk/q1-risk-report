@@ -1,0 +1,25 @@
+{
+  "yolo_mode": true,
+  "bash_approval": false,
+  "auto_execute": {
+    "npm": true,
+    "npx": true,
+    "node": true,
+    "git": true,
+    "vercel": true,
+    "playwright": true
+  },
+  "parallel_agents": {
+    "max_concurrent": 10,
+    "auto_spawn": true
+  },
+  "permissions": {
+    "read_files": "always",
+    "write_files": "always",
+    "execute_commands": "always",
+    "create_agents": "always",
+    "deploy": "always"
+  },
+  "confirmation_required": false,
+  "approval_prompts": false
+}

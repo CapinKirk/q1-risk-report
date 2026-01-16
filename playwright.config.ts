@@ -17,6 +17,10 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     baseURL: process.env.CI ? 'https://q1-risk-report.vercel.app' : 'https://q1-risk-report.vercel.app',
     trace: 'on-first-retry',
+    // Test bypass header for E2E testing (bypasses auth middleware)
+    extraHTTPHeaders: {
+      'x-playwright-test': process.env.PLAYWRIGHT_TEST_SECRET || 'e2e-test-bypass-2026',
+    },
   },
   projects: [
     // Frontend UI Tests

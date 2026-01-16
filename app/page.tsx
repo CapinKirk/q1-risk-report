@@ -547,7 +547,11 @@ function ReportContent() {
       <GoogleAdsPerf data={filteredData} />
 
       {/* AI-Powered Analysis & Recommendations */}
-      <AIAnalysis reportData={filteredData} />
+      <AIAnalysis
+        reportData={filteredData}
+        selectedProducts={selectedProducts}
+        selectedRegions={selectedRegions}
+      />
 
       <footer className="footer">
         <p>

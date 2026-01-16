@@ -20,7 +20,12 @@ function normalizeAttainmentDetail(attainment_detail: any): any[] {
 
 // Build the analysis prompt based on report data
 function buildAnalysisPrompt(reportData: any, analysisType: string): string {
-  const { period, grand_total, product_totals, attainment_detail, funnel_by_category, pipeline_rca, loss_reason_rca } = reportData;
+  const {
+    period, grand_total, product_totals, attainment_detail,
+    funnel_by_category, funnel_by_source, pipeline_rca, loss_reason_rca,
+    source_attainment, google_ads, google_ads_rca,
+    mql_details, sql_details, mql_disqualification_summary
+  } = reportData;
 
   // Calculate key metrics for context
   const porTotal = product_totals?.POR || {};
@@ -38,6 +43,27 @@ function buildAnalysisPrompt(reportData: any, analysisType: string): string {
     POR: funnel_by_category?.POR || [],
     R360: funnel_by_category?.R360 || [],
   };
+
+  // Get funnel by source
+  const funnelBySourceData = {
+    POR: funnel_by_source?.POR || [],
+    R360: funnel_by_source?.R360 || [],
+  };
+
+  // Get source attainment
+  const sourceAttainmentData = {
+    POR: source_attainment?.POR || [],
+    R360: source_attainment?.R360 || [],
+  };
+
+  // Get Google Ads data
+  const googleAdsData = {
+    POR: google_ads?.POR || [],
+    R360: google_ads?.R360 || [],
+  };
+
+  // Get MQL disqualification summary
+  const dqSummary = mql_disqualification_summary || { POR: {}, R360: {} };
 
   // Build comprehensive context
   const prompt = `You are a Revenue Operations analyst reviewing Q1 2026 Bookings performance data. Analyze the following data and provide:
@@ -99,12 +125,69 @@ ${(pipeline_rca?.POR || []).concat(pipeline_rca?.R360 || []).map((row: any) =>
   `- ${row.region} ${row.category}: $${(row.pipeline_acv || 0).toLocaleString()} pipeline, ${row.pipeline_coverage_x}x coverage, ${row.pipeline_avg_age_days} days avg age, Health: ${row.pipeline_health}`
 ).join('\n')}
 
-## Loss Reasons (Top Issues)
-${(loss_reason_rca?.POR || []).concat(loss_reason_rca?.R360 || []).slice(0, 10).map((row: any) =>
-  `- ${row.loss_reason}: ${row.deal_count} deals, $${(row.lost_acv || 0).toLocaleString()} lost`
-).join('\n')}
+## Loss Reasons by Product (Top Issues)
+### POR Loss Reasons
+${(loss_reason_rca?.POR || []).slice(0, 8).map((row: any) =>
+  `- ${row.loss_reason} (${row.region}): ${row.deal_count} deals, $${(row.lost_acv || 0).toLocaleString()} lost`
+).join('\n') || 'No POR loss data'}
 
-Provide your analysis in a structured format with clear headers. Be specific about which segments need attention and what actions should be taken. Include realistic assessments - don't sugarcoat underperformance.`;
+### R360 Loss Reasons
+${(loss_reason_rca?.R360 || []).slice(0, 8).map((row: any) =>
+  `- ${row.loss_reason} (${row.region}): ${row.deal_count} deals, $${(row.lost_acv || 0).toLocaleString()} lost`
+).join('\n') || 'No R360 loss data'}
+
+## Funnel Performance by Source (POR)
+${funnelBySourceData.POR.map((row: any) =>
+  `- ${row.source} (${row.region}): MQL ${row.actual_mql}/${row.target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), Conversion MQL→SQL: ${row.mql_to_sql_rate || 0}%`
+).join('\n') || 'No POR source data'}
+
+## Funnel Performance by Source (R360)
+${funnelBySourceData.R360.map((row: any) =>
+  `- ${row.source} (${row.region}): MQL ${row.actual_mql}/${row.target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), Conversion MQL→SQL: ${row.mql_to_sql_rate || 0}%`
+).join('\n') || 'No R360 source data'}
+
+## MQL Disqualification/Reversion Summary
+### POR MQL Status
+- Total MQLs: ${dqSummary.POR?.total_mqls || 0}
+- Reverted/Disqualified: ${dqSummary.POR?.reverted_count || 0} (${dqSummary.POR?.reverted_pct || 0}%)
+- Converted to SQL: ${dqSummary.POR?.converted_count || 0} (${dqSummary.POR?.converted_pct || 0}%)
+- Stalled (>30 days): ${dqSummary.POR?.stalled_count || 0} (${dqSummary.POR?.stalled_pct || 0}%)
+- Active: ${dqSummary.POR?.active_count || 0}
+
+### R360 MQL Status
+- Total MQLs: ${dqSummary.R360?.total_mqls || 0}
+- Reverted/Disqualified: ${dqSummary.R360?.reverted_count || 0} (${dqSummary.R360?.reverted_pct || 0}%)
+- Converted to SQL: ${dqSummary.R360?.converted_count || 0} (${dqSummary.R360?.converted_pct || 0}%)
+- Stalled (>30 days): ${dqSummary.R360?.stalled_count || 0} (${dqSummary.R360?.stalled_pct || 0}%)
+- Active: ${dqSummary.R360?.active_count || 0}
+
+## Google Ads Performance
+### POR Ads
+${googleAdsData.POR.map((row: any) =>
+  `- ${row.region}: $${(row.ad_spend_usd || 0).toLocaleString()} spend, ${row.clicks || 0} clicks, ${row.conversions || 0} conversions, CPA: $${row.cpa_usd || 'N/A'}`
+).join('\n') || 'No POR ads data'}
+
+### R360 Ads
+${googleAdsData.R360.map((row: any) =>
+  `- ${row.region}: $${(row.ad_spend_usd || 0).toLocaleString()} spend, ${row.clicks || 0} clicks, ${row.conversions || 0} conversions, CPA: $${row.cpa_usd || 'N/A'}`
+).join('\n') || 'No R360 ads data'}
+
+## Source Channel Attainment (Revenue by Source)
+### POR by Source
+${sourceAttainmentData.POR.map((row: any) =>
+  `- ${row.source} (${row.region}): ${row.attainment_pct || 0}% attainment, $${(row.gap || 0).toLocaleString()} gap, RAG: ${row.rag_status || 'N/A'}`
+).join('\n') || 'No POR source attainment data'}
+
+### R360 by Source
+${sourceAttainmentData.R360.map((row: any) =>
+  `- ${row.source} (${row.region}): ${row.attainment_pct || 0}% attainment, $${(row.gap || 0).toLocaleString()} gap, RAG: ${row.rag_status || 'N/A'}`
+).join('\n') || 'No R360 source attainment data'}
+
+Provide your analysis in a structured format with clear headers. Be specific about which segments need attention and what actions should be taken. Include realistic assessments - don't sugarcoat underperformance. Pay special attention to:
+1. Loss reasons by product - what patterns emerge?
+2. MQL disqualification rates - are we generating quality leads?
+3. Source channel performance - which channels are working/failing?
+4. Funnel conversion rates - where are we losing deals?`;
 
   return prompt;
 }

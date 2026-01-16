@@ -43,9 +43,11 @@ function ProductAttainmentTable({
             <tr>
               <th>Region</th>
               <th>Cat</th>
+              <th className="right">FY Tgt</th>
               <th className="right">Q1 Tgt</th>
               <th className="right">QTD Act</th>
               <th className="right">Att%</th>
+              <th className="right">FY%</th>
               <th className="right">Gap</th>
               <th className="right">Lost</th>
               <th className="right">Pipe</th>
@@ -63,10 +65,14 @@ function ProductAttainmentTable({
               const lostAcv = row.qtd_lost_acv || 0;
               const ragBgColor = rag === 'GREEN' ? '#16a34a' : rag === 'YELLOW' ? '#ca8a04' : '#dc2626';
 
+              const fyProgressPct = (row as any).fy_progress_pct || 0;
+              const fyTarget = (row as any).fy_target || 0;
+
               return (
                 <tr key={`${row.region}-${row.category}-${idx}`}>
                   <td>{row.region}</td>
                   <td>{row.category}</td>
+                  <td className="right">{formatCurrency(fyTarget)}</td>
                   <td className="right">{formatCurrency(row.q1_target)}</td>
                   <td
                     className={`right ${hasDeals ? 'clickable' : ''}`}
@@ -78,6 +84,9 @@ function ProductAttainmentTable({
                   </td>
                   <td className="right" style={{ color: getAttainmentColor(row.qtd_attainment_pct), fontWeight: 600 }}>
                     {formatPercent(row.qtd_attainment_pct)}
+                  </td>
+                  <td className="right" style={{ color: '#6b7280' }}>
+                    {formatPercent(fyProgressPct)}
                   </td>
                   <td className="right" style={{ color: getGapColor(gap) }}>{formatCurrency(gap)}</td>
                   <td
