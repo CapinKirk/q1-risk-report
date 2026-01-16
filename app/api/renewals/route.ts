@@ -173,8 +173,8 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
       SELECT
         Id AS opportunity_id,
         AccountId AS account_id,
-        Account_Name__c AS account_name,
-        Name AS opportunity_name,
+        AccountName AS account_name,
+        OpportunityName AS opportunity_name,
         CASE WHEN por_record__c THEN 'POR' ELSE 'R360' END AS product,
         CASE Division
           WHEN 'US' THEN 'AMER'
@@ -185,13 +185,13 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
         CAST(CloseDate AS STRING) AS close_date,
         StageName AS stage,
         Won AS is_won,
-        Closed AS is_closed,
-        Loss_Reason__c AS loss_reason,
-        Owner_Name__c AS owner_name,
-        CONCAT('https://pointofrental.lightning.force.com/lightning/r/Opportunity/', Id, '/view') AS salesforce_url,
+        IsClosed AS is_closed,
+        ClosedLostReason AS loss_reason,
+        Owner AS owner_name,
+        CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url,
         SBQQ__RenewedContract__c AS contract_id,
-        ROUND(ACV - COALESCE(Prior_Year_ACV__c, 0), 2) AS uplift_amount,
-        ROUND(COALESCE(Prior_Year_ACV__c, 0), 2) AS prior_acv
+        ROUND(ACV - COALESCE(PriorYearACV, 0), 2) AS uplift_amount,
+        ROUND(COALESCE(PriorYearACV, 0), 2) AS prior_acv
       FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
       WHERE Type = 'Renewal'
         AND CloseDate >= '2026-01-01'
