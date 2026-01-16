@@ -84,11 +84,11 @@ export interface RenewalSummary {
   renewalRiskGap: number;           // Expected - Target (negative = at risk)
   renewalRiskPct: number;           // Pacing percentage vs target
   // NEW: Target-based RAG assessment
-  q1Target: number;                 // Full Q1 renewal bookings target
-  qtdTarget: number;                // QTD renewal bookings target (prorated)
-  qtdAttainmentPct: number;         // (Won renewals + Expected uplift) / QTD Target * 100
+  q1Target: number;                 // Full Q1 renewal bookings target (P75)
+  qtdTarget: number;                // Same as q1Target for renewals (no prorating)
+  qtdAttainmentPct: number;         // (Won renewals + Expected uplift) / Q1 Target * 100
   forecastedBookings: number;       // Won ACV + Expected uplift from upcoming contracts
-  ragStatus: RAGStatus;             // GREEN/YELLOW/RED based on attainment
+  ragStatus: RAGStatus;             // GREEN/YELLOW/RED based on Q1 attainment
   // NEW: Missing uplift tracking
   missingUpliftCount: number;       // Contracts with ACV > 0 but UpliftAmount = 0
   missingUpliftACV: number;         // Total ACV of contracts missing uplift

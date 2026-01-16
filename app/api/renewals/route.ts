@@ -496,16 +496,18 @@ function calculateRenewalSummary(
 ): RenewalSummary {
   // Calculate effective targets based on region filter
   // If filtering by specific regions, sum only those regional targets
+  // CRITICAL: qtdTarget = q1Target for renewal bookings forecast (no prorating)
   let effectiveQ1Target = targets.total.q1Target;
-  let effectiveQtdTarget = targets.total.qtdTarget;
 
   if (regionFilter && regionFilter.length > 0 && regionFilter.length < 3) {
     effectiveQ1Target = regionFilter.reduce(
       (sum, region) => sum + (targets.byRegion[region]?.q1Target || 0),
       0
     );
-    effectiveQtdTarget = effectiveQ1Target; // QTD = Q1 for RevOpsReport
   }
+
+  // QTD target equals Q1 target for renewal forecast (we track against full quarter)
+  const effectiveQtdTarget = effectiveQ1Target;
   const wonRenewalACV = wonOpps.reduce((sum, o) => sum + (o.acv || 0), 0);
   const lostRenewalACV = lostOpps.reduce((sum, o) => sum + (o.acv || 0), 0);
   const pipelineRenewalACV = pipelineOpps.reduce((sum, o) => sum + (o.acv || 0), 0);
@@ -567,12 +569,13 @@ function calculateRenewalSummary(
     ? Math.round((autoRenewalUplift / totalPotentialUplift) * 100)
     : 0;
 
-  // CALCULATE RAG STATUS based on Q1 forecast vs Q1 target (NOT QTD!)
+  // CALCULATE RAG STATUS based on Q1 forecast vs FULL Q1 target
   // Q1 Attainment = (Won + Q1 Expected Uplift) / Q1 Target
   // Uses effectiveQ1Target which accounts for region filtering
+  // CRITICAL: Use full Q1 target, not prorated QTD target
   const qtdAttainmentPct = effectiveQ1Target > 0
     ? Math.round((forecastedBookings / effectiveQ1Target) * 1000) / 10
-    : (forecastedBookings > 0 ? 100 : 100); // No target = 100%
+    : 100; // No target = 100%
 
   const ragStatus = calculateRAG(qtdAttainmentPct);
 

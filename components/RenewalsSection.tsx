@@ -88,8 +88,10 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
     const q1Target = summaries.reduce((sum, s) => sum + (s.q1Target || 0), 0);
     const qtdTarget = summaries.reduce((sum, s) => sum + (s.qtdTarget || 0), 0);
     const forecastedBookings = summaries.reduce((sum, s) => sum + (s.forecastedBookings || 0), 0);
-    const qtdAttainmentPct = qtdTarget > 0
-      ? Math.round((forecastedBookings / qtdTarget) * 1000) / 10
+    // CRITICAL: Use q1Target (full quarter) for Q1 attainment, not qtdTarget (prorated)
+    // This matches the "Q1 Target" display and user expectations
+    const qtdAttainmentPct = q1Target > 0
+      ? Math.round((forecastedBookings / q1Target) * 1000) / 10
       : 100;
 
     return {
