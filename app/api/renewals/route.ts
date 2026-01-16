@@ -194,14 +194,15 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
         ON LOWER(c.currencyisocode) = LOWER(ct.isocode)
       WHERE c.Status = 'Activated'
         AND DATE(c.EndDate) >= CURRENT_DATE()
-        AND DATE(c.EndDate) <= DATE_ADD(CURRENT_DATE(), INTERVAL 90 DAY)
+        -- Q1 2026 ends March 31 - include all contracts through that date
+        AND DATE(c.EndDate) <= '2026-03-31'
         AND c.account_division__c IN ('US', 'UK', 'AU')
         -- CRITICAL: Only include contracts that will actually renew
         AND (c.Renewal_Status__c IS NULL
              OR c.Renewal_Status__c NOT IN ('Non Renewing', 'Success'))
         AND c.acv__c > 0
       ORDER BY c.EndDate ASC
-      LIMIT 1000
+      LIMIT 2000
     `;
 
     console.log('Querying Contract data from BigQuery with USD conversion...');
