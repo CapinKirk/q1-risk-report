@@ -90,9 +90,10 @@ async function getRevenueActuals(filters: ReportFilters) {
         WHEN 'Existing Business' THEN 'EXPANSION'
         WHEN 'New Business' THEN 'NEW LOGO'
         WHEN 'Migration' THEN 'MIGRATION'
+        WHEN 'Renewal' THEN 'RENEWAL'
         ELSE 'OTHER'
       END AS category,
-      COALESCE(SDRSource, 'N/A') AS source,
+      COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
       Type AS deal_type,
       COUNT(*) AS deal_count,
       ROUND(SUM(ACV), 2) AS total_acv,
@@ -101,7 +102,7 @@ async function getRevenueActuals(filters: ReportFilters) {
     WHERE Won = true
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
-      AND Type NOT IN ('Renewal', 'Credit Card', 'Consulting')
+      AND Type NOT IN ('Credit Card', 'Consulting')
       AND ACV > 0
       AND Division IN ('US', 'UK', 'AU')
       ${filterClause}
@@ -132,6 +133,7 @@ async function getTargets(filters: ReportFilters) {
         WHEN FunnelType IN ('NEW LOGO', 'INBOUND', 'R360 NEW LOGO', 'R360 INBOUND') THEN 'NEW LOGO'
         WHEN FunnelType IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
         WHEN FunnelType = 'MIGRATION' THEN 'MIGRATION'
+        WHEN FunnelType IN ('RENEWAL', 'R360 RENEWAL') THEN 'RENEWAL'
         ELSE FunnelType
       END AS category,
       ROUND(SUM(CASE
@@ -176,7 +178,6 @@ async function getTargets(filters: ReportFilters) {
       END), 0) AS target_sqo
     FROM \`data-analytics-306119.Staging.StrategicOperatingPlan\`
     WHERE Percentile = 'P50'
-      AND OpportunityType != 'RENEWAL'
       AND RecordType IN ('POR', 'R360')
       ${productClause}
       ${regionClause}
@@ -286,7 +287,6 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
       AND RecordType = '${product}'
       AND TargetDate >= '${filters.startDate}'
       AND TargetDate <= '${filters.endDate}'
-      AND OpportunityType != 'RENEWAL'
       AND Source IS NOT NULL
       ${regionClause}
     GROUP BY RecordType, Region, UPPER(Source)
@@ -396,13 +396,13 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
       AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
       AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
       AND Region IN ('AMER', 'EMEA', 'APAC')
-      AND UPPER(FunnelType) NOT IN ('RENEWAL', 'R360 RENEWAL')
       ${regionClause}
     GROUP BY RecordType, Region,
       CASE
         WHEN UPPER(FunnelType) IN ('INBOUND', 'R360 INBOUND', 'NEW LOGO', 'R360 NEW LOGO') THEN 'NEW LOGO'
         WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
         WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
+        WHEN UPPER(FunnelType) IN ('RENEWAL', 'R360 RENEWAL') THEN 'RENEWAL'
         ELSE 'OTHER'
       END
     ORDER BY region, category
@@ -443,10 +443,11 @@ async function getWonDeals(filters: ReportFilters) {
         WHEN 'Existing Business' THEN 'EXPANSION'
         WHEN 'New Business' THEN 'NEW LOGO'
         WHEN 'Migration' THEN 'MIGRATION'
+        WHEN 'Renewal' THEN 'RENEWAL'
         ELSE 'OTHER'
       END AS category,
       Type AS deal_type,
-      COALESCE(SDRSource, POR_SDRSource, 'N/A') AS source,
+      COALESCE(NULLIF(COALESCE(SDRSource, POR_SDRSource), ''), 'INBOUND') AS source,
       ROUND(ACV, 2) AS acv,
       CAST(CloseDate AS STRING) AS close_date,
       Owner AS owner_name,
@@ -456,7 +457,7 @@ async function getWonDeals(filters: ReportFilters) {
     WHERE Won = true
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
-      AND Type NOT IN ('Renewal', 'Credit Card', 'Consulting')
+      AND Type NOT IN ('Credit Card', 'Consulting')
       AND ACV > 0
       AND Division IN ('US', 'UK', 'AU')
       ${productClause}
@@ -500,10 +501,11 @@ async function getLostDeals(filters: ReportFilters) {
         WHEN 'Existing Business' THEN 'EXPANSION'
         WHEN 'New Business' THEN 'NEW LOGO'
         WHEN 'Migration' THEN 'MIGRATION'
+        WHEN 'Renewal' THEN 'RENEWAL'
         ELSE 'OTHER'
       END AS category,
       Type AS deal_type,
-      COALESCE(SDRSource, POR_SDRSource, 'N/A') AS source,
+      COALESCE(NULLIF(COALESCE(SDRSource, POR_SDRSource), ''), 'INBOUND') AS source,
       ROUND(ACV, 2) AS acv,
       COALESCE(ClosedLostReason, 'Not Specified') AS loss_reason,
       CAST(CloseDate AS STRING) AS close_date,
@@ -514,7 +516,7 @@ async function getLostDeals(filters: ReportFilters) {
     WHERE StageName = 'Closed Lost'
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
-      AND Type NOT IN ('Renewal', 'Credit Card', 'Consulting')
+      AND Type NOT IN ('Credit Card', 'Consulting')
       AND Division IN ('US', 'UK', 'AU')
       ${productClause}
       ${regionClause}
@@ -557,10 +559,11 @@ async function getPipelineDeals(filters: ReportFilters) {
         WHEN 'Existing Business' THEN 'EXPANSION'
         WHEN 'New Business' THEN 'NEW LOGO'
         WHEN 'Migration' THEN 'MIGRATION'
+        WHEN 'Renewal' THEN 'RENEWAL'
         ELSE 'OTHER'
       END AS category,
       Type AS deal_type,
-      COALESCE(SDRSource, POR_SDRSource, 'N/A') AS source,
+      COALESCE(NULLIF(COALESCE(SDRSource, POR_SDRSource), ''), 'INBOUND') AS source,
       ROUND(ACV, 2) AS acv,
       StageName AS stage,
       CAST(CloseDate AS STRING) AS close_date,
@@ -569,7 +572,7 @@ async function getPipelineDeals(filters: ReportFilters) {
       CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url
     FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
     WHERE IsClosed = false
-      AND Type NOT IN ('Renewal', 'Credit Card', 'Consulting')
+      AND Type NOT IN ('Credit Card', 'Consulting')
       AND ACV > 0
       AND Division IN ('US', 'UK', 'AU')
       ${productClause}
@@ -621,7 +624,7 @@ async function getSourceActuals(filters: ReportFilters) {
     WHERE Won = true
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
-      AND Type NOT IN ('Renewal', 'Credit Card', 'Consulting')
+      AND Type NOT IN ('Credit Card', 'Consulting')
       AND ACV > 0
       AND Division IN ('US', 'UK', 'AU')
       ${productClause}
@@ -672,7 +675,6 @@ async function getSourceTargets(filters: ReportFilters) {
       END), 2) AS qtd_target
     FROM \`data-analytics-306119.Staging.StrategicOperatingPlan\`
     WHERE Percentile = 'P50'
-      AND OpportunityType != 'RENEWAL'
       AND RecordType IN ('POR', 'R360')
       AND Region IN ('AMER', 'EMEA', 'APAC')
       ${productClause}
@@ -719,12 +721,13 @@ async function getPipelineAge(filters: ReportFilters) {
         WHEN 'Existing Business' THEN 'EXPANSION'
         WHEN 'New Business' THEN 'NEW LOGO'
         WHEN 'Migration' THEN 'MIGRATION'
+        WHEN 'Renewal' THEN 'RENEWAL'
         ELSE 'OTHER'
       END AS category,
       ROUND(AVG(DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY)), 0) AS avg_age_days
     FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
     WHERE IsClosed = false
-      AND Type NOT IN ('Renewal', 'Credit Card', 'Consulting')
+      AND Type NOT IN ('Credit Card', 'Consulting')
       AND ACV > 0
       AND Division IN ('US', 'UK', 'AU')
       ${productClause}
@@ -773,7 +776,7 @@ async function getLossReasonRCA(filters: ReportFilters) {
     WHERE StageName = 'Closed Lost'
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
-      AND Type NOT IN ('Renewal', 'Credit Card', 'Consulting')
+      AND Type NOT IN ('Credit Card', 'Consulting')
       AND Division IN ('US', 'UK', 'AU')
       ${productClause}
       ${regionClause}
@@ -815,7 +818,7 @@ async function getMQLDetails(filters: ReportFilters) {
       END AS salesforce_url,
       COALESCE(Company, 'Unknown') AS company_name,
       COALESCE(LeadEmail, ContactEmail, 'N/A') AS email,
-      SDRSource AS source,
+      COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
       CAST(MQL_DT AS STRING) AS mql_date,
       CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
       -- Disqualification status
@@ -851,7 +854,7 @@ async function getMQLDetails(filters: ReportFilters) {
       CONCAT('https://por.my.salesforce.com/', LeadId) AS salesforce_url,
       COALESCE(Company, 'Unknown') AS company_name,
       Email AS email,
-      SDRSource AS source,
+      COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
       CAST(MQL_DT AS STRING) AS mql_date,
       CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
       -- Disqualification status
@@ -919,7 +922,7 @@ async function getSQLDetails(filters: ReportFilters) {
       END AS salesforce_url,
       COALESCE(Company, 'Unknown') AS company_name,
       COALESCE(LeadEmail, ContactEmail, 'N/A') AS email,
-      SDRSource AS source,
+      COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
       CAST(SQL_DT AS STRING) AS sql_date,
       CAST(MQL_DT AS STRING) AS mql_date,
       DATE_DIFF(CAST(SQL_DT AS DATE), CAST(MQL_DT AS DATE), DAY) AS days_mql_to_sql,
@@ -966,7 +969,7 @@ async function getSQLDetails(filters: ReportFilters) {
       END AS salesforce_url,
       COALESCE(Company, 'Unknown') AS company_name,
       Email AS email,
-      SDRSource AS source,
+      COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
       CAST(SQL_DT AS STRING) AS sql_date,
       CAST(MQL_DT AS STRING) AS mql_date,
       DATE_DIFF(CAST(SQL_DT AS DATE), CAST(MQL_DT AS DATE), DAY) AS days_mql_to_sql,
@@ -1744,6 +1747,59 @@ export async function POST(request: Request) {
       });
     }
 
+    // Calculate MQL disqualification summary from MQL details
+    const calculateDQSummary = (mqls: any[]) => {
+      const total = mqls.length;
+      const reverted = mqls.filter((m: any) => m.mql_status === 'REVERTED' || m.was_reverted).length;
+      const converted = mqls.filter((m: any) => m.mql_status === 'CONVERTED' || m.converted_to_sql === 'Yes').length;
+      const stalled = mqls.filter((m: any) => m.mql_status === 'STALLED').length;
+      const active = mqls.filter((m: any) => m.mql_status === 'ACTIVE').length;
+      return {
+        total_mqls: total,
+        reverted_count: reverted,
+        reverted_pct: total > 0 ? Math.round((reverted / total) * 100) : 0,
+        converted_count: converted,
+        converted_pct: total > 0 ? Math.round((converted / total) * 100) : 0,
+        stalled_count: stalled,
+        stalled_pct: total > 0 ? Math.round((stalled / total) * 100) : 0,
+        active_count: active,
+        active_pct: total > 0 ? Math.round((active / total) * 100) : 0,
+      };
+    };
+
+    const mqlDisqualificationSummary = {
+      POR: calculateDQSummary(mqlDetailsData.POR || []),
+      R360: calculateDQSummary(mqlDetailsData.R360 || []),
+    };
+
+    // Calculate SQL disqualification summary from SQL details
+    const calculateSQLDQSummary = (sqls: any[]) => {
+      const total = sqls.length;
+      const convertedSQO = sqls.filter((s: any) => s.sql_status === 'CONVERTED_SQO' || s.converted_to_sqo === 'Yes').length;
+      const convertedSAL = sqls.filter((s: any) => s.sql_status === 'CONVERTED_SAL' || s.converted_to_sal === 'Yes').length;
+      const stalled = sqls.filter((s: any) => s.sql_status === 'STALLED').length;
+      const active = sqls.filter((s: any) => s.sql_status === 'ACTIVE').length;
+      const withOpp = sqls.filter((s: any) => s.has_opportunity === 'Yes').length;
+      return {
+        total_sqls: total,
+        converted_to_sqo_count: convertedSQO,
+        converted_to_sqo_pct: total > 0 ? Math.round((convertedSQO / total) * 100) : 0,
+        converted_to_sal_count: convertedSAL,
+        converted_to_sal_pct: total > 0 ? Math.round((convertedSAL / total) * 100) : 0,
+        stalled_count: stalled,
+        stalled_pct: total > 0 ? Math.round((stalled / total) * 100) : 0,
+        active_count: active,
+        active_pct: total > 0 ? Math.round((active / total) * 100) : 0,
+        with_opportunity_count: withOpp,
+        with_opportunity_pct: total > 0 ? Math.round((withOpp / total) * 100) : 0,
+      };
+    };
+
+    const sqlDisqualificationSummary = {
+      POR: calculateSQLDQSummary(sqlDetailsData.POR || []),
+      R360: calculateSQLDQSummary(sqlDetailsData.R360 || []),
+    };
+
     // Build response
     const response = {
       generated_at_utc: new Date().toISOString(),
@@ -1762,6 +1818,8 @@ export async function POST(request: Request) {
       loss_reason_rca: lossReasonRca,
       mql_details: mqlDetailsData,
       sql_details: sqlDetailsData,
+      mql_disqualification_summary: mqlDisqualificationSummary,
+      sql_disqualification_summary: sqlDisqualificationSummary,
       won_deals: wonDeals,
       lost_deals: lostDeals,
       pipeline_deals: pipelineDeals,
