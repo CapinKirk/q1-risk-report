@@ -74,10 +74,23 @@ interface RequestFilters {
   regions?: string[];
 }
 
-// Renewal targets from StrategicOperatingPlan
+// Renewal targets from RevOpsReport (P75)
+// Now includes regional breakdown for accurate filtering
+interface RegionalTargets {
+  q1Target: number;
+  qtdActual: number;
+  attainmentPct: number;
+}
+
 interface RenewalTargets {
-  POR: { q1Target: number; qtdTarget: number };
-  R360: { q1Target: number; qtdTarget: number };
+  POR: {
+    total: { q1Target: number; qtdTarget: number };
+    byRegion: Record<Region, RegionalTargets>;
+  };
+  R360: {
+    total: { q1Target: number; qtdTarget: number };
+    byRegion: Record<Region, RegionalTargets>;
+  };
 }
 
 // Calculate RAG status based on attainment percentage
@@ -87,58 +100,84 @@ function calculateRAG(attainmentPct: number): 'GREEN' | 'YELLOW' | 'RED' {
   return 'RED';
 }
 
-// Query renewal targets from StrategicOperatingPlan
+// Query renewal targets from RevOpsReport (P75)
 async function getRenewalTargets(): Promise<RenewalTargets> {
+  const emptyRegionalTargets: Record<Region, RegionalTargets> = {
+    AMER: { q1Target: 0, qtdActual: 0, attainmentPct: 0 },
+    EMEA: { q1Target: 0, qtdActual: 0, attainmentPct: 0 },
+    APAC: { q1Target: 0, qtdActual: 0, attainmentPct: 0 },
+  };
+
   try {
     const bigquery = getBigQueryClient();
 
-    // Get current date to calculate QTD target proportionally
-    const today = new Date();
-    const quarterStart = new Date('2026-01-01');
-    const quarterEnd = new Date('2026-03-31');
-
+    // Query RevOpsReport for P75 renewal targets by product and region
+    // Horizon = 'QTD' gives us quarter-to-date context
+    // Period_Start_Date = '2026-01-01' ensures Q1 2026 targets
     const query = `
       SELECT
         RecordType AS product,
-        ROUND(SUM(CASE
-          WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
-          THEN Target_ACV ELSE 0
-        END), 2) AS q1_target,
-        ROUND(SUM(CASE
-          WHEN TargetDate BETWEEN '2026-01-01' AND CURRENT_DATE()
-          THEN Target_ACV ELSE 0
-        END), 2) AS qtd_target
-      FROM \`data-analytics-306119.Staging.StrategicOperatingPlan\`
-      WHERE Percentile = 'P50'
+        Region AS region,
+        ROUND(COALESCE(Target_ACV, 0), 2) AS q1_target,
+        ROUND(COALESCE(Actual_ACV, 0), 2) AS qtd_actual,
+        ROUND(COALESCE(Revenue_Pacing_Score, 0), 2) AS attainment_pct
+      FROM \`data-analytics-306119.Staging.RevOpsReport\`
+      WHERE Horizon = 'QTD'
+        AND RiskProfile = 'P75'
+        AND OpportunityType = 'Renewal'
+        AND Period_Start_Date = '2026-01-01'
         AND RecordType IN ('POR', 'R360')
-        AND FunnelType IN ('RENEWAL', 'R360 RENEWAL')
-      GROUP BY product
+        AND Region IN ('AMER', 'EMEA', 'APAC')
     `;
 
     const [rows] = await bigquery.query({ query });
 
+    // Initialize targets structure
     const targets: RenewalTargets = {
-      POR: { q1Target: 0, qtdTarget: 0 },
-      R360: { q1Target: 0, qtdTarget: 0 },
+      POR: {
+        total: { q1Target: 0, qtdTarget: 0 },
+        byRegion: { ...emptyRegionalTargets },
+      },
+      R360: {
+        total: { q1Target: 0, qtdTarget: 0 },
+        byRegion: { ...emptyRegionalTargets },
+      },
     };
 
+    // Process rows and aggregate by product/region
     for (const row of rows as any[]) {
       const product = row.product as Product;
-      if (product === 'POR' || product === 'R360') {
-        targets[product] = {
+      const region = row.region as Region;
+
+      if ((product === 'POR' || product === 'R360') &&
+          (region === 'AMER' || region === 'EMEA' || region === 'APAC')) {
+        // Store regional targets
+        targets[product].byRegion[region] = {
           q1Target: row.q1_target || 0,
-          qtdTarget: row.qtd_target || 0,
+          qtdActual: row.qtd_actual || 0,
+          attainmentPct: row.attainment_pct || 0,
         };
+
+        // Aggregate to total (Q1 target sum across regions)
+        targets[product].total.q1Target += row.q1_target || 0;
+        // QTD target is same as Q1 target for RevOpsReport (it tracks against full quarter)
+        targets[product].total.qtdTarget += row.q1_target || 0;
       }
     }
 
-    console.log('Renewal targets:', targets);
+    console.log('Renewal targets (P75 from RevOpsReport):', JSON.stringify(targets, null, 2));
     return targets;
   } catch (error: any) {
-    console.error('Failed to fetch renewal targets:', error.message);
+    console.error('Failed to fetch renewal targets from RevOpsReport:', error.message);
     return {
-      POR: { q1Target: 0, qtdTarget: 0 },
-      R360: { q1Target: 0, qtdTarget: 0 },
+      POR: {
+        total: { q1Target: 0, qtdTarget: 0 },
+        byRegion: { ...emptyRegionalTargets },
+      },
+      R360: {
+        total: { q1Target: 0, qtdTarget: 0 },
+        byRegion: { ...emptyRegionalTargets },
+      },
     };
   }
 }
@@ -443,13 +482,30 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
 
 // Calculate renewal summary from opportunities and contracts
 // IMPORTANT: For bookings forecast, only UPLIFT counts as new bookings, not full ACV!
+// targets now includes regional breakdown for accurate filtering
 function calculateRenewalSummary(
   wonOpps: RenewalOpportunity[],
   lostOpps: RenewalOpportunity[],
   pipelineOpps: RenewalOpportunity[],
   contracts: SalesforceContract[],
-  targets: { q1Target: number; qtdTarget: number }
+  targets: {
+    total: { q1Target: number; qtdTarget: number };
+    byRegion: Record<Region, RegionalTargets>;
+  },
+  regionFilter?: Region[]
 ): RenewalSummary {
+  // Calculate effective targets based on region filter
+  // If filtering by specific regions, sum only those regional targets
+  let effectiveQ1Target = targets.total.q1Target;
+  let effectiveQtdTarget = targets.total.qtdTarget;
+
+  if (regionFilter && regionFilter.length > 0 && regionFilter.length < 3) {
+    effectiveQ1Target = regionFilter.reduce(
+      (sum, region) => sum + (targets.byRegion[region]?.q1Target || 0),
+      0
+    );
+    effectiveQtdTarget = effectiveQ1Target; // QTD = Q1 for RevOpsReport
+  }
   const wonRenewalACV = wonOpps.reduce((sum, o) => sum + (o.acv || 0), 0);
   const lostRenewalACV = lostOpps.reduce((sum, o) => sum + (o.acv || 0), 0);
   const pipelineRenewalACV = pipelineOpps.reduce((sum, o) => sum + (o.acv || 0), 0);
@@ -513,13 +569,14 @@ function calculateRenewalSummary(
 
   // CALCULATE RAG STATUS based on Q1 forecast vs Q1 target (NOT QTD!)
   // Q1 Attainment = (Won + Q1 Expected Uplift) / Q1 Target
-  const qtdAttainmentPct = targets.q1Target > 0
-    ? Math.round((forecastedBookings / targets.q1Target) * 1000) / 10
+  // Uses effectiveQ1Target which accounts for region filtering
+  const qtdAttainmentPct = effectiveQ1Target > 0
+    ? Math.round((forecastedBookings / effectiveQ1Target) * 1000) / 10
     : (forecastedBookings > 0 ? 100 : 100); // No target = 100%
 
   const ragStatus = calculateRAG(qtdAttainmentPct);
 
-  console.log(`Renewal Forecast: Won=${wonRenewalACV}, Q1 Uplift=${q1ExpectedUplift}, Total Forecast=${forecastedBookings}, Q1 Target=${targets.q1Target}, Attainment=${qtdAttainmentPct}%, RAG=${ragStatus}`);
+  console.log(`Renewal Forecast (P75): Won=${wonRenewalACV}, Q1 Uplift=${q1ExpectedUplift}, Total Forecast=${forecastedBookings}, Q1 Target=${effectiveQ1Target}, Attainment=${qtdAttainmentPct}%, RAG=${ragStatus}`);
 
   // Track contracts with ACV but missing uplift - these are revenue leakage!
   const missingUpliftContracts = contracts.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0);
@@ -554,9 +611,9 @@ function calculateRenewalSummary(
     expectedRenewalACVWithUplift,
     renewalRiskGap,
     renewalRiskPct,
-    // New target/RAG fields
-    q1Target: targets.q1Target,
-    qtdTarget: targets.qtdTarget,
+    // New target/RAG fields (P75 from RevOpsReport)
+    q1Target: effectiveQ1Target,
+    qtdTarget: effectiveQtdTarget,
     qtdAttainmentPct,
     forecastedBookings,
     ragStatus,
@@ -617,13 +674,19 @@ export async function GET(request: Request) {
 
     const filteredContractsByProduct = splitByProduct(filteredContracts);
 
-    // Calculate summaries with targets for RAG status
+    // Parse region filter for target calculation
+    const regionFilter = (filters.regions && filters.regions.length > 0 && filters.regions.length < 3)
+      ? filters.regions as Region[]
+      : undefined;
+
+    // Calculate summaries with P75 targets for RAG status
     const porSummary = calculateRenewalSummary(
       wonByProduct.POR,
       lostByProduct.POR,
       pipelineByProduct.POR,
       filteredContractsByProduct.POR,
-      renewalTargets.POR
+      renewalTargets.POR,
+      regionFilter
     );
 
     const r360Summary = calculateRenewalSummary(
@@ -631,7 +694,8 @@ export async function GET(request: Request) {
       lostByProduct.R360,
       pipelineByProduct.R360,
       filteredContractsByProduct.R360,
-      renewalTargets.R360
+      renewalTargets.R360,
+      regionFilter
     );
 
     // Build response

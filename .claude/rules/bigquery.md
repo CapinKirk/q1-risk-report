@@ -6,7 +6,54 @@ paths:
 
 # BigQuery Data Patterns
 
-## Datasets & Tables
+## RevOps Architecture (PRIMARY - 2026)
+
+**Always use P75 risk profile for targets. Query RevOpsReport for all performance metrics.**
+
+### Staging Dataset - RevOps Tables
+
+**RevOpsReport** (Layer 5) - **PRIMARY TABLE FOR ALL REPORTING**
+- Columns: Horizon, RiskProfile, RecordType, Region, OpportunityType, Period_Start_Date, Target_ACV, Actual_ACV, Revenue_Pacing_Score
+- Use: WTD/MTD/QTD/YTD targets and actuals
+- Filter: `RiskProfile = 'P75'` for standard reporting
+
+**RevOpsPerformance** (Layer 4) - Daily pacing
+- Columns: Date, RecordType, Region, OpportunityType, RiskProfile, Target_ACV, Actual_ACV
+- Use: Daily attainment tracking
+
+**RevOpsPlan** (Layer 3) - Vertical format
+- Columns: RiskProfile, RecordType, Region, OpportunityType, Target_ACV
+- Use: Reference for target breakdowns
+
+**Source Tables** (Layer 1):
+- `SourcePlanByMonth2026` - Monthly plan with seasonality
+- `SourceTargetRates` - Conversion rates & ADS
+- `SourceBookingsAllocations` - Source mix allocations
+- `SalesCycleLags2026` - Stage duration (P50/P75/P90)
+
+**Raw Data** (Layer 0):
+- `RAW_2026_Plan_by_Month` - CSV import
+- `MonthlyRevenueFunnel` - Monthly aggregated funnels
+- `DailyRevenueFunnel` - Daily funnels
+
+### Standard RevOpsReport Query Pattern
+```sql
+SELECT
+  RecordType AS product,
+  Region AS region,
+  OpportunityType,
+  ROUND(COALESCE(Target_ACV, 0), 2) AS target,
+  ROUND(COALESCE(Actual_ACV, 0), 2) AS actual,
+  ROUND(COALESCE(Revenue_Pacing_Score, 0), 2) AS attainment_pct
+FROM `data-analytics-306119.Staging.RevOpsReport`
+WHERE Horizon = 'QTD'
+  AND RiskProfile = 'P75'
+  AND Period_Start_Date = '2026-01-01'
+  AND RecordType IN ('POR', 'R360')
+  AND Region IN ('AMER', 'EMEA', 'APAC')
+```
+
+## Legacy Tables
 
 ### sfdc (Salesforce)
 
@@ -14,9 +61,9 @@ paths:
 - Columns: Id, OpportunityName, AccountName, contactid, Division, Type, StageName, ACV, Won, CloseDate, por_record__c, SDRSource, POR_SDRSource
 - Grain: One row per opportunity
 
-**StrategicOperatingPlan** - Q1 2026 targets
+**StrategicOperatingPlan** - DEPRECATED (use RevOpsReport)
 - Columns: Quarter, Product, Division, TargetMRR
-- Grain: One row per (Product, Division, Quarter)
+- Note: Contains P50 targets only
 
 ### MarketingFunnel
 

@@ -110,12 +110,51 @@ export const BIGQUERY_CONFIG = {
     GOOGLE_ADS_R360: 'GoogleAds_Record360_3799591491',
   },
   TABLES: {
+    // Legacy tables
     OPPORTUNITY: 'OpportunityViewTable',
     SOP: 'StrategicOperatingPlan',
     INBOUND_FUNNEL: 'InboundFunnel',
     R360_INBOUND_FUNNEL: 'R360InboundFunnel',
+
+    // RevOps Architecture (Layer 0 - Raw Data)
+    RAW_2026_PLAN_BY_MONTH: 'RAW_2026_Plan_by_Month',
+    MONTHLY_REVENUE_FUNNEL: 'MonthlyRevenueFunnel',
     DAILY_REVENUE_FUNNEL: 'DailyRevenueFunnel',
+
+    // RevOps Architecture (Layer 1 - Processed Sources)
+    SOURCE_PLAN_BY_MONTH_2026: 'SourcePlanByMonth2026',
+    SOURCE_TARGET_RATES: 'SourceTargetRates',
+    SOURCE_BOOKINGS_ALLOCATIONS: 'SourceBookingsAllocations',
+    SALES_CYCLE_LAGS_2026: 'SalesCycleLags2026',
+
+    // RevOps Architecture (Layer 2-5 - Model & Reports)
+    REVOPS_MODEL: 'RevOpsModel',      // Layer 2: Wide data framework
+    REVOPS_PLAN: 'RevOpsPlan',        // Layer 3: Vertical format for metrics
+    REVOPS_PERFORMANCE: 'RevOpsPerformance', // Layer 4: Daily pacing
+    REVOPS_REPORT: 'RevOpsReport',    // Layer 5: WTD, MTD, QTD, YTD reporting (PRIMARY)
   },
+} as const;
+
+// RevOps Risk Profile levels
+export type RiskProfile = 'P50' | 'P75' | 'P90';
+export const DEFAULT_RISK_PROFILE: RiskProfile = 'P75';
+
+// RevOps Horizon levels for reporting
+export type Horizon = 'WTD' | 'MTD' | 'QTD' | 'YTD';
+
+// OpportunityType to Category mapping (for RevOps tables)
+export const OPPORTUNITY_TYPE_MAP = {
+  'New Business': 'NEW LOGO',
+  'Existing Business': 'EXPANSION',
+  'Migration': 'MIGRATION',
+  'Renewal': 'RENEWAL',
+} as const;
+
+export const OPPORTUNITY_TYPE_REVERSE_MAP = {
+  'NEW LOGO': 'New Business',
+  'EXPANSION': 'Existing Business',
+  'MIGRATION': 'Migration',
+  'RENEWAL': 'Renewal',
 } as const;
 
 

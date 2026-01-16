@@ -159,12 +159,50 @@ npx playwright test  # Run E2E tests
 
 ## Data Sources
 
-### Salesforce (sfdc dataset)
+### RevOps Plan Architecture (PRIMARY - 2026)
+
+The RevOps architecture is a 6-layer data model for 2026 bookings targets and performance tracking.
+
+**Always use P75 risk profile for targets.**
+
+| Layer | Table | Purpose | Key Columns |
+|-------|-------|---------|-------------|
+| 0 | `RAW_2026_Plan_by_Month` | Raw CSV import of 2026 bookings plan | - |
+| 0 | `MonthlyRevenueFunnel` | Live monthly aggregated sales funnels | - |
+| 0 | `DailyRevenueFunnel` | Live daily sales funnels | - |
+| 1 | `SourcePlanByMonth2026` | Cleaned plan with seasonality | BookingType, Region, Month, Target |
+| 1 | `SourceTargetRates` | Conversion rates & ADS | ConversionRate, ADS |
+| 1 | `SourceBookingsAllocations` | Source mix / allocations | Source, Allocation |
+| 1 | `SalesCycleLags2026` | Stage-to-stage duration (P50/P75/P90) | Stage, Lag_P50, Lag_P75, Lag_P90 |
+| 2 | `RevOpsModel` | Wide data framework | All metrics wide format |
+| 3 | `RevOpsPlan` | Vertical format for metrics | RiskProfile, OpportunityType, Region, Target_ACV |
+| 4 | `RevOpsPerformance` | Daily pacing with actuals | Date, Actual_ACV, Target_ACV |
+| **5** | **`RevOpsReport`** | **WTD/MTD/QTD/YTD reporting (USE THIS)** | Horizon, RiskProfile, RecordType, Region, OpportunityType, Target_ACV, Actual_ACV, Revenue_Pacing_Score |
+
+**RevOpsReport Key Columns:**
+- `Horizon`: WTD, MTD, QTD, YTD
+- `RiskProfile`: P50, P75, P90 (use P75)
+- `RecordType`: POR, R360
+- `Region`: AMER, EMEA, APAC
+- `OpportunityType`: New Business, Existing Business, Migration, Renewal
+- `Target_ACV`: Target amount for the horizon
+- `Actual_ACV`: Actual closed amount
+- `Revenue_Pacing_Score`: Attainment percentage
+
+**OpportunityType to Category Mapping:**
+| OpportunityType | Category |
+|-----------------|----------|
+| New Business | NEW LOGO |
+| Existing Business | EXPANSION |
+| Migration | MIGRATION |
+| Renewal | RENEWAL |
+
+### Salesforce (sfdc dataset) - Legacy
 
 | Table | Purpose |
 |-------|---------|
 | `OpportunityViewTable` | Won/Lost deals, ACV, stages |
-| `StrategicOperatingPlan` | Q1 targets (P50) |
+| `StrategicOperatingPlan` | Q1 targets (P50) - **DEPRECATED: Use RevOpsReport** |
 
 ### Marketing Funnel (MarketingFunnel dataset)
 

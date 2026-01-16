@@ -25,9 +25,25 @@ sql/
 
 See `schemas/data-lineage.md` for complete source documentation.
 
+### RevOps Architecture (PRIMARY - 2026)
+
+| Layer | Table | Purpose |
+|-------|-------|---------|
+| 5 | **RevOpsReport** | WTD/MTD/QTD/YTD reporting (PRIMARY) |
+| 4 | RevOpsPerformance | Daily pacing with actuals |
+| 3 | RevOpsPlan | Vertical format for metrics |
+| 2 | RevOpsModel | Wide data framework |
+| 1 | SourcePlanByMonth2026, SourceTargetRates, SalesCycleLags2026 | Processed sources |
+| 0 | RAW_2026_Plan_by_Month, MonthlyRevenueFunnel, DailyRevenueFunnel | Raw data |
+
+**Use P75 RiskProfile for all target queries.**
+
+### Legacy Tables
+
 | Dataset | Tables |
 |---------|--------|
-| sfdc | OpportunityViewTable, StrategicOperatingPlan |
+| Staging | RevOpsReport, RevOpsPerformance, RevOpsPlan |
+| sfdc | OpportunityViewTable, StrategicOperatingPlan (DEPRECATED) |
 | MarketingFunnel | InboundFunnel, R360InboundFunnel |
 | GoogleAds_POR_* | ads_CampaignBasicStats, ads_Campaign |
 | GoogleAds_Record360_* | ads_CampaignBasicStats, ads_Campaign |
@@ -36,4 +52,4 @@ See `schemas/data-lineage.md` for complete source documentation.
 
 1. Open [BigQuery Console](https://console.cloud.google.com/bigquery)
 2. Project: `data-analytics-306119`
-3. See `.claude/rules/bigquery.md` for required filters
+3. See `.claude/rules/bigquery.md` for required filters and query patterns

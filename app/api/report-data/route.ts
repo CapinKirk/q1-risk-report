@@ -1,29 +1,27 @@
 import { NextResponse } from 'next/server';
-import { BigQuery } from '@google-cloud/bigquery';
+import { getBigQueryClient } from '@/lib/bigquery-client';
+import {
+  BIGQUERY_CONFIG,
+  REGION_REVERSE_MAP,
+  getRAGStatus,
+  type RAGStatus,
+} from '@/lib/constants/dimensions';
 
-// Initialize BigQuery client with credentials from environment
-const projectId = process.env.GOOGLE_CLOUD_PROJECT || 'data-analytics-306119';
-
-function initBigQuery(): BigQuery {
-  // Check for credentials JSON in environment (Vercel deployment)
-  if (process.env.GOOGLE_CREDENTIALS_JSON) {
-    const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
-    console.log('BigQuery: Using GOOGLE_CREDENTIALS_JSON env var');
-    return new BigQuery({ projectId, credentials });
-  }
-
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-    const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-    console.log('BigQuery: Using GOOGLE_APPLICATION_CREDENTIALS_JSON env var');
-    return new BigQuery({ projectId, credentials });
-  }
-
-  // Local development with gcloud auth
-  console.log('BigQuery: Using default credentials (ADC)');
-  return new BigQuery({ projectId });
-}
-
-const bigquery = initBigQuery();
+/**
+ * Q1 2026 Risk Report API - RevOps Architecture
+ *
+ * Data Sources (RevOps Layer Architecture):
+ * - Layer 5: RevOpsReport - WTD, MTD, QTD, YTD reporting with P75 targets
+ * - Layer 4: RevOpsPerformance - Daily pacing with actuals (for trends)
+ * - sfdc.OpportunityViewTable - Deal-level details (won, lost, pipeline)
+ * - MarketingFunnel - Lead/funnel stage details
+ *
+ * Key Changes from StrategicOperatingPlan:
+ * - Now uses RevOpsReport with RiskProfile='P75' for risk-adjusted targets
+ * - Horizon='QTD' for quarter-to-date metrics
+ * - Period_Start_Date='2026-01-01' for Q1 2026
+ * - OpportunityType maps to Category (New Business->NEW LOGO, etc.)
+ */
 
 interface ReportFilters {
   startDate: string;
@@ -32,51 +30,148 @@ interface ReportFilters {
   regions: string[];
 }
 
-// Build WHERE clause for filters
-function buildFilterClause(filters: ReportFilters): string {
+// Helper to get BigQuery client
+function getBigQuery() {
+  return getBigQueryClient();
+}
+
+// Build filter clauses for RevOpsReport queries
+function buildRevOpsFilterClause(filters: ReportFilters): string {
   const conditions: string[] = [];
 
-  if (filters.products && filters.products.length > 0) {
-    const productList = filters.products.map(p => `'${p}'`).join(', ');
-    conditions.push(`(
-      (por_record__c = true AND '${filters.products.includes('POR') ? 'POR' : ''}' = 'POR') OR
-      (r360_record__c = true AND '${filters.products.includes('R360') ? 'R360' : ''}' = 'R360')
-    )`);
+  if (filters.products && filters.products.length > 0 && filters.products.length < 2) {
+    conditions.push(`RecordType IN (${filters.products.map(p => `'${p}'`).join(', ')})`);
   }
 
-  if (filters.regions && filters.regions.length > 0) {
-    const regionMap: Record<string, string> = {
-      'AMER': 'US',
-      'EMEA': 'UK',
-      'APAC': 'AU'
-    };
-    const divisions = filters.regions.map(r => `'${regionMap[r]}'`).join(', ');
-    conditions.push(`Division IN (${divisions})`);
+  if (filters.regions && filters.regions.length > 0 && filters.regions.length < 3) {
+    conditions.push(`Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`);
   }
 
   return conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';
 }
 
-// Helper to get BigQuery client
-function getBigQuery(): BigQuery {
-  return bigquery;
+// Build filter clauses for Opportunity queries (Salesforce data)
+function buildOpportunityFilterClause(filters: ReportFilters): {
+  productClause: string;
+  regionClause: string;
+} {
+  let productClause = '';
+  if (filters.products && filters.products.length > 0) {
+    productClause = `AND (
+      (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
+      (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
+    )`;
+  }
+
+  let regionClause = '';
+  if (filters.regions && filters.regions.length > 0 && filters.regions.length < 3) {
+    const divisions = filters.regions.map(r => `'${REGION_REVERSE_MAP[r as keyof typeof REGION_REVERSE_MAP]}'`).join(', ');
+    regionClause = `AND Division IN (${divisions})`;
+  }
+
+  return { productClause, regionClause };
 }
 
-// Query for revenue actuals
-async function getRevenueActuals(filters: ReportFilters) {
-  const filterClause = filters.products && filters.products.length > 0
-    ? `AND (
-        (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
-        (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
-      )`
-    : '';
+/**
+ * Query RevOpsReport for QTD targets and actuals with P75 risk profile
+ * This replaces the old StrategicOperatingPlan queries
+ */
+async function getRevOpsQTDData(filters: ReportFilters) {
+  const filterClause = buildRevOpsFilterClause(filters);
 
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Division IN (${filters.regions.map(r => {
-        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
-        return `'${map[r]}'`;
-      }).join(', ')})`
-    : '';
+  const query = `
+    SELECT
+      RecordType AS product,
+      Region AS region,
+      -- Map OpportunityType to Category
+      CASE OpportunityType
+        WHEN 'New Business' THEN 'NEW LOGO'
+        WHEN 'Existing Business' THEN 'EXPANSION'
+        WHEN 'Migration' THEN 'MIGRATION'
+        WHEN 'Renewal' THEN 'RENEWAL'
+        ELSE OpportunityType
+      END AS category,
+      OpportunityType AS opportunity_type,
+      ROUND(COALESCE(Target_ACV, 0), 2) AS q1_target,
+      ROUND(COALESCE(Actual_ACV, 0), 2) AS qtd_actual,
+      -- Revenue_Pacing_Score is attainment as decimal (e.g., 0.85 = 85%)
+      ROUND(COALESCE(Revenue_Pacing_Score, 0) * 100, 1) AS attainment_pct,
+      -- Funnel metrics
+      ROUND(COALESCE(Target_MQL, 0), 0) AS target_mql,
+      ROUND(COALESCE(Actual_MQL, 0), 0) AS actual_mql,
+      ROUND(COALESCE(Target_SQL, 0), 0) AS target_sql,
+      ROUND(COALESCE(Actual_SQL, 0), 0) AS actual_sql,
+      ROUND(COALESCE(Target_SAL, 0), 0) AS target_sal,
+      ROUND(COALESCE(Actual_SAL, 0), 0) AS actual_sal,
+      ROUND(COALESCE(Target_SQO, 0), 0) AS target_sqo,
+      ROUND(COALESCE(Actual_SQO, 0), 0) AS actual_sqo,
+      ROUND(COALESCE(Target_Won, 0), 0) AS target_won,
+      ROUND(COALESCE(Actual_Won, 0), 0) AS actual_won,
+      -- Leakage metrics for RCA
+      ROUND(COALESCE(MQL_to_SQL_Leakage_Variance, 0), 1) AS mql_to_sql_leakage,
+      ROUND(COALESCE(SQL_to_SAL_Leakage_Variance, 0), 1) AS sql_to_sal_leakage,
+      ROUND(COALESCE(SAL_to_SQO_Leakage_Variance, 0), 1) AS sal_to_sqo_leakage,
+      RiskProfile AS risk_profile
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsReport\`
+    WHERE Horizon = 'QTD'
+      AND RiskProfile = 'P75'
+      AND Period_Start_Date = '2026-01-01'
+      AND RecordType IN ('POR', 'R360')
+      AND Region IN ('AMER', 'EMEA', 'APAC')
+      ${filterClause}
+    ORDER BY product, region, category
+  `;
+
+  try {
+    const [rows] = await getBigQuery().query({ query });
+    console.log(`RevOpsReport QTD data: ${(rows as any[]).length} rows`);
+    return rows as any[];
+  } catch (error: any) {
+    console.error('RevOpsReport query failed:', error.message);
+    // Return empty array on error - will fall back to legacy data
+    return [];
+  }
+}
+
+/**
+ * Query for Q1 full targets (for FY and Q1 progress tracking)
+ */
+async function getRevOpsQ1Targets(filters: ReportFilters) {
+  const filterClause = buildRevOpsFilterClause(filters);
+
+  const query = `
+    SELECT
+      RecordType AS product,
+      Region AS region,
+      CASE OpportunityType
+        WHEN 'New Business' THEN 'NEW LOGO'
+        WHEN 'Existing Business' THEN 'EXPANSION'
+        WHEN 'Migration' THEN 'MIGRATION'
+        WHEN 'Renewal' THEN 'RENEWAL'
+        ELSE OpportunityType
+      END AS category,
+      ROUND(COALESCE(Target_ACV, 0), 2) AS q1_target
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsReport\`
+    WHERE Horizon = 'QTD'
+      AND RiskProfile = 'P75'
+      AND Period_Start_Date = '2026-01-01'
+      AND RecordType IN ('POR', 'R360')
+      AND Region IN ('AMER', 'EMEA', 'APAC')
+      ${filterClause}
+  `;
+
+  try {
+    const [rows] = await getBigQuery().query({ query });
+    return rows as any[];
+  } catch (error: any) {
+    console.error('RevOps Q1 targets query failed:', error.message);
+    return [];
+  }
+}
+
+// Query for revenue actuals from OpportunityViewTable (for deal-level details)
+async function getRevenueActuals(filters: ReportFilters) {
+  const { productClause, regionClause } = buildOpportunityFilterClause(filters);
 
   const query = `
     SELECT
@@ -98,14 +193,14 @@ async function getRevenueActuals(filters: ReportFilters) {
       COUNT(*) AS deal_count,
       ROUND(SUM(ACV), 2) AS total_acv,
       ROUND(AVG(ACV), 2) AS avg_acv
-    FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
     WHERE Won = true
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
       AND Type NOT IN ('Credit Card', 'Consulting')
       AND ACV > 0
       AND Division IN ('US', 'UK', 'AU')
-      ${filterClause}
+      ${productClause}
       ${regionClause}
     GROUP BY product, region, category, source, deal_type
     ORDER BY product, region, category
@@ -115,93 +210,9 @@ async function getRevenueActuals(filters: ReportFilters) {
   return rows;
 }
 
-// Query for targets
-async function getTargets(filters: ReportFilters) {
-  const productClause = filters.products && filters.products.length > 0
-    ? `AND RecordType IN (${filters.products.map(p => `'${p}'`).join(', ')})`
-    : '';
-
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
-    : '';
-
-  const query = `
-    SELECT
-      RecordType AS product,
-      Region AS region,
-      CASE
-        WHEN FunnelType IN ('NEW LOGO', 'INBOUND', 'R360 NEW LOGO', 'R360 INBOUND') THEN 'NEW LOGO'
-        WHEN FunnelType IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
-        WHEN FunnelType = 'MIGRATION' THEN 'MIGRATION'
-        WHEN FunnelType IN ('RENEWAL', 'R360 RENEWAL') THEN 'RENEWAL'
-        ELSE FunnelType
-      END AS category,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-12-31'
-        THEN Target_ACV ELSE 0
-      END), 2) AS fy_target,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
-        THEN Target_ACV ELSE 0
-      END), 2) AS q1_target,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
-        THEN Target_ACV ELSE 0
-      END), 2) AS qtd_target,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
-        THEN Target_MQL ELSE 0
-      END), 0) AS q1_target_mql,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
-        THEN Target_MQL ELSE 0
-      END), 0) AS target_mql,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
-        THEN Target_SQL ELSE 0
-      END), 0) AS q1_target_sql,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
-        THEN Target_SQL ELSE 0
-      END), 0) AS target_sql,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
-        THEN Target_SAL ELSE 0
-      END), 0) AS q1_target_sal,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
-        THEN Target_SAL ELSE 0
-      END), 0) AS target_sal,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
-        THEN Target_SQO ELSE 0
-      END), 0) AS q1_target_sqo,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
-        THEN Target_SQO ELSE 0
-      END), 0) AS target_sqo
-    FROM \`data-analytics-306119.Staging.StrategicOperatingPlan\`
-    WHERE Percentile = 'P50'
-      AND RecordType IN ('POR', 'R360')
-      ${productClause}
-      ${regionClause}
-    GROUP BY product, region, category
-    HAVING q1_target > 0
-    ORDER BY product, region, category
-  `;
-
-  const [rows] = await getBigQuery().query({ query });
-  return rows;
-}
-
 // Query for Q1 renewal uplift by product/region from Contract table
-// CRITICAL: Only count contracts renewing within Q1 (by March 31, 2026)
-// This aligns the uplift forecast with the Q1 target period
-// FORMULA: Expected Increase = (ACV / ConversionRate) × (UpliftRate / 100)
 async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
   try {
-    // Join with CurrencyType to convert all amounts to USD
-    // CORRECT FORMULA: (ACV / conversionrate) × (uplift_rate / 100)
     const query = `
       SELECT
         CASE WHEN c.r360_record__c = true OR c.r360_record__c = 'true' THEN 'R360' ELSE 'POR' END AS product,
@@ -211,20 +222,18 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
           WHEN 'AU' THEN 'APAC'
         END AS region,
         COUNT(*) as contract_count,
-        -- CORRECT: Expected increase = (ACV_USD) × (uplift_rate / 100)
         SUM(ROUND(
           (COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1)) *
           (COALESCE(c.sbqq__renewalupliftrate__c, 5) / 100)
         , 2)) AS total_expected_increase_usd
-      FROM \`data-analytics-306119.sfdc.Contract\` c
-      LEFT JOIN \`data-analytics-306119.sfdc.CurrencyType\` ct
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contract\` c
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.CurrencyType\` ct
         ON LOWER(c.currencyisocode) = LOWER(ct.isocode)
       WHERE c.Status = 'Activated'
         AND DATE(c.EndDate) >= CURRENT_DATE()
         AND DATE(c.EndDate) <= '2026-03-31'
         AND c.account_division__c IN ('US', 'UK', 'AU')
         AND c.acv__c > 0
-        -- CRITICAL: Only include contracts that will actually renew
         AND (c.Renewal_Status__c IS NULL
              OR c.Renewal_Status__c NOT IN ('Non Renewing', 'Success'))
       GROUP BY 1, 2
@@ -236,10 +245,8 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
     for (const row of rows as any[]) {
       const key = `${row.product}-${row.region}-RENEWAL`;
       upliftMap.set(key, row.total_expected_increase_usd || 0);
-      console.log(`Q1 Renewal: ${key} = ${row.contract_count} contracts, $${row.total_expected_increase_usd} expected increase`);
     }
 
-    console.log('Q1 Renewal expected increase (USD) by product/region (thru Mar 31):', Object.fromEntries(upliftMap));
     return upliftMap;
   } catch (error: any) {
     console.error('Error fetching renewal uplift:', error.message);
@@ -247,7 +254,92 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
   }
 }
 
-// Query for funnel actuals (POR) - aggregated
+// Query for funnel actuals by source using DailyRevenueFunnel
+async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360') {
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+    : '';
+
+  const query = `
+    WITH actuals AS (
+      SELECT
+        RecordType AS product,
+        Region AS region,
+        UPPER(Source) AS source,
+        COALESCE(SUM(MQL), 0) AS actual_mql,
+        COALESCE(SUM(SQL), 0) AS actual_sql,
+        COALESCE(SUM(SAL), 0) AS actual_sal,
+        COALESCE(SUM(SQO), 0) AS actual_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\`
+      WHERE RecordType = '${product}'
+        AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
+        AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
+        AND Source IS NOT NULL
+        ${regionClause}
+      GROUP BY RecordType, Region, UPPER(Source)
+    )
+    SELECT
+      product,
+      region,
+      source,
+      actual_mql,
+      actual_sql,
+      actual_sal,
+      actual_sqo,
+      ROUND(SAFE_DIVIDE(actual_sql, NULLIF(actual_mql, 0)) * 100, 1) AS mql_to_sql_rate,
+      ROUND(SAFE_DIVIDE(actual_sal, NULLIF(actual_sql, 0)) * 100, 1) AS sql_to_sal_rate,
+      ROUND(SAFE_DIVIDE(actual_sqo, NULLIF(actual_sal, 0)) * 100, 1) AS sal_to_sqo_rate
+    FROM actuals
+    ORDER BY region, source
+  `;
+
+  const [rows] = await getBigQuery().query({ query });
+  return rows;
+}
+
+// Query for funnel actuals by category using DailyRevenueFunnel
+async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R360') {
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+    : '';
+
+  const query = `
+    SELECT
+      RecordType AS product,
+      Region AS region,
+      CASE
+        WHEN UPPER(FunnelType) IN ('INBOUND', 'R360 INBOUND', 'NEW LOGO', 'R360 NEW LOGO') THEN 'NEW LOGO'
+        WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
+        WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
+        WHEN UPPER(FunnelType) IN ('RENEWAL', 'R360 RENEWAL') THEN 'RENEWAL'
+        ELSE 'OTHER'
+      END AS category,
+      COALESCE(SUM(MQL), 0) AS actual_mql,
+      COALESCE(SUM(SQL), 0) AS actual_sql,
+      COALESCE(SUM(SAL), 0) AS actual_sal,
+      COALESCE(SUM(SQO), 0) AS actual_sqo
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\`
+    WHERE RecordType = '${product}'
+      AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
+      AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
+      AND Region IN ('AMER', 'EMEA', 'APAC')
+      ${regionClause}
+    GROUP BY RecordType, Region,
+      CASE
+        WHEN UPPER(FunnelType) IN ('INBOUND', 'R360 INBOUND', 'NEW LOGO', 'R360 NEW LOGO') THEN 'NEW LOGO'
+        WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
+        WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
+        WHEN UPPER(FunnelType) IN ('RENEWAL', 'R360 RENEWAL') THEN 'RENEWAL'
+        ELSE 'OTHER'
+      END
+    ORDER BY region, category
+  `;
+
+  const [rows] = await getBigQuery().query({ query });
+  return rows;
+}
+
+// Query for POR funnel actuals (aggregated INBOUND)
 async function getPORFunnelActuals(filters: ReportFilters) {
   const regionClause = filters.regions && filters.regions.length > 0
     ? `AND Division IN (${filters.regions.map(r => {
@@ -289,7 +381,7 @@ async function getPORFunnelActuals(filters: ReportFilters) {
           AND CAST(SQO_DT AS DATE) <= '${filters.endDate}'
         THEN COALESCE(LeadEmail, ContactEmail)
       END) AS actual_sqo
-    FROM \`data-analytics-306119.MarketingFunnel.InboundFunnel\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
     WHERE Division IN ('US', 'UK', 'AU')
       AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
       AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
@@ -302,91 +394,7 @@ async function getPORFunnelActuals(filters: ReportFilters) {
   return rows;
 }
 
-// Query for funnel actuals by source (POR) - broken down by SDRSource
-// Query for funnel actuals by source using DailyRevenueFunnel table
-// This table has all sources (INBOUND, OUTBOUND, AE SOURCED, etc.)
-async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360') {
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
-    : '';
-
-  // Query actuals from DailyRevenueFunnel
-  const actualsQuery = `
-    SELECT
-      RecordType AS product,
-      Region AS region,
-      UPPER(Source) AS source,
-      COALESCE(SUM(MQL), 0) AS actual_mql,
-      COALESCE(SUM(SQL), 0) AS actual_sql,
-      COALESCE(SUM(SAL), 0) AS actual_sal,
-      COALESCE(SUM(SQO), 0) AS actual_sqo
-    FROM \`data-analytics-306119.Staging.DailyRevenueFunnel\`
-    WHERE RecordType = '${product}'
-      AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
-      AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
-      AND Source IS NOT NULL
-      ${regionClause}
-    GROUP BY RecordType, Region, UPPER(Source)
-  `;
-
-  // Query targets from StrategicOperatingPlan
-  const targetsQuery = `
-    SELECT
-      RecordType AS product,
-      Region AS region,
-      UPPER(Source) AS source,
-      ROUND(SUM(Target_MQL), 0) AS target_mql,
-      ROUND(SUM(Target_SQL), 0) AS target_sql,
-      ROUND(SUM(Target_SAL), 0) AS target_sal,
-      ROUND(SUM(Target_SQO), 0) AS target_sqo
-    FROM \`data-analytics-306119.Staging.StrategicOperatingPlan\`
-    WHERE Percentile = 'P50'
-      AND RecordType = '${product}'
-      AND TargetDate >= '${filters.startDate}'
-      AND TargetDate <= '${filters.endDate}'
-      AND Source IS NOT NULL
-      ${regionClause}
-    GROUP BY RecordType, Region, UPPER(Source)
-  `;
-
-  // Combined query joining actuals and targets
-  const query = `
-    WITH actuals AS (${actualsQuery}),
-    targets AS (${targetsQuery})
-    SELECT
-      COALESCE(a.product, t.product) AS product,
-      COALESCE(a.region, t.region) AS region,
-      COALESCE(a.source, t.source) AS source,
-      COALESCE(a.actual_mql, 0) AS actual_mql,
-      COALESCE(t.target_mql, 0) AS target_mql,
-      COALESCE(a.actual_sql, 0) AS actual_sql,
-      COALESCE(t.target_sql, 0) AS target_sql,
-      COALESCE(a.actual_sal, 0) AS actual_sal,
-      COALESCE(t.target_sal, 0) AS target_sal,
-      COALESCE(a.actual_sqo, 0) AS actual_sqo,
-      COALESCE(t.target_sqo, 0) AS target_sqo,
-      -- Pacing percentages
-      ROUND(SAFE_DIVIDE(COALESCE(a.actual_mql, 0), NULLIF(t.target_mql, 0)) * 100, 0) AS mql_pacing_pct,
-      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sql, 0), NULLIF(t.target_sql, 0)) * 100, 0) AS sql_pacing_pct,
-      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sal, 0), NULLIF(t.target_sal, 0)) * 100, 0) AS sal_pacing_pct,
-      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sqo, 0), NULLIF(t.target_sqo, 0)) * 100, 0) AS sqo_pacing_pct,
-      -- Conversion rates
-      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sql, 0), NULLIF(a.actual_mql, 0)) * 100, 1) AS mql_to_sql_rate,
-      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sal, 0), NULLIF(a.actual_sql, 0)) * 100, 1) AS sql_to_sal_rate,
-      ROUND(SAFE_DIVIDE(COALESCE(a.actual_sqo, 0), NULLIF(a.actual_sal, 0)) * 100, 1) AS sal_to_sqo_rate
-    FROM actuals a
-    FULL OUTER JOIN targets t
-      ON a.product = t.product
-      AND a.region = t.region
-      AND a.source = t.source
-    ORDER BY region, source
-  `;
-
-  const [rows] = await getBigQuery().query({ query });
-  return rows;
-}
-
-// Query for funnel actuals (R360) - aggregated
+// Query for R360 funnel actuals (aggregated INBOUND)
 async function getR360FunnelActuals(filters: ReportFilters) {
   const regionClause = filters.regions && filters.regions.length > 0
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
@@ -416,7 +424,7 @@ async function getR360FunnelActuals(filters: ReportFilters) {
           AND CAST(SQO_DT AS DATE) <= '${filters.endDate}'
         THEN Email
       END) AS actual_sqo
-    FROM \`data-analytics-306119.MarketingFunnel.R360InboundFunnel\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
     WHERE MQL_Reverted = false
       AND Region IS NOT NULL
       ${regionClause}
@@ -428,63 +436,9 @@ async function getR360FunnelActuals(filters: ReportFilters) {
   return rows;
 }
 
-// Query for funnel actuals BY CATEGORY (NEW LOGO, EXPANSION) from DailyRevenueFunnel
-async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R360') {
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
-    : '';
-
-  const query = `
-    SELECT
-      RecordType AS product,
-      Region AS region,
-      CASE
-        WHEN UPPER(FunnelType) IN ('INBOUND', 'R360 INBOUND', 'NEW LOGO', 'R360 NEW LOGO') THEN 'NEW LOGO'
-        WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
-        WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
-        WHEN UPPER(FunnelType) IN ('RENEWAL', 'R360 RENEWAL') THEN 'RENEWAL'
-        ELSE 'OTHER'
-      END AS category,
-      COALESCE(SUM(MQL), 0) AS actual_mql,
-      COALESCE(SUM(SQL), 0) AS actual_sql,
-      COALESCE(SUM(SAL), 0) AS actual_sal,
-      COALESCE(SUM(SQO), 0) AS actual_sqo
-    FROM \`data-analytics-306119.Staging.DailyRevenueFunnel\`
-    WHERE RecordType = '${product}'
-      AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
-      AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
-      AND Region IN ('AMER', 'EMEA', 'APAC')
-      ${regionClause}
-    GROUP BY RecordType, Region,
-      CASE
-        WHEN UPPER(FunnelType) IN ('INBOUND', 'R360 INBOUND', 'NEW LOGO', 'R360 NEW LOGO') THEN 'NEW LOGO'
-        WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
-        WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
-        WHEN UPPER(FunnelType) IN ('RENEWAL', 'R360 RENEWAL') THEN 'RENEWAL'
-        ELSE 'OTHER'
-      END
-    ORDER BY region, category
-  `;
-
-  const [rows] = await getBigQuery().query({ query });
-  return rows;
-}
-
-// Query for deal details (won)
+// Query for won deals
 async function getWonDeals(filters: ReportFilters) {
-  const productClause = filters.products && filters.products.length > 0
-    ? `AND (
-        (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
-        (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
-      )`
-    : '';
-
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Division IN (${filters.regions.map(r => {
-        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
-        return `'${map[r]}'`;
-      }).join(', ')})`
-    : '';
+  const { productClause, regionClause } = buildOpportunityFilterClause(filters);
 
   const query = `
     SELECT
@@ -511,7 +465,7 @@ async function getWonDeals(filters: ReportFilters) {
       Owner AS owner_name,
       OwnerId AS owner_id,
       CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url
-    FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
     WHERE Won = true
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
@@ -530,19 +484,7 @@ async function getWonDeals(filters: ReportFilters) {
 
 // Query for lost deals
 async function getLostDeals(filters: ReportFilters) {
-  const productClause = filters.products && filters.products.length > 0
-    ? `AND (
-        (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
-        (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
-      )`
-    : '';
-
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Division IN (${filters.regions.map(r => {
-        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
-        return `'${map[r]}'`;
-      }).join(', ')})`
-    : '';
+  const { productClause, regionClause } = buildOpportunityFilterClause(filters);
 
   const query = `
     SELECT
@@ -570,7 +512,7 @@ async function getLostDeals(filters: ReportFilters) {
       Owner AS owner_name,
       OwnerId AS owner_id,
       CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url
-    FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
     WHERE StageName = 'Closed Lost'
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
@@ -588,19 +530,7 @@ async function getLostDeals(filters: ReportFilters) {
 
 // Query for pipeline deals
 async function getPipelineDeals(filters: ReportFilters) {
-  const productClause = filters.products && filters.products.length > 0
-    ? `AND (
-        (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
-        (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
-      )`
-    : '';
-
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Division IN (${filters.regions.map(r => {
-        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
-        return `'${map[r]}'`;
-      }).join(', ')})`
-    : '';
+  const { productClause, regionClause } = buildOpportunityFilterClause(filters);
 
   const query = `
     SELECT
@@ -628,7 +558,7 @@ async function getPipelineDeals(filters: ReportFilters) {
       Owner AS owner_name,
       OwnerId AS owner_id,
       CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url
-    FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
     WHERE IsClosed = false
       AND Type NOT IN ('Credit Card', 'Consulting')
       AND ACV > 0
@@ -643,21 +573,9 @@ async function getPipelineDeals(filters: ReportFilters) {
   return rows;
 }
 
-// Query for source attainment data - actuals from won deals
+// Query for source actuals from won deals
 async function getSourceActuals(filters: ReportFilters) {
-  const productClause = filters.products && filters.products.length > 0
-    ? `AND (
-        (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
-        (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
-      )`
-    : '';
-
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Division IN (${filters.regions.map(r => {
-        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
-        return `'${map[r]}'`;
-      }).join(', ')})`
-    : '';
+  const { productClause, regionClause } = buildOpportunityFilterClause(filters);
 
   const query = `
     SELECT
@@ -678,7 +596,7 @@ async function getSourceActuals(filters: ReportFilters) {
       END AS source,
       COUNT(*) AS deal_count,
       ROUND(SUM(ACV), 2) AS total_acv
-    FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
     WHERE Won = true
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
@@ -700,72 +618,9 @@ async function getSourceActuals(filters: ReportFilters) {
   }
 }
 
-// Query for source targets from StrategicOperatingPlan
-async function getSourceTargets(filters: ReportFilters) {
-  const productClause = filters.products && filters.products.length > 0
-    ? `AND RecordType IN (${filters.products.map(p => `'${p}'`).join(', ')})`
-    : '';
-
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
-    : '';
-
-  const query = `
-    SELECT
-      RecordType AS product,
-      Region AS region,
-      CASE
-        WHEN UPPER(Source) IN ('INBOUND', 'INBOUND CALL', 'CHAT', 'WEBSITE') THEN 'INBOUND'
-        WHEN UPPER(Source) IN ('OUTBOUND', 'OUTBOUND CALL', 'SDR OUTBOUND') THEN 'OUTBOUND'
-        WHEN UPPER(Source) IN ('AE SOURCED', 'AE', 'ACCOUNT EXECUTIVE') THEN 'AE SOURCED'
-        WHEN UPPER(Source) IN ('AM SOURCED', 'AM', 'ACCOUNT MANAGER', 'CSM SOURCED') THEN 'AM SOURCED'
-        WHEN UPPER(Source) IN ('TRADESHOW', 'TRADE SHOW', 'EVENT') THEN 'TRADESHOW'
-        WHEN UPPER(Source) IN ('PARTNERSHIPS', 'PARTNER', 'REFERRAL', 'CHANNEL') THEN 'PARTNERSHIPS'
-        ELSE UPPER(Source)
-      END AS source,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '2026-01-01' AND '2026-03-31'
-        THEN Target_ACV ELSE 0
-      END), 2) AS q1_target,
-      ROUND(SUM(CASE
-        WHEN TargetDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
-        THEN Target_ACV ELSE 0
-      END), 2) AS qtd_target
-    FROM \`data-analytics-306119.Staging.StrategicOperatingPlan\`
-    WHERE Percentile = 'P50'
-      AND RecordType IN ('POR', 'R360')
-      AND Region IN ('AMER', 'EMEA', 'APAC')
-      ${productClause}
-      ${regionClause}
-    GROUP BY product, region, source
-    HAVING q1_target > 0
-    ORDER BY product, region, source
-  `;
-
-  try {
-    const [rows] = await getBigQuery().query({ query });
-    return rows;
-  } catch (error) {
-    console.warn('Source targets query failed:', error);
-    return [];
-  }
-}
-
-// Query for pipeline age by product/region/category
+// Query for pipeline age
 async function getPipelineAge(filters: ReportFilters) {
-  const productClause = filters.products && filters.products.length > 0
-    ? `AND (
-        (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
-        (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
-      )`
-    : '';
-
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Division IN (${filters.regions.map(r => {
-        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
-        return `'${map[r]}'`;
-      }).join(', ')})`
-    : '';
+  const { productClause, regionClause } = buildOpportunityFilterClause(filters);
 
   const query = `
     SELECT
@@ -783,7 +638,7 @@ async function getPipelineAge(filters: ReportFilters) {
         ELSE 'OTHER'
       END AS category,
       ROUND(AVG(DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY)), 0) AS avg_age_days
-    FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
     WHERE IsClosed = false
       AND Type NOT IN ('Credit Card', 'Consulting')
       AND ACV > 0
@@ -803,21 +658,9 @@ async function getPipelineAge(filters: ReportFilters) {
   }
 }
 
-// Query for loss reason RCA - aggregate lost deals by reason
+// Query for loss reason RCA
 async function getLossReasonRCA(filters: ReportFilters) {
-  const productClause = filters.products && filters.products.length > 0
-    ? `AND (
-        (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
-        (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
-      )`
-    : '';
-
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Division IN (${filters.regions.map(r => {
-        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
-        return `'${map[r]}'`;
-      }).join(', ')})`
-    : '';
+  const { productClause, regionClause } = buildOpportunityFilterClause(filters);
 
   const query = `
     SELECT
@@ -830,7 +673,7 @@ async function getLossReasonRCA(filters: ReportFilters) {
       COALESCE(ClosedLostReason, 'Not Specified') AS loss_reason,
       COUNT(*) AS deal_count,
       ROUND(SUM(ACV), 2) AS lost_acv
-    FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
     WHERE StageName = 'Closed Lost'
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
@@ -851,7 +694,7 @@ async function getLossReasonRCA(filters: ReportFilters) {
   }
 }
 
-// Query for MQL details with Salesforce links, company name, source, and disqualification status
+// Query for MQL details
 async function getMQLDetails(filters: ReportFilters) {
   const regionClause = filters.regions && filters.regions.length > 0
     ? `AND Division IN (${filters.regions.map(r => {
@@ -860,7 +703,6 @@ async function getMQLDetails(filters: ReportFilters) {
       }).join(', ')})`
     : '';
 
-  // POR MQL details query - includes ALL MQLs (including reverted)
   const porQuery = `
     SELECT
       'POR' AS product,
@@ -879,7 +721,6 @@ async function getMQLDetails(filters: ReportFilters) {
       COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
       CAST(MQL_DT AS STRING) AS mql_date,
       CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
-      -- Disqualification status
       CASE
         WHEN MQL_Reverted = true THEN 'REVERTED'
         WHEN SQL_DT IS NOT NULL THEN 'CONVERTED'
@@ -888,7 +729,7 @@ async function getMQLDetails(filters: ReportFilters) {
       END AS mql_status,
       COALESCE(MQL_Reverted, false) AS was_reverted,
       DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage
-    FROM \`data-analytics-306119.MarketingFunnel.InboundFunnel\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
     WHERE Division IN ('US', 'UK', 'AU')
       AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
       AND MQL_DT IS NOT NULL
@@ -899,7 +740,6 @@ async function getMQLDetails(filters: ReportFilters) {
     LIMIT 200
   `;
 
-  // R360 MQL details query - includes ALL MQLs (including reverted)
   const r360RegionClause = filters.regions && filters.regions.length > 0
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
@@ -915,7 +755,6 @@ async function getMQLDetails(filters: ReportFilters) {
       COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
       CAST(MQL_DT AS STRING) AS mql_date,
       CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
-      -- Disqualification status
       CASE
         WHEN MQL_Reverted = true THEN 'REVERTED'
         WHEN SQL_DT IS NOT NULL THEN 'CONVERTED'
@@ -924,7 +763,7 @@ async function getMQLDetails(filters: ReportFilters) {
       END AS mql_status,
       COALESCE(MQL_Reverted, false) AS was_reverted,
       DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage
-    FROM \`data-analytics-306119.MarketingFunnel.R360InboundFunnel\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
     WHERE Region IS NOT NULL
       AND MQL_DT IS NOT NULL
       AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
@@ -953,7 +792,7 @@ async function getMQLDetails(filters: ReportFilters) {
   }
 }
 
-// Query for SQL details with opportunity info and disqualification/loss reasons
+// Query for SQL details
 async function getSQLDetails(filters: ReportFilters) {
   const regionClause = filters.regions && filters.regions.length > 0
     ? `AND Division IN (${filters.regions.map(r => {
@@ -962,7 +801,6 @@ async function getSQLDetails(filters: ReportFilters) {
       }).join(', ')})`
     : '';
 
-  // POR SQL details query - includes opportunity info from InboundFunnel
   const porQuery = `
     SELECT
       'POR' AS product,
@@ -972,7 +810,6 @@ async function getSQLDetails(filters: ReportFilters) {
         WHEN 'AU' THEN 'APAC'
       END AS region,
       COALESCE(LeadId, ContactId) AS record_id,
-      -- Link to opportunity if available, otherwise lead/contact
       CASE
         WHEN OpportunityID IS NOT NULL AND OpportunityID != '' THEN OpportunityLink
         WHEN LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', LeadId)
@@ -999,7 +836,7 @@ async function getSQLDetails(filters: ReportFilters) {
       CAST(NULL AS FLOAT64) AS opportunity_acv,
       'N/A' AS loss_reason,
       DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) AS days_in_stage
-    FROM \`data-analytics-306119.MarketingFunnel.InboundFunnel\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
     WHERE Division IN ('US', 'UK', 'AU')
       AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
       AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
@@ -1010,7 +847,6 @@ async function getSQLDetails(filters: ReportFilters) {
     ORDER BY SQL_DT DESC
   `;
 
-  // R360 SQL details query - includes opportunity info from R360InboundFunnel
   const r360RegionClause = filters.regions && filters.regions.length > 0
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
@@ -1020,7 +856,6 @@ async function getSQLDetails(filters: ReportFilters) {
       'R360' AS product,
       Region AS region,
       LeadId AS record_id,
-      -- Link to opportunity if available, otherwise lead
       CASE
         WHEN OpportunityID IS NOT NULL AND OpportunityID != '' THEN OpportunityLink
         ELSE COALESCE(LeadLink, CONCAT('https://por.my.salesforce.com/', LeadId))
@@ -1045,7 +880,7 @@ async function getSQLDetails(filters: ReportFilters) {
       CAST(NULL AS FLOAT64) AS opportunity_acv,
       'N/A' AS loss_reason,
       DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) AS days_in_stage
-    FROM \`data-analytics-306119.MarketingFunnel.R360InboundFunnel\`
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
     WHERE MQL_Reverted = false
       AND Region IS NOT NULL
       AND SQL_DT IS NOT NULL
@@ -1063,9 +898,6 @@ async function getSQLDetails(filters: ReportFilters) {
       shouldFetchPOR ? getBigQuery().query({ query: porQuery }).then(r => r[0]) : Promise.resolve([]),
       shouldFetchR360 ? getBigQuery().query({ query: r360Query }).then(r => r[0]) : Promise.resolve([]),
     ]);
-
-    console.log('SQL details - POR count:', (porRows as any[]).length);
-    console.log('SQL details - R360 count:', (r360Rows as any[]).length);
 
     return {
       POR: porRows as any[],
@@ -1085,7 +917,7 @@ async function getGoogleAds(filters: ReportFilters) {
       FROM (
         SELECT campaign_id, campaign_name,
                ROW_NUMBER() OVER (PARTITION BY campaign_id ORDER BY _DATA_DATE DESC) AS rn
-        FROM \`data-analytics-306119.GoogleAds_POR_8275359090.ads_Campaign_8275359090\`
+        FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_POR}.ads_Campaign_8275359090\`
       )
       WHERE rn = 1
     ),
@@ -1102,7 +934,7 @@ async function getGoogleAds(filters: ReportFilters) {
         SUM(s.metrics_clicks) AS clicks,
         ROUND(SUM(s.metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
         SUM(s.metrics_conversions) AS conversions
-      FROM \`data-analytics-306119.GoogleAds_POR_8275359090.ads_CampaignBasicStats_8275359090\` s
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_POR}.ads_CampaignBasicStats_8275359090\` s
       JOIN por_campaigns c ON s.campaign_id = c.campaign_id
       WHERE s.segments_date >= '${filters.startDate}'
         AND s.segments_date <= '${filters.endDate}'
@@ -1114,7 +946,7 @@ async function getGoogleAds(filters: ReportFilters) {
       FROM (
         SELECT campaign_id, campaign_name,
                ROW_NUMBER() OVER (PARTITION BY campaign_id ORDER BY _DATA_DATE DESC) AS rn
-        FROM \`data-analytics-306119.GoogleAds_Record360_3799591491.ads_Campaign_3799591491\`
+        FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_R360}.ads_Campaign_3799591491\`
       )
       WHERE rn = 1
     ),
@@ -1131,7 +963,7 @@ async function getGoogleAds(filters: ReportFilters) {
         SUM(s.metrics_clicks) AS clicks,
         ROUND(SUM(s.metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
         SUM(s.metrics_conversions) AS conversions
-      FROM \`data-analytics-306119.GoogleAds_Record360_3799591491.ads_CampaignBasicStats_3799591491\` s
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_R360}.ads_CampaignBasicStats_3799591491\` s
       JOIN r360_campaigns c ON s.campaign_id = c.campaign_id
       WHERE s.segments_date >= '${filters.startDate}'
         AND s.segments_date <= '${filters.endDate}'
@@ -1168,10 +1000,9 @@ async function getGoogleAds(filters: ReportFilters) {
 
 // Calculate period info
 function calculatePeriodInfo(startDate: string, endDate: string) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
   const quarterStart = new Date('2026-01-01');
   const quarterEnd = new Date('2026-03-31');
+  const end = new Date(endDate);
 
   const daysElapsed = Math.ceil((end.getTime() - quarterStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   const totalDays = 90;
@@ -1189,10 +1020,8 @@ function calculatePeriodInfo(startDate: string, endDate: string) {
 }
 
 // Calculate RAG status
-function calculateRAG(attainmentPct: number): string {
-  if (attainmentPct >= 90) return 'GREEN';
-  if (attainmentPct >= 70) return 'YELLOW';
-  return 'RED';
+function calculateRAG(attainmentPct: number): RAGStatus {
+  return getRAGStatus(attainmentPct);
 }
 
 // Main handler
@@ -1212,8 +1041,8 @@ export async function POST(request: Request) {
 
     // Execute all BigQuery queries in parallel
     const [
+      revOpsData,
       revenueActuals,
-      targets,
       porFunnel,
       r360Funnel,
       porFunnelBySource,
@@ -1223,7 +1052,6 @@ export async function POST(request: Request) {
       pipelineDeals,
       googleAds,
       sourceActualsRaw,
-      sourceTargetsRaw,
       pipelineAgeData,
       lossReasonData,
       mqlDetailsData,
@@ -1232,8 +1060,8 @@ export async function POST(request: Request) {
       r360FunnelByCategory,
       renewalUpliftMap,
     ] = await Promise.all([
+      getRevOpsQTDData(filters),
       getRevenueActuals(filters),
-      getTargets(filters),
       filters.products.length === 0 || filters.products.includes('POR')
         ? getPORFunnelActuals(filters)
         : Promise.resolve([]),
@@ -1251,7 +1079,6 @@ export async function POST(request: Request) {
       getPipelineDeals(filters),
       getGoogleAds(filters),
       getSourceActuals(filters),
-      getSourceTargets(filters),
       getPipelineAge(filters),
       getLossReasonRCA(filters),
       getMQLDetails(filters),
@@ -1268,13 +1095,14 @@ export async function POST(request: Request) {
     // Calculate period info
     const periodInfo = calculatePeriodInfo(startDate, endDate);
 
-    // Build attainment detail by joining actuals with targets
-    const attainmentDetail: any[] = [];
-    const targetMap = new Map(targets.map((t: any) =>
-      [`${t.product}-${t.region}-${t.category}`, t]
-    ));
+    // Build target map from RevOpsReport data (P75 targets)
+    const revOpsTargetMap = new Map<string, any>();
+    for (const row of revOpsData) {
+      const key = `${row.product}-${row.region}-${row.category}`;
+      revOpsTargetMap.set(key, row);
+    }
 
-    // Group revenue by product/region/category
+    // Group revenue by product/region/category from won deals
     const revenueMap = new Map<string, any>();
     for (const r of revenueActuals as any[]) {
       const key = `${r.product}-${r.region}-${r.category}`;
@@ -1313,33 +1141,40 @@ export async function POST(request: Request) {
       });
     }
 
-    // Build attainment for each target
-    for (const target of targets as any[]) {
-      const key = `${target.product}-${target.region}-${target.category}`;
+    // Build attainment detail from RevOpsReport P75 targets
+    const attainmentDetail: any[] = [];
+
+    for (const [key, target] of Array.from(revOpsTargetMap.entries())) {
       const actual = revenueMap.get(key);
       const pipeline = pipelineMap.get(key) || { acv: 0, count: 0 };
       const lost = lostMap.get(key) || { acv: 0, count: 0 };
 
       const wonAcv = actual ? actual.total_acv : 0;
       const qtdDeals = actual ? actual.deal_count : 0;
-      const qtdTarget = parseFloat(target.qtd_target) || 0;
       const q1Target = parseFloat(target.q1_target) || 0;
-      const fyTarget = parseFloat(target.fy_target) || 0;
 
-      // For RENEWAL category: add upcoming uplift to calculate forecasted bookings
-      // This makes RAG consistent with the Renewal Bookings Forecast card
+      // For RENEWAL category: add upcoming uplift for forecasted bookings
       let qtdAcv = wonAcv;
       if (target.category === 'RENEWAL') {
         const upliftKey = `${target.product}-${target.region}-RENEWAL`;
-        const uplift = (renewalUpliftMap as unknown as Map<string, number>).get(upliftKey) || 0;
-        qtdAcv = wonAcv + uplift; // Forecasted bookings = Won + Expected uplift
-        console.log(`RENEWAL ${target.product}-${target.region}: Won=${wonAcv}, Uplift=${uplift}, Forecasted=${qtdAcv}, Target=${qtdTarget}`);
+        const uplift = renewalUpliftMap.get(upliftKey) || 0;
+        qtdAcv = wonAcv + uplift;
+        console.log(`RENEWAL ${target.product}-${target.region}: Won=${wonAcv}, Uplift=${uplift}, Forecasted=${qtdAcv}, Q1Target=${q1Target}`);
       }
 
-      // When target is 0: if you have actuals, you've exceeded expectations (100%)
-      const attainmentPct = qtdTarget > 0 ? Math.round((qtdAcv / qtdTarget) * 1000) / 10 : (qtdAcv > 0 ? 100 : 100);
+      // Calculate QTD target based on period progress
+      const qtdTarget = q1Target * (periodInfo.quarter_pct_complete / 100);
+
+      // Use RevOpsReport attainment if available, otherwise calculate
+      let attainmentPct = parseFloat(target.attainment_pct) || 0;
+      if (attainmentPct === 0 && qtdTarget > 0) {
+        attainmentPct = Math.round((qtdAcv / qtdTarget) * 1000) / 10;
+      }
+
       const gap = qtdAcv - qtdTarget;
       const progressPct = q1Target > 0 ? Math.round((qtdAcv / q1Target) * 1000) / 10 : 0;
+      // FY target is 4x Q1 for simplicity (adjust if actual data available)
+      const fyTarget = q1Target * 4;
       const fyProgressPct = fyTarget > 0 ? Math.round((qtdAcv / fyTarget) * 1000) / 10 : 0;
 
       // Calculate pipeline coverage (pipeline / remaining gap to Q1)
@@ -1356,19 +1191,35 @@ export async function POST(request: Request) {
         category: target.category,
         fy_target: fyTarget,
         q1_target: q1Target,
-        qtd_target: qtdTarget,
+        qtd_target: Math.round(qtdTarget * 100) / 100,
         qtd_deals: qtdDeals,
         qtd_acv: qtdAcv,
         qtd_attainment_pct: attainmentPct,
         q1_progress_pct: progressPct,
         fy_progress_pct: fyProgressPct,
-        qtd_gap: gap,
+        qtd_gap: Math.round(gap * 100) / 100,
         pipeline_acv: pipeline.acv,
         pipeline_coverage_x: Math.round(pipelineCoverage * 10) / 10,
         win_rate_pct: winRate,
         qtd_lost_deals: lost.count,
         qtd_lost_acv: lost.acv,
         rag_status: calculateRAG(attainmentPct),
+        // Include funnel metrics from RevOpsReport
+        target_mql: parseInt(target.target_mql) || 0,
+        actual_mql: parseInt(target.actual_mql) || 0,
+        target_sql: parseInt(target.target_sql) || 0,
+        actual_sql: parseInt(target.actual_sql) || 0,
+        target_sal: parseInt(target.target_sal) || 0,
+        actual_sal: parseInt(target.actual_sal) || 0,
+        target_sqo: parseInt(target.target_sqo) || 0,
+        actual_sqo: parseInt(target.actual_sqo) || 0,
+        target_won: parseInt(target.target_won) || 0,
+        actual_won: parseInt(target.actual_won) || 0,
+        // Leakage metrics
+        mql_to_sql_leakage: parseFloat(target.mql_to_sql_leakage) || 0,
+        sql_to_sal_leakage: parseFloat(target.sql_to_sal_leakage) || 0,
+        sal_to_sqo_leakage: parseFloat(target.sal_to_sqo_leakage) || 0,
+        risk_profile: target.risk_profile || 'P75',
       });
     }
 
@@ -1376,6 +1227,7 @@ export async function POST(request: Request) {
     const totalPipelineAcv = attainmentDetail.reduce((sum, a) => sum + (a.pipeline_acv || 0), 0);
     const totalFyTarget = attainmentDetail.reduce((sum, a) => sum + a.fy_target, 0);
     const totalQ1Target = attainmentDetail.reduce((sum, a) => sum + a.q1_target, 0);
+    const totalQtdTarget = attainmentDetail.reduce((sum, a) => sum + a.qtd_target, 0);
     const totalQtdAcv = attainmentDetail.reduce((sum, a) => sum + a.qtd_acv, 0);
     const totalWonDeals = attainmentDetail.reduce((sum, a) => sum + a.qtd_deals, 0);
     const totalLostDeals = attainmentDetail.reduce((sum, a) => sum + (a.qtd_lost_deals || 0), 0);
@@ -1385,29 +1237,26 @@ export async function POST(request: Request) {
       product: 'ALL',
       total_fy_target: totalFyTarget,
       total_q1_target: totalQ1Target,
-      total_qtd_target: attainmentDetail.reduce((sum, a) => sum + a.qtd_target, 0),
+      total_qtd_target: totalQtdTarget,
       total_qtd_deals: totalWonDeals,
       total_qtd_acv: totalQtdAcv,
-      total_qtd_attainment_pct: 0,
-      total_q1_progress_pct: 0,
-      total_fy_progress_pct: 0,
-      total_qtd_gap: 0,
+      total_qtd_attainment_pct: totalQtdTarget > 0
+        ? Math.round((totalQtdAcv / totalQtdTarget) * 1000) / 10
+        : 0,
+      total_q1_progress_pct: totalQ1Target > 0
+        ? Math.round((totalQtdAcv / totalQ1Target) * 1000) / 10
+        : 0,
+      total_fy_progress_pct: totalFyTarget > 0
+        ? Math.round((totalQtdAcv / totalFyTarget) * 1000) / 10
+        : 0,
+      total_qtd_gap: totalQtdAcv - totalQtdTarget,
       total_pipeline_acv: totalPipelineAcv,
       total_pipeline_coverage_x: totalRemainingGap > 0 ? Math.round((totalPipelineAcv / totalRemainingGap) * 10) / 10 : 0,
       total_win_rate_pct: (totalWonDeals + totalLostDeals) > 0
         ? Math.round((totalWonDeals / (totalWonDeals + totalLostDeals)) * 1000) / 10
         : 0,
+      risk_profile: 'P75',
     };
-    grandTotal.total_qtd_attainment_pct = grandTotal.total_qtd_target > 0
-      ? Math.round((grandTotal.total_qtd_acv / grandTotal.total_qtd_target) * 1000) / 10
-      : 0;
-    grandTotal.total_q1_progress_pct = grandTotal.total_q1_target > 0
-      ? Math.round((grandTotal.total_qtd_acv / grandTotal.total_q1_target) * 1000) / 10
-      : 0;
-    grandTotal.total_fy_progress_pct = grandTotal.total_fy_target > 0
-      ? Math.round((grandTotal.total_qtd_acv / grandTotal.total_fy_target) * 1000) / 10
-      : 0;
-    grandTotal.total_qtd_gap = grandTotal.total_qtd_acv - grandTotal.total_qtd_target;
 
     // Calculate product totals
     const productTotals: Record<string, any> = {};
@@ -1417,6 +1266,7 @@ export async function POST(request: Request) {
         const prodPipelineAcv = productDetails.reduce((sum, a) => sum + (a.pipeline_acv || 0), 0);
         const prodFyTarget = productDetails.reduce((sum, a) => sum + a.fy_target, 0);
         const prodQ1Target = productDetails.reduce((sum, a) => sum + a.q1_target, 0);
+        const prodQtdTarget = productDetails.reduce((sum, a) => sum + a.qtd_target, 0);
         const prodQtdAcv = productDetails.reduce((sum, a) => sum + a.qtd_acv, 0);
         const prodWonDeals = productDetails.reduce((sum, a) => sum + a.qtd_deals, 0);
         const prodLostDeals = productDetails.reduce((sum, a) => sum + (a.qtd_lost_deals || 0), 0);
@@ -1427,12 +1277,16 @@ export async function POST(request: Request) {
           product,
           total_fy_target: prodFyTarget,
           total_q1_target: prodQ1Target,
-          total_qtd_target: productDetails.reduce((sum, a) => sum + a.qtd_target, 0),
+          total_qtd_target: prodQtdTarget,
           total_qtd_deals: prodWonDeals,
           total_qtd_acv: prodQtdAcv,
-          total_qtd_attainment_pct: 0,
-          total_fy_progress_pct: 0,
-          total_qtd_gap: 0,
+          total_qtd_attainment_pct: prodQtdTarget > 0
+            ? Math.round((prodQtdAcv / prodQtdTarget) * 1000) / 10
+            : 0,
+          total_fy_progress_pct: prodFyTarget > 0
+            ? Math.round((prodQtdAcv / prodFyTarget) * 1000) / 10
+            : 0,
+          total_qtd_gap: prodQtdAcv - prodQtdTarget,
           total_pipeline_acv: prodPipelineAcv,
           total_pipeline_coverage_x: prodRemainingGap > 0 ? Math.round((prodPipelineAcv / prodRemainingGap) * 10) / 10 : 0,
           total_win_rate_pct: (prodWonDeals + prodLostDeals) > 0
@@ -1440,47 +1294,37 @@ export async function POST(request: Request) {
             : 0,
           total_lost_deals: prodLostDeals,
           total_lost_acv: prodLostAcv,
+          risk_profile: 'P75',
         };
-        const pt = productTotals[product];
-        pt.total_qtd_attainment_pct = pt.total_qtd_target > 0
-          ? Math.round((pt.total_qtd_acv / pt.total_qtd_target) * 1000) / 10
-          : 0;
-        pt.total_fy_progress_pct = pt.total_fy_target > 0
-          ? Math.round((pt.total_qtd_acv / pt.total_fy_target) * 1000) / 10
-          : 0;
-        pt.total_qtd_gap = pt.total_qtd_acv - pt.total_qtd_target;
       }
     }
 
-    // Build funnel pacing
+    // Build funnel pacing from RevOpsReport data
     const funnelPacing: any[] = [];
     const allFunnel = [...(porFunnel as any[]), ...(r360Funnel as any[])];
-    const funnelTargetMap = new Map<string, any>();
 
-    for (const t of targets as any[]) {
-      if (t.category === 'NEW LOGO') { // INBOUND targets are in NEW LOGO
-        const key = `${t.product}-${t.region}`;
+    // Get funnel targets from RevOpsReport (NEW LOGO category has INBOUND funnel)
+    const funnelTargetMap = new Map<string, any>();
+    for (const row of revOpsData) {
+      if (row.category === 'NEW LOGO') {
+        const key = `${row.product}-${row.region}`;
         if (!funnelTargetMap.has(key)) {
           funnelTargetMap.set(key, {
-            q1_target_mql: 0,
-            target_mql: 0,
-            q1_target_sql: 0,
-            target_sql: 0,
-            q1_target_sal: 0,
-            target_sal: 0,
-            q1_target_sqo: 0,
-            target_sqo: 0,
+            q1_target_mql: 0, target_mql: 0,
+            q1_target_sql: 0, target_sql: 0,
+            q1_target_sal: 0, target_sal: 0,
+            q1_target_sqo: 0, target_sqo: 0,
           });
         }
         const existing = funnelTargetMap.get(key)!;
-        existing.q1_target_mql += parseFloat(t.q1_target_mql) || 0;
-        existing.target_mql += parseFloat(t.target_mql) || 0;
-        existing.q1_target_sql += parseFloat(t.q1_target_sql) || 0;
-        existing.target_sql += parseFloat(t.target_sql) || 0;
-        existing.q1_target_sal += parseFloat(t.q1_target_sal) || 0;
-        existing.target_sal += parseFloat(t.target_sal) || 0;
-        existing.q1_target_sqo += parseFloat(t.q1_target_sqo) || 0;
-        existing.target_sqo += parseFloat(t.target_sqo) || 0;
+        existing.q1_target_mql += parseInt(row.target_mql) || 0;
+        existing.target_mql += parseInt(row.target_mql) || 0;
+        existing.q1_target_sql += parseInt(row.target_sql) || 0;
+        existing.target_sql += parseInt(row.target_sql) || 0;
+        existing.q1_target_sal += parseInt(row.target_sal) || 0;
+        existing.target_sal += parseInt(row.target_sal) || 0;
+        existing.q1_target_sqo += parseInt(row.target_sqo) || 0;
+        existing.target_sqo += parseInt(row.target_sqo) || 0;
       }
     }
 
@@ -1545,7 +1389,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Build pipeline age map from query results
+    // Build pipeline age map
     const pipelineAgeMap = new Map<string, number>();
     for (const ageRow of pipelineAgeData as any[]) {
       const key = `${ageRow.product}-${ageRow.region}-${ageRow.category}`;
@@ -1581,7 +1425,6 @@ export async function POST(request: Request) {
       const lostAcv = parseFloat(lossRow.lost_acv) || 0;
       const dealCount = parseInt(lossRow.deal_count) || 0;
 
-      // Determine severity based on ACV impact
       let severity = 'LOW';
       if (lostAcv >= 50000) severity = 'CRITICAL';
       else if (lostAcv >= 20000) severity = 'HIGH';
@@ -1602,57 +1445,27 @@ export async function POST(request: Request) {
       }
     }
 
-    // Build source attainment data by joining actuals with targets from StrategicOperatingPlan
-    // Create a map of source targets
-    const sourceTargetMap = new Map<string, { q1_target: number; qtd_target: number }>();
-    for (const t of sourceTargetsRaw as any[]) {
-      const key = `${t.product}-${t.region}-${t.source}`;
-      sourceTargetMap.set(key, {
-        q1_target: parseFloat(t.q1_target) || 0,
-        qtd_target: parseFloat(t.qtd_target) || 0,
-      });
-    }
-
-    // Also track all sources that have targets (even if no actuals)
-    const allSourceKeys = new Set<string>();
-    for (const t of sourceTargetsRaw as any[]) {
-      allSourceKeys.add(`${t.product}-${t.region}-${t.source}`);
-    }
-    for (const a of sourceActualsRaw as any[]) {
-      allSourceKeys.add(`${a.product}-${a.region}-${a.source}`);
-    }
-
-    // Create map of actuals
+    // Build source attainment from won deals (actuals only)
+    const sourceAttainment: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
     const sourceActualsMap = new Map<string, number>();
     for (const a of sourceActualsRaw as any[]) {
       const key = `${a.product}-${a.region}-${a.source}`;
       sourceActualsMap.set(key, parseFloat(a.total_acv) || 0);
     }
 
-    const sourceAttainment: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
-
-    // Process all source/region combinations
-    for (const key of Array.from(allSourceKeys)) {
+    for (const key of Array.from(sourceActualsMap.keys())) {
       const [product, region, source] = key.split('-');
-      const targets = sourceTargetMap.get(key) || { q1_target: 0, qtd_target: 0 };
       const qtdAcv = sourceActualsMap.get(key) || 0;
-
-      const q1Target = targets.q1_target;
-      const qtdTarget = targets.qtd_target;
-
-      // Calculate attainment
-      const attainmentPct = qtdTarget > 0 ? (qtdAcv / qtdTarget) * 100 : (qtdAcv > 0 ? 100 : 0);
-      const gap = qtdAcv - qtdTarget;
 
       const sourceRow = {
         region,
         source,
-        q1_target: Math.round(q1Target),
-        qtd_target: Math.round(qtdTarget),
+        q1_target: 0, // Source-level targets not in RevOpsReport
+        qtd_target: 0,
         qtd_acv: qtdAcv,
-        attainment_pct: Math.round(attainmentPct * 10) / 10,
-        gap: Math.round(gap),
-        rag_status: calculateRAG(attainmentPct),
+        attainment_pct: qtdAcv > 0 ? 100 : 0,
+        gap: qtdAcv,
+        rag_status: qtdAcv > 0 ? 'GREEN' : 'YELLOW' as RAGStatus,
       };
 
       if (product === 'POR') {
@@ -1662,76 +1475,60 @@ export async function POST(request: Request) {
       }
     }
 
-    // Sort by attainment (worst first)
-    sourceAttainment.POR.sort((a, b) => a.attainment_pct - b.attainment_pct);
-    sourceAttainment.R360.sort((a, b) => a.attainment_pct - b.attainment_pct);
-
-    // Build funnel by source data with targets and pacing
+    // Build funnel by source data
     const funnelBySource: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
 
-    // Process POR funnel by source (now includes targets from StrategicOperatingPlan)
     for (const row of porFunnelBySource as any[]) {
-      const funnelSourceRow = {
+      funnelBySource.POR.push({
         region: row.region,
         source: row.source,
-        // Actuals
         actual_mql: parseInt(row.actual_mql) || 0,
         actual_sql: parseInt(row.actual_sql) || 0,
         actual_sal: parseInt(row.actual_sal) || 0,
         actual_sqo: parseInt(row.actual_sqo) || 0,
-        // Targets
-        target_mql: parseInt(row.target_mql) || 0,
-        target_sql: parseInt(row.target_sql) || 0,
-        target_sal: parseInt(row.target_sal) || 0,
-        target_sqo: parseInt(row.target_sqo) || 0,
-        // Pacing percentages
-        mql_pacing_pct: parseInt(row.mql_pacing_pct) || 0,
-        sql_pacing_pct: parseInt(row.sql_pacing_pct) || 0,
-        sal_pacing_pct: parseInt(row.sal_pacing_pct) || 0,
-        sqo_pacing_pct: parseInt(row.sqo_pacing_pct) || 0,
-        // Conversion rates
+        target_mql: 0,
+        target_sql: 0,
+        target_sal: 0,
+        target_sqo: 0,
+        mql_pacing_pct: 0,
+        sql_pacing_pct: 0,
+        sal_pacing_pct: 0,
+        sqo_pacing_pct: 0,
         mql_to_sql_rate: parseFloat(row.mql_to_sql_rate) || 0,
         sql_to_sal_rate: parseFloat(row.sql_to_sal_rate) || 0,
         sal_to_sqo_rate: parseFloat(row.sal_to_sqo_rate) || 0,
-      };
-      funnelBySource.POR.push(funnelSourceRow);
+      });
     }
 
-    // Process R360 funnel by source (now includes targets from StrategicOperatingPlan)
     for (const row of r360FunnelBySource as any[]) {
-      const funnelSourceRow = {
+      funnelBySource.R360.push({
         region: row.region,
         source: row.source,
-        // Actuals
         actual_mql: parseInt(row.actual_mql) || 0,
         actual_sql: parseInt(row.actual_sql) || 0,
         actual_sal: parseInt(row.actual_sal) || 0,
         actual_sqo: parseInt(row.actual_sqo) || 0,
-        // Targets
-        target_mql: parseInt(row.target_mql) || 0,
-        target_sql: parseInt(row.target_sql) || 0,
-        target_sal: parseInt(row.target_sal) || 0,
-        target_sqo: parseInt(row.target_sqo) || 0,
-        // Pacing percentages
-        mql_pacing_pct: parseInt(row.mql_pacing_pct) || 0,
-        sql_pacing_pct: parseInt(row.sql_pacing_pct) || 0,
-        sal_pacing_pct: parseInt(row.sal_pacing_pct) || 0,
-        sqo_pacing_pct: parseInt(row.sqo_pacing_pct) || 0,
-        // Conversion rates
+        target_mql: 0,
+        target_sql: 0,
+        target_sal: 0,
+        target_sqo: 0,
+        mql_pacing_pct: 0,
+        sql_pacing_pct: 0,
+        sal_pacing_pct: 0,
+        sqo_pacing_pct: 0,
         mql_to_sql_rate: parseFloat(row.mql_to_sql_rate) || 0,
         sql_to_sal_rate: parseFloat(row.sql_to_sal_rate) || 0,
         sal_to_sqo_rate: parseFloat(row.sal_to_sqo_rate) || 0,
-      };
-      funnelBySource.R360.push(funnelSourceRow);
+      });
     }
 
     // Build funnel by category data
     const funnelByCategory: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
 
-    // Get category-level targets from the targets data
+    // Get category-level targets from RevOpsReport
     const categoryTargetMap = new Map<string, any>();
-    for (const t of targets as any[]) {
-      const key = `${t.product}-${t.region}-${t.category}`;
+    for (const row of revOpsData) {
+      const key = `${row.product}-${row.region}-${row.category}`;
       if (!categoryTargetMap.has(key)) {
         categoryTargetMap.set(key, {
           q1_target_mql: 0, target_mql: 0,
@@ -1741,17 +1538,16 @@ export async function POST(request: Request) {
         });
       }
       const existing = categoryTargetMap.get(key)!;
-      existing.q1_target_mql += parseFloat(t.q1_target_mql) || 0;
-      existing.target_mql += parseFloat(t.target_mql) || 0;
-      existing.q1_target_sql += parseFloat(t.q1_target_sql) || 0;
-      existing.target_sql += parseFloat(t.target_sql) || 0;
-      existing.q1_target_sal += parseFloat(t.q1_target_sal) || 0;
-      existing.target_sal += parseFloat(t.target_sal) || 0;
-      existing.q1_target_sqo += parseFloat(t.q1_target_sqo) || 0;
-      existing.target_sqo += parseFloat(t.target_sqo) || 0;
+      existing.q1_target_mql += parseInt(row.target_mql) || 0;
+      existing.target_mql += parseInt(row.target_mql) || 0;
+      existing.q1_target_sql += parseInt(row.target_sql) || 0;
+      existing.target_sql += parseInt(row.target_sql) || 0;
+      existing.q1_target_sal += parseInt(row.target_sal) || 0;
+      existing.target_sal += parseInt(row.target_sal) || 0;
+      existing.q1_target_sqo += parseInt(row.target_sqo) || 0;
+      existing.target_sqo += parseInt(row.target_sqo) || 0;
     }
 
-    // Process POR funnel by category
     for (const row of porFunnelByCategory as any[]) {
       const key = `${row.product}-${row.region}-${row.category}`;
       const catTargets = categoryTargetMap.get(key) || {
@@ -1793,7 +1589,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // Process R360 funnel by category
     for (const row of r360FunnelByCategory as any[]) {
       const key = `${row.product}-${row.region}-${row.category}`;
       const catTargets = categoryTargetMap.get(key) || {
@@ -1835,7 +1630,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Calculate MQL disqualification summary from MQL details
+    // Calculate MQL disqualification summary
     const calculateDQSummary = (mqls: any[]) => {
       const total = mqls.length;
       const reverted = mqls.filter((m: any) => m.mql_status === 'REVERTED' || m.was_reverted).length;
@@ -1860,7 +1655,7 @@ export async function POST(request: Request) {
       R360: calculateDQSummary(mqlDetailsData.R360 || []),
     };
 
-    // Calculate SQL disqualification summary from SQL details
+    // Calculate SQL disqualification summary
     const calculateSQLDQSummary = (sqls: any[]) => {
       const total = sqls.length;
       const convertedSQO = sqls.filter((s: any) => s.sql_status === 'CONVERTED_SQO' || s.converted_to_sqo === 'Yes').length;
@@ -1894,6 +1689,11 @@ export async function POST(request: Request) {
       report_date: endDate,
       filters_applied: filters,
       period: periodInfo,
+      data_source: {
+        targets: 'RevOpsReport (P75)',
+        actuals: 'sfdc.OpportunityViewTable + RevOpsReport',
+        funnel: 'MarketingFunnel + DailyRevenueFunnel',
+      },
       grand_total: grandTotal,
       product_totals: productTotals,
       attainment_detail: attainmentDetail,
@@ -1931,7 +1731,13 @@ export async function GET() {
   return NextResponse.json({
     endpoint: '/api/report-data',
     method: 'POST',
-    description: 'Fetch report data from BigQuery with filters',
+    description: 'Fetch Q1 2026 Risk Report data using RevOps architecture with P75 targets',
+    data_sources: {
+      targets: 'Staging.RevOpsReport (RiskProfile=P75, Horizon=QTD)',
+      actuals: 'sfdc.OpportunityViewTable + RevOpsReport.Actual_ACV',
+      funnel: 'MarketingFunnel.InboundFunnel, R360InboundFunnel, DailyRevenueFunnel',
+      google_ads: 'GoogleAds_POR_*, GoogleAds_Record360_*',
+    },
     parameters: {
       startDate: 'YYYY-MM-DD (required)',
       endDate: 'YYYY-MM-DD (required)',
@@ -1940,9 +1746,15 @@ export async function GET() {
     },
     example: {
       startDate: '2026-01-01',
-      endDate: '2026-01-14',
+      endDate: '2026-01-16',
       products: ['POR'],
       regions: ['AMER', 'EMEA'],
     },
+    notes: [
+      'Uses P75 risk profile for conservative/realistic targets',
+      'RevOpsReport provides pre-calculated QTD attainment',
+      'OpportunityType maps to Category (New Business -> NEW LOGO, etc.)',
+      'Renewal forecasts include expected uplift from auto-renewing contracts',
+    ],
   });
 }
