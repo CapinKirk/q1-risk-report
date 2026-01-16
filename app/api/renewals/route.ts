@@ -169,7 +169,8 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
       regionClause = `AND Division IN (${divisions})`;
     }
 
-    const query = `
+    // Query for closed renewals (Q1 2026)
+    const closedQuery = `
       SELECT
         Id AS opportunity_id,
         AccountId AS account_id,
@@ -194,51 +195,114 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
         0 AS prior_acv
       FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
       WHERE Type = 'Renewal'
+        AND IsClosed = true
         AND CloseDate >= '2026-01-01'
+        AND CloseDate <= CURRENT_DATE()
         AND Division IN ('US', 'UK', 'AU')
         ${productClause}
         ${regionClause}
       ORDER BY CloseDate DESC
-      LIMIT 500
+      LIMIT 200
     `;
 
-    const [rows] = await bigquery.query({ query });
+    // Query for pipeline renewals (open, close date in Q1 2026)
+    const pipelineQuery = `
+      SELECT
+        Id AS opportunity_id,
+        AccountId AS account_id,
+        AccountName AS account_name,
+        OpportunityName AS opportunity_name,
+        CASE WHEN por_record__c THEN 'POR' ELSE 'R360' END AS product,
+        CASE Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        ROUND(COALESCE(ACV, 0), 2) AS acv,
+        CAST(CloseDate AS STRING) AS close_date,
+        StageName AS stage,
+        Won AS is_won,
+        IsClosed AS is_closed,
+        ClosedLostReason AS loss_reason,
+        Owner AS owner_name,
+        CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url,
+        '' AS contract_id,
+        0 AS uplift_amount,
+        0 AS prior_acv
+      FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
+      WHERE Type = 'Renewal'
+        AND IsClosed = false
+        AND CloseDate >= '2026-01-01'
+        AND CloseDate <= '2026-03-31'
+        AND Division IN ('US', 'UK', 'AU')
+        ${productClause}
+        ${regionClause}
+      ORDER BY CloseDate ASC
+      LIMIT 200
+    `;
 
-  const won: RenewalOpportunity[] = [];
-  const lost: RenewalOpportunity[] = [];
-  const pipeline: RenewalOpportunity[] = [];
+    // Run both queries
+    const [closedRows] = await bigquery.query({ query: closedQuery });
+    const [pipelineRows] = await bigquery.query({ query: pipelineQuery });
 
-  for (const row of rows as any[]) {
-    const opp: RenewalOpportunity = {
-      opportunity_id: row.opportunity_id,
-      account_id: row.account_id,
-      account_name: row.account_name || 'Unknown',
-      opportunity_name: row.opportunity_name,
-      product: row.product as Product,
-      region: row.region as Region,
-      acv: row.acv || 0,
-      close_date: row.close_date,
-      stage: row.stage,
-      is_won: row.is_won,
-      is_closed: row.is_closed,
-      loss_reason: row.loss_reason,
-      owner_name: row.owner_name || 'Unknown',
-      salesforce_url: row.salesforce_url,
-      contract_id: row.contract_id,
-      uplift_amount: row.uplift_amount || 0,
-      prior_acv: row.prior_acv || 0,
-    };
+    const won: RenewalOpportunity[] = [];
+    const lost: RenewalOpportunity[] = [];
+    const pipeline: RenewalOpportunity[] = [];
 
-    if (row.is_won) {
-      won.push(opp);
-    } else if (row.is_closed && !row.is_won) {
-      lost.push(opp);
-    } else {
+    // Process closed deals (won and lost)
+    for (const row of closedRows as any[]) {
+      const opp: RenewalOpportunity = {
+        opportunity_id: row.opportunity_id,
+        account_id: row.account_id,
+        account_name: row.account_name || 'Unknown',
+        opportunity_name: row.opportunity_name,
+        product: row.product as Product,
+        region: row.region as Region,
+        acv: row.acv || 0,
+        close_date: row.close_date,
+        stage: row.stage,
+        is_won: row.is_won,
+        is_closed: row.is_closed,
+        loss_reason: row.loss_reason,
+        owner_name: row.owner_name || 'Unknown',
+        salesforce_url: row.salesforce_url,
+        contract_id: row.contract_id,
+        uplift_amount: row.uplift_amount || 0,
+        prior_acv: row.prior_acv || 0,
+      };
+
+      if (row.is_won) {
+        won.push(opp);
+      } else {
+        lost.push(opp);
+      }
+    }
+
+    // Process pipeline deals
+    for (const row of pipelineRows as any[]) {
+      const opp: RenewalOpportunity = {
+        opportunity_id: row.opportunity_id,
+        account_id: row.account_id,
+        account_name: row.account_name || 'Unknown',
+        opportunity_name: row.opportunity_name,
+        product: row.product as Product,
+        region: row.region as Region,
+        acv: row.acv || 0,
+        close_date: row.close_date,
+        stage: row.stage,
+        is_won: row.is_won,
+        is_closed: row.is_closed,
+        loss_reason: row.loss_reason,
+        owner_name: row.owner_name || 'Unknown',
+        salesforce_url: row.salesforce_url,
+        contract_id: row.contract_id,
+        uplift_amount: row.uplift_amount || 0,
+        prior_acv: row.prior_acv || 0,
+      };
       pipeline.push(opp);
     }
-  }
 
-  return { won, lost, pipeline };
+    return { won, lost, pipeline };
   } catch (error: any) {
     console.error('BigQuery renewal query error:', error.message);
     // Return empty arrays on error
