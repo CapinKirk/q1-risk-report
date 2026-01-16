@@ -385,6 +385,7 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
         WHEN UPPER(FunnelType) IN ('INBOUND', 'R360 INBOUND', 'NEW LOGO', 'R360 NEW LOGO') THEN 'NEW LOGO'
         WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
         WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
+        WHEN UPPER(FunnelType) IN ('RENEWAL', 'R360 RENEWAL') THEN 'RENEWAL'
         ELSE 'OTHER'
       END AS category,
       COALESCE(SUM(MQL), 0) AS actual_mql,
