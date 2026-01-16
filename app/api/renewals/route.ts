@@ -151,13 +151,14 @@ function divisionToRegion(division: string): Region {
 
 // Query Contract data from BigQuery (SF data is synced there)
 // IMPORTANT: All amounts are converted to USD using CurrencyType conversion rates
+// FORMULA: Expected Increase = (ACV / ConversionRate) × (UpliftRate / 100)
 async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
   try {
     const bigquery = getBigQueryClient();
 
     // Join with CurrencyType to convert all amounts to USD
     // Salesforce formula: local_amount / conversionrate = USD_amount
-    // USD has implied rate of 1.0
+    // CORRECT UPLIFT FORMULA: ACV_USD × (uplift_rate / 100)
     const query = `
       SELECT
         c.Id,
@@ -167,6 +168,7 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
         DATE(c.EndDate) as EndDate,
         c.ContractTerm,
         c.Status,
+        c.Renewal_Status__c,
         c.neo_automaticrenewal__c,
         c.manual_renewal__c,
         c.sbqq__evergreen__c,
@@ -175,12 +177,13 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
         c.acv__c as acv_local,
         c.starting_acv__c as starting_acv_local,
         c.ending_acv__c as ending_acv_local,
-        c.projected_uplift__c as projected_uplift_local,
-        -- USD converted values (divide by conversion rate)
+        COALESCE(c.sbqq__renewalupliftrate__c, 5) as uplift_rate,
+        -- USD converted ACV (divide by conversion rate, default to 1 for USD)
         ROUND(COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) as acv_usd,
         ROUND(COALESCE(c.starting_acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) as starting_acv_usd,
         ROUND(COALESCE(c.ending_acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) as ending_acv_usd,
-        ROUND(COALESCE(c.projected_uplift__c, 0) / COALESCE(ct.conversionrate, 1), 2) as projected_uplift_usd,
+        -- CORRECT: Expected increase = ACV_USD × (uplift_rate / 100)
+        ROUND((COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1)) * (COALESCE(c.sbqq__renewalupliftrate__c, 5) / 100), 2) as expected_increase_usd,
         COALESCE(ct.conversionrate, 1) as conversion_rate,
         c.sbqq__renewalupliftrate__c,
         c.sbqq__renewalopportunity__c,
@@ -193,8 +196,12 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
         AND DATE(c.EndDate) >= CURRENT_DATE()
         AND DATE(c.EndDate) <= DATE_ADD(CURRENT_DATE(), INTERVAL 90 DAY)
         AND c.account_division__c IN ('US', 'UK', 'AU')
+        -- CRITICAL: Only include contracts that will actually renew
+        AND (c.Renewal_Status__c IS NULL
+             OR c.Renewal_Status__c NOT IN ('Non Renewing', 'Success'))
+        AND c.acv__c > 0
       ORDER BY c.EndDate ASC
-      LIMIT 500
+      LIMIT 1000
     `;
 
     console.log('Querying Contract data from BigQuery with USD conversion...');
@@ -217,19 +224,17 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
       const currentACV = parseFloat(record.acv_usd) || parseFloat(record.starting_acv_usd) || 0;
       const endingACV = parseFloat(record.ending_acv_usd) || currentACV;
 
-      // CRITICAL: projected_uplift_usd is the USD-converted uplift amount
-      const upliftAmount = parseFloat(record.projected_uplift_usd) || 0;
+      // CORRECT FORMULA: Expected increase = ACV_USD × (uplift_rate / 100)
+      // This is calculated in SQL as expected_increase_usd
+      const upliftAmount = parseFloat(record.expected_increase_usd) || 0;
       const upliftPct = parseFloat(record.sbqq__renewalupliftrate__c) || DEFAULT_RENEWAL_UPLIFT_PCT;
 
-      // Log currency conversion for debugging
-      if (record.currencyisocode !== 'USD' && record.projected_uplift_local > 0) {
-        console.log(`Currency conversion: ${record.currencyisocode} ${record.projected_uplift_local} / ${record.conversion_rate} = USD ${upliftAmount}`);
-      }
-
-      // Check if auto-renewing
+      // Check if auto-renewing (Future Renewal status indicates it will renew)
+      const renewalStatus = record.Renewal_Status__c || '';
       const isAutoRenewalFlag = record.neo_automaticrenewal__c === true || record.neo_automaticrenewal__c === 'true';
       const isEvergreen = record.sbqq__evergreen__c === true || record.sbqq__evergreen__c === 'true';
-      const isAutoRenewal = isAutoRenewalFlag || isEvergreen;
+      const isFutureRenewal = renewalStatus === 'Future Renewal';
+      const isAutoRenewal = isAutoRenewalFlag || isEvergreen || isFutureRenewal;
       const isManualRenewal = record.manual_renewal__c === true || record.manual_renewal__c === 'true';
 
       // A contract is at risk if expiring within 30 days and NOT auto-renewing

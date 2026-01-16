@@ -197,12 +197,11 @@ async function getTargets(filters: ReportFilters) {
 // Query for Q1 renewal uplift by product/region from Contract table
 // CRITICAL: Only count contracts renewing within Q1 (by March 31, 2026)
 // This aligns the uplift forecast with the Q1 target period
-// IMPORTANT: All amounts are converted to USD using CurrencyType conversion rates
+// FORMULA: Expected Increase = (ACV / ConversionRate) × (UpliftRate / 100)
 async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
   try {
     // Join with CurrencyType to convert all amounts to USD
-    // Salesforce formula: local_amount / conversionrate = USD_amount
-    // USD has implied rate of 1.0
+    // CORRECT FORMULA: (ACV / conversionrate) × (uplift_rate / 100)
     const query = `
       SELECT
         CASE WHEN c.r360_record__c = true OR c.r360_record__c = 'true' THEN 'R360' ELSE 'POR' END AS product,
@@ -211,8 +210,12 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
           WHEN 'UK' THEN 'EMEA'
           WHEN 'AU' THEN 'APAC'
         END AS region,
-        -- Convert to USD by dividing by conversion rate
-        SUM(ROUND(COALESCE(CAST(c.projected_uplift__c AS FLOAT64), 0) / COALESCE(ct.conversionrate, 1), 2)) AS total_uplift_usd
+        COUNT(*) as contract_count,
+        -- CORRECT: Expected increase = (ACV_USD) × (uplift_rate / 100)
+        SUM(ROUND(
+          (COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1)) *
+          (COALESCE(c.sbqq__renewalupliftrate__c, 5) / 100)
+        , 2)) AS total_expected_increase_usd
       FROM \`data-analytics-306119.sfdc.Contract\` c
       LEFT JOIN \`data-analytics-306119.sfdc.CurrencyType\` ct
         ON LOWER(c.currencyisocode) = LOWER(ct.isocode)
@@ -220,8 +223,10 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
         AND DATE(c.EndDate) >= CURRENT_DATE()
         AND DATE(c.EndDate) <= '2026-03-31'
         AND c.account_division__c IN ('US', 'UK', 'AU')
-        AND (c.neo_automaticrenewal__c = true OR c.neo_automaticrenewal__c = 'true'
-             OR c.sbqq__evergreen__c = true OR c.sbqq__evergreen__c = 'true')
+        AND c.acv__c > 0
+        -- CRITICAL: Only include contracts that will actually renew
+        AND (c.Renewal_Status__c IS NULL
+             OR c.Renewal_Status__c NOT IN ('Non Renewing', 'Success'))
       GROUP BY 1, 2
     `;
 
@@ -230,10 +235,11 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
 
     for (const row of rows as any[]) {
       const key = `${row.product}-${row.region}-RENEWAL`;
-      upliftMap.set(key, row.total_uplift_usd || 0);
+      upliftMap.set(key, row.total_expected_increase_usd || 0);
+      console.log(`Q1 Renewal: ${key} = ${row.contract_count} contracts, $${row.total_expected_increase_usd} expected increase`);
     }
 
-    console.log('Q1 Renewal uplift (USD) by product/region (thru Mar 31):', Object.fromEntries(upliftMap));
+    console.log('Q1 Renewal expected increase (USD) by product/region (thru Mar 31):', Object.fromEntries(upliftMap));
     return upliftMap;
   } catch (error: any) {
     console.error('Error fetching renewal uplift:', error.message);
