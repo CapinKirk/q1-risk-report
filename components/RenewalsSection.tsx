@@ -304,12 +304,15 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
             <span className="metric-sub">Full quarter target</span>
           </div>
           <div className="forecast-metric">
-            <span className="metric-label">Q1 Attainment</span>
+            <span className="metric-label">Projected Q1 Attainment</span>
             <span className="metric-value" style={{ color: ragColor.text }}>
               {safeSummary.qtdAttainmentPct?.toFixed(1) || 0}%
             </span>
             <span className="metric-sub">
-              Gap: {formatCurrency((safeSummary.forecastedBookings || 0) - (safeSummary.q1Target || 0))}
+              {(safeSummary.forecastedBookings || 0) >= (safeSummary.q1Target || 0)
+                ? `Surplus: ${formatCurrency((safeSummary.forecastedBookings || 0) - (safeSummary.q1Target || 0))}`
+                : `Gap: ${formatCurrency((safeSummary.q1Target || 0) - (safeSummary.forecastedBookings || 0))}`
+              }
             </span>
           </div>
           <div className="forecast-metric">
