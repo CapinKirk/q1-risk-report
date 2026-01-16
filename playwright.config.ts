@@ -15,7 +15,7 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
     actionTimeout: 10000,
     screenshot: 'only-on-failure',
-    baseURL: 'http://localhost:3000',
+    baseURL: process.env.CI ? 'https://q1-risk-report.vercel.app' : 'https://q1-risk-report.vercel.app',
     trace: 'on-first-retry',
   },
   projects: [
@@ -42,10 +42,11 @@ export default defineConfig({
     },
   ],
   outputDir: 'tests/test-results',
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
+  // webServer config disabled - testing against production
+  // webServer: {
+  //   command: 'npm run dev',
+  //   url: 'http://localhost:3000',
+  //   reuseExistingServer: !process.env.CI,
+  //   timeout: 120000,
+  // },
 });
