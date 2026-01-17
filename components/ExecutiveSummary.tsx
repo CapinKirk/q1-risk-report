@@ -48,6 +48,12 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
         </thead>
         <tbody>
           <tr>
+            <td>FY Target</td>
+            <td className="right">{formatCurrency(grand_total.total_fy_target)}</td>
+            {hasPOR && <td className="right">{formatCurrency(por?.total_fy_target)}</td>}
+            {hasR360 && <td className="right">{formatCurrency(r360?.total_fy_target)}</td>}
+          </tr>
+          <tr>
             <td>Q1 Target</td>
             <td className="right">{formatCurrency(grand_total.total_q1_target)}</td>
             {hasPOR && <td className="right">{formatCurrency(por?.total_q1_target)}</td>}

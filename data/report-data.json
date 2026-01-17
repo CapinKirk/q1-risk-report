@@ -19,6 +19,7 @@
   },
   "grand_total": {
     "product": "ALL",
+    "total_fy_target": 14111517.36,
     "total_q1_target": 3527879.34,
     "total_qtd_target": 548781.22,
     "total_qtd_deals": 99,
@@ -35,6 +36,7 @@
   "product_totals": {
     "POR": {
       "product": "POR",
+      "total_fy_target": 10637240,
       "total_q1_target": 2659310,
       "total_qtd_target": 413670.44,
       "total_qtd_deals": 73,
@@ -50,6 +52,7 @@
     },
     "R360": {
       "product": "R360",
+      "total_fy_target": 3474277.36,
       "total_q1_target": 868569.34,
       "total_qtd_target": 135110.78,
       "total_qtd_deals": 26,
@@ -126,37 +129,34 @@
       {
         "product": "POR",
         "region": "AMER",
+        "category": "NEW LOGO",
         "momentum_tier": "MODERATE_MOMENTUM",
-        "positive_momentum_count": 2,
-        "momentum_commentary": "AMER showing positive momentum across multiple funnel stages.",
-        "mql_trend": "DOWN",
+        "positive_momentum_count": 1,
+        "momentum_commentary": "AMER NEW LOGO at 85% (YELLOW) showing positive momentum: Pipeline coverage at 2.3x.",
+        "mql_trend": "FLAT",
         "mql_wow_pct": -3,
-        "sql_trend": "DOWN",
-        "sql_wow_pct": -8
+        "sql_trend": "UP",
+        "sql_wow_pct": 5,
+        "current_attainment_pct": 85,
+        "pipeline_coverage_x": 2.3,
+        "gap_to_green": 5
       }
     ],
     "R360": [
       {
         "product": "R360",
         "region": "AMER",
-        "momentum_tier": "MODERATE_MOMENTUM",
+        "category": "NEW LOGO",
+        "momentum_tier": "STRONG_MOMENTUM",
         "positive_momentum_count": 2,
-        "momentum_commentary": "AMER showing strong SQL momentum (+40% WoW). SDR conversion improving.",
-        "mql_trend": "DOWN",
-        "mql_wow_pct": -29,
-        "sql_trend": "UP",
-        "sql_wow_pct": 40
-      },
-      {
-        "product": "R360",
-        "region": "APAC",
-        "momentum_tier": "SOME_MOMENTUM",
-        "positive_momentum_count": 1,
-        "momentum_commentary": null,
+        "momentum_commentary": "AMER NEW LOGO at 82% (YELLOW) showing positive momentum: Pipeline coverage at 2.5x, SQL at 95% of target.",
         "mql_trend": "UP",
-        "mql_wow_pct": null,
-        "sql_trend": "FLAT",
-        "sql_wow_pct": null
+        "mql_wow_pct": 10,
+        "sql_trend": "UP",
+        "sql_wow_pct": 15,
+        "current_attainment_pct": 82,
+        "pipeline_coverage_x": 2.5,
+        "gap_to_green": 8
       }
     ]
   },

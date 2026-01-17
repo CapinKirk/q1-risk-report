@@ -120,16 +120,22 @@ export default function MomentumTracker({ momentum, period }: MomentumTrackerPro
     return null;
   }
 
-  // Sort by momentum tier (strong first)
-  const tierOrder = { 'STRONG_MOMENTUM': 0, 'MODERATE_MOMENTUM': 1, 'NO_MOMENTUM': 2, 'DECLINING': 3 };
-  const sorted = allIndicators.sort((a, b) =>
-    (tierOrder[a.momentum_tier as keyof typeof tierOrder] || 4) -
-    (tierOrder[b.momentum_tier as keyof typeof tierOrder] || 4)
-  );
+  // Sort by momentum tier (strong first), then by attainment (closest to green first)
+  const tierOrder = { 'STRONG_MOMENTUM': 0, 'MODERATE_MOMENTUM': 1 };
+  const sorted = allIndicators.sort((a, b) => {
+    const tierDiff = (tierOrder[a.momentum_tier as keyof typeof tierOrder] || 2) -
+      (tierOrder[b.momentum_tier as keyof typeof tierOrder] || 2);
+    if (tierDiff !== 0) return tierDiff;
+    // Within same tier, sort by gap_to_green (smaller gap = closer to GREEN)
+    return (a.gap_to_green || 0) - (b.gap_to_green || 0);
+  });
 
   return (
     <section>
-      <h2>Momentum Tracker (WoW)</h2>
+      <h2>Areas with Momentum</h2>
+      <p className="section-subtitle">
+        YELLOW status areas (70-89%) trending toward GREEN based on strong pipeline (≥2x) or funnel pacing (≥90%)
+      </p>
       {isEarlyQuarter && (
         <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
           Limited data ({quarterPct.toFixed(0)}% of quarter) - trends may not be statistically significant
@@ -139,6 +145,9 @@ export default function MomentumTracker({ momentum, period }: MomentumTrackerPro
         {sorted.map((indicator, idx) => {
           const style = getMomentumTierStyle(indicator.momentum_tier);
           const improvedCommentary = improveCommentary(indicator.momentum_commentary, quarterPct);
+          const attainmentPct = indicator.current_attainment_pct?.toFixed(0) || '?';
+          const gapToGreen = indicator.gap_to_green || 0;
+          const pipelineCoverage = indicator.pipeline_coverage_x?.toFixed(1) || '?';
 
           return (
             <div
@@ -157,12 +166,27 @@ export default function MomentumTracker({ momentum, period }: MomentumTrackerPro
                   className="momentum-tier"
                   style={{ color: style.text }}
                 >
-                  {indicator.momentum_tier.replace(/_/g, ' ')}
+                  {indicator.momentum_tier === 'STRONG_MOMENTUM' ? '🚀 STRONG' : '📈 MODERATE'}
                 </span>
+              </div>
+              <div className="category-label">{indicator.category}</div>
+              <div className="attainment-row">
+                <div className="attainment-stat">
+                  <span className="stat-value yellow">{attainmentPct}%</span>
+                  <span className="stat-label">Attainment</span>
+                </div>
+                <div className="attainment-stat">
+                  <span className="stat-value">{gapToGreen}%</span>
+                  <span className="stat-label">Gap to GREEN</span>
+                </div>
+                <div className="attainment-stat">
+                  <span className="stat-value">{pipelineCoverage}x</span>
+                  <span className="stat-label">Pipeline</span>
+                </div>
               </div>
               <div className="trend-row">
                 <TrendIndicator
-                  label="MQL"
+                  label="MQL/EQL"
                   trend={indicator.mql_trend}
                   wowPct={indicator.mql_wow_pct}
                   isEarlyQuarter={isEarlyQuarter}
@@ -182,9 +206,15 @@ export default function MomentumTracker({ momentum, period }: MomentumTrackerPro
         })}
       </div>
       <style jsx>{`
+        .section-subtitle {
+          font-size: 0.75rem;
+          color: #6b7280;
+          margin-top: -6px;
+          margin-bottom: 8px;
+        }
         .momentum-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
           gap: 12px;
           margin-top: 12px;
         }
@@ -197,7 +227,7 @@ export default function MomentumTracker({ momentum, period }: MomentumTrackerPro
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 8px;
+          margin-bottom: 4px;
         }
         .region-label {
           font-weight: 600;
@@ -205,8 +235,39 @@ export default function MomentumTracker({ momentum, period }: MomentumTrackerPro
           color: #1f2937;
         }
         .momentum-tier {
-          font-size: 0.65rem;
+          font-size: 0.7rem;
           font-weight: bold;
+        }
+        .category-label {
+          font-size: 0.7rem;
+          color: #6b7280;
+          margin-bottom: 8px;
+          text-transform: uppercase;
+        }
+        .attainment-row {
+          display: flex;
+          justify-content: space-around;
+          margin-bottom: 8px;
+          padding: 8px;
+          background: rgba(255,255,255,0.7);
+          border-radius: 6px;
+        }
+        .attainment-stat {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        .stat-value {
+          font-size: 1rem;
+          font-weight: bold;
+          color: #1f2937;
+        }
+        .stat-value.yellow {
+          color: #ca8a04;
+        }
+        .stat-label {
+          font-size: 0.55rem;
+          color: #6b7280;
           text-transform: uppercase;
         }
         .trend-row {

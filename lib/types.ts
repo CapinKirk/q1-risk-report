@@ -139,6 +139,7 @@ export interface Period {
 
 // Grand total metrics
 export interface GrandTotal {
+  total_fy_target: number;
   total_q1_target: number;
   total_qtd_target: number;
   total_qtd_acv: number;
@@ -150,6 +151,7 @@ export interface GrandTotal {
 
 // Product totals
 export interface ProductTotal {
+  total_fy_target: number;
   total_q1_target: number;
   total_qtd_target: number;
   total_qtd_acv: number;
@@ -166,6 +168,7 @@ export interface AttainmentRow {
   product: Product;
   region: Region;
   category: Category;
+  fy_target?: number;
   q1_target: number;
   qtd_target: number;
   qtd_acv: number;
@@ -195,6 +198,8 @@ export interface SourceAttainmentRow {
 export interface FunnelByCategoryRow {
   category: Category;
   region: Region;
+  lead_stage_label?: 'MQL' | 'EQL';  // MQL for NEW LOGO, EQL for EXPANSION/MIGRATION
+  tof_score?: number;  // TOF Score from API (EQL/MQL=10%, SQL=20%, SAL=30%, SQO=40%)
   weighted_tof_score: number;
   q1_target_mql: number;
   qtd_target_mql: number;
@@ -439,17 +444,22 @@ export interface ActionItem {
   recommendedAction?: string;   // Specific next steps
 }
 
-// Momentum Indicator
+// Momentum Indicator - YELLOW status areas trending toward GREEN
+// Criteria: 70-89% attainment + strong pipeline coverage (>=2x) OR strong funnel pacing (>=90%)
 export interface MomentumIndicator {
   product: Product;
   region: Region;
-  momentum_tier: 'STRONG_MOMENTUM' | 'MODERATE_MOMENTUM' | 'NO_MOMENTUM' | 'DECLINING';
+  category: Category;
+  momentum_tier: 'STRONG_MOMENTUM' | 'MODERATE_MOMENTUM';
   positive_momentum_count: number;
   momentum_commentary: string;
   mql_trend: 'UP' | 'DOWN' | 'FLAT';
   mql_wow_pct: number;
   sql_trend: 'UP' | 'DOWN' | 'FLAT';
   sql_wow_pct: number;
+  current_attainment_pct: number;
+  pipeline_coverage_x: number;
+  gap_to_green: number;
 }
 
 // Top Risk Pocket

@@ -116,6 +116,7 @@ function recalculateExecutiveCounts(
 function recalculateProductTotals(
   attainmentRows: AttainmentRow[]
 ): ProductTotal {
+  const fyTarget = attainmentRows.reduce((sum, row) => sum + (row.fy_target || 0), 0);
   const q1Target = attainmentRows.reduce((sum, row) => sum + (row.q1_target || 0), 0);
   const qtdTarget = attainmentRows.reduce((sum, row) => sum + (row.qtd_target || 0), 0);
   const qtdAcv = attainmentRows.reduce((sum, row) => sum + (row.qtd_acv || 0), 0);
@@ -126,12 +127,14 @@ function recalculateProductTotals(
   const remaining = q1Target - qtdAcv;
 
   return {
+    total_fy_target: fyTarget,
     total_q1_target: q1Target,
     total_qtd_target: qtdTarget,
     total_qtd_acv: qtdAcv,
-    total_qtd_attainment_pct: qtdTarget > 0 ? (qtdAcv / qtdTarget) * 100 : 0,
+    // Logic: target=0 means 100% attainment (met zero target). Rounded for display.
+    total_qtd_attainment_pct: qtdTarget > 0 ? Math.round((qtdAcv / qtdTarget) * 100) : 100,
     total_pipeline_acv: pipelineAcv,
-    total_pipeline_coverage_x: remaining > 0 ? pipelineAcv / remaining : 0,
+    total_pipeline_coverage_x: remaining > 0 ? Math.round((pipelineAcv / remaining) * 10) / 10 : 0,
     total_win_rate_pct: 0, // Would need deal counts to calculate
     total_lost_deals: lostDeals,
     total_lost_acv: lostAcv,
@@ -258,6 +261,7 @@ export function filterReportData(
 
   // Recalculate product totals (only for included products)
   const emptyProductTotal: ProductTotal = {
+    total_fy_target: 0,
     total_q1_target: 0,
     total_qtd_target: 0,
     total_qtd_acv: 0,
@@ -273,13 +277,17 @@ export function filterReportData(
   const r360Totals = includeR360 ? recalculateProductTotals(filteredAttainmentR360) : emptyProductTotal;
 
   // Calculate grand totals based on selected products
+  const combinedQtdTarget = porTotals.total_qtd_target + r360Totals.total_qtd_target;
+  const combinedQtdAcv = porTotals.total_qtd_acv + r360Totals.total_qtd_acv;
   const grandTotal: GrandTotal = {
+    total_fy_target: porTotals.total_fy_target + r360Totals.total_fy_target,
     total_q1_target: porTotals.total_q1_target + r360Totals.total_q1_target,
-    total_qtd_target: porTotals.total_qtd_target + r360Totals.total_qtd_target,
-    total_qtd_acv: porTotals.total_qtd_acv + r360Totals.total_qtd_acv,
-    total_qtd_attainment_pct: (porTotals.total_qtd_target + r360Totals.total_qtd_target) > 0
-      ? ((porTotals.total_qtd_acv + r360Totals.total_qtd_acv) / (porTotals.total_qtd_target + r360Totals.total_qtd_target)) * 100
-      : 0,
+    total_qtd_target: combinedQtdTarget,
+    total_qtd_acv: combinedQtdAcv,
+    // Logic: target=0 means 100% attainment. Rounded for display.
+    total_qtd_attainment_pct: combinedQtdTarget > 0
+      ? Math.round((combinedQtdAcv / combinedQtdTarget) * 100)
+      : 100,
     total_pipeline_acv: porTotals.total_pipeline_acv + r360Totals.total_pipeline_acv,
     total_pipeline_coverage_x: 0, // Calculated below
     total_win_rate_pct: 0,
@@ -287,7 +295,7 @@ export function filterReportData(
 
   const totalRemaining = grandTotal.total_q1_target - grandTotal.total_qtd_acv;
   grandTotal.total_pipeline_coverage_x = totalRemaining > 0
-    ? grandTotal.total_pipeline_acv / totalRemaining
+    ? Math.round((grandTotal.total_pipeline_acv / totalRemaining) * 10) / 10
     : 0;
 
   // Filter action items by product and region

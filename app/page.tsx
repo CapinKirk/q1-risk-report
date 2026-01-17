@@ -47,6 +47,7 @@ function transformAPIResponse(apiData: any): ReportData {
       product: row.product,
       region: row.region,
       category: row.category,
+      fy_target: row.fy_target || 0,
       q1_target: row.q1_target || 0,
       qtd_target: row.qtd_target || 0,
       qtd_acv: row.qtd_acv || 0,
@@ -69,11 +70,16 @@ function transformAPIResponse(apiData: any): ReportData {
 
   // Calculate executive counts from attainment data
   const allAttainmentRows = [...attainmentByProduct.POR, ...attainmentByProduct.R360];
+
+  // Count areas with momentum from API response (YELLOW status trending toward GREEN)
+  const momentumData = apiData.momentum_indicators || { POR: [], R360: [] };
+  const areasWithMomentum = (momentumData.POR?.length || 0) + (momentumData.R360?.length || 0);
+
   const executiveCounts = {
     areas_exceeding_target: allAttainmentRows.filter(r => r.qtd_attainment_pct >= 100).length,
     areas_at_risk: allAttainmentRows.filter(r => r.rag_status === 'RED').length,
     areas_needing_attention: allAttainmentRows.filter(r => r.rag_status === 'YELLOW').length,
-    areas_with_momentum: 0, // Will be recalculated if momentum_indicators exist
+    areas_with_momentum: areasWithMomentum,
   };
 
   // Transform Google Ads data (already grouped by product from API)
@@ -86,38 +92,49 @@ function transformAPIResponse(apiData: any): ReportData {
   const funnelByProduct: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
 
   for (const row of apiData.funnel_pacing || []) {
-    const mqlPct = row.mql_pacing_pct || 0;
-    const sqlPct = row.sql_pacing_pct || 0;
-    const salPct = row.sal_pacing_pct || 0;
-    const sqoPct = row.sqo_pacing_pct || 0;
+    // Get targets and actuals
+    const qtdTargetMql = row.target_mql || 0;
+    const qtdTargetSql = row.target_sql || 0;
+    const qtdTargetSal = row.target_sal || 0;
+    const qtdTargetSqo = row.target_sqo || 0;
+    const actualMql = row.actual_mql || 0;
+    const actualSql = row.actual_sql || 0;
+    const actualSal = row.actual_sal || 0;
+    const actualSqo = row.actual_sqo || 0;
+
+    // Calculate pacing: target=0 means 100% (met zero target). Rounded for display.
+    const mqlPct = qtdTargetMql > 0 ? Math.round((actualMql / qtdTargetMql) * 100) : 100;
+    const sqlPct = qtdTargetSql > 0 ? Math.round((actualSql / qtdTargetSql) * 100) : 100;
+    const salPct = qtdTargetSal > 0 ? Math.round((actualSal / qtdTargetSal) * 100) : 100;
+    const sqoPct = qtdTargetSqo > 0 ? Math.round((actualSqo / qtdTargetSqo) * 100) : 100;
 
     // Calculate weighted TOF score: MQL=10%, SQL=20%, SAL=30%, SQO=40%
     const weightedTofScore = (mqlPct * 0.10) + (sqlPct * 0.20) + (salPct * 0.30) + (sqoPct * 0.40);
 
     const funnelRow = {
-      category: 'NEW LOGO' as Category,
+      category: (row.category || 'NEW LOGO') as Category,
       region: row.region,
-      weighted_tof_score: Math.round(weightedTofScore * 10) / 10,
+      weighted_tof_score: Math.round(weightedTofScore),
       q1_target_mql: row.q1_target_mql || 0,
-      qtd_target_mql: row.target_mql || 0,
-      actual_mql: row.actual_mql || 0,
+      qtd_target_mql: qtdTargetMql,
+      actual_mql: actualMql,
       mql_pacing_pct: mqlPct,
-      mql_gap: (row.actual_mql || 0) - (row.target_mql || 0),
+      mql_gap: actualMql - qtdTargetMql,
       q1_target_sql: row.q1_target_sql || 0,
-      qtd_target_sql: row.target_sql || 0,
-      actual_sql: row.actual_sql || 0,
+      qtd_target_sql: qtdTargetSql,
+      actual_sql: actualSql,
       sql_pacing_pct: sqlPct,
-      sql_gap: (row.actual_sql || 0) - (row.target_sql || 0),
+      sql_gap: actualSql - qtdTargetSql,
       q1_target_sal: row.q1_target_sal || 0,
-      qtd_target_sal: row.target_sal || 0,
-      actual_sal: row.actual_sal || 0,
+      qtd_target_sal: qtdTargetSal,
+      actual_sal: actualSal,
       sal_pacing_pct: salPct,
-      sal_gap: (row.actual_sal || 0) - (row.target_sal || 0),
+      sal_gap: actualSal - qtdTargetSal,
       q1_target_sqo: row.q1_target_sqo || 0,
-      qtd_target_sqo: row.target_sqo || 0,
-      actual_sqo: row.actual_sqo || 0,
+      qtd_target_sqo: qtdTargetSqo,
+      actual_sqo: actualSqo,
       sqo_pacing_pct: sqoPct,
-      sqo_gap: (row.actual_sqo || 0) - (row.target_sqo || 0),
+      sqo_gap: actualSqo - qtdTargetSqo,
     };
 
     if (row.product === 'POR') {
@@ -224,6 +241,7 @@ function transformAPIResponse(apiData: any): ReportData {
       total_days: apiData.period?.total_days || 90,
     },
     grand_total: {
+      total_fy_target: apiData.grand_total?.total_fy_target || 0,
       total_q1_target: apiData.grand_total?.total_q1_target || 0,
       total_qtd_target: apiData.grand_total?.total_qtd_target || 0,
       total_qtd_acv: apiData.grand_total?.total_qtd_acv || 0,
@@ -234,6 +252,7 @@ function transformAPIResponse(apiData: any): ReportData {
     },
     product_totals: {
       POR: {
+        total_fy_target: apiData.product_totals?.POR?.total_fy_target || 0,
         total_q1_target: apiData.product_totals?.POR?.total_q1_target || 0,
         total_qtd_target: apiData.product_totals?.POR?.total_qtd_target || 0,
         total_qtd_acv: apiData.product_totals?.POR?.total_qtd_acv || 0,
@@ -245,6 +264,7 @@ function transformAPIResponse(apiData: any): ReportData {
         total_lost_acv: apiData.product_totals?.POR?.total_lost_acv || 0,
       },
       R360: {
+        total_fy_target: apiData.product_totals?.R360?.total_fy_target || 0,
         total_q1_target: apiData.product_totals?.R360?.total_q1_target || 0,
         total_qtd_target: apiData.product_totals?.R360?.total_qtd_target || 0,
         total_qtd_acv: apiData.product_totals?.R360?.total_qtd_acv || 0,
@@ -273,15 +293,17 @@ function transformAPIResponse(apiData: any): ReportData {
     sql_details: apiData.sql_details || { POR: [], R360: [] },
     // Include executive counts so filterReportData can recalculate them
     executive_counts: executiveCounts,
+    // Include momentum indicators (YELLOW status trending toward GREEN)
+    momentum_indicators: momentumData,
   };
 }
 
 function ReportContent() {
   const searchParams = useSearchParams();
-  const [selectedRegions, setSelectedRegions] = useState<Region[]>(['AMER', 'EMEA', 'APAC']);
-  const [selectedProducts, setSelectedProducts] = useState<Product[]>(['POR', 'R360']);
-  const [selectedCategories, setSelectedCategories] = useState<Category[]>(['NEW LOGO', 'EXPANSION', 'MIGRATION']);
-  const [selectedSources, setSelectedSources] = useState<Source[]>(['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS']);
+  const [selectedRegions, setSelectedRegions] = useState<Region[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
+  const [selectedSources, setSelectedSources] = useState<Source[]>([]);
   const [filteredData, setFilteredData] = useState<ReportData | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);

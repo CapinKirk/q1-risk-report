@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Region, Product, FunnelByCategoryRow, FunnelBySourceActuals, RAGStatus } from '@/lib/types';
+import { Region, Product, Category, FunnelByCategoryRow, FunnelBySourceActuals, RAGStatus } from '@/lib/types';
 
 interface FunnelMilestoneAttainmentProps {
   funnelData: {
@@ -14,64 +14,16 @@ interface FunnelMilestoneAttainmentProps {
   };
 }
 
-interface RegionMilestoneData {
-  region: Region;
-  mqlActual: number;
-  mqlTarget: number;
-  mqlAttainmentPct: number;
-  mqlRag: RAGStatus;
-  sqlActual: number;
-  sqlTarget: number;
-  sqlAttainmentPct: number;
-  sqlRag: RAGStatus;
-  salActual: number;
-  salTarget: number;
-  salAttainmentPct: number;
-  salRag: RAGStatus;
-  sqoActual: number;
-  sqoTarget: number;
-  sqoAttainmentPct: number;
-  sqoRag: RAGStatus;
-  funnelScore: number;
-}
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
-interface SourceMilestoneData {
-  source: string;
-  region: Region;
-  product: Product;
-  // Actuals
-  mqlActual: number;
-  sqlActual: number;
-  salActual: number;
-  sqoActual: number;
-  // Targets
-  mqlTarget: number;
-  sqlTarget: number;
-  salTarget: number;
-  sqoTarget: number;
-  // Pacing percentages
-  mqlPacingPct: number;
-  sqlPacingPct: number;
-  salPacingPct: number;
-  sqoPacingPct: number;
-  // Conversion rates
-  mqlToSqlRate: number;
-  sqlToSalRate: number;
-  salToSqoRate: number;
-}
-
-/**
- * Get RAG status based on attainment percentage
- */
 function getRAG(pct: number): RAGStatus {
   if (pct >= 90) return 'GREEN';
   if (pct >= 70) return 'YELLOW';
   return 'RED';
 }
 
-/**
- * Get RAG color
- */
 function getRagColor(rag: RAGStatus): string {
   switch (rag) {
     case 'GREEN': return '#16a34a';
@@ -82,49 +34,206 @@ function getRagColor(rag: RAGStatus): string {
 }
 
 /**
- * Get color for conversion rate
+ * TOF Score: Weighted attainment across funnel stages
+ * EQL/MQL=10%, SQL=20%, SAL=30%, SQO=40%
  */
-function getConversionColor(rate: number): string {
-  if (rate >= 30) return '#16a34a';
-  if (rate >= 15) return '#ca8a04';
-  return '#dc2626';
+function calculateTOFScore(mql: number, sql: number, sal: number, sqo: number): number {
+  return Math.round((mql * 0.10) + (sql * 0.20) + (sal * 0.30) + (sqo * 0.40));
 }
 
-/**
- * Calculate funnel score - weighted average of milestone attainment
- */
-function calculateFunnelScore(mql: number, sql: number, sal: number, sqo: number): number {
-  // Weighted average: MQL 15%, SQL 25%, SAL 30%, SQO 30%
-  return (mql * 0.15) + (sql * 0.25) + (sal * 0.30) + (sqo * 0.30);
+function getLeadStageLabel(category: Category): 'MQL' | 'EQL' {
+  return category === 'NEW LOGO' ? 'MQL' : 'EQL';
 }
+
+// ============================================================================
+// INTERFACES
+// ============================================================================
+
+interface CategoryMilestoneData {
+  category: Category;
+  leadStageLabel: 'MQL' | 'EQL';
+  mqlActual: number;
+  mqlTarget: number;
+  mqlPacingPct: number;
+  sqlActual: number;
+  sqlTarget: number;
+  sqlPacingPct: number;
+  salActual: number;
+  salTarget: number;
+  salPacingPct: number;
+  sqoActual: number;
+  sqoTarget: number;
+  sqoPacingPct: number;
+  tofScore: number;
+}
+
+interface SourceMilestoneData {
+  source: string;
+  mqlActual: number;
+  mqlTarget: number;
+  mqlPacingPct: number;
+  sqlActual: number;
+  sqlTarget: number;
+  sqlPacingPct: number;
+  salActual: number;
+  salTarget: number;
+  salPacingPct: number;
+  sqoActual: number;
+  sqoTarget: number;
+  sqoPacingPct: number;
+  tofScore: number;
+}
+
+interface RegionMilestoneData {
+  region: Region;
+  mqlActual: number;
+  mqlTarget: number;
+  mqlPacingPct: number;
+  sqlActual: number;
+  sqlTarget: number;
+  sqlPacingPct: number;
+  salActual: number;
+  salTarget: number;
+  salPacingPct: number;
+  sqoActual: number;
+  sqoTarget: number;
+  sqoPacingPct: number;
+  tofScore: number;
+}
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
 
 export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }: FunnelMilestoneAttainmentProps) {
-  const [viewMode, setViewMode] = useState<'region' | 'source'>('source');
+  const [viewMode, setViewMode] = useState<'category' | 'source' | 'region'>('category');
   const [selectedProduct, setSelectedProduct] = useState<Product | 'ALL'>('ALL');
 
+  // Process by CATEGORY (NEW LOGO=MQL, EXPANSION/MIGRATION=EQL)
+  const categoryData = useMemo(() => {
+    const allRows = [...funnelData.POR, ...funnelData.R360];
+    const funnelCategories: Category[] = ['NEW LOGO', 'EXPANSION', 'MIGRATION'];
+
+    const categoryMap = new Map<Category, {
+      mqlActual: number; mqlTarget: number;
+      sqlActual: number; sqlTarget: number;
+      salActual: number; salTarget: number;
+      sqoActual: number; sqoTarget: number;
+    }>();
+
+    allRows.forEach(row => {
+      if (!funnelCategories.includes(row.category)) return;
+      const existing = categoryMap.get(row.category) || {
+        mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
+        salActual: 0, salTarget: 0, sqoActual: 0, sqoTarget: 0,
+      };
+      categoryMap.set(row.category, {
+        mqlActual: existing.mqlActual + (row.actual_mql || 0),
+        mqlTarget: existing.mqlTarget + (row.qtd_target_mql || 0),
+        sqlActual: existing.sqlActual + (row.actual_sql || 0),
+        sqlTarget: existing.sqlTarget + (row.qtd_target_sql || 0),
+        salActual: existing.salActual + (row.actual_sal || 0),
+        salTarget: existing.salTarget + (row.qtd_target_sal || 0),
+        sqoActual: existing.sqoActual + (row.actual_sqo || 0),
+        sqoTarget: existing.sqoTarget + (row.qtd_target_sqo || 0),
+      });
+    });
+
+    const result: CategoryMilestoneData[] = [];
+    categoryMap.forEach((data, category) => {
+      const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : 100;
+      const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : 100;
+      const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 100;
+      const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 100;
+
+      result.push({
+        category,
+        leadStageLabel: getLeadStageLabel(category),
+        ...data,
+        mqlPacingPct,
+        sqlPacingPct,
+        salPacingPct,
+        sqoPacingPct,
+        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
+      });
+    });
+
+    return result.sort((a, b) => a.tofScore - b.tofScore);
+  }, [funnelData]);
+
+  // Process by SOURCE
+  const sourceData = useMemo(() => {
+    if (!funnelBySource) return [];
+
+    const sourceMap = new Map<string, {
+      mqlActual: number; mqlTarget: number;
+      sqlActual: number; sqlTarget: number;
+      salActual: number; salTarget: number;
+      sqoActual: number; sqoTarget: number;
+    }>();
+
+    const processProduct = (rows: FunnelBySourceActuals[]) => {
+      rows.forEach(row => {
+        const existing = sourceMap.get(row.source) || {
+          mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
+          salActual: 0, salTarget: 0, sqoActual: 0, sqoTarget: 0,
+        };
+        sourceMap.set(row.source, {
+          mqlActual: existing.mqlActual + row.actual_mql,
+          mqlTarget: existing.mqlTarget + row.target_mql,
+          sqlActual: existing.sqlActual + row.actual_sql,
+          sqlTarget: existing.sqlTarget + row.target_sql,
+          salActual: existing.salActual + row.actual_sal,
+          salTarget: existing.salTarget + row.target_sal,
+          sqoActual: existing.sqoActual + row.actual_sqo,
+          sqoTarget: existing.sqoTarget + row.target_sqo,
+        });
+      });
+    };
+
+    if (selectedProduct === 'ALL' || selectedProduct === 'POR') processProduct(funnelBySource.POR);
+    if (selectedProduct === 'ALL' || selectedProduct === 'R360') processProduct(funnelBySource.R360);
+
+    const result: SourceMilestoneData[] = [];
+    sourceMap.forEach((data, source) => {
+      const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : 100;
+      const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : 100;
+      const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 100;
+      const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 100;
+
+      // Skip sources with no targets
+      if (data.mqlTarget === 0 && data.sqlTarget === 0 && data.salTarget === 0 && data.sqoTarget === 0) return;
+
+      result.push({
+        source,
+        ...data,
+        mqlPacingPct,
+        sqlPacingPct,
+        salPacingPct,
+        sqoPacingPct,
+        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
+      });
+    });
+
+    return result.sort((a, b) => a.tofScore - b.tofScore);
+  }, [funnelBySource, selectedProduct]);
+
+  // Process by REGION
   const regionData = useMemo(() => {
     const allRows = [...funnelData.POR, ...funnelData.R360];
 
-    // Aggregate by region
     const regionMap = new Map<Region, {
-      mqlActual: number;
-      mqlTarget: number;
-      sqlActual: number;
-      sqlTarget: number;
-      salActual: number;
-      salTarget: number;
-      sqoActual: number;
-      sqoTarget: number;
+      mqlActual: number; mqlTarget: number;
+      sqlActual: number; sqlTarget: number;
+      salActual: number; salTarget: number;
+      sqoActual: number; sqoTarget: number;
     }>();
 
     allRows.forEach(row => {
       const existing = regionMap.get(row.region) || {
-        mqlActual: 0, mqlTarget: 0,
-        sqlActual: 0, sqlTarget: 0,
-        salActual: 0, salTarget: 0,
-        sqoActual: 0, sqoTarget: 0,
+        mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
+        salActual: 0, salTarget: 0, sqoActual: 0, sqoTarget: 0,
       };
-
       regionMap.set(row.region, {
         mqlActual: existing.mqlActual + (row.actual_mql || 0),
         mqlTarget: existing.mqlTarget + (row.qtd_target_mql || 0),
@@ -137,186 +246,31 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       });
     });
 
-    // Calculate attainment and funnel score for each region
     const result: RegionMilestoneData[] = [];
     regionMap.forEach((data, region) => {
-      // When target is 0: if you have actuals, you've exceeded expectations (100%); otherwise 100% (nothing required)
-      const mqlAttainmentPct = data.mqlTarget > 0 ? (data.mqlActual / data.mqlTarget) * 100 : 100;
-      const sqlAttainmentPct = data.sqlTarget > 0 ? (data.sqlActual / data.sqlTarget) * 100 : 100;
-      const salAttainmentPct = data.salTarget > 0 ? (data.salActual / data.salTarget) * 100 : 100;
-      const sqoAttainmentPct = data.sqoTarget > 0 ? (data.sqoActual / data.sqoTarget) * 100 : 100;
-
-      result.push({
-        region,
-        mqlActual: data.mqlActual,
-        mqlTarget: data.mqlTarget,
-        mqlAttainmentPct,
-        mqlRag: getRAG(mqlAttainmentPct),
-        sqlActual: data.sqlActual,
-        sqlTarget: data.sqlTarget,
-        sqlAttainmentPct,
-        sqlRag: getRAG(sqlAttainmentPct),
-        salActual: data.salActual,
-        salTarget: data.salTarget,
-        salAttainmentPct,
-        salRag: getRAG(salAttainmentPct),
-        sqoActual: data.sqoActual,
-        sqoTarget: data.sqoTarget,
-        sqoAttainmentPct,
-        sqoRag: getRAG(sqoAttainmentPct),
-        funnelScore: calculateFunnelScore(mqlAttainmentPct, sqlAttainmentPct, salAttainmentPct, sqoAttainmentPct),
-      });
-    });
-
-    // Sort by funnel score (worst first)
-    return result.sort((a, b) => a.funnelScore - b.funnelScore);
-  }, [funnelData]);
-
-  // Process funnel by source data
-  const sourceData = useMemo(() => {
-    if (!funnelBySource) return [];
-
-    const result: SourceMilestoneData[] = [];
-
-    // Add POR data
-    if (selectedProduct === 'ALL' || selectedProduct === 'POR') {
-      for (const row of funnelBySource.POR) {
-        result.push({
-          source: row.source,
-          region: row.region,
-          product: 'POR',
-          mqlActual: row.actual_mql,
-          sqlActual: row.actual_sql,
-          salActual: row.actual_sal,
-          sqoActual: row.actual_sqo,
-          mqlTarget: row.target_mql,
-          sqlTarget: row.target_sql,
-          salTarget: row.target_sal,
-          sqoTarget: row.target_sqo,
-          mqlPacingPct: row.mql_pacing_pct,
-          sqlPacingPct: row.sql_pacing_pct,
-          salPacingPct: row.sal_pacing_pct,
-          sqoPacingPct: row.sqo_pacing_pct,
-          mqlToSqlRate: row.mql_to_sql_rate,
-          sqlToSalRate: row.sql_to_sal_rate,
-          salToSqoRate: row.sal_to_sqo_rate,
-        });
-      }
-    }
-
-    // Add R360 data
-    if (selectedProduct === 'ALL' || selectedProduct === 'R360') {
-      for (const row of funnelBySource.R360) {
-        result.push({
-          source: row.source,
-          region: row.region,
-          product: 'R360',
-          mqlActual: row.actual_mql,
-          sqlActual: row.actual_sql,
-          salActual: row.actual_sal,
-          sqoActual: row.actual_sqo,
-          mqlTarget: row.target_mql,
-          sqlTarget: row.target_sql,
-          salTarget: row.target_sal,
-          sqoTarget: row.target_sqo,
-          mqlPacingPct: row.mql_pacing_pct,
-          sqlPacingPct: row.sql_pacing_pct,
-          salPacingPct: row.sal_pacing_pct,
-          sqoPacingPct: row.sqo_pacing_pct,
-          mqlToSqlRate: row.mql_to_sql_rate,
-          sqlToSalRate: row.sql_to_sal_rate,
-          salToSqoRate: row.sal_to_sqo_rate,
-        });
-      }
-    }
-
-    // Sort by MQL count (highest first)
-    return result.sort((a, b) => b.mqlActual - a.mqlActual);
-  }, [funnelBySource, selectedProduct]);
-
-  // Aggregate source data by source (totals across regions)
-  const sourceAggregated = useMemo(() => {
-    const sourceMap = new Map<string, {
-      mqlActual: number;
-      sqlActual: number;
-      salActual: number;
-      sqoActual: number;
-      mqlTarget: number;
-      sqlTarget: number;
-      salTarget: number;
-      sqoTarget: number;
-    }>();
-
-    sourceData.forEach(row => {
-      const existing = sourceMap.get(row.source) || {
-        mqlActual: 0, sqlActual: 0, salActual: 0, sqoActual: 0,
-        mqlTarget: 0, sqlTarget: 0, salTarget: 0, sqoTarget: 0,
-      };
-      sourceMap.set(row.source, {
-        mqlActual: existing.mqlActual + row.mqlActual,
-        sqlActual: existing.sqlActual + row.sqlActual,
-        salActual: existing.salActual + row.salActual,
-        sqoActual: existing.sqoActual + row.sqoActual,
-        mqlTarget: existing.mqlTarget + row.mqlTarget,
-        sqlTarget: existing.sqlTarget + row.sqlTarget,
-        salTarget: existing.salTarget + row.salTarget,
-        sqoTarget: existing.sqoTarget + row.sqoTarget,
-      });
-    });
-
-    const result: {
-      source: string;
-      mqlActual: number;
-      sqlActual: number;
-      salActual: number;
-      sqoActual: number;
-      mqlTarget: number;
-      sqlTarget: number;
-      salTarget: number;
-      sqoTarget: number;
-      mqlPacingPct: number;
-      sqlPacingPct: number;
-      salPacingPct: number;
-      sqoPacingPct: number;
-      funnelScore: number;
-      mqlToSqlRate: number;
-      sqlToSalRate: number;
-      salToSqoRate: number;
-    }[] = [];
-
-    sourceMap.forEach((data, source) => {
-      // When target is 0: treat as 100% (no target = fully achieved)
       const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : 100;
       const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : 100;
       const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 100;
       const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 100;
 
       result.push({
-        source,
+        region,
         ...data,
         mqlPacingPct,
         sqlPacingPct,
         salPacingPct,
         sqoPacingPct,
-        funnelScore: calculateFunnelScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
-        mqlToSqlRate: data.mqlActual > 0 ? Math.round((data.sqlActual / data.mqlActual) * 1000) / 10 : 0,
-        sqlToSalRate: data.sqlActual > 0 ? Math.round((data.salActual / data.sqlActual) * 1000) / 10 : 0,
-        salToSqoRate: data.salActual > 0 ? Math.round((data.sqoActual / data.salActual) * 1000) / 10 : 0,
+        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
       });
     });
 
-    // Filter out sources with 0 targets (all stages)
-    const filtered = result.filter(row =>
-      row.mqlTarget > 0 || row.sqlTarget > 0 || row.salTarget > 0 || row.sqoTarget > 0
-    );
+    return result.sort((a, b) => a.tofScore - b.tofScore);
+  }, [funnelData]);
 
-    // Sort by funnel score (worst first)
-    return filtered.sort((a, b) => a.funnelScore - b.funnelScore);
-  }, [sourceData]);
-
-  // Calculate totals
+  // Calculate totals for footer
   const totals = useMemo(() => {
-    const total = regionData.reduce((acc, row) => ({
+    const data = viewMode === 'category' ? categoryData : viewMode === 'source' ? sourceData : regionData;
+    const total = data.reduce((acc, row) => ({
       mqlActual: acc.mqlActual + row.mqlActual,
       mqlTarget: acc.mqlTarget + row.mqlTarget,
       sqlActual: acc.sqlActual + row.sqlActual,
@@ -326,94 +280,95 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       sqoActual: acc.sqoActual + row.sqoActual,
       sqoTarget: acc.sqoTarget + row.sqoTarget,
     }), {
-      mqlActual: 0, mqlTarget: 0,
-      sqlActual: 0, sqlTarget: 0,
-      salActual: 0, salTarget: 0,
-      sqoActual: 0, sqoTarget: 0,
+      mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
+      salActual: 0, salTarget: 0, sqoActual: 0, sqoTarget: 0,
     });
 
-    // When target is 0: treat as 100% (no target = fully achieved)
-    const mqlPct = total.mqlTarget > 0 ? (total.mqlActual / total.mqlTarget) * 100 : 100;
-    const sqlPct = total.sqlTarget > 0 ? (total.sqlActual / total.sqlTarget) * 100 : 100;
-    const salPct = total.salTarget > 0 ? (total.salActual / total.salTarget) * 100 : 100;
-    const sqoPct = total.sqoTarget > 0 ? (total.sqoActual / total.sqoTarget) * 100 : 100;
+    const mqlPacingPct = total.mqlTarget > 0 ? Math.round((total.mqlActual / total.mqlTarget) * 100) : 100;
+    const sqlPacingPct = total.sqlTarget > 0 ? Math.round((total.sqlActual / total.sqlTarget) * 100) : 100;
+    const salPacingPct = total.salTarget > 0 ? Math.round((total.salActual / total.salTarget) * 100) : 100;
+    const sqoPacingPct = total.sqoTarget > 0 ? Math.round((total.sqoActual / total.sqoTarget) * 100) : 100;
 
     return {
-      mqlPct,
-      mqlRag: getRAG(mqlPct),
-      sqlPct,
-      sqlRag: getRAG(sqlPct),
-      salPct,
-      salRag: getRAG(salPct),
-      sqoPct,
-      sqoRag: getRAG(sqoPct),
-      funnelScore: calculateFunnelScore(mqlPct, sqlPct, salPct, sqoPct),
-    };
-  }, [regionData]);
-
-  // Source totals
-  const sourceTotals = useMemo(() => {
-    const totals = sourceAggregated.reduce((acc, row) => ({
-      mqlActual: acc.mqlActual + row.mqlActual,
-      sqlActual: acc.sqlActual + row.sqlActual,
-      salActual: acc.salActual + row.salActual,
-      sqoActual: acc.sqoActual + row.sqoActual,
-      mqlTarget: acc.mqlTarget + row.mqlTarget,
-      sqlTarget: acc.sqlTarget + row.sqlTarget,
-      salTarget: acc.salTarget + row.salTarget,
-      sqoTarget: acc.sqoTarget + row.sqoTarget,
-    }), {
-      mqlActual: 0, sqlActual: 0, salActual: 0, sqoActual: 0,
-      mqlTarget: 0, sqlTarget: 0, salTarget: 0, sqoTarget: 0,
-    });
-
-    // When target is 0: treat as 100% (no target = fully achieved)
-    const mqlPacingPct = totals.mqlTarget > 0 ? Math.round((totals.mqlActual / totals.mqlTarget) * 100) : 100;
-    const sqlPacingPct = totals.sqlTarget > 0 ? Math.round((totals.sqlActual / totals.sqlTarget) * 100) : 100;
-    const salPacingPct = totals.salTarget > 0 ? Math.round((totals.salActual / totals.salTarget) * 100) : 100;
-    const sqoPacingPct = totals.sqoTarget > 0 ? Math.round((totals.sqoActual / totals.sqoTarget) * 100) : 100;
-
-    return {
-      ...totals,
+      ...total,
       mqlPacingPct,
       sqlPacingPct,
       salPacingPct,
       sqoPacingPct,
-      funnelScore: calculateFunnelScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
+      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
     };
-  }, [sourceAggregated]);
+  }, [viewMode, categoryData, sourceData, regionData]);
 
-  if (regionData.length === 0 && sourceAggregated.length === 0) {
+  if (categoryData.length === 0 && sourceData.length === 0 && regionData.length === 0) {
     return null;
   }
 
   const hasPOR = funnelBySource?.POR && funnelBySource.POR.length > 0;
   const hasR360 = funnelBySource?.R360 && funnelBySource.R360.length > 0;
 
+  // Reusable table row renderer
+  const renderStageColumns = (row: { mqlActual: number; mqlTarget: number; mqlPacingPct: number; sqlActual: number; sqlTarget: number; sqlPacingPct: number; salActual: number; salTarget: number; salPacingPct: number; sqoActual: number; sqoTarget: number; sqoPacingPct: number; tofScore: number }, isBold = false) => (
+    <>
+      <td className="number-cell">{isBold ? <strong>{row.mqlActual.toLocaleString()}</strong> : row.mqlActual.toLocaleString()}</td>
+      <td className="number-cell target-cell">{isBold ? <strong>{row.mqlTarget.toLocaleString()}</strong> : row.mqlTarget.toLocaleString()}</td>
+      <td className="pacing-cell">
+        <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.mqlPacingPct)) }}>
+          {isBold ? <strong>{row.mqlPacingPct}%</strong> : `${row.mqlPacingPct}%`}
+        </span>
+      </td>
+      <td className="number-cell">{isBold ? <strong>{row.sqlActual.toLocaleString()}</strong> : row.sqlActual.toLocaleString()}</td>
+      <td className="number-cell target-cell">{isBold ? <strong>{row.sqlTarget.toLocaleString()}</strong> : row.sqlTarget.toLocaleString()}</td>
+      <td className="pacing-cell">
+        <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.sqlPacingPct)) }}>
+          {isBold ? <strong>{row.sqlPacingPct}%</strong> : `${row.sqlPacingPct}%`}
+        </span>
+      </td>
+      <td className="number-cell">{isBold ? <strong>{row.salActual.toLocaleString()}</strong> : row.salActual.toLocaleString()}</td>
+      <td className="number-cell target-cell">{isBold ? <strong>{row.salTarget.toLocaleString()}</strong> : row.salTarget.toLocaleString()}</td>
+      <td className="pacing-cell">
+        <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.salPacingPct)) }}>
+          {isBold ? <strong>{row.salPacingPct}%</strong> : `${row.salPacingPct}%`}
+        </span>
+      </td>
+      <td className="number-cell">{isBold ? <strong>{row.sqoActual.toLocaleString()}</strong> : row.sqoActual.toLocaleString()}</td>
+      <td className="number-cell target-cell">{isBold ? <strong>{row.sqoTarget.toLocaleString()}</strong> : row.sqoTarget.toLocaleString()}</td>
+      <td className="pacing-cell">
+        <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.sqoPacingPct)) }}>
+          {isBold ? <strong>{row.sqoPacingPct}%</strong> : `${row.sqoPacingPct}%`}
+        </span>
+      </td>
+      <td className="tof-score-cell">
+        <span className="tof-score" style={{ backgroundColor: getRagColor(getRAG(row.tofScore)) }}>
+          {isBold ? <strong>{row.tofScore}%</strong> : `${row.tofScore}%`}
+        </span>
+      </td>
+    </>
+  );
+
   return (
     <section>
-      <h2>Full Funnel Attainment (MQL → SQO)</h2>
+      <h2>Full Funnel Pacing (EQL/MQL → SQO)</h2>
+      <p className="section-subtitle">
+        <span className="lead-label mql">MQL</span> Marketing Qualified Lead (NEW LOGO)
+        <span className="separator">|</span>
+        <span className="lead-label eql">EQL</span> Existing Qualified Lead (EXPANSION, MIGRATION)
+        <span className="separator">|</span>
+        <span className="tof-label">TOF Score</span> = 10% EQL/MQL + 20% SQL + 30% SAL + 40% SQO
+      </p>
 
       {/* View Mode Toggle */}
       <div className="view-toggle">
-        <button
-          className={`toggle-btn ${viewMode === 'source' ? 'active' : ''}`}
-          onClick={() => setViewMode('source')}
-        >
+        <button className={`toggle-btn ${viewMode === 'category' ? 'active' : ''}`} onClick={() => setViewMode('category')}>
+          By Category
+        </button>
+        <button className={`toggle-btn ${viewMode === 'source' ? 'active' : ''}`} onClick={() => setViewMode('source')}>
           By Source
         </button>
-        <button
-          className={`toggle-btn ${viewMode === 'region' ? 'active' : ''}`}
-          onClick={() => setViewMode('region')}
-        >
+        <button className={`toggle-btn ${viewMode === 'region' ? 'active' : ''}`} onClick={() => setViewMode('region')}>
           By Region
         </button>
         {viewMode === 'source' && (
-          <select
-            className="product-filter"
-            value={selectedProduct}
-            onChange={(e) => setSelectedProduct(e.target.value as Product | 'ALL')}
-          >
+          <select className="product-filter" value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value as Product | 'ALL')}>
             <option value="ALL">All Products</option>
             {hasPOR && <option value="POR">POR</option>}
             {hasR360 && <option value="R360">R360</option>}
@@ -421,251 +376,83 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         )}
       </div>
 
-      {viewMode === 'source' && sourceAggregated.length > 0 && (
-        <>
-          <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
-            Sorted by funnel score (worst first) | Weights: MQL 15%, SQL 25%, SAL 30%, SQO 30%
-          </p>
-          <div className="milestone-table-container">
-            <table className="milestone-table source-table">
-              <thead>
-                <tr>
-                  <th rowSpan={2}>Source</th>
-                  <th colSpan={3}>MQL</th>
-                  <th colSpan={3}>SQL</th>
-                  <th colSpan={3}>SAL</th>
-                  <th colSpan={3}>SQO</th>
-                  <th rowSpan={2}>Funnel<br/>Score</th>
-                </tr>
-                <tr className="sub-header">
-                  <th>Actual</th>
-                  <th>Target</th>
-                  <th>Pacing</th>
-                  <th>Actual</th>
-                  <th>Target</th>
-                  <th>Pacing</th>
-                  <th>Actual</th>
-                  <th>Target</th>
-                  <th>Pacing</th>
-                  <th>Actual</th>
-                  <th>Target</th>
-                  <th>Pacing</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sourceAggregated.map(row => (
-                  <tr key={row.source}>
-                    <td className="source-cell">
-                      <span className={`source-badge ${row.source.toLowerCase().replace(/\s+/g, '-')}`}>
-                        {row.source}
-                      </span>
-                    </td>
-                    {/* MQL */}
-                    <td className="number-cell">{row.mqlActual.toLocaleString()}</td>
-                    <td className="number-cell target-cell">{row.mqlTarget.toLocaleString()}</td>
-                    <td className="pacing-cell">
-                      <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.mqlPacingPct)) }}>
-                        {row.mqlPacingPct}%
-                      </span>
-                    </td>
-                    {/* SQL */}
-                    <td className="number-cell">{row.sqlActual.toLocaleString()}</td>
-                    <td className="number-cell target-cell">{row.sqlTarget.toLocaleString()}</td>
-                    <td className="pacing-cell">
-                      <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.sqlPacingPct)) }}>
-                        {row.sqlPacingPct}%
-                      </span>
-                    </td>
-                    {/* SAL */}
-                    <td className="number-cell">{row.salActual.toLocaleString()}</td>
-                    <td className="number-cell target-cell">{row.salTarget.toLocaleString()}</td>
-                    <td className="pacing-cell">
-                      <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.salPacingPct)) }}>
-                        {row.salPacingPct}%
-                      </span>
-                    </td>
-                    {/* SQO */}
-                    <td className="number-cell">{row.sqoActual.toLocaleString()}</td>
-                    <td className="number-cell target-cell">{row.sqoTarget.toLocaleString()}</td>
-                    <td className="pacing-cell">
-                      <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.sqoPacingPct)) }}>
-                        {row.sqoPacingPct}%
-                      </span>
-                    </td>
-                    {/* Funnel Score */}
-                    <td className="funnel-score-cell">
-                      <span
-                        className="funnel-score"
-                        style={{ backgroundColor: getRagColor(getRAG(row.funnelScore)) }}
-                      >
-                        {row.funnelScore.toFixed(0)}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="totals-row">
-                  <td className="source-cell"><strong>TOTAL</strong></td>
-                  {/* MQL */}
-                  <td className="number-cell"><strong>{sourceTotals.mqlActual.toLocaleString()}</strong></td>
-                  <td className="number-cell target-cell"><strong>{sourceTotals.mqlTarget.toLocaleString()}</strong></td>
-                  <td className="pacing-cell">
-                    <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(sourceTotals.mqlPacingPct)) }}>
-                      <strong>{sourceTotals.mqlPacingPct}%</strong>
-                    </span>
-                  </td>
-                  {/* SQL */}
-                  <td className="number-cell"><strong>{sourceTotals.sqlActual.toLocaleString()}</strong></td>
-                  <td className="number-cell target-cell"><strong>{sourceTotals.sqlTarget.toLocaleString()}</strong></td>
-                  <td className="pacing-cell">
-                    <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(sourceTotals.sqlPacingPct)) }}>
-                      <strong>{sourceTotals.sqlPacingPct}%</strong>
-                    </span>
-                  </td>
-                  {/* SAL */}
-                  <td className="number-cell"><strong>{sourceTotals.salActual.toLocaleString()}</strong></td>
-                  <td className="number-cell target-cell"><strong>{sourceTotals.salTarget.toLocaleString()}</strong></td>
-                  <td className="pacing-cell">
-                    <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(sourceTotals.salPacingPct)) }}>
-                      <strong>{sourceTotals.salPacingPct}%</strong>
-                    </span>
-                  </td>
-                  {/* SQO */}
-                  <td className="number-cell"><strong>{sourceTotals.sqoActual.toLocaleString()}</strong></td>
-                  <td className="number-cell target-cell"><strong>{sourceTotals.sqoTarget.toLocaleString()}</strong></td>
-                  <td className="pacing-cell">
-                    <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(sourceTotals.sqoPacingPct)) }}>
-                      <strong>{sourceTotals.sqoPacingPct}%</strong>
-                    </span>
-                  </td>
-                  {/* Funnel Score */}
-                  <td className="funnel-score-cell">
-                    <span
-                      className="funnel-score"
-                      style={{ backgroundColor: getRagColor(getRAG(sourceTotals.funnelScore)) }}
-                    >
-                      <strong>{sourceTotals.funnelScore.toFixed(0)}%</strong>
-                    </span>
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </>
-      )}
-
-      {viewMode === 'region' && (
-        <>
-          <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
-            Sorted by funnel score (worst first) | Weights: MQL 15%, SQL 25%, SAL 30%, SQO 30%
-          </p>
-          <div className="milestone-table-container">
-            <table className="milestone-table">
-              <thead>
-                <tr>
-                  <th>Region</th>
-                  <th colSpan={2}>MQL</th>
-                  <th colSpan={2}>SQL</th>
-                  <th colSpan={2}>SAL</th>
-                  <th colSpan={2}>SQO</th>
-                  <th>Funnel Score</th>
-                </tr>
-                <tr className="sub-header">
-                  <th></th>
-                  <th>Att%</th>
-                  <th>RAG</th>
-                  <th>Att%</th>
-                  <th>RAG</th>
-                  <th>Att%</th>
-                  <th>RAG</th>
-                  <th>Att%</th>
-                  <th>RAG</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {regionData.map(row => (
-                  <tr key={row.region}>
-                    <td className="region-cell">{row.region}</td>
-                    <td className="number-cell">{row.mqlAttainmentPct.toFixed(0)}%</td>
-                    <td>
-                      <span className="rag-badge" style={{ backgroundColor: getRagColor(row.mqlRag) }}>
-                        {row.mqlRag}
-                      </span>
-                    </td>
-                    <td className="number-cell">{row.sqlAttainmentPct.toFixed(0)}%</td>
-                    <td>
-                      <span className="rag-badge" style={{ backgroundColor: getRagColor(row.sqlRag) }}>
-                        {row.sqlRag}
-                      </span>
-                    </td>
-                    <td className="number-cell">{row.salAttainmentPct.toFixed(0)}%</td>
-                    <td>
-                      <span className="rag-badge" style={{ backgroundColor: getRagColor(row.salRag) }}>
-                        {row.salRag}
-                      </span>
-                    </td>
-                    <td className="number-cell">{row.sqoAttainmentPct.toFixed(0)}%</td>
-                    <td>
-                      <span className="rag-badge" style={{ backgroundColor: getRagColor(row.sqoRag) }}>
-                        {row.sqoRag}
-                      </span>
-                    </td>
-                    <td className="funnel-score-cell">
-                      <span
-                        className="funnel-score"
-                        style={{ backgroundColor: getRagColor(getRAG(row.funnelScore)) }}
-                      >
-                        {row.funnelScore.toFixed(0)}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="totals-row">
-                  <td className="region-cell"><strong>TOTAL</strong></td>
-                  <td className="number-cell"><strong>{totals.mqlPct.toFixed(0)}%</strong></td>
-                  <td>
-                    <span className="rag-badge" style={{ backgroundColor: getRagColor(totals.mqlRag) }}>
-                      {totals.mqlRag}
-                    </span>
-                  </td>
-                  <td className="number-cell"><strong>{totals.sqlPct.toFixed(0)}%</strong></td>
-                  <td>
-                    <span className="rag-badge" style={{ backgroundColor: getRagColor(totals.sqlRag) }}>
-                      {totals.sqlRag}
-                    </span>
-                  </td>
-                  <td className="number-cell"><strong>{totals.salPct.toFixed(0)}%</strong></td>
-                  <td>
-                    <span className="rag-badge" style={{ backgroundColor: getRagColor(totals.salRag) }}>
-                      {totals.salRag}
-                    </span>
-                  </td>
-                  <td className="number-cell"><strong>{totals.sqoPct.toFixed(0)}%</strong></td>
-                  <td>
-                    <span className="rag-badge" style={{ backgroundColor: getRagColor(totals.sqoRag) }}>
-                      {totals.sqoRag}
-                    </span>
-                  </td>
-                  <td className="funnel-score-cell">
-                    <span
-                      className="funnel-score"
-                      style={{ backgroundColor: getRagColor(getRAG(totals.funnelScore)) }}
-                    >
-                      <strong>{totals.funnelScore.toFixed(0)}%</strong>
-                    </span>
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </>
-      )}
+      <div className="table-container">
+        <table className="funnel-table">
+          <thead>
+            <tr>
+              <th rowSpan={2}>{viewMode === 'category' ? 'Category' : viewMode === 'source' ? 'Source' : 'Region'}</th>
+              <th colSpan={3}>EQL/MQL</th>
+              <th colSpan={3}>SQL</th>
+              <th colSpan={3}>SAL</th>
+              <th colSpan={3}>SQO</th>
+              <th rowSpan={2}>TOF<br/>Score</th>
+            </tr>
+            <tr className="sub-header">
+              <th>Act</th><th>Tgt</th><th>Pace</th>
+              <th>Act</th><th>Tgt</th><th>Pace</th>
+              <th>Act</th><th>Tgt</th><th>Pace</th>
+              <th>Act</th><th>Tgt</th><th>Pace</th>
+            </tr>
+          </thead>
+          <tbody>
+            {viewMode === 'category' && categoryData.map(row => (
+              <tr key={row.category}>
+                <td className="label-cell">
+                  <span className={`category-badge ${row.category.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {row.category}
+                  </span>
+                  <span className={`lead-badge ${row.leadStageLabel.toLowerCase()}`}>{row.leadStageLabel}</span>
+                </td>
+                {renderStageColumns(row)}
+              </tr>
+            ))}
+            {viewMode === 'source' && sourceData.map(row => (
+              <tr key={row.source}>
+                <td className="label-cell">
+                  <span className={`source-badge ${row.source.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {row.source}
+                  </span>
+                </td>
+                {renderStageColumns(row)}
+              </tr>
+            ))}
+            {viewMode === 'region' && regionData.map(row => (
+              <tr key={row.region}>
+                <td className="label-cell region">{row.region}</td>
+                {renderStageColumns(row)}
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="totals-row">
+              <td className="label-cell"><strong>TOTAL</strong></td>
+              {renderStageColumns(totals, true)}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
 
       <style jsx>{`
+        .section-subtitle {
+          font-size: 10px;
+          color: #6b7280;
+          margin: -4px 0 12px 0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+        .lead-label {
+          padding: 1px 6px;
+          border-radius: 10px;
+          font-weight: 700;
+          font-size: 9px;
+        }
+        .lead-label.mql { background: #dbeafe; color: #1e40af; }
+        .lead-label.eql { background: #dcfce7; color: #166534; }
+        .tof-label { font-weight: 600; color: #374151; }
+        .separator { color: #d1d5db; }
+
         .view-toggle {
           display: flex;
           gap: 8px;
@@ -681,9 +468,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           cursor: pointer;
           transition: all 0.2s;
         }
-        .toggle-btn:hover {
-          background: #f3f4f6;
-        }
+        .toggle-btn:hover { background: #f3f4f6; }
         .toggle-btn.active {
           background: #1a1a2e;
           color: white;
@@ -697,119 +482,116 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           border-radius: 4px;
           background: white;
         }
-        .milestone-table-container {
+
+        .table-container {
           overflow-x: auto;
-          margin-top: 12px;
         }
-        .milestone-table {
+        .funnel-table {
           width: 100%;
           border-collapse: collapse;
-          font-size: 0.75rem;
+          font-size: 0.7rem;
         }
-        .milestone-table th,
-        .milestone-table td {
-          padding: 8px 6px;
+        .funnel-table th,
+        .funnel-table td {
+          padding: 6px 4px;
           border: 1px solid #e5e7eb;
           text-align: center;
         }
-        .milestone-table th {
+        .funnel-table th {
           background-color: #1a1a2e;
           color: white;
           font-weight: 600;
+          font-size: 0.65rem;
         }
         .sub-header th {
           background-color: #2d2d44;
-          color: white;
           font-weight: 500;
-          font-size: 0.65rem;
+          font-size: 0.6rem;
+          padding: 4px 2px;
         }
-        .region-cell,
-        .source-cell {
+        .label-cell {
           text-align: left;
           font-weight: 500;
+          white-space: nowrap;
+        }
+        .label-cell.region {
+          font-weight: 600;
         }
         .number-cell {
           font-family: monospace;
+          font-size: 0.65rem;
         }
-        .rate-cell {
-          font-family: monospace;
-          font-weight: 600;
+        .target-cell {
+          color: #9ca3af;
         }
-        .rag-badge {
+        .pacing-cell {
+          padding: 3px;
+        }
+        .pacing-badge {
           display: inline-block;
-          padding: 2px 6px;
+          padding: 2px 5px;
           border-radius: 3px;
           color: white;
           font-size: 0.6rem;
           font-weight: bold;
+          min-width: 32px;
         }
-        .source-badge {
+        .tof-score-cell {
+          background-color: #f9fafb;
+          padding: 3px;
+        }
+        .tof-score {
           display: inline-block;
           padding: 3px 8px;
           border-radius: 4px;
-          font-size: 0.65rem;
-          font-weight: 600;
-          background: #e5e7eb;
-          color: #1f2937;
-        }
-        .source-badge.inbound {
-          background: #dbeafe;
-          color: #1e40af;
-        }
-        .source-badge.outbound {
-          background: #fef3c7;
-          color: #92400e;
-        }
-        .source-badge.ae-sourced {
-          background: #dcfce7;
-          color: #166534;
-        }
-        .source-badge.am-sourced {
-          background: #f3e8ff;
-          color: #7c3aed;
-        }
-        .source-badge.tradeshow {
-          background: #ffe4e6;
-          color: #be123c;
-        }
-        .source-badge.partnerships {
-          background: #e0e7ff;
-          color: #3730a3;
-        }
-        .funnel-score-cell {
-          background-color: #f9fafb;
-        }
-        .funnel-score {
-          display: inline-block;
-          padding: 4px 10px;
-          border-radius: 4px;
           color: white;
           font-weight: bold;
-          font-size: 0.75rem;
+          font-size: 0.7rem;
         }
         .totals-row {
           background-color: #f3f4f6;
         }
-        .source-table th {
-          font-size: 0.65rem;
-        }
-        .target-cell {
-          color: #6b7280;
-          font-size: 0.65rem;
-        }
-        .pacing-cell {
-          padding: 4px;
-        }
-        .pacing-badge {
+
+        /* Category badges */
+        .category-badge {
           display: inline-block;
           padding: 2px 6px;
-          border-radius: 3px;
-          color: white;
-          font-size: 0.65rem;
-          font-weight: bold;
-          min-width: 36px;
-          text-align: center;
+          border-radius: 4px;
+          font-size: 0.6rem;
+          font-weight: 600;
+          margin-right: 4px;
         }
+        .category-badge.new-logo { background: #dbeafe; color: #1e40af; }
+        .category-badge.expansion { background: #dcfce7; color: #166534; }
+        .category-badge.migration { background: #fef3c7; color: #92400e; }
+
+        .lead-badge {
+          display: inline-block;
+          padding: 1px 5px;
+          border-radius: 10px;
+          font-size: 0.55rem;
+          font-weight: 700;
+          letter-spacing: 0.3px;
+        }
+        .lead-badge.mql { background: #dbeafe; color: #1e40af; }
+        .lead-badge.eql { background: #dcfce7; color: #166534; }
+
+        /* Source badges */
+        .source-badge {
+          display: inline-block;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 0.6rem;
+          font-weight: 600;
+          background: #e5e7eb;
+          color: #1f2937;
+        }
+        .source-badge.inbound { background: #dbeafe; color: #1e40af; }
+        .source-badge.outbound { background: #fef3c7; color: #92400e; }
+        .source-badge.ae-sourced { background: #dcfce7; color: #166534; }
+        .source-badge.am-sourced { background: #f3e8ff; color: #7c3aed; }
+        .source-badge.tradeshow { background: #ffe4e6; color: #be123c; }
+        .source-badge.partnerships { background: #e0e7ff; color: #3730a3; }
       `}</style>
     </section>
   );
