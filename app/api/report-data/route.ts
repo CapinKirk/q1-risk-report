@@ -1226,95 +1226,117 @@ async function getSQLDetails(filters: ReportFilters) {
       }).join(', ')})`
     : '';
 
+  // POR SQL query - supplements missing OpportunityID from Lead.ConvertedOpportunityId
   const porQuery = `
     SELECT
       'POR' AS product,
-      CASE Division
+      CASE f.Division
         WHEN 'US' THEN 'AMER'
         WHEN 'UK' THEN 'EMEA'
         WHEN 'AU' THEN 'APAC'
       END AS region,
-      COALESCE(LeadId, ContactId) AS record_id,
+      COALESCE(f.LeadId, f.ContactId) AS record_id,
+      -- Build Salesforce URL: prefer direct OpportunityID, then Lead conversion, then Lead/Contact
       CASE
-        WHEN OpportunityID IS NOT NULL AND OpportunityID != '' THEN OpportunityLink
-        WHEN LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', LeadId)
-        ELSE CONCAT('https://por.my.salesforce.com/', ContactId)
+        WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
+        WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
+        WHEN f.LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
+        ELSE CONCAT('https://por.my.salesforce.com/', f.ContactId)
       END AS salesforce_url,
-      COALESCE(Company, 'Unknown') AS company_name,
-      COALESCE(LeadEmail, ContactEmail, 'N/A') AS email,
-      COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
-      CAST(SQL_DT AS STRING) AS sql_date,
-      CAST(MQL_DT AS STRING) AS mql_date,
-      DATE_DIFF(CAST(SQL_DT AS DATE), CAST(MQL_DT AS DATE), DAY) AS days_mql_to_sql,
-      CASE WHEN SAL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
-      CASE WHEN SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-      CASE WHEN OpportunityID IS NOT NULL AND OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+      COALESCE(f.Company, 'Unknown') AS company_name,
+      COALESCE(f.LeadEmail, f.ContactEmail, 'N/A') AS email,
+      COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND') AS source,
+      CAST(f.SQL_DT AS STRING) AS sql_date,
+      CAST(f.MQL_DT AS STRING) AS mql_date,
+      DATE_DIFF(CAST(f.SQL_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_mql_to_sql,
+      CASE WHEN f.SAL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
+      CASE WHEN f.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+      -- has_opportunity: true if we have OpportunityID directly OR via Lead conversion
+      CASE WHEN (f.OpportunityID IS NOT NULL AND f.OpportunityID != '') OR l.ConvertedOpportunityId IS NOT NULL THEN 'Yes' ELSE 'No' END AS has_opportunity,
       CASE
-        WHEN SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-        WHEN SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
-        WHEN DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
+        WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+        WHEN f.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
         ELSE 'ACTIVE'
       END AS sql_status,
-      OpportunityID AS opportunity_id,
-      OpportunityName AS opportunity_name,
-      CAST(NULL AS STRING) AS opportunity_stage,
-      CAST(NULL AS FLOAT64) AS opportunity_acv,
-      'N/A' AS loss_reason,
-      DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) AS days_in_stage
-    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
-    WHERE Division IN ('US', 'UK', 'AU')
-      AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
-      AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
+      -- opportunity_id: prefer direct, fall back to Lead conversion
+      COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) AS opportunity_id,
+      COALESCE(f.OpportunityName, o.OpportunityName) AS opportunity_name,
+      o.StageName AS opportunity_stage,
+      o.ACV AS opportunity_acv,
+      COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+      DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) AS days_in_stage
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\` f
+    -- Join with Lead table to get ConvertedOpportunityId for leads without direct OpportunityID
+    LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
+      ON f.LeadId = l.Id
+    -- Join with Opportunity to get additional details (stage, ACV, loss reason)
+    LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+      ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
+    WHERE f.Division IN ('US', 'UK', 'AU')
+      AND (f.SpiralyzeTest IS NULL OR f.SpiralyzeTest = false)
+      AND (f.MQL_Reverted IS NULL OR f.MQL_Reverted = false)
       -- Removed SDRSource filter to include all MQL sources
-      AND SQL_DT IS NOT NULL
-      AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
-      AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
-      ${regionClause}
-    ORDER BY SQL_DT DESC
+      AND f.SQL_DT IS NOT NULL
+      AND CAST(f.SQL_DT AS DATE) >= '${filters.startDate}'
+      AND CAST(f.SQL_DT AS DATE) <= '${filters.endDate}'
+      ${regionClause.replace(/Division/g, 'f.Division')}
+    ORDER BY f.SQL_DT DESC
   `;
 
   const r360RegionClause = filters.regions && filters.regions.length > 0
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
+  // R360 SQL query - supplements missing OpportunityID from Lead.ConvertedOpportunityId
   const r360Query = `
     SELECT
       'R360' AS product,
-      Region AS region,
-      LeadId AS record_id,
+      f.Region AS region,
+      f.LeadId AS record_id,
+      -- Build Salesforce URL: prefer direct OpportunityID, then Lead conversion, then Lead
       CASE
-        WHEN OpportunityID IS NOT NULL AND OpportunityID != '' THEN OpportunityLink
-        ELSE COALESCE(LeadLink, CONCAT('https://por.my.salesforce.com/', LeadId))
+        WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
+        WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
+        ELSE COALESCE(f.LeadLink, CONCAT('https://por.my.salesforce.com/', f.LeadId))
       END AS salesforce_url,
-      COALESCE(Company, 'Unknown') AS company_name,
-      Email AS email,
-      COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
-      CAST(SQL_DT AS STRING) AS sql_date,
-      CAST(MQL_DT AS STRING) AS mql_date,
-      DATE_DIFF(CAST(SQL_DT AS DATE), CAST(MQL_DT AS DATE), DAY) AS days_mql_to_sql,
+      COALESCE(f.Company, 'Unknown') AS company_name,
+      f.Email AS email,
+      COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND') AS source,
+      CAST(f.SQL_DT AS STRING) AS sql_date,
+      CAST(f.MQL_DT AS STRING) AS mql_date,
+      DATE_DIFF(CAST(f.SQL_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_mql_to_sql,
       'N/A' AS converted_to_sal,
-      CASE WHEN SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-      CASE WHEN OpportunityID IS NOT NULL AND OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+      CASE WHEN f.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+      -- has_opportunity: true if we have OpportunityID directly OR via Lead conversion
+      CASE WHEN (f.OpportunityID IS NOT NULL AND f.OpportunityID != '') OR l.ConvertedOpportunityId IS NOT NULL THEN 'Yes' ELSE 'No' END AS has_opportunity,
       CASE
-        WHEN SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-        WHEN DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
+        WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
         ELSE 'ACTIVE'
       END AS sql_status,
-      OpportunityID AS opportunity_id,
-      OpportunityName AS opportunity_name,
-      CAST(NULL AS STRING) AS opportunity_stage,
-      CAST(NULL AS FLOAT64) AS opportunity_acv,
-      'N/A' AS loss_reason,
-      DATE_DIFF(CURRENT_DATE(), CAST(SQL_DT AS DATE), DAY) AS days_in_stage
-    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
-    WHERE MQL_Reverted = false
-      AND Region IS NOT NULL
+      -- opportunity_id: prefer direct, fall back to Lead conversion
+      COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) AS opportunity_id,
+      COALESCE(f.OpportunityName, o.OpportunityName) AS opportunity_name,
+      o.StageName AS opportunity_stage,
+      o.ACV AS opportunity_acv,
+      COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+      DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) AS days_in_stage
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\` f
+    -- Join with Lead table to get ConvertedOpportunityId for leads without direct OpportunityID
+    LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
+      ON f.LeadId = l.Id
+    -- Join with Opportunity to get additional details (stage, ACV, loss reason)
+    LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+      ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
+    WHERE f.MQL_Reverted = false
+      AND f.Region IS NOT NULL
       -- Removed SDRSource filter to include all MQL sources
-      AND SQL_DT IS NOT NULL
-      AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
-      AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
-      ${r360RegionClause}
-    ORDER BY SQL_DT DESC
+      AND f.SQL_DT IS NOT NULL
+      AND CAST(f.SQL_DT AS DATE) >= '${filters.startDate}'
+      AND CAST(f.SQL_DT AS DATE) <= '${filters.endDate}'
+      ${r360RegionClause.replace(/Region/g, 'f.Region')}
+    ORDER BY f.SQL_DT DESC
   `;
 
   try {
