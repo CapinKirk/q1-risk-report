@@ -108,16 +108,16 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
   return (
     <section className="sql-details-section">
       <h2>SQL Details</h2>
-      <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '12px' }}>
+      <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
         Sales Qualified Leads with opportunity tracking and loss reasons
       </p>
 
       {!hasData && (
-        <div style={{ padding: '40px', textAlign: 'center', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-          <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>
+        <div style={{ padding: '40px', textAlign: 'center', backgroundColor: 'var(--bg-tertiary)', borderRadius: '8px', border: '1px solid var(--border-primary)' }}>
+          <p style={{ color: 'var(--text-tertiary)', fontSize: '14px', margin: 0 }}>
             No SQL data available for the selected date range.
           </p>
-          <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '8px' }}>
+          <p style={{ color: 'var(--text-tertiary)', fontSize: '12px', marginTop: '8px' }}>
             SQL details require live BigQuery connection. Click "Refresh" to load live data.
           </p>
         </div>
@@ -220,7 +220,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
           <tbody>
             {paginatedSQLs.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: '20px', color: '#6b7280' }}>
+                <td colSpan={10} style={{ textAlign: 'center', padding: '20px', color: 'var(--text-tertiary)' }}>
                   No SQLs found matching the filters
                 </td>
               </tr>
@@ -262,7 +262,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
                           {sql.opportunity_name ? (sql.opportunity_name.length > 18 ? sql.opportunity_name.substring(0, 18) + '...' : sql.opportunity_name) : 'Yes'}
                         </span>
                       ) : (
-                        <span style={{ color: '#9ca3af' }}>No Opp</span>
+                        <span style={{ color: 'var(--text-tertiary)' }}>No Opp</span>
                       )}
                     </td>
                     <td className="loss-reason-cell" title={sql.loss_reason || ''}>
@@ -275,7 +275,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
                           {sql.days_in_stage ? `${sql.days_in_stage}d stalled` : 'Stalled'}
                         </span>
                       ) : (
-                        <span style={{ color: '#9ca3af' }}>-</span>
+                        <span style={{ color: 'var(--text-tertiary)' }}>-</span>
                       )}
                     </td>
                     <td>
@@ -372,19 +372,19 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
           flex-direction: column;
           align-items: center;
           padding: 10px 16px;
-          background: #f9fafb;
+          background: var(--bg-tertiary);
           border-radius: 8px;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border-primary);
           min-width: 80px;
         }
         .stat-value {
           font-size: 1.25rem;
           font-weight: 700;
-          color: #1f2937;
+          color: var(--text-primary);
         }
         .stat-label {
           font-size: 0.65rem;
-          color: #6b7280;
+          color: var(--text-tertiary);
           margin-top: 2px;
         }
         .sql-filters {
@@ -401,16 +401,17 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
         }
         .filter-group label {
           font-size: 0.7rem;
-          color: #6b7280;
+          color: var(--text-tertiary);
           font-weight: 500;
         }
         .filter-group select,
         .filter-group input {
           font-size: 0.75rem;
           padding: 4px 8px;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border-primary);
           border-radius: 4px;
-          background: white;
+          background: var(--bg-secondary);
+          color: var(--text-primary);
         }
         .filter-group.search input {
           width: 220px;
@@ -426,7 +427,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
         .sql-table th,
         .sql-table td {
           padding: 6px 5px;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border-primary);
           text-align: left;
         }
         .sql-table th {
@@ -436,10 +437,10 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
           font-size: 0.65rem;
         }
         .sql-table tbody tr:nth-child(even) {
-          background-color: #f9fafb;
+          background-color: var(--bg-tertiary);
         }
         .sql-table tbody tr:hover {
-          background-color: #f3f4f6;
+          background-color: var(--bg-hover);
         }
         .product-badge {
           display: inline-block;
@@ -511,7 +512,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
         }
         .result-count {
           font-size: 0.7rem;
-          color: #6b7280;
+          color: var(--text-tertiary);
           font-weight: 500;
         }
         .pagination {
@@ -524,16 +525,17 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
         }
         .pagination button {
           padding: 4px 10px;
-          border: 1px solid #d1d5db;
+          border: 1px solid var(--border-primary);
           border-radius: 4px;
-          background: white;
+          background: var(--bg-secondary);
+          color: var(--text-primary);
           font-size: 0.7rem;
           cursor: pointer;
           transition: all 0.15s;
         }
         .pagination button:hover:not(:disabled) {
-          background: #f3f4f6;
-          border-color: #9ca3af;
+          background: var(--bg-hover);
+          border-color: var(--border-primary);
         }
         .pagination button:disabled {
           opacity: 0.5;
@@ -542,12 +544,12 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
         .page-info {
           padding: 0 12px;
           font-size: 0.7rem;
-          color: #6b7280;
+          color: var(--text-tertiary);
         }
         .loss-summary {
           margin-top: 16px;
           padding: 12px;
-          background: #fef2f2;
+          background: var(--danger-bg);
           border-radius: 8px;
           border: 1px solid #fecaca;
         }
@@ -566,7 +568,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
           align-items: center;
           gap: 8px;
           padding: 6px 10px;
-          background: white;
+          background: var(--bg-secondary);
           border-radius: 4px;
           border: 1px solid #fecaca;
         }
@@ -577,7 +579,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
         }
         .loss-reason-text {
           font-size: 0.7rem;
-          color: #4b5563;
+          color: var(--text-primary);
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;

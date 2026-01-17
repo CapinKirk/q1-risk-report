@@ -212,7 +212,7 @@ export default function DealListModal({
             z-index: 1000;
           }
           .modal-content {
-            background: white;
+            background: var(--bg-secondary);
             border-radius: 8px;
             width: 90%;
             max-width: 900px;
@@ -226,31 +226,31 @@ export default function DealListModal({
             justify-content: space-between;
             align-items: center;
             padding: 16px 20px;
-            border-bottom: 1px solid #e5e7eb;
+            border-bottom: 1px solid var(--border-primary);
           }
           .modal-header h3 {
             margin: 0;
             font-size: 16px;
-            color: #1f2937;
+            color: var(--text-primary);
           }
           .close-btn {
             background: none;
             border: none;
             font-size: 24px;
             cursor: pointer;
-            color: #6b7280;
+            color: var(--text-secondary);
             padding: 0;
             line-height: 1;
           }
           .close-btn:hover {
-            color: #1f2937;
+            color: var(--text-primary);
           }
           .modal-summary {
             display: flex;
             gap: 20px;
             padding: 12px 20px;
-            background: #f9fafb;
-            border-bottom: 1px solid #e5e7eb;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-primary);
             align-items: center;
           }
           .modal-summary span {
@@ -299,10 +299,10 @@ export default function DealListModal({
           }
           .deal-table td {
             padding: 8px 10px;
-            border-bottom: 1px solid #e5e7eb;
+            border-bottom: 1px solid var(--border-primary);
           }
           .deal-table tr:hover {
-            background: #f3f4f6;
+            background: var(--bg-tertiary);
           }
           .account-cell {
             max-width: 200px;
@@ -335,19 +335,19 @@ export default function DealListModal({
             gap: 8px;
             margin-top: 12px;
             padding: 8px;
-            border-top: 1px solid #e5e7eb;
+            border-top: 1px solid var(--border-primary);
           }
           .pagination button {
             padding: 4px 10px;
             border: 1px solid #d1d5db;
             border-radius: 4px;
-            background: white;
+            background: var(--bg-secondary);
             font-size: 0.7rem;
             cursor: pointer;
             transition: all 0.15s;
           }
           .pagination button:hover:not(:disabled) {
-            background: #f3f4f6;
+            background: var(--bg-tertiary);
             border-color: #9ca3af;
           }
           .pagination button:disabled {
@@ -357,7 +357,7 @@ export default function DealListModal({
           .page-info {
             padding: 0 12px;
             font-size: 0.7rem;
-            color: #6b7280;
+            color: var(--text-secondary);
           }
         `}</style>
       </div>

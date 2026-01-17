@@ -96,7 +96,7 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
               <td className="right red">{formatCurrency(r360Lost?.total_lost_acv)}</td>
               <td className="right">{formatCurrency((r360Lost?.total_lost_deals || 0) > 0 ? (r360Lost?.total_lost_acv || 0) / (r360Lost?.total_lost_deals || 1) : 0)}</td>
             </tr>
-            <tr style={{ fontWeight: 'bold', background: '#f8f9fa' }}>
+            <tr style={{ fontWeight: 'bold', background: 'var(--bg-tertiary)' }}>
               <td>TOTAL</td>
               <td className="right">{Math.round(totalLostDeals)}</td>
               <td className="right red">{formatCurrency(totalLostAcv)}</td>
@@ -184,9 +184,9 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
               onClick={() => setCurrentPage(1)}
               style={{
                 padding: '4px 10px',
-                border: '1px solid #d1d5db',
+                border: '1px solid var(--border-primary)',
                 borderRadius: '4px',
-                background: 'white',
+                background: 'var(--bg-secondary)',
                 fontSize: '0.75rem',
                 cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
                 opacity: currentPage === 1 ? 0.5 : 1
@@ -199,9 +199,9 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               style={{
                 padding: '4px 10px',
-                border: '1px solid #d1d5db',
+                border: '1px solid var(--border-primary)',
                 borderRadius: '4px',
-                background: 'white',
+                background: 'var(--bg-secondary)',
                 fontSize: '0.75rem',
                 cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
                 opacity: currentPage === 1 ? 0.5 : 1
@@ -209,7 +209,7 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
             >
               ‹ Prev
             </button>
-            <span style={{ padding: '0 12px', fontSize: '0.75rem', color: '#6b7280' }}>
+            <span style={{ padding: '0 12px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
               Page {currentPage} of {totalPages}
             </span>
             <button
@@ -217,9 +217,9 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               style={{
                 padding: '4px 10px',
-                border: '1px solid #d1d5db',
+                border: '1px solid var(--border-primary)',
                 borderRadius: '4px',
-                background: 'white',
+                background: 'var(--bg-secondary)',
                 fontSize: '0.75rem',
                 cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
                 opacity: currentPage === totalPages ? 0.5 : 1
@@ -232,9 +232,9 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
               onClick={() => setCurrentPage(totalPages)}
               style={{
                 padding: '4px 10px',
-                border: '1px solid #d1d5db',
+                border: '1px solid var(--border-primary)',
                 borderRadius: '4px',
-                background: 'white',
+                background: 'var(--bg-secondary)',
                 fontSize: '0.75rem',
                 cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
                 opacity: currentPage === totalPages ? 0.5 : 1

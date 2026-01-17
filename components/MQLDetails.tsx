@@ -111,16 +111,16 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
   return (
     <section className="mql-details-section">
       <h2>Lead Details (MQL + EQL)</h2>
-      <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '12px' }}>
+      <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
         MQL = Marketing Qualified Leads (New Business) | EQL = Existing Qualified Leads (Expansion/Migration)
       </p>
 
       {!hasData && (
-        <div style={{ padding: '40px', textAlign: 'center', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-          <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>
+        <div style={{ padding: '40px', textAlign: 'center', backgroundColor: 'var(--bg-tertiary)', borderRadius: '8px', border: '1px solid var(--border-primary)' }}>
+          <p style={{ color: 'var(--text-tertiary)', fontSize: '14px', margin: 0 }}>
             No lead data available for the selected date range.
           </p>
-          <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '8px' }}>
+          <p style={{ color: 'var(--text-tertiary)', fontSize: '12px', marginTop: '8px' }}>
             Lead details require live BigQuery connection. Click "Refresh" to load live data.
           </p>
         </div>
@@ -239,7 +239,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
           <tbody>
             {paginatedMQLs.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: '20px', color: '#6b7280' }}>
+                <td colSpan={10} style={{ textAlign: 'center', padding: '20px', color: 'var(--text-tertiary)' }}>
                   No leads found matching the filters
                 </td>
               </tr>
@@ -342,7 +342,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         }
         .toggle-label {
           font-size: 0.75rem;
-          color: #6b7280;
+          color: var(--text-tertiary);
           font-weight: 500;
         }
         .toggle-btn {
@@ -356,7 +356,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         }
         .toggle-btn.mql {
           border-color: #3b82f6;
-          background: white;
+          background: var(--bg-secondary);
           color: #3b82f6;
         }
         .toggle-btn.mql.active {
@@ -365,7 +365,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         }
         .toggle-btn.eql {
           border-color: #8b5cf6;
-          background: white;
+          background: var(--bg-secondary);
           color: #8b5cf6;
         }
         .toggle-btn.eql.active {
@@ -383,31 +383,31 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
           flex-direction: column;
           align-items: center;
           padding: 10px 16px;
-          background: #f9fafb;
+          background: var(--bg-tertiary);
           border-radius: 8px;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border-primary);
           min-width: 80px;
         }
         .stat-card.blue {
-          background: #eff6ff;
+          background: var(--bg-tertiary);
           border-color: #93c5fd;
         }
         .stat-card.purple {
-          background: #faf5ff;
+          background: var(--bg-tertiary);
           border-color: #c4b5fd;
         }
         .stat-card.orange {
-          background: #fff7ed;
+          background: var(--bg-tertiary);
           border-color: #fdba74;
         }
         .stat-value {
           font-size: 1.3rem;
           font-weight: 700;
-          color: #1f2937;
+          color: var(--text-primary);
         }
         .stat-label {
           font-size: 0.65rem;
-          color: #6b7280;
+          color: var(--text-tertiary);
           margin-top: 4px;
         }
         .mql-filters {
@@ -424,16 +424,17 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         }
         .filter-group label {
           font-size: 0.7rem;
-          color: #6b7280;
+          color: var(--text-tertiary);
           font-weight: 500;
         }
         .filter-group select,
         .filter-group input {
           font-size: 0.75rem;
           padding: 4px 8px;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border-primary);
           border-radius: 4px;
-          background: white;
+          background: var(--bg-secondary);
+          color: var(--text-primary);
         }
         .filter-group.search input {
           width: 180px;
@@ -449,7 +450,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         .mql-table th,
         .mql-table td {
           padding: 8px 6px;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border-primary);
           text-align: left;
         }
         .mql-table th {
@@ -458,10 +459,10 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
           font-weight: 600;
         }
         .mql-table tbody tr:nth-child(even) {
-          background-color: #f9fafb;
+          background-color: var(--bg-tertiary);
         }
         .mql-table tbody tr:hover {
-          background-color: #f3f4f6;
+          background-color: var(--bg-hover);
         }
         .lead-type-badge {
           display: inline-block;
@@ -489,11 +490,11 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
           color: #1e40af;
         }
         .category-badge.expansion {
-          background-color: #f3e8ff;
+          background-color: var(--bg-tertiary);
           color: #7c3aed;
         }
         .category-badge.migration {
-          background-color: #ffedd5;
+          background-color: var(--bg-tertiary);
           color: #c2410c;
         }
         .product-badge {
@@ -539,11 +540,11 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
           color: #1e40af;
         }
         .status-badge.reverted {
-          background-color: #fee2e2;
+          background-color: var(--danger-bg);
           color: #991b1b;
         }
         .status-badge.stalled {
-          background-color: #fef3c7;
+          background-color: var(--warning-bg);
           color: #92400e;
         }
         .days-cell {
@@ -555,17 +556,17 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
           text-decoration: none;
           font-weight: 500;
           padding: 2px 6px;
-          background: #eff6ff;
+          background: var(--bg-tertiary);
           border-radius: 3px;
           font-size: 0.65rem;
         }
         .sf-link:hover {
-          background: #dbeafe;
+          background: var(--bg-hover);
           text-decoration: underline;
         }
         .result-count {
           font-size: 0.7rem;
-          color: #6b7280;
+          color: var(--text-tertiary);
           font-weight: 500;
         }
         .pagination {
@@ -578,16 +579,17 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         }
         .pagination button {
           padding: 4px 10px;
-          border: 1px solid #d1d5db;
+          border: 1px solid var(--border-primary);
           border-radius: 4px;
-          background: white;
+          background: var(--bg-secondary);
           font-size: 0.7rem;
           cursor: pointer;
           transition: all 0.15s;
+          color: var(--text-primary);
         }
         .pagination button:hover:not(:disabled) {
-          background: #f3f4f6;
-          border-color: #9ca3af;
+          background: var(--bg-hover);
+          border-color: var(--border-primary);
         }
         .pagination button:disabled {
           opacity: 0.5;
@@ -596,7 +598,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         .page-info {
           padding: 0 12px;
           font-size: 0.7rem;
-          color: #6b7280;
+          color: var(--text-tertiary);
         }
       `}</style>
         </>

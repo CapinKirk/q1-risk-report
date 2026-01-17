@@ -165,7 +165,7 @@ export default function AIAnalysisTile({ product, region, reportData, isActive, 
     <div
       className={`ai-tile ${!isActive ? 'inactive' : ''}`}
       style={{
-        border: `1px solid ${isActive ? productColor.border : '#e5e7eb'}`,
+        border: `1px solid ${isActive ? productColor.border : 'var(--border-primary)'}`,
         opacity: isActive ? 1 : 0.5,
       }}
     >
@@ -235,7 +235,7 @@ export default function AIAnalysisTile({ product, region, reportData, isActive, 
 
       <style jsx>{`
         .ai-tile {
-          background: white;
+          background: var(--bg-secondary);
           border-radius: 8px;
           overflow: hidden;
           display: flex;
@@ -247,11 +247,11 @@ export default function AIAnalysisTile({ product, region, reportData, isActive, 
         }
         .tile-header {
           padding: 12px 16px;
-          border-bottom: 1px solid #f1f5f9;
+          border-bottom: 1px solid var(--border-primary);
           display: flex;
           justify-content: space-between;
           align-items: center;
-          background: #fafafa;
+          background: var(--bg-tertiary);
         }
         .tile-badges {
           display: flex;
@@ -302,7 +302,7 @@ export default function AIAnalysisTile({ product, region, reportData, isActive, 
           justify-content: center;
           height: 100%;
           min-height: 120px;
-          color: #9ca3af;
+          color: var(--text-secondary);
           text-align: center;
           font-size: 0.9em;
         }
@@ -313,12 +313,12 @@ export default function AIAnalysisTile({ product, region, reportData, isActive, 
           justify-content: center;
           height: 100%;
           min-height: 120px;
-          color: #64748b;
+          color: var(--text-secondary);
         }
         .spinner {
           width: 28px;
           height: 28px;
-          border: 3px solid #e2e8f0;
+          border: 3px solid var(--border-primary);
           border-top-color: #2563eb;
           border-radius: 50%;
           animation: spin 1s linear infinite;
@@ -339,10 +339,10 @@ export default function AIAnalysisTile({ product, region, reportData, isActive, 
         }
         .tile-timestamp {
           font-size: 0.75em;
-          color: #94a3b8;
+          color: var(--text-secondary);
           margin-bottom: 10px;
           padding-bottom: 10px;
-          border-bottom: 1px solid #f1f5f9;
+          border-bottom: 1px solid var(--border-primary);
         }
         .analysis-text :global(.tile-h3) {
           font-size: 1em;
@@ -354,7 +354,7 @@ export default function AIAnalysisTile({ product, region, reportData, isActive, 
           font-size: 0.95em;
           font-weight: 600;
           margin: 10px 0 4px;
-          color: #374151;
+          color: var(--text-primary);
         }
         .analysis-text :global(.tile-bold) {
           font-weight: 600;

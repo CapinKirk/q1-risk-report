@@ -39,7 +39,7 @@ function getTrendIcon(trend: 'UP' | 'DOWN' | 'FLAT'): string {
 }
 
 function getTrendColor(trend: 'UP' | 'DOWN' | 'FLAT', isPositiveGood: boolean = true): string {
-  if (trend === 'FLAT') return '#6b7280';
+  if (trend === 'FLAT') return 'var(--text-secondary)';
   if (trend === 'UP') return isPositiveGood ? '#16a34a' : '#dc2626';
   return isPositiveGood ? '#dc2626' : '#16a34a';
 }
@@ -76,11 +76,11 @@ function MetricCell({ metric, format, isPositiveGood = true }: MetricCellProps) 
         .current-value {
           font-size: 14px;
           font-weight: 600;
-          color: #1e293b;
+          color: var(--text-primary);
         }
         .previous-value {
           font-size: 11px;
-          color: #94a3b8;
+          color: var(--text-secondary);
           margin-top: 2px;
         }
         .delta-value {
@@ -140,8 +140,8 @@ export default function TrendComparisonTable({
         <style jsx>{`
           .trend-table-container {
             overflow-x: auto;
-            background: white;
-            border: 1px solid #e2e8f0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
             border-radius: 8px;
             margin-bottom: 20px;
           }
@@ -151,12 +151,12 @@ export default function TrendComparisonTable({
             font-size: 13px;
           }
           .trend-table th {
-            background: #f8fafc;
+            background: var(--bg-tertiary);
             padding: 12px;
             text-align: left;
             font-weight: 600;
-            color: #475569;
-            border-bottom: 2px solid #e2e8f0;
+            color: var(--text-secondary);
+            border-bottom: 2px solid var(--border-primary);
             white-space: nowrap;
           }
           .trend-table th.metric-header {
@@ -164,21 +164,21 @@ export default function TrendComparisonTable({
           }
           .trend-table td {
             padding: 12px;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid var(--border-primary);
             vertical-align: top;
           }
           .trend-table tbody tr:hover {
-            background: #f8fafc;
+            background: var(--bg-tertiary);
           }
           .product-cell {
             font-weight: 500;
-            color: #1e293b;
+            color: var(--text-primary);
           }
           .region-cell {
-            color: #64748b;
+            color: var(--text-secondary);
           }
           .category-cell {
-            color: #64748b;
+            color: var(--text-secondary);
             font-size: 12px;
           }
         `}</style>
@@ -216,8 +216,8 @@ export default function TrendComparisonTable({
         <style jsx>{`
           .trend-table-container {
             overflow-x: auto;
-            background: white;
-            border: 1px solid #e2e8f0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
             border-radius: 8px;
             margin-bottom: 20px;
           }
@@ -227,12 +227,12 @@ export default function TrendComparisonTable({
             font-size: 13px;
           }
           .trend-table th {
-            background: #f8fafc;
+            background: var(--bg-tertiary);
             padding: 12px;
             text-align: left;
             font-weight: 600;
-            color: #475569;
-            border-bottom: 2px solid #e2e8f0;
+            color: var(--text-secondary);
+            border-bottom: 2px solid var(--border-primary);
             white-space: nowrap;
           }
           .trend-table th.metric-header {
@@ -240,18 +240,18 @@ export default function TrendComparisonTable({
           }
           .trend-table td {
             padding: 12px;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid var(--border-primary);
             vertical-align: top;
           }
           .trend-table tbody tr:hover {
-            background: #f8fafc;
+            background: var(--bg-tertiary);
           }
           .product-cell {
             font-weight: 500;
-            color: #1e293b;
+            color: var(--text-primary);
           }
           .region-cell {
-            color: #64748b;
+            color: var(--text-secondary);
           }
         `}</style>
       </div>
@@ -265,9 +265,9 @@ export default function TrendComparisonTable({
         .empty-state {
           padding: 40px;
           text-align: center;
-          color: #64748b;
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
+          color: var(--text-secondary);
+          background: var(--bg-tertiary);
+          border: 1px solid var(--border-primary);
           border-radius: 8px;
         }
       `}</style>

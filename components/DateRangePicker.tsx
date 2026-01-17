@@ -247,8 +247,8 @@ export default function DateRangePicker({ onAnalyze, isLoading, disabled }: Date
 
       <style jsx>{`
         .date-range-picker {
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
+          background: var(--bg-tertiary);
+          border: 1px solid var(--border-primary);
           border-radius: 8px;
           padding: 16px;
           margin-bottom: 20px;
@@ -263,13 +263,13 @@ export default function DateRangePicker({ onAnalyze, isLoading, disabled }: Date
 
         .preset-btn {
           padding: 8px 16px;
-          border: 1px solid #cbd5e1;
-          background: white;
+          border: 1px solid var(--border-primary);
+          background: var(--bg-secondary);
           border-radius: 6px;
           cursor: pointer;
           font-size: 13px;
           font-weight: 500;
-          color: #475569;
+          color: var(--text-secondary);
           transition: all 0.15s ease;
         }
 
@@ -305,17 +305,19 @@ export default function DateRangePicker({ onAnalyze, isLoading, disabled }: Date
         .date-input-group label {
           font-size: 12px;
           font-weight: 500;
-          color: #64748b;
+          color: var(--text-secondary);
           text-transform: uppercase;
           letter-spacing: 0.5px;
         }
 
         .date-input-group input {
           padding: 8px 12px;
-          border: 1px solid #cbd5e1;
+          border: 1px solid var(--border-primary);
           border-radius: 6px;
           font-size: 14px;
           min-width: 150px;
+          background: var(--bg-secondary);
+          color: var(--text-primary);
         }
 
         .date-input-group input:focus {
@@ -325,7 +327,7 @@ export default function DateRangePicker({ onAnalyze, isLoading, disabled }: Date
         }
 
         .date-input-group input:disabled {
-          background: #f1f5f9;
+          background: var(--bg-tertiary);
           cursor: not-allowed;
         }
 
@@ -376,8 +378,8 @@ export default function DateRangePicker({ onAnalyze, isLoading, disabled }: Date
         .period-preview {
           margin-top: 16px;
           padding: 12px;
-          background: white;
-          border: 1px solid #e2e8f0;
+          background: var(--bg-secondary);
+          border: 1px solid var(--border-primary);
           border-radius: 6px;
           display: flex;
           gap: 24px;
@@ -393,14 +395,14 @@ export default function DateRangePicker({ onAnalyze, isLoading, disabled }: Date
         .period-label {
           font-size: 11px;
           font-weight: 600;
-          color: #64748b;
+          color: var(--text-secondary);
           text-transform: uppercase;
           letter-spacing: 0.5px;
         }
 
         .period-dates {
           font-size: 14px;
-          color: #1e293b;
+          color: var(--text-primary);
           font-family: monospace;
         }
 

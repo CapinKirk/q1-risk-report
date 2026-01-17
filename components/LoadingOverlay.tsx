@@ -105,7 +105,7 @@ export default function LoadingOverlay({ isLoading, message }: LoadingOverlayPro
 
         .loading-content {
           text-align: center;
-          color: white;
+          color: var(--text-primary);
           max-width: 400px;
           padding: 40px;
         }
@@ -151,7 +151,7 @@ export default function LoadingOverlay({ isLoading, message }: LoadingOverlayPro
           left: 50%;
           width: 10px;
           height: 10px;
-          background: white;
+          background: var(--bg-secondary);
           border-radius: 50%;
           transform: translate(-50%, -50%);
           animation: pulse 1s ease-in-out infinite;
@@ -179,7 +179,7 @@ export default function LoadingOverlay({ isLoading, message }: LoadingOverlayPro
 
         .loading-joke {
           font-size: 1rem;
-          color: #a1a1aa;
+          color: var(--text-secondary);
           margin: 0 0 20px 0;
           min-height: 48px;
           animation: fadeInOut 3s ease-in-out infinite;
@@ -194,7 +194,7 @@ export default function LoadingOverlay({ isLoading, message }: LoadingOverlayPro
 
         .loading-message {
           font-size: 0.875rem;
-          color: #71717a;
+          color: var(--text-secondary);
           margin: 0;
         }
 

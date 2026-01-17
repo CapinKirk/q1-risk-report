@@ -40,7 +40,7 @@ function getTrendIcon(trend: 'UP' | 'DOWN' | 'FLAT'): string {
 }
 
 function getTrendColor(trend: 'UP' | 'DOWN' | 'FLAT', isPositiveGood: boolean = true): string {
-  if (trend === 'FLAT') return '#6b7280';
+  if (trend === 'FLAT') return 'var(--text-secondary)';
   if (trend === 'UP') return isPositiveGood ? '#16a34a' : '#dc2626';
   return isPositiveGood ? '#dc2626' : '#16a34a';
 }
@@ -75,14 +75,14 @@ function KPICard({ title, metric, format, isPositiveGood = true }: KPICardProps)
       <style jsx>{`
         .kpi-card {
           padding: 16px 20px;
-          border: 1px solid #e2e8f0;
+          border: 1px solid var(--border-primary);
           border-radius: 8px;
-          background: white;
+          background: var(--bg-secondary);
         }
         .kpi-title {
           font-size: 12px;
           font-weight: 600;
-          color: #64748b;
+          color: var(--text-secondary);
           text-transform: uppercase;
           letter-spacing: 0.5px;
           margin-bottom: 8px;
@@ -90,7 +90,7 @@ function KPICard({ title, metric, format, isPositiveGood = true }: KPICardProps)
         .kpi-value {
           font-size: 28px;
           font-weight: 700;
-          color: #1e293b;
+          color: var(--text-primary);
           margin-bottom: 8px;
         }
         .kpi-comparison {
@@ -100,7 +100,7 @@ function KPICard({ title, metric, format, isPositiveGood = true }: KPICardProps)
         }
         .kpi-previous {
           font-size: 12px;
-          color: #94a3b8;
+          color: var(--text-secondary);
         }
         .kpi-delta {
           font-size: 13px;
@@ -180,7 +180,7 @@ export default function TrendKPICards({ revenueSummary, funnelSummary }: TrendKP
           margin: 0 0 12px 0;
           font-size: 14px;
           font-weight: 600;
-          color: #475569;
+          color: var(--text-primary);
         }
         .kpi-grid {
           display: grid;

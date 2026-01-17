@@ -436,7 +436,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       <style jsx>{`
         .section-subtitle {
           font-size: 10px;
-          color: #6b7280;
+          color: var(--text-secondary);
           margin: -4px 0 12px 0;
           display: flex;
           align-items: center;
@@ -449,10 +449,10 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           font-weight: 700;
           font-size: 9px;
         }
-        .lead-label.mql { background: #dbeafe; color: #1e40af; }
-        .lead-label.eql { background: #dcfce7; color: #166534; }
-        .tof-label { font-weight: 600; color: #374151; }
-        .separator { color: #d1d5db; }
+        .lead-label.mql { background: var(--info-bg); color: var(--info-text); }
+        .lead-label.eql { background: var(--success-bg); color: var(--success-text); }
+        .tof-label { font-weight: 600; color: var(--text-primary); }
+        .separator { color: var(--border-primary); }
 
         .view-toggle {
           display: flex;
@@ -463,13 +463,14 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         .toggle-btn {
           padding: 6px 12px;
           font-size: 0.75rem;
-          border: 1px solid #e5e7eb;
-          background: white;
+          border: 1px solid var(--border-primary);
+          background: var(--bg-secondary);
+          color: var(--text-primary);
           border-radius: 4px;
           cursor: pointer;
           transition: all 0.2s;
         }
-        .toggle-btn:hover { background: #f3f4f6; }
+        .toggle-btn:hover { background: var(--bg-hover); }
         .toggle-btn.active {
           background: #1a1a2e;
           color: white;
@@ -479,9 +480,10 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           margin-left: 12px;
           padding: 6px 8px;
           font-size: 0.75rem;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border-primary);
           border-radius: 4px;
-          background: white;
+          background: var(--bg-secondary);
+          color: var(--text-primary);
         }
 
         .table-container {
@@ -495,7 +497,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         .funnel-table th,
         .funnel-table td {
           padding: 6px 4px;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border-primary);
           text-align: center;
         }
         .funnel-table th {
@@ -523,17 +525,17 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           font-size: 0.65rem;
         }
         .target-cell {
-          color: #9ca3af;
+          color: var(--text-muted);
         }
         .pacing-cell {
           padding: 3px;
         }
         .tof-score-cell {
-          background-color: #f9fafb;
+          background-color: var(--bg-tertiary);
           padding: 3px;
         }
         .totals-row {
-          background-color: #f3f4f6;
+          background-color: var(--bg-hover);
         }
 
         /* Category badges */
@@ -545,9 +547,9 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           font-weight: 600;
           margin-right: 4px;
         }
-        .category-badge.new-logo { background: #dbeafe; color: #1e40af; }
-        .category-badge.expansion { background: #dcfce7; color: #166534; }
-        .category-badge.migration { background: #fef3c7; color: #92400e; }
+        .category-badge.new-logo { background: var(--info-bg); color: var(--info-text); }
+        .category-badge.expansion { background: var(--success-bg); color: var(--success-text); }
+        .category-badge.migration { background: var(--warning-bg); color: var(--warning-text); }
 
         .lead-badge {
           display: inline-block;
@@ -557,8 +559,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           font-weight: 700;
           letter-spacing: 0.3px;
         }
-        .lead-badge.mql { background: #dbeafe; color: #1e40af; }
-        .lead-badge.eql { background: #dcfce7; color: #166534; }
+        .lead-badge.mql { background: var(--info-bg); color: var(--info-text); }
+        .lead-badge.eql { background: var(--success-bg); color: var(--success-text); }
 
         /* Source badges */
         .source-badge {
@@ -567,15 +569,15 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           border-radius: 4px;
           font-size: 0.6rem;
           font-weight: 600;
-          background: #e5e7eb;
-          color: #1f2937;
+          background: var(--border-primary);
+          color: var(--text-primary);
         }
-        .source-badge.inbound { background: #dbeafe; color: #1e40af; }
-        .source-badge.outbound { background: #fef3c7; color: #92400e; }
-        .source-badge.ae-sourced { background: #dcfce7; color: #166534; }
-        .source-badge.am-sourced { background: #f3e8ff; color: #7c3aed; }
-        .source-badge.tradeshow { background: #ffe4e6; color: #be123c; }
-        .source-badge.partnerships { background: #e0e7ff; color: #3730a3; }
+        .source-badge.inbound { background: var(--info-bg); color: var(--info-text); }
+        .source-badge.outbound { background: var(--warning-bg); color: var(--warning-text); }
+        .source-badge.ae-sourced { background: var(--success-bg); color: var(--success-text); }
+        .source-badge.am-sourced { background: var(--bg-tertiary); color: var(--accent-purple); }
+        .source-badge.tradeshow { background: var(--bg-tertiary); color: var(--danger-text); }
+        .source-badge.partnerships { background: var(--bg-tertiary); color: var(--accent-indigo); }
       `}</style>
     </section>
   );

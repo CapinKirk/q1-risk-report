@@ -109,16 +109,16 @@ export default function TrendChart({
     if (chartType === 'area') {
       return (
         <AreaChart {...commonProps}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-primary)" />
           <XAxis
             dataKey="date"
             tickFormatter={formatDateShort}
-            stroke="#64748b"
+            stroke="var(--text-secondary)"
             fontSize={12}
           />
           <YAxis
             tickFormatter={(value) => formatValue(value, valueFormat)}
-            stroke="#64748b"
+            stroke="var(--text-secondary)"
             fontSize={12}
             width={80}
           />
@@ -149,16 +149,16 @@ export default function TrendChart({
 
     return (
       <LineChart {...commonProps}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-primary)" />
         <XAxis
           dataKey="date"
           tickFormatter={formatDateShort}
-          stroke="#64748b"
+          stroke="var(--text-secondary)"
           fontSize={12}
         />
         <YAxis
           tickFormatter={(value) => formatValue(value, valueFormat)}
-          stroke="#64748b"
+          stroke="var(--text-secondary)"
           fontSize={12}
           width={80}
         />
@@ -217,8 +217,8 @@ export default function TrendChart({
 
       <style jsx>{`
         .trend-chart {
-          background: white;
-          border: 1px solid #e2e8f0;
+          background: var(--bg-secondary);
+          border: 1px solid var(--border-primary);
           border-radius: 8px;
           padding: 16px;
           margin-bottom: 20px;
@@ -235,13 +235,13 @@ export default function TrendChart({
           margin: 0;
           font-size: 16px;
           font-weight: 600;
-          color: #1e293b;
+          color: var(--text-primary);
         }
 
         .chart-type-toggle {
           display: flex;
           gap: 4px;
-          background: #f1f5f9;
+          background: var(--bg-tertiary);
           padding: 4px;
           border-radius: 6px;
         }
@@ -253,7 +253,7 @@ export default function TrendChart({
           border-radius: 4px;
           font-size: 12px;
           font-weight: 500;
-          color: #64748b;
+          color: var(--text-secondary);
           cursor: pointer;
           transition: all 0.15s ease;
         }
@@ -263,7 +263,7 @@ export default function TrendChart({
         }
 
         .toggle-btn.active {
-          background: white;
+          background: var(--bg-secondary);
           color: #3b82f6;
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
@@ -273,8 +273,8 @@ export default function TrendChart({
         }
 
         :global(.chart-tooltip) {
-          background: white;
-          border: 1px solid #e2e8f0;
+          background: var(--bg-secondary);
+          border: 1px solid var(--border-primary);
           border-radius: 6px;
           padding: 10px 14px;
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -284,7 +284,7 @@ export default function TrendChart({
           margin: 0 0 8px 0;
           font-size: 12px;
           font-weight: 600;
-          color: #64748b;
+          color: var(--text-secondary);
         }
 
         :global(.tooltip-value) {

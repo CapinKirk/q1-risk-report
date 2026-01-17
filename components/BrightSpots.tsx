@@ -82,8 +82,8 @@ export default function BrightSpots({ wins }: BrightSpotsProps) {
           margin-top: 16px;
         }
         .bright-spot-card {
-          background: #f0fdf4;
-          border: 1px solid #86efac;
+          background: var(--success-bg);
+          border: 1px solid var(--success-border);
           border-radius: 8px;
           padding: 16px;
         }
@@ -97,14 +97,14 @@ export default function BrightSpots({ wins }: BrightSpotsProps) {
           display: inline-block;
           padding: 4px 8px;
           border-radius: 4px;
-          color: white;
+          color: var(--bg-secondary);
           font-size: 0.75rem;
           font-weight: bold;
           width: fit-content;
         }
         .spot-label {
           font-weight: 600;
-          color: #1f2937;
+          color: var(--text-primary);
         }
         .spot-metrics {
           display: flex;
@@ -121,18 +121,18 @@ export default function BrightSpots({ wins }: BrightSpotsProps) {
         }
         .metric-label {
           font-size: 0.75rem;
-          color: #6b7280;
+          color: var(--text-secondary);
         }
         .spot-commentary {
           font-size: 0.875rem;
-          color: #374151;
+          color: var(--text-primary);
           margin: 8px 0;
           line-height: 1.4;
         }
         .contributing-factor {
           font-size: 0.75rem;
-          color: #059669;
-          background: #d1fae5;
+          color: var(--success-text);
+          background: var(--bg-tertiary);
           padding: 6px 10px;
           border-radius: 4px;
         }

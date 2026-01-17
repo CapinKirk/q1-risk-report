@@ -84,13 +84,13 @@ function getSeverityColor(severity: string): string {
 function getUrgencyStyle(urgency: string): { bg: string; border: string; badge: string } {
   switch (urgency) {
     case 'IMMEDIATE':
-      return { bg: '#fef2f2', border: '#fecaca', badge: '#dc2626' };
+      return { bg: 'var(--bg-tertiary)', border: 'var(--border-primary)', badge: '#dc2626' };
     case 'SHORT_TERM':
-      return { bg: '#fffbeb', border: '#fde68a', badge: '#d97706' };
+      return { bg: 'var(--bg-tertiary)', border: 'var(--border-primary)', badge: '#d97706' };
     case 'STRATEGIC':
-      return { bg: '#eff6ff', border: '#bfdbfe', badge: '#2563eb' };
+      return { bg: 'var(--bg-tertiary)', border: 'var(--border-primary)', badge: '#2563eb' };
     default:
-      return { bg: '#f9fafb', border: '#e5e7eb', badge: '#6b7280' };
+      return { bg: 'var(--bg-tertiary)', border: 'var(--border-primary)', badge: 'var(--text-secondary)' };
   }
 }
 
@@ -216,23 +216,23 @@ function ActionItemCard({
         }
         .action-context {
           font-size: 0.7rem;
-          color: #6b7280;
+          color: var(--text-secondary);
         }
         .action-issue {
           font-size: 0.8rem;
-          color: #1f2937;
+          color: var(--text-primary);
           margin: 0 0 6px 0;
           line-height: 1.35;
         }
         .action-reason {
           font-size: 0.7rem;
-          color: #4b5563;
+          color: var(--text-secondary);
           margin: 0 0 4px 0;
           line-height: 1.3;
         }
         .action-metric {
           font-size: 0.7rem;
-          color: #4b5563;
+          color: var(--text-secondary);
           margin: 0 0 4px 0;
           line-height: 1.3;
         }
@@ -264,7 +264,7 @@ export default function ActionItemsDashboard({ actionItems, period }: ActionItem
   return (
     <section>
       <h2>Action Items</h2>
-      <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
+      <p style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
         Sorted by attainment % (worst first)
         {showSampleSizeNote && ` • * Severity adjusted for early quarter (${quarterPct.toFixed(0)}% complete)`}
       </p>
@@ -322,12 +322,12 @@ export default function ActionItemsDashboard({ actionItems, period }: ActionItem
           margin-top: 12px;
         }
         .action-column {
-          background: #f9fafb;
+          background: var(--bg-tertiary);
           border-radius: 8px;
           overflow: hidden;
         }
         .column-header {
-          color: white;
+          color: var(--bg-secondary);
           font-weight: bold;
           font-size: 0.7rem;
           padding: 8px 10px;
@@ -341,7 +341,7 @@ export default function ActionItemsDashboard({ actionItems, period }: ActionItem
         .more-items {
           text-align: center;
           padding: 6px;
-          color: #6b7280;
+          color: var(--text-secondary);
           font-size: 0.7rem;
         }
         @media (max-width: 900px) {

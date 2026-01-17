@@ -417,7 +417,7 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
           align-items: flex-end;
           margin-bottom: 16px;
           padding: 12px;
-          background: #f9fafb;
+          background: var(--bg-tertiary);
           border-radius: 8px;
         }
 
@@ -430,7 +430,7 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
         .filter-group label {
           font-size: 0.7rem;
           font-weight: 600;
-          color: #6b7280;
+          color: var(--text-tertiary);
           text-transform: uppercase;
         }
 
@@ -441,11 +441,12 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
 
         .button-group button {
           padding: 6px 12px;
-          border: 1px solid #d1d5db;
-          background: white;
+          border: 1px solid var(--border-primary);
+          background: var(--bg-secondary);
           font-size: 0.75rem;
           cursor: pointer;
           transition: all 0.15s;
+          color: var(--text-primary);
         }
 
         .button-group button:first-child {
@@ -479,10 +480,11 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
 
         .filter-group select {
           padding: 6px 10px;
-          border: 1px solid #d1d5db;
+          border: 1px solid var(--border-primary);
           border-radius: 4px;
           font-size: 0.75rem;
-          background: white;
+          background: var(--bg-secondary);
+          color: var(--text-primary);
           min-width: 140px;
         }
 
@@ -491,23 +493,23 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
           gap: 16px;
           margin-left: auto;
           padding: 6px 12px;
-          background: white;
+          background: var(--bg-secondary);
           border-radius: 4px;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border-primary);
         }
 
         .stat {
           font-size: 0.8rem;
-          color: #374151;
+          color: var(--text-primary);
         }
 
         .stat strong {
-          color: #111827;
+          color: var(--text-primary);
         }
 
         .table-container {
           overflow-x: auto;
-          border: 1px solid #e5e7eb;
+          border: 1px solid var(--border-primary);
           border-radius: 8px;
         }
 
@@ -518,12 +520,12 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
         }
 
         .opportunities-table th {
-          background: #f3f4f6;
+          background: var(--bg-hover);
           padding: 10px 12px;
           text-align: left;
           font-weight: 600;
-          color: #374151;
-          border-bottom: 2px solid #e5e7eb;
+          color: var(--text-primary);
+          border-bottom: 2px solid var(--border-primary);
           white-space: nowrap;
         }
 
@@ -533,7 +535,7 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
         }
 
         .opportunities-table th.sortable:hover {
-          background: #e5e7eb;
+          background: var(--border-primary);
         }
 
         .opportunities-table th.right,
@@ -548,17 +550,17 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
 
         .opportunities-table td {
           padding: 10px 12px;
-          border-bottom: 1px solid #f3f4f6;
-          color: #374151;
+          border-bottom: 1px solid var(--bg-hover);
+          color: var(--text-primary);
         }
 
         .opportunities-table tr:hover {
-          background: #f9fafb;
+          background: var(--bg-tertiary);
         }
 
         .opp-name {
           font-weight: 500;
-          color: #111827;
+          color: var(--text-primary);
           max-width: 220px;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -587,7 +589,7 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
         }
 
         .product-badge.r360 {
-          background: #fef3c7;
+          background: var(--warning-bg);
           color: #92400e;
         }
 
@@ -597,7 +599,7 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
 
         .acv {
           font-weight: 600;
-          color: #111827;
+          color: var(--text-primary);
         }
 
         .stage-badge {
@@ -614,7 +616,7 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
         }
 
         .stage-badge.lost {
-          background: #fee2e2;
+          background: var(--danger-bg);
           color: #991b1b;
         }
 
@@ -624,13 +626,13 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
         }
 
         .stage-badge.late {
-          background: #fef3c7;
+          background: var(--warning-bg);
           color: #92400e;
         }
 
         .source {
           font-size: 0.7rem;
-          color: #6b7280;
+          color: var(--text-tertiary);
         }
 
         .loss-reason {
@@ -653,7 +655,7 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
 
         .empty-row {
           text-align: center;
-          color: #9ca3af;
+          color: var(--text-tertiary);
           padding: 40px !important;
           font-style: italic;
         }
@@ -669,17 +671,18 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
 
         .pagination button {
           padding: 6px 12px;
-          border: 1px solid #d1d5db;
+          border: 1px solid var(--border-primary);
           border-radius: 4px;
-          background: white;
+          background: var(--bg-secondary);
           font-size: 0.75rem;
           cursor: pointer;
           transition: all 0.15s;
+          color: var(--text-primary);
         }
 
         .pagination button:hover:not(:disabled) {
-          background: #f3f4f6;
-          border-color: #9ca3af;
+          background: var(--bg-hover);
+          border-color: var(--text-tertiary);
         }
 
         .pagination button:disabled {
@@ -690,7 +693,7 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
         .page-info {
           padding: 0 16px;
           font-size: 0.8rem;
-          color: #6b7280;
+          color: var(--text-tertiary);
         }
 
         @media (max-width: 768px) {

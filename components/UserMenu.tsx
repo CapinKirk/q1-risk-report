@@ -25,22 +25,23 @@ export default function UserMenu() {
           align-items: center;
           gap: 12px;
           padding: 8px 12px;
-          background: #f8f9fa;
+          background: var(--bg-tertiary);
           border-radius: 4px;
-          border: 1px solid #ddd;
+          border: 1px solid var(--border-primary);
           font-size: 11px;
         }
 
         .user-email {
-          color: #666;
+          color: var(--text-secondary);
         }
 
         .signout-btn {
           padding: 4px 10px;
           font-size: 10px;
-          border: 1px solid #ccc;
+          border: 1px solid var(--border-primary);
           border-radius: 4px;
-          background: white;
+          background: var(--bg-secondary);
+          color: var(--text-primary);
           cursor: pointer;
           transition: all 0.2s ease;
         }
