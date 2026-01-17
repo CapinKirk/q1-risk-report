@@ -275,101 +275,6 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
   // Get RAG color for display
   const ragColor = RAG_COLORS[safeSummary.ragStatus] || RAG_COLORS.RED;
 
-  // Sorting hooks for each table (must be called unconditionally per React hooks rules)
-  const wonOpps = getFilteredOpps('won');
-  const renewalsTableWon = useSortableTable(
-    wonOpps,
-    wonOpps,
-    (item: RenewalOpportunity, column: string) => {
-      switch (column) {
-        case 'account_name': return item.account_name;
-        case 'product': return item.product;
-        case 'region': return item.region;
-        case 'acv': return item.acv;
-        case 'uplift_amount': return item.uplift_amount || 0;
-        case 'close_date': return item.close_date;
-        case 'owner_name': return item.owner_name;
-        default: return '';
-      }
-    }
-  );
-
-  const pipelineOpps = getFilteredOpps('pipeline');
-  const renewalsTablePipeline = useSortableTable(
-    pipelineOpps,
-    pipelineOpps,
-    (item: RenewalOpportunity, column: string) => {
-      switch (column) {
-        case 'account_name': return item.account_name;
-        case 'product': return item.product;
-        case 'region': return item.region;
-        case 'acv': return item.acv;
-        case 'uplift_amount': return item.uplift_amount || 0;
-        case 'close_date': return item.close_date;
-        case 'owner_name': return item.owner_name;
-        default: return '';
-      }
-    }
-  );
-
-  const upcomingContracts = getFilteredContracts('upcoming');
-  const contractsTableUpcoming = useSortableTable(
-    upcomingContracts,
-    upcomingContracts,
-    (item: SalesforceContract, column: string) => {
-      switch (column) {
-        case 'ContractNumber': return item.ContractNumber;
-        case 'AccountName': return item.AccountName;
-        case 'Product': return item.Product;
-        case 'Region': return item.Region;
-        case 'EndDate': return item.EndDate;
-        case 'DaysUntilRenewal': return item.DaysUntilRenewal;
-        case 'AutoRenewal': return item.AutoRenewal;
-        case 'IsAtRisk': return item.IsAtRisk;
-        default: return '';
-      }
-    }
-  );
-
-  const atRiskContracts = getFilteredContracts('atrisk');
-  const contractsTableAtRisk = useSortableTable(
-    atRiskContracts,
-    atRiskContracts,
-    (item: SalesforceContract, column: string) => {
-      switch (column) {
-        case 'ContractNumber': return item.ContractNumber;
-        case 'AccountName': return item.AccountName;
-        case 'Product': return item.Product;
-        case 'Region': return item.Region;
-        case 'EndDate': return item.EndDate;
-        case 'DaysUntilRenewal': return item.DaysUntilRenewal;
-        case 'AutoRenewal': return item.AutoRenewal;
-        case 'IsAtRisk': return item.IsAtRisk;
-        default: return '';
-      }
-    }
-  );
-
-  const missingUpliftContracts = getFilteredContracts('missinguplift');
-  const missingUpliftTable = useSortableTable(
-    missingUpliftContracts,
-    missingUpliftContracts,
-    (item: SalesforceContract, column: string) => {
-      switch (column) {
-        case 'ContractNumber': return item.ContractNumber;
-        case 'AccountName': return item.AccountName;
-        case 'Product': return item.Product;
-        case 'Region': return item.Region;
-        case 'CurrentACV': return item.CurrentACV;
-        case 'UpliftAmount': return item.UpliftAmount;
-        case 'PotentialLost': return item.CurrentACV * 0.05;
-        case 'EndDate': return item.EndDate;
-        case 'DaysUntilRenewal': return item.DaysUntilRenewal;
-        default: return '';
-      }
-    }
-  );
-
   return (
     <section className="renewals-section" data-testid="renewals-section">
       <div className="section-header">
@@ -542,56 +447,81 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
 
       {/* Table Content */}
       <div className="table-container">
-        {(activeTab === 'won' || activeTab === 'pipeline') && (
-          <table className="renewals-table">
-            <thead>
-              <tr>
-                <SortableHeader
-                  label="Account"
-                  column="account_name"
-                  sortDirection={activeTab === 'won' ? renewalsTableWon.getSortDirection('account_name') : renewalsTablePipeline.getSortDirection('account_name')}
-                  onSort={activeTab === 'won' ? renewalsTableWon.handleSort : renewalsTablePipeline.handleSort}
-                />
-                <SortableHeader
-                  label="Product"
-                  column="product"
-                  sortDirection={activeTab === 'won' ? renewalsTableWon.getSortDirection('product') : renewalsTablePipeline.getSortDirection('product')}
-                  onSort={activeTab === 'won' ? renewalsTableWon.handleSort : renewalsTablePipeline.handleSort}
-                />
-                <SortableHeader
-                  label="Region"
-                  column="region"
-                  sortDirection={activeTab === 'won' ? renewalsTableWon.getSortDirection('region') : renewalsTablePipeline.getSortDirection('region')}
-                  onSort={activeTab === 'won' ? renewalsTableWon.handleSort : renewalsTablePipeline.handleSort}
-                />
-                <SortableHeader
-                  label="ACV"
-                  column="acv"
-                  sortDirection={activeTab === 'won' ? renewalsTableWon.getSortDirection('acv') : renewalsTablePipeline.getSortDirection('acv')}
-                  onSort={activeTab === 'won' ? renewalsTableWon.handleSort : renewalsTablePipeline.handleSort}
-                />
-                <SortableHeader
-                  label="Uplift"
-                  column="uplift_amount"
-                  sortDirection={activeTab === 'won' ? renewalsTableWon.getSortDirection('uplift_amount') : renewalsTablePipeline.getSortDirection('uplift_amount')}
-                  onSort={activeTab === 'won' ? renewalsTableWon.handleSort : renewalsTablePipeline.handleSort}
-                />
-                <SortableHeader
-                  label="Close Date"
-                  column="close_date"
-                  sortDirection={activeTab === 'won' ? renewalsTableWon.getSortDirection('close_date') : renewalsTablePipeline.getSortDirection('close_date')}
-                  onSort={activeTab === 'won' ? renewalsTableWon.handleSort : renewalsTablePipeline.handleSort}
-                />
-                <SortableHeader
-                  label="Owner"
-                  column="owner_name"
-                  sortDirection={activeTab === 'won' ? renewalsTableWon.getSortDirection('owner_name') : renewalsTablePipeline.getSortDirection('owner_name')}
-                  onSort={activeTab === 'won' ? renewalsTableWon.handleSort : renewalsTablePipeline.handleSort}
-                />
-              </tr>
-            </thead>
-            <tbody>
-              {(activeTab === 'won' ? renewalsTableWon.sortedData : renewalsTablePipeline.sortedData).slice(0, 20).map((opp, i) => (
+        {(activeTab === 'won' || activeTab === 'pipeline') && (() => {
+          const filteredData = getFilteredOpps(activeTab === 'won' ? 'won' : 'pipeline');
+          const defaultSortedData = [...filteredData].sort((a, b) =>
+            new Date(b.close_date).getTime() - new Date(a.close_date).getTime()
+          ).slice(0, 20);
+
+          const getColumnValue = (opp: RenewalOpportunity, column: string) => {
+            switch (column) {
+              case 'account_name': return opp.account_name;
+              case 'product': return opp.product;
+              case 'region': return opp.region;
+              case 'acv': return opp.acv;
+              case 'uplift_amount': return opp.uplift_amount || 0;
+              case 'close_date': return new Date(opp.close_date).getTime();
+              case 'owner_name': return opp.owner_name;
+              default: return '';
+            }
+          };
+
+          const { sortedData, handleSort, getSortDirection } = useSortableTable(
+            filteredData,
+            defaultSortedData,
+            getColumnValue
+          );
+
+          return (
+            <table className="renewals-table">
+              <thead>
+                <tr>
+                  <SortableHeader
+                    label="Account"
+                    column="account_name"
+                    sortDirection={getSortDirection('account_name')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Product"
+                    column="product"
+                    sortDirection={getSortDirection('product')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Region"
+                    column="region"
+                    sortDirection={getSortDirection('region')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="ACV"
+                    column="acv"
+                    sortDirection={getSortDirection('acv')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Uplift"
+                    column="uplift_amount"
+                    sortDirection={getSortDirection('uplift_amount')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Close Date"
+                    column="close_date"
+                    sortDirection={getSortDirection('close_date')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Owner"
+                    column="owner_name"
+                    sortDirection={getSortDirection('owner_name')}
+                    onSort={handleSort}
+                  />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedData.map((opp, i) => (
                 <tr key={i}>
                   <td>
                     <a href={opp.salesforce_url} target="_blank" rel="noopener noreferrer">
@@ -618,71 +548,98 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
                   <td>{opp.owner_name}</td>
                 </tr>
               ))}
-              {(activeTab === 'won' ? renewalsTableWon.sortedData : renewalsTablePipeline.sortedData).length === 0 && (
+              {filteredData.length === 0 && (
                 <tr>
                   <td colSpan={7} className="empty-row">No {activeTab} renewals found</td>
                 </tr>
               )}
             </tbody>
           </table>
-        )}
+          );
+        })()}
 
-        {(activeTab === 'upcoming' || activeTab === 'atrisk') && (
-          <table className="renewals-table">
-            <thead>
-              <tr>
-                <SortableHeader
-                  label="Contract"
-                  column="ContractNumber"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('ContractNumber') : contractsTableAtRisk.getSortDirection('ContractNumber')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
-                />
-                <SortableHeader
-                  label="Account"
-                  column="AccountName"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('AccountName') : contractsTableAtRisk.getSortDirection('AccountName')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
-                />
-                <SortableHeader
-                  label="Product"
-                  column="Product"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('Product') : contractsTableAtRisk.getSortDirection('Product')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
-                />
-                <SortableHeader
-                  label="Region"
-                  column="Region"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('Region') : contractsTableAtRisk.getSortDirection('Region')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
-                />
-                <SortableHeader
-                  label="End Date"
-                  column="EndDate"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('EndDate') : contractsTableAtRisk.getSortDirection('EndDate')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
-                />
-                <SortableHeader
-                  label="Days Until"
-                  column="DaysUntilRenewal"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('DaysUntilRenewal') : contractsTableAtRisk.getSortDirection('DaysUntilRenewal')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
-                />
-                <SortableHeader
-                  label="Auto-Renew"
-                  column="AutoRenewal"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('AutoRenewal') : contractsTableAtRisk.getSortDirection('AutoRenewal')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
-                />
-                <SortableHeader
-                  label="Status"
-                  column="IsAtRisk"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('IsAtRisk') : contractsTableAtRisk.getSortDirection('IsAtRisk')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
-                />
-              </tr>
-            </thead>
-            <tbody>
-              {(activeTab === 'upcoming' ? contractsTableUpcoming.sortedData : contractsTableAtRisk.sortedData).slice(0, 20).map((contract, i) => (
+        {(activeTab === 'upcoming' || activeTab === 'atrisk') && (() => {
+          const filteredData = getFilteredContracts(activeTab);
+          const defaultSortedData = [...filteredData].sort((a, b) =>
+            a.DaysUntilRenewal - b.DaysUntilRenewal
+          ).slice(0, 20);
+
+          const getColumnValue = (contract: SalesforceContract, column: string) => {
+            switch (column) {
+              case 'ContractNumber': return contract.ContractNumber;
+              case 'AccountName': return contract.AccountName;
+              case 'Product': return contract.Product;
+              case 'Region': return contract.Region;
+              case 'EndDate': return new Date(contract.EndDate).getTime();
+              case 'DaysUntilRenewal': return contract.DaysUntilRenewal;
+              case 'AutoRenewal': return contract.AutoRenewal ? 1 : 0;
+              case 'IsAtRisk': return contract.IsAtRisk ? 1 : 0;
+              default: return '';
+            }
+          };
+
+          const { sortedData, handleSort, getSortDirection } = useSortableTable(
+            filteredData,
+            defaultSortedData,
+            getColumnValue
+          );
+
+          return (
+            <table className="renewals-table">
+              <thead>
+                <tr>
+                  <SortableHeader
+                    label="Contract"
+                    column="ContractNumber"
+                    sortDirection={getSortDirection('ContractNumber')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Account"
+                    column="AccountName"
+                    sortDirection={getSortDirection('AccountName')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Product"
+                    column="Product"
+                    sortDirection={getSortDirection('Product')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Region"
+                    column="Region"
+                    sortDirection={getSortDirection('Region')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="End Date"
+                    column="EndDate"
+                    sortDirection={getSortDirection('EndDate')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Days Until"
+                    column="DaysUntilRenewal"
+                    sortDirection={getSortDirection('DaysUntilRenewal')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Auto-Renew"
+                    column="AutoRenewal"
+                    sortDirection={getSortDirection('AutoRenewal')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Status"
+                    column="IsAtRisk"
+                    sortDirection={getSortDirection('IsAtRisk')}
+                    onSort={handleSort}
+                  />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedData.map((contract, i) => (
                 <tr key={i}>
                   <td>
                     <a
@@ -722,7 +679,7 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
                   </td>
                 </tr>
               ))}
-              {(activeTab === 'upcoming' ? contractsTableUpcoming.sortedData : contractsTableAtRisk.sortedData).length === 0 && (
+              {filteredData.length === 0 && (
                 <tr>
                   <td colSpan={8} className="empty-row">
                     {safeData.sfAvailable
@@ -733,70 +690,98 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
               )}
             </tbody>
           </table>
-        )}
+          );
+        })()}
 
-        {activeTab === 'missinguplift' && (
-          <table className="renewals-table">
-            <thead>
-              <tr>
-                <SortableHeader
-                  label="Contract #"
-                  column="ContractNumber"
-                  sortDirection={missingUpliftTable.getSortDirection('ContractNumber')}
-                  onSort={missingUpliftTable.handleSort}
-                />
-                <SortableHeader
-                  label="Account"
-                  column="AccountName"
-                  sortDirection={missingUpliftTable.getSortDirection('AccountName')}
-                  onSort={missingUpliftTable.handleSort}
-                />
-                <SortableHeader
-                  label="Product"
-                  column="Product"
-                  sortDirection={missingUpliftTable.getSortDirection('Product')}
-                  onSort={missingUpliftTable.handleSort}
-                />
-                <SortableHeader
-                  label="Region"
-                  column="Region"
-                  sortDirection={missingUpliftTable.getSortDirection('Region')}
-                  onSort={missingUpliftTable.handleSort}
-                />
-                <SortableHeader
-                  label="Current ACV"
-                  column="CurrentACV"
-                  sortDirection={missingUpliftTable.getSortDirection('CurrentACV')}
-                  onSort={missingUpliftTable.handleSort}
-                />
-                <SortableHeader
-                  label="Uplift Configured"
-                  column="UpliftAmount"
-                  sortDirection={missingUpliftTable.getSortDirection('UpliftAmount')}
-                  onSort={missingUpliftTable.handleSort}
-                />
-                <SortableHeader
-                  label="Potential Lost"
-                  column="PotentialLost"
-                  sortDirection={missingUpliftTable.getSortDirection('PotentialLost')}
-                  onSort={missingUpliftTable.handleSort}
-                />
-                <SortableHeader
-                  label="End Date"
-                  column="EndDate"
-                  sortDirection={missingUpliftTable.getSortDirection('EndDate')}
-                  onSort={missingUpliftTable.handleSort}
-                />
-                <SortableHeader
-                  label="Days Until"
-                  column="DaysUntilRenewal"
-                  sortDirection={missingUpliftTable.getSortDirection('DaysUntilRenewal')}
-                  onSort={missingUpliftTable.handleSort}
-                />
-              </tr>
-            </thead>
-            <tbody>
-              {missingUpliftTable.sortedData.map((contract, i) => (
+        {activeTab === 'missinguplift' && (() => {
+          const filteredData = getFilteredContracts('missinguplift');
+          const defaultSortedData = [...filteredData].sort((a, b) =>
+            (b.CurrentACV || 0) - (a.CurrentACV || 0)
+          );
+
+          const getColumnValue = (contract: SalesforceContract, column: string) => {
+            switch (column) {
+              case 'ContractNumber': return contract.ContractNumber;
+              case 'AccountName': return contract.AccountName;
+              case 'Product': return contract.Product;
+              case 'Region': return contract.Region;
+              case 'CurrentACV': return contract.CurrentACV || 0;
+              case 'UpliftAmount': return contract.UpliftAmount || 0;
+              case 'PotentialLost': return (contract.CurrentACV || 0) * 0.05;
+              case 'EndDate': return new Date(contract.EndDate).getTime();
+              case 'DaysUntilRenewal': return contract.DaysUntilRenewal;
+              default: return '';
+            }
+          };
+
+          const { sortedData, handleSort, getSortDirection } = useSortableTable(
+            filteredData,
+            defaultSortedData,
+            getColumnValue
+          );
+
+          return (
+            <table className="renewals-table">
+              <thead>
+                <tr>
+                  <SortableHeader
+                    label="Contract #"
+                    column="ContractNumber"
+                    sortDirection={getSortDirection('ContractNumber')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Account"
+                    column="AccountName"
+                    sortDirection={getSortDirection('AccountName')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Product"
+                    column="Product"
+                    sortDirection={getSortDirection('Product')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Region"
+                    column="Region"
+                    sortDirection={getSortDirection('Region')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Current ACV"
+                    column="CurrentACV"
+                    sortDirection={getSortDirection('CurrentACV')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Uplift Configured"
+                    column="UpliftAmount"
+                    sortDirection={getSortDirection('UpliftAmount')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Potential Lost"
+                    column="PotentialLost"
+                    sortDirection={getSortDirection('PotentialLost')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="End Date"
+                    column="EndDate"
+                    sortDirection={getSortDirection('EndDate')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Days Until"
+                    column="DaysUntilRenewal"
+                    sortDirection={getSortDirection('DaysUntilRenewal')}
+                    onSort={handleSort}
+                  />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedData.map((contract, i) => (
                 <tr key={i} className="warning-row">
                   <td>
                     <a
@@ -833,7 +818,7 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
                   </td>
                 </tr>
               ))}
-              {missingUpliftTable.sortedData.length === 0 && (
+              {filteredData.length === 0 && (
                 <tr>
                   <td colSpan={9} className="empty-row">
                     No contracts with missing uplift found
@@ -842,7 +827,8 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
               )}
             </tbody>
           </table>
-        )}
+          );
+        })()}
       </div>
 
       <style jsx>{`

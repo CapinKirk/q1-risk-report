@@ -9,6 +9,8 @@ interface SortableHeaderProps {
   onSort: (column: string) => void;
   className?: string;
   style?: React.CSSProperties;
+  rowSpan?: number;
+  colSpan?: number;
 }
 
 /**
@@ -22,11 +24,15 @@ export default function SortableHeader({
   onSort,
   className = '',
   style,
+  rowSpan,
+  colSpan,
 }: SortableHeaderProps) {
   return (
     <th
       className={`sortable-header ${className}`}
       style={style}
+      rowSpan={rowSpan}
+      colSpan={colSpan}
       onClick={() => onSort(column)}
     >
       <span className="header-content">

@@ -1,9 +1,26 @@
+'use client';
+
+import { useMemo, useCallback } from 'react';
 import { ReportData, AttainmentRow } from '@/lib/types';
 import { formatCurrency, formatPercent, formatCoverage, getRAGColor, getAttainmentColor } from '@/lib/formatters';
+import SortableHeader from './SortableHeader';
+import { useSortableTable } from '@/lib/useSortableTable';
 
 interface ExecutiveSummaryProps {
   data: ReportData;
 }
+
+type DetailRow = {
+  product: string;
+  region: string;
+  fy_target: number;
+  q1_target: number;
+  qtd_target: number;
+  qtd_actual: number;
+  attainment_pct: number;
+  pipeline_coverage: number;
+  win_rate_pct: number;
+};
 
 export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
   const { period, grand_total, product_totals, attainment_detail } = data;
@@ -33,6 +50,120 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
   const r360 = product_totals.R360;
   const r360Att = r360?.total_qtd_attainment_pct || 0;
   const r360Color = getAttainmentColor(r360Att);
+
+  // Create detailed breakdown data for sorting
+  const detailRows = useMemo<DetailRow[]>(() => {
+    const rows: DetailRow[] = [];
+
+    // Aggregate POR by region
+    if (hasPOR) {
+      const porByRegion = attainment_detail.POR.reduce((acc, row) => {
+        const region = row.region;
+        if (!acc[region]) {
+          acc[region] = {
+            fy_target: 0,
+            q1_target: 0,
+            qtd_target: 0,
+            qtd_actual: 0,
+            pipeline_acv: 0,
+            win_rate_total: 0,
+            count: 0,
+          };
+        }
+        acc[region].fy_target += (row as any).fy_target || 0;
+        acc[region].q1_target += row.q1_target || 0;
+        acc[region].qtd_target += row.qtd_target || 0;
+        acc[region].qtd_actual += row.qtd_acv || 0;
+        acc[region].pipeline_acv += row.pipeline_acv || 0;
+        acc[region].win_rate_total += row.win_rate_pct || 0;
+        acc[region].count += 1;
+        return acc;
+      }, {} as Record<string, any>);
+
+      Object.entries(porByRegion).forEach(([region, data]) => {
+        rows.push({
+          product: 'POR',
+          region,
+          fy_target: data.fy_target,
+          q1_target: data.q1_target,
+          qtd_target: data.qtd_target,
+          qtd_actual: data.qtd_actual,
+          attainment_pct: data.qtd_target > 0 ? (data.qtd_actual / data.qtd_target) * 100 : 0,
+          pipeline_coverage: data.qtd_target > 0 ? data.pipeline_acv / (data.qtd_target - data.qtd_actual) : 0,
+          win_rate_pct: data.count > 0 ? data.win_rate_total / data.count : 0,
+        });
+      });
+    }
+
+    // Aggregate R360 by region
+    if (hasR360) {
+      const r360ByRegion = attainment_detail.R360.reduce((acc, row) => {
+        const region = row.region;
+        if (!acc[region]) {
+          acc[region] = {
+            fy_target: 0,
+            q1_target: 0,
+            qtd_target: 0,
+            qtd_actual: 0,
+            pipeline_acv: 0,
+            win_rate_total: 0,
+            count: 0,
+          };
+        }
+        acc[region].fy_target += (row as any).fy_target || 0;
+        acc[region].q1_target += row.q1_target || 0;
+        acc[region].qtd_target += row.qtd_target || 0;
+        acc[region].qtd_actual += row.qtd_acv || 0;
+        acc[region].pipeline_acv += row.pipeline_acv || 0;
+        acc[region].win_rate_total += row.win_rate_pct || 0;
+        acc[region].count += 1;
+        return acc;
+      }, {} as Record<string, any>);
+
+      Object.entries(r360ByRegion).forEach(([region, data]) => {
+        rows.push({
+          product: 'R360',
+          region,
+          fy_target: data.fy_target,
+          q1_target: data.q1_target,
+          qtd_target: data.qtd_target,
+          qtd_actual: data.qtd_actual,
+          attainment_pct: data.qtd_target > 0 ? (data.qtd_actual / data.qtd_target) * 100 : 0,
+          pipeline_coverage: data.qtd_target > 0 ? data.pipeline_acv / (data.qtd_target - data.qtd_actual) : 0,
+          win_rate_pct: data.count > 0 ? data.win_rate_total / data.count : 0,
+        });
+      });
+    }
+
+    return rows;
+  }, [attainment_detail, hasPOR, hasR360]);
+
+  // Default sort by attainment % (worst first)
+  const defaultSorted = useMemo(() =>
+    [...detailRows].sort((a, b) => a.attainment_pct - b.attainment_pct),
+    [detailRows]
+  );
+
+  const getColumnValue = useCallback((row: DetailRow, column: string) => {
+    switch (column) {
+      case 'product': return row.product;
+      case 'region': return row.region;
+      case 'fy_target': return row.fy_target;
+      case 'q1_target': return row.q1_target;
+      case 'qtd_target': return row.qtd_target;
+      case 'qtd_actual': return row.qtd_actual;
+      case 'attainment_pct': return row.attainment_pct;
+      case 'pipeline_coverage': return row.pipeline_coverage;
+      case 'win_rate_pct': return row.win_rate_pct;
+      default: return null;
+    }
+  }, []);
+
+  const { sortedData, handleSort, getSortDirection } = useSortableTable(
+    detailRows,
+    defaultSorted,
+    getColumnValue
+  );
 
   return (
     <section>
@@ -97,6 +228,107 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
           </tr>
         </tbody>
       </table>
+
+      {detailRows.length > 0 && (
+        <>
+          <h3 style={{ marginTop: '24px', marginBottom: '8px' }}>Regional Breakdown</h3>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <SortableHeader
+                    label="Product"
+                    column="product"
+                    sortDirection={getSortDirection('product')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Region"
+                    column="region"
+                    sortDirection={getSortDirection('region')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="FY Target"
+                    column="fy_target"
+                    sortDirection={getSortDirection('fy_target')}
+                    onSort={handleSort}
+                    className="right"
+                  />
+                  <SortableHeader
+                    label="Q1 Target"
+                    column="q1_target"
+                    sortDirection={getSortDirection('q1_target')}
+                    onSort={handleSort}
+                    className="right"
+                  />
+                  <SortableHeader
+                    label="QTD Target"
+                    column="qtd_target"
+                    sortDirection={getSortDirection('qtd_target')}
+                    onSort={handleSort}
+                    className="right"
+                  />
+                  <SortableHeader
+                    label="QTD Actual"
+                    column="qtd_actual"
+                    sortDirection={getSortDirection('qtd_actual')}
+                    onSort={handleSort}
+                    className="right"
+                  />
+                  <SortableHeader
+                    label="Attainment %"
+                    column="attainment_pct"
+                    sortDirection={getSortDirection('attainment_pct')}
+                    onSort={handleSort}
+                    className="right"
+                  />
+                  <SortableHeader
+                    label="Pipeline Coverage"
+                    column="pipeline_coverage"
+                    sortDirection={getSortDirection('pipeline_coverage')}
+                    onSort={handleSort}
+                    className="right"
+                  />
+                  <SortableHeader
+                    label="Win Rate %"
+                    column="win_rate_pct"
+                    sortDirection={getSortDirection('win_rate_pct')}
+                    onSort={handleSort}
+                    className="right"
+                  />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedData.map((row, idx) => {
+                  const attColor = getAttainmentColor(row.attainment_pct);
+                  const covColor = row.pipeline_coverage >= 3 ? '#16a34a' : row.pipeline_coverage >= 2 ? '#ca8a04' : '#dc2626';
+
+                  return (
+                    <tr key={`${row.product}-${row.region}-${idx}`}>
+                      <td>{row.product}</td>
+                      <td>{row.region}</td>
+                      <td className="right">{formatCurrency(row.fy_target)}</td>
+                      <td className="right">{formatCurrency(row.q1_target)}</td>
+                      <td className="right">{formatCurrency(row.qtd_target)}</td>
+                      <td className="right"><strong>{formatCurrency(row.qtd_actual)}</strong></td>
+                      <td className="right" style={{ color: attColor }}>
+                        <strong>{formatPercent(row.attainment_pct)}</strong>
+                      </td>
+                      <td className="right" style={{ color: covColor }}>
+                        <strong>{formatCoverage(row.pipeline_coverage)}</strong>
+                      </td>
+                      <td className="right" style={{ color: getAttainmentColor(row.win_rate_pct) }}>
+                        {formatPercent(row.win_rate_pct)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </section>
   );
 }

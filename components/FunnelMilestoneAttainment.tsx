@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { Region, Product, Category, FunnelByCategoryRow, FunnelBySourceActuals, RAGStatus } from '@/lib/types';
+import SortableHeader from './SortableHeader';
+import { useSortableTable } from '@/lib/useSortableTable';
 
 interface FunnelMilestoneAttainmentProps {
   funnelData: {
@@ -268,6 +270,66 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     return result.sort((a, b) => a.tofScore - b.tofScore);
   }, [funnelData]);
 
+  // Sorting configuration for category view
+  const getColumnValueCategory = (item: CategoryMilestoneData, column: string): any => {
+    switch (column) {
+      case 'category': return item.category;
+      case 'tofScore': return item.tofScore;
+      case 'mqlPacing': return item.mqlPacingPct;
+      case 'sqlPacing': return item.sqlPacingPct;
+      case 'salPacing': return item.salPacingPct;
+      case 'sqoPacing': return item.sqoPacingPct;
+      default: return '';
+    }
+  };
+
+  const {
+    sortedData: sortedCategoryData,
+    sortState: categorySortState,
+    handleSort: handleCategorySort,
+    getSortDirection: getCategorySortDirection,
+  } = useSortableTable(categoryData, categoryData, getColumnValueCategory);
+
+  // Sorting configuration for source view
+  const getColumnValueSource = (item: SourceMilestoneData, column: string): any => {
+    switch (column) {
+      case 'source': return item.source;
+      case 'tofScore': return item.tofScore;
+      case 'mqlPacing': return item.mqlPacingPct;
+      case 'sqlPacing': return item.sqlPacingPct;
+      case 'salPacing': return item.salPacingPct;
+      case 'sqoPacing': return item.sqoPacingPct;
+      default: return '';
+    }
+  };
+
+  const {
+    sortedData: sortedSourceData,
+    sortState: sourceSortState,
+    handleSort: handleSourceSort,
+    getSortDirection: getSourceSortDirection,
+  } = useSortableTable(sourceData, sourceData, getColumnValueSource);
+
+  // Sorting configuration for region view
+  const getColumnValueRegion = (item: RegionMilestoneData, column: string): any => {
+    switch (column) {
+      case 'region': return item.region;
+      case 'tofScore': return item.tofScore;
+      case 'mqlPacing': return item.mqlPacingPct;
+      case 'sqlPacing': return item.sqlPacingPct;
+      case 'salPacing': return item.salPacingPct;
+      case 'sqoPacing': return item.sqoPacingPct;
+      default: return '';
+    }
+  };
+
+  const {
+    sortedData: sortedRegionData,
+    sortState: regionSortState,
+    handleSort: handleRegionSort,
+    getSortDirection: getRegionSortDirection,
+  } = useSortableTable(regionData, regionData, getColumnValueRegion);
+
   // Calculate totals for footer
   const totals = useMemo(() => {
     const data = viewMode === 'category' ? categoryData : viewMode === 'source' ? sourceData : regionData;
@@ -381,22 +443,58 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         <table className="funnel-table">
           <thead>
             <tr>
-              <th rowSpan={2}>{viewMode === 'category' ? 'Category' : viewMode === 'source' ? 'Source' : 'Region'}</th>
+              <SortableHeader
+                label={viewMode === 'category' ? 'Category' : viewMode === 'source' ? 'Source' : 'Region'}
+                column={viewMode === 'category' ? 'category' : viewMode === 'source' ? 'source' : 'region'}
+                sortDirection={viewMode === 'category' ? getCategorySortDirection('category') : viewMode === 'source' ? getSourceSortDirection('source') : getRegionSortDirection('region')}
+                onSort={viewMode === 'category' ? handleCategorySort : viewMode === 'source' ? handleSourceSort : handleRegionSort}
+                rowSpan={2}
+              />
               <th colSpan={3}>EQL/MQL</th>
               <th colSpan={3}>SQL</th>
               <th colSpan={3}>SAL</th>
               <th colSpan={3}>SQO</th>
-              <th rowSpan={2}>TOF<br/>Score</th>
+              <SortableHeader
+                label="TOF Score"
+                column="tofScore"
+                sortDirection={viewMode === 'category' ? getCategorySortDirection('tofScore') : viewMode === 'source' ? getSourceSortDirection('tofScore') : getRegionSortDirection('tofScore')}
+                onSort={viewMode === 'category' ? handleCategorySort : viewMode === 'source' ? handleSourceSort : handleRegionSort}
+                rowSpan={2}
+              />
             </tr>
             <tr className="sub-header">
-              <th>Act</th><th>Tgt</th><th>Pace</th>
-              <th>Act</th><th>Tgt</th><th>Pace</th>
-              <th>Act</th><th>Tgt</th><th>Pace</th>
-              <th>Act</th><th>Tgt</th><th>Pace</th>
+              <th>Act</th><th>Tgt</th>
+              <SortableHeader
+                label="Pace"
+                column="mqlPacing"
+                sortDirection={viewMode === 'category' ? getCategorySortDirection('mqlPacing') : viewMode === 'source' ? getSourceSortDirection('mqlPacing') : getRegionSortDirection('mqlPacing')}
+                onSort={viewMode === 'category' ? handleCategorySort : viewMode === 'source' ? handleSourceSort : handleRegionSort}
+              />
+              <th>Act</th><th>Tgt</th>
+              <SortableHeader
+                label="Pace"
+                column="sqlPacing"
+                sortDirection={viewMode === 'category' ? getCategorySortDirection('sqlPacing') : viewMode === 'source' ? getSourceSortDirection('sqlPacing') : getRegionSortDirection('sqlPacing')}
+                onSort={viewMode === 'category' ? handleCategorySort : viewMode === 'source' ? handleSourceSort : handleRegionSort}
+              />
+              <th>Act</th><th>Tgt</th>
+              <SortableHeader
+                label="Pace"
+                column="salPacing"
+                sortDirection={viewMode === 'category' ? getCategorySortDirection('salPacing') : viewMode === 'source' ? getSourceSortDirection('salPacing') : getRegionSortDirection('salPacing')}
+                onSort={viewMode === 'category' ? handleCategorySort : viewMode === 'source' ? handleSourceSort : handleRegionSort}
+              />
+              <th>Act</th><th>Tgt</th>
+              <SortableHeader
+                label="Pace"
+                column="sqoPacing"
+                sortDirection={viewMode === 'category' ? getCategorySortDirection('sqoPacing') : viewMode === 'source' ? getSourceSortDirection('sqoPacing') : getRegionSortDirection('sqoPacing')}
+                onSort={viewMode === 'category' ? handleCategorySort : viewMode === 'source' ? handleSourceSort : handleRegionSort}
+              />
             </tr>
           </thead>
           <tbody>
-            {viewMode === 'category' && categoryData.map(row => (
+            {viewMode === 'category' && sortedCategoryData.map(row => (
               <tr key={row.category}>
                 <td className="label-cell">
                   <span className={`category-badge ${row.category.toLowerCase().replace(/\s+/g, '-')}`}>
@@ -407,7 +505,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
                 {renderStageColumns(row)}
               </tr>
             ))}
-            {viewMode === 'source' && sourceData.map(row => (
+            {viewMode === 'source' && sortedSourceData.map(row => (
               <tr key={row.source}>
                 <td className="label-cell">
                   <span className={`source-badge ${row.source.toLowerCase().replace(/\s+/g, '-')}`}>
@@ -417,7 +515,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
                 {renderStageColumns(row)}
               </tr>
             ))}
-            {viewMode === 'region' && regionData.map(row => (
+            {viewMode === 'region' && sortedRegionData.map(row => (
               <tr key={row.region}>
                 <td className="label-cell region">{row.region}</td>
                 {renderStageColumns(row)}

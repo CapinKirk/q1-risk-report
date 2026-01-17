@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { MQLDetailRow, Product, Region, LeadType } from '@/lib/types';
+import SortableHeader from './SortableHeader';
+import { useSortableTable } from '@/lib/useSortableTable';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -71,6 +73,24 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
     return allMQLs;
   }, [mqlDetails, selectedProduct, selectedRegion, selectedStatus, selectedLeadTypes, searchTerm]);
 
+  // Sorting
+  const { sortedData, handleSort, getSortDirection } = useSortableTable(
+    filteredMQLs,
+    filteredMQLs,
+    (item, column) => {
+      if (column === 'lead_type') return item.lead_type || 'MQL';
+      if (column === 'category') return item.category || 'NEW LOGO';
+      if (column === 'product') return item.product;
+      if (column === 'region') return item.region;
+      if (column === 'company_name') return item.company_name;
+      if (column === 'source') return item.source || '';
+      if (column === 'mql_date') return item.mql_date || '';
+      if (column === 'mql_status') return item.mql_status || (item.converted_to_sql === 'Yes' ? 'CONVERTED' : 'ACTIVE');
+      if (column === 'days_in_stage') return item.days_in_stage ?? -1; // Treat null as -1 for sorting
+      return '';
+    }
+  );
+
   // Calculate summary stats
   const stats = useMemo(() => {
     const total = filteredMQLs.length;
@@ -90,13 +110,13 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
   }, [filteredMQLs]);
 
   // Pagination - memoized to ensure proper re-rendering
-  const totalPages = Math.ceil(filteredMQLs.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
   const paginatedMQLs = useMemo(() => {
-    return filteredMQLs.slice(
+    return sortedData.slice(
       (currentPage - 1) * ITEMS_PER_PAGE,
       currentPage * ITEMS_PER_PAGE
     );
-  }, [filteredMQLs, currentPage]);
+  }, [sortedData, currentPage]);
 
   // Reset page when filters change
   const handleFilterChange = (setter: (v: any) => void, value: any) => {
@@ -224,15 +244,60 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         <table className="mql-table">
           <thead>
             <tr>
-              <th>Type</th>
-              <th>Category</th>
-              <th>Product</th>
-              <th>Region</th>
-              <th>Company</th>
-              <th>Source</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Days</th>
+              <SortableHeader
+                label="Type"
+                column="lead_type"
+                sortDirection={getSortDirection('lead_type')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Category"
+                column="category"
+                sortDirection={getSortDirection('category')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Product"
+                column="product"
+                sortDirection={getSortDirection('product')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Region"
+                column="region"
+                sortDirection={getSortDirection('region')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Company"
+                column="company_name"
+                sortDirection={getSortDirection('company_name')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Source"
+                column="source"
+                sortDirection={getSortDirection('source')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Date"
+                column="mql_date"
+                sortDirection={getSortDirection('mql_date')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Status"
+                column="mql_status"
+                sortDirection={getSortDirection('mql_status')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Days"
+                column="days_in_stage"
+                sortDirection={getSortDirection('days_in_stage')}
+                onSort={handleSort}
+              />
               <th>SF</th>
             </tr>
           </thead>

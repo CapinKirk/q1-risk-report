@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { ReportData, LossReasonRow } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatters';
+import SortableHeader from './SortableHeader';
+import { useSortableTable } from '@/lib/useSortableTable';
 
 const ITEMS_PER_PAGE = 15;
 
@@ -20,6 +22,37 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
   const totalLostDeals = (porLost?.total_lost_deals || 0) + (r360Lost?.total_lost_deals || 0);
   const totalLostAcv = (porLost?.total_lost_acv || 0) + (r360Lost?.total_lost_acv || 0);
   const totalAvg = totalLostDeals > 0 ? totalLostAcv / totalLostDeals : 0;
+
+  // Product table data structure
+  type ProductRow = { product: string; deals: number; acv: number; avg: number };
+  const productData: ProductRow[] = [
+    {
+      product: 'POR',
+      deals: porLost?.total_lost_deals || 0,
+      acv: porLost?.total_lost_acv || 0,
+      avg: (porLost?.total_lost_deals || 0) > 0 ? (porLost?.total_lost_acv || 0) / (porLost?.total_lost_deals || 1) : 0
+    },
+    {
+      product: 'R360',
+      deals: r360Lost?.total_lost_deals || 0,
+      acv: r360Lost?.total_lost_acv || 0,
+      avg: (r360Lost?.total_lost_deals || 0) > 0 ? (r360Lost?.total_lost_acv || 0) / (r360Lost?.total_lost_deals || 1) : 0
+    }
+  ];
+
+  const productTable = useSortableTable<ProductRow>(
+    productData,
+    productData,
+    (item, column) => {
+      switch (column) {
+        case 'product': return item.product;
+        case 'deals': return item.deals;
+        case 'acv': return item.acv;
+        case 'avg': return item.avg;
+        default: return '';
+      }
+    }
+  );
 
   // Lost by Region
   const regionLost: Record<string, { POR_deals: number; POR_acv: number; R360_deals: number; R360_acv: number }> = {};
@@ -40,9 +73,34 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
     regionLost[row.region].R360_acv += row.qtd_lost_acv || 0;
   });
 
-  // Sort regions by total ACV lost
-  const sortedRegions = Object.entries(regionLost).sort((a, b) =>
-    (b[1].POR_acv + b[1].R360_acv) - (a[1].POR_acv + a[1].R360_acv)
+  // Region table data structure
+  type RegionRow = { region: string; por_deals: number; por_acv: number; r360_deals: number; r360_acv: number; total_acv: number };
+  const regionData: RegionRow[] = Object.entries(regionLost).map(([region, data]) => ({
+    region,
+    por_deals: data.POR_deals,
+    por_acv: data.POR_acv,
+    r360_deals: data.R360_deals,
+    r360_acv: data.R360_acv,
+    total_acv: data.POR_acv + data.R360_acv
+  }));
+
+  // Default sort: by total ACV lost (descending)
+  const defaultRegionData = [...regionData].sort((a, b) => b.total_acv - a.total_acv);
+
+  const regionTable = useSortableTable<RegionRow>(
+    regionData,
+    defaultRegionData,
+    (item, column) => {
+      switch (column) {
+        case 'region': return item.region;
+        case 'por_deals': return item.por_deals;
+        case 'por_acv': return item.por_acv;
+        case 'r360_deals': return item.r360_deals;
+        case 'r360_acv': return item.r360_acv;
+        case 'total_acv': return item.total_acv;
+        default: return '';
+      }
+    }
   );
 
   // Top Loss Reasons
@@ -51,12 +109,28 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
     ...loss_reason_rca.R360.map(l => ({ ...l, product: 'R360' as const }))
   ];
 
-  const sortedLosses = [...allLosses]
-    .sort((a, b) => (b.lost_acv || 0) - (a.lost_acv || 0));
+  // Default sort: by ACV lost (descending)
+  const defaultLossData = [...allLosses].sort((a, b) => (b.lost_acv || 0) - (a.lost_acv || 0));
+
+  const lossTable = useSortableTable<LossReasonRow & { product: 'POR' | 'R360' }>(
+    allLosses,
+    defaultLossData,
+    (item, column) => {
+      switch (column) {
+        case 'product': return item.product;
+        case 'region': return item.region;
+        case 'reason': return item.loss_reason || 'Unknown';
+        case 'deals': return item.deal_count || 0;
+        case 'acv': return item.lost_acv || 0;
+        case 'severity': return item.severity || 'LOW';
+        default: return '';
+      }
+    }
+  );
 
   // Pagination for loss reasons
-  const totalPages = Math.ceil(sortedLosses.length / ITEMS_PER_PAGE);
-  const paginatedLosses = sortedLosses.slice(
+  const totalPages = Math.ceil(lossTable.sortedData.length / ITEMS_PER_PAGE);
+  const paginatedLosses = lossTable.sortedData.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
@@ -77,25 +151,44 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
         <table>
           <thead>
             <tr>
-              <th>Product</th>
-              <th className="right">Deals Lost</th>
-              <th className="right">ACV Lost</th>
-              <th className="right">Avg Deal Size</th>
+              <SortableHeader
+                label="Product"
+                column="product"
+                sortDirection={productTable.getSortDirection('product')}
+                onSort={productTable.handleSort}
+              />
+              <SortableHeader
+                label="Deals Lost"
+                column="deals"
+                sortDirection={productTable.getSortDirection('deals')}
+                onSort={productTable.handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="ACV Lost"
+                column="acv"
+                sortDirection={productTable.getSortDirection('acv')}
+                onSort={productTable.handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="Avg Deal Size"
+                column="avg"
+                sortDirection={productTable.getSortDirection('avg')}
+                onSort={productTable.handleSort}
+                className="right"
+              />
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>POR</td>
-              <td className="right">{Math.round(porLost?.total_lost_deals || 0)}</td>
-              <td className="right red">{formatCurrency(porLost?.total_lost_acv)}</td>
-              <td className="right">{formatCurrency((porLost?.total_lost_deals || 0) > 0 ? (porLost?.total_lost_acv || 0) / (porLost?.total_lost_deals || 1) : 0)}</td>
-            </tr>
-            <tr>
-              <td>R360</td>
-              <td className="right">{Math.round(r360Lost?.total_lost_deals || 0)}</td>
-              <td className="right red">{formatCurrency(r360Lost?.total_lost_acv)}</td>
-              <td className="right">{formatCurrency((r360Lost?.total_lost_deals || 0) > 0 ? (r360Lost?.total_lost_acv || 0) / (r360Lost?.total_lost_deals || 1) : 0)}</td>
-            </tr>
+            {productTable.sortedData.map((row) => (
+              <tr key={row.product}>
+                <td>{row.product}</td>
+                <td className="right">{Math.round(row.deals)}</td>
+                <td className="right red">{formatCurrency(row.acv)}</td>
+                <td className="right">{formatCurrency(row.avg)}</td>
+              </tr>
+            ))}
             <tr style={{ fontWeight: 'bold', background: 'var(--bg-tertiary)' }}>
               <td>TOTAL</td>
               <td className="right">{Math.round(totalLostDeals)}</td>
@@ -107,28 +200,63 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
       </div>
 
       {/* Lost by Region */}
-      <h3>Lost Deals by Region (sorted by ACV lost)</h3>
+      <h3>Lost Deals by Region</h3>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Region</th>
-              <th className="right">POR Deals</th>
-              <th className="right">POR ACV</th>
-              <th className="right">R360 Deals</th>
-              <th className="right">R360 ACV</th>
-              <th className="right">Total ACV</th>
+              <SortableHeader
+                label="Region"
+                column="region"
+                sortDirection={regionTable.getSortDirection('region')}
+                onSort={regionTable.handleSort}
+              />
+              <SortableHeader
+                label="POR Deals"
+                column="por_deals"
+                sortDirection={regionTable.getSortDirection('por_deals')}
+                onSort={regionTable.handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="POR ACV"
+                column="por_acv"
+                sortDirection={regionTable.getSortDirection('por_acv')}
+                onSort={regionTable.handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="R360 Deals"
+                column="r360_deals"
+                sortDirection={regionTable.getSortDirection('r360_deals')}
+                onSort={regionTable.handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="R360 ACV"
+                column="r360_acv"
+                sortDirection={regionTable.getSortDirection('r360_acv')}
+                onSort={regionTable.handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="Total ACV"
+                column="total_acv"
+                sortDirection={regionTable.getSortDirection('total_acv')}
+                onSort={regionTable.handleSort}
+                className="right"
+              />
             </tr>
           </thead>
           <tbody>
-            {sortedRegions.map(([region, data]) => (
-              <tr key={region}>
-                <td>{region}</td>
-                <td className="right">{Math.round(data.POR_deals)}</td>
-                <td className="right">{formatCurrency(data.POR_acv)}</td>
-                <td className="right">{Math.round(data.R360_deals)}</td>
-                <td className="right">{formatCurrency(data.R360_acv)}</td>
-                <td className="right red"><strong>{formatCurrency(data.POR_acv + data.R360_acv)}</strong></td>
+            {regionTable.sortedData.map((row) => (
+              <tr key={row.region}>
+                <td>{row.region}</td>
+                <td className="right">{Math.round(row.por_deals)}</td>
+                <td className="right">{formatCurrency(row.por_acv)}</td>
+                <td className="right">{Math.round(row.r360_deals)}</td>
+                <td className="right">{formatCurrency(row.r360_acv)}</td>
+                <td className="right red"><strong>{formatCurrency(row.total_acv)}</strong></td>
               </tr>
             ))}
           </tbody>
@@ -136,17 +264,50 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
       </div>
 
       {/* Top Loss Reasons */}
-      <h3>Loss Reasons (sorted by ACV impact) - {sortedLosses.length} total</h3>
+      <h3>Loss Reasons - {lossTable.sortedData.length} total</h3>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Prod</th>
-              <th>Region</th>
-              <th>Reason</th>
-              <th className="right">Deals</th>
-              <th className="right">ACV Lost</th>
-              <th className="center">Severity</th>
+              <SortableHeader
+                label="Prod"
+                column="product"
+                sortDirection={lossTable.getSortDirection('product')}
+                onSort={lossTable.handleSort}
+              />
+              <SortableHeader
+                label="Region"
+                column="region"
+                sortDirection={lossTable.getSortDirection('region')}
+                onSort={lossTable.handleSort}
+              />
+              <SortableHeader
+                label="Reason"
+                column="reason"
+                sortDirection={lossTable.getSortDirection('reason')}
+                onSort={lossTable.handleSort}
+              />
+              <SortableHeader
+                label="Deals"
+                column="deals"
+                sortDirection={lossTable.getSortDirection('deals')}
+                onSort={lossTable.handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="ACV Lost"
+                column="acv"
+                sortDirection={lossTable.getSortDirection('acv')}
+                onSort={lossTable.handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="Severity"
+                column="severity"
+                sortDirection={lossTable.getSortDirection('severity')}
+                onSort={lossTable.handleSort}
+                className="center"
+              />
             </tr>
           </thead>
           <tbody>

@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { SQLDetailRow, Product, Region } from '@/lib/types';
+import SortableHeader from './SortableHeader';
+import { useSortableTable } from '@/lib/useSortableTable';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -55,6 +57,26 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
     return allSQLs;
   }, [sqlDetails, selectedProduct, selectedRegion, selectedStatus, searchTerm]);
 
+  // Setup sorting
+  const { sortedData, handleSort, getSortDirection } = useSortableTable(
+    filteredSQLs,
+    filteredSQLs,
+    (item: SQLDetailRow, column: string) => {
+      switch (column) {
+        case 'product': return item.product;
+        case 'region': return item.region;
+        case 'company': return item.company_name;
+        case 'source': return item.source || '';
+        case 'sql_date': return item.sql_date || '';
+        case 'days_mql_sql': return item.days_mql_to_sql ?? 0;
+        case 'status': return item.sql_status;
+        case 'opportunity': return item.opportunity_name || '';
+        case 'loss_reason': return item.loss_reason || '';
+        default: return '';
+      }
+    }
+  );
+
   // Calculate summary stats
   const stats = useMemo(() => {
     const total = filteredSQLs.length;
@@ -76,9 +98,9 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
     return uniqueStatuses.sort();
   }, [sqlDetails]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredSQLs.length / ITEMS_PER_PAGE);
-  const paginatedSQLs = filteredSQLs.slice(
+  // Pagination (use sortedData instead of filteredSQLs)
+  const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
+  const paginatedSQLs = sortedData.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
@@ -205,15 +227,60 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
         <table className="sql-table">
           <thead>
             <tr>
-              <th>Product</th>
-              <th>Region</th>
-              <th>Company</th>
-              <th>Source</th>
-              <th>SQL Date</th>
-              <th>Days MQL-SQL</th>
-              <th>Status</th>
-              <th>Opportunity</th>
-              <th>Loss Reason</th>
+              <SortableHeader
+                label="Product"
+                column="product"
+                sortDirection={getSortDirection('product')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Region"
+                column="region"
+                sortDirection={getSortDirection('region')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Company"
+                column="company"
+                sortDirection={getSortDirection('company')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Source"
+                column="source"
+                sortDirection={getSortDirection('source')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="SQL Date"
+                column="sql_date"
+                sortDirection={getSortDirection('sql_date')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Days MQL-SQL"
+                column="days_mql_sql"
+                sortDirection={getSortDirection('days_mql_sql')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Status"
+                column="status"
+                sortDirection={getSortDirection('status')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Opportunity"
+                column="opportunity"
+                sortDirection={getSortDirection('opportunity')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Loss Reason"
+                column="loss_reason"
+                sortDirection={getSortDirection('loss_reason')}
+                onSort={handleSort}
+              />
               <th>Salesforce</th>
             </tr>
           </thead>

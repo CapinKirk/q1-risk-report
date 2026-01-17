@@ -1,8 +1,28 @@
+'use client';
+
 import { ReportData, GoogleAdsRegionalData, GoogleAdsData, GoogleAdsRCA, Region } from '@/lib/types';
 import { formatCurrency, formatNumber, formatPercentDecimal } from '@/lib/formatters';
+import SortableHeader from './SortableHeader';
+import { useSortableTable } from '@/lib/useSortableTable';
 
 interface GoogleAdsPerfProps {
   data: ReportData;
+}
+
+/**
+ * Flattened row type for sortable table
+ */
+interface GoogleAdsRow {
+  product: string;
+  region: string | null; // null for totals
+  impressions: number;
+  clicks: number;
+  ctr_pct: number;
+  ad_spend_usd: number;
+  cpc_usd: number;
+  conversions: number;
+  cpa_usd: number;
+  isSubRow: boolean;
 }
 
 /**
@@ -37,12 +57,88 @@ function getActiveRegions(porData: GoogleAdsRegionalData[], r360Data: GoogleAdsR
   return Array.from(regions).sort();
 }
 
+/**
+ * Create flattened table rows for sorting
+ */
+function createTableRows(
+  porData: GoogleAdsRegionalData[],
+  r360Data: GoogleAdsRegionalData[],
+  porTotal: GoogleAdsData | null,
+  r360Total: GoogleAdsData | null,
+  activeRegions: Region[]
+): GoogleAdsRow[] {
+  const rows: GoogleAdsRow[] = [];
+
+  // Add POR rows
+  if (porTotal) {
+    rows.push({
+      product: 'POR',
+      region: null,
+      ...porTotal,
+      isSubRow: false,
+    });
+
+    // Add regional breakdowns if applicable
+    if (activeRegions.length >= 1) {
+      activeRegions.forEach(region => {
+        const regionData = porData.find(r => r.region === region);
+        if (regionData) {
+          rows.push({
+            product: 'POR',
+            region,
+            impressions: regionData.impressions || 0,
+            clicks: regionData.clicks || 0,
+            ctr_pct: regionData.impressions > 0 ? (regionData.clicks / regionData.impressions) * 100 : 0,
+            ad_spend_usd: regionData.ad_spend_usd || 0,
+            cpc_usd: regionData.clicks > 0 ? (regionData.ad_spend_usd || 0) / regionData.clicks : 0,
+            conversions: regionData.conversions || 0,
+            cpa_usd: regionData.conversions > 0 ? (regionData.ad_spend_usd || 0) / regionData.conversions : 0,
+            isSubRow: true,
+          });
+        }
+      });
+    }
+  }
+
+  // Add R360 rows
+  if (r360Total) {
+    rows.push({
+      product: 'R360',
+      region: null,
+      ...r360Total,
+      isSubRow: false,
+    });
+
+    // Add regional breakdowns if applicable
+    if (activeRegions.length >= 1) {
+      activeRegions.forEach(region => {
+        const regionData = r360Data.find(r => r.region === region);
+        if (regionData) {
+          rows.push({
+            product: 'R360',
+            region,
+            impressions: regionData.impressions || 0,
+            clicks: regionData.clicks || 0,
+            ctr_pct: regionData.impressions > 0 ? (regionData.clicks / regionData.impressions) * 100 : 0,
+            ad_spend_usd: regionData.ad_spend_usd || 0,
+            cpc_usd: regionData.clicks > 0 ? (regionData.ad_spend_usd || 0) / regionData.clicks : 0,
+            conversions: regionData.conversions || 0,
+            cpa_usd: regionData.conversions > 0 ? (regionData.ad_spend_usd || 0) / regionData.conversions : 0,
+            isSubRow: true,
+          });
+        }
+      });
+    }
+  }
+
+  return rows;
+}
+
 export default function GoogleAdsPerf({ data }: GoogleAdsPerfProps) {
   const { google_ads, google_ads_rca } = data;
 
   // Get active regions from filtered data
   const activeRegions = getActiveRegions(google_ads.POR || [], google_ads.R360 || []);
-  const showRegionalBreakdown = activeRegions.length > 1 || activeRegions.length === 1;
 
   // Aggregate totals for each product
   const porTotal = aggregateAdsData(google_ads.POR || []);
@@ -53,28 +149,45 @@ export default function GoogleAdsPerf({ data }: GoogleAdsPerfProps) {
     return null;
   }
 
-  // Helper to render a data row
-  const renderRow = (label: string, ads: GoogleAdsData | null, isSubRow = false) => {
-    if (!ads) return null;
-    return (
-      <tr className={isSubRow ? 'sub-row' : ''}>
-        <td style={isSubRow ? { paddingLeft: '20px', fontSize: '0.9em' } : {}}>{label}</td>
-        <td className="right">{formatNumber(ads.impressions)}</td>
-        <td className="right">{formatNumber(ads.clicks)}</td>
-        <td className="right">{formatPercentDecimal(ads.ctr_pct)}</td>
-        <td className="right">{formatCurrency(ads.ad_spend_usd)}</td>
-        <td className="right">${(ads.cpc_usd || 0).toFixed(2)}</td>
-        <td className="right">{Math.round(ads.conversions || 0)}</td>
-        <td className="right">${Math.round(ads.cpa_usd || 0)}</td>
-      </tr>
-    );
+  // Create flattened rows for sorting
+  const tableRows = createTableRows(
+    google_ads.POR || [],
+    google_ads.R360 || [],
+    porTotal,
+    r360Total,
+    activeRegions
+  );
+
+  // Column value getter for sorting
+  const getColumnValue = (row: GoogleAdsRow, column: string): any => {
+    switch (column) {
+      case 'product_region':
+        return row.region ? `${row.product} ${row.region}` : row.product;
+      case 'impressions':
+        return row.impressions;
+      case 'clicks':
+        return row.clicks;
+      case 'ctr_pct':
+        return row.ctr_pct;
+      case 'ad_spend_usd':
+        return row.ad_spend_usd;
+      case 'cpc_usd':
+        return row.cpc_usd;
+      case 'conversions':
+        return row.conversions;
+      case 'cpa_usd':
+        return row.cpa_usd;
+      default:
+        return '';
+    }
   };
 
-  // Helper to get regional data for a product
-  const getRegionalData = (productData: GoogleAdsRegionalData[], region: Region): GoogleAdsData | null => {
-    const regionData = productData.find(r => r.region === region);
-    return regionData || null;
-  };
+  // Use sortable table hook
+  const { sortedData, handleSort, getSortDirection } = useSortableTable(
+    tableRows,
+    tableRows, // default order
+    getColumnValue
+  );
 
   return (
     <section>
@@ -83,38 +196,78 @@ export default function GoogleAdsPerf({ data }: GoogleAdsPerfProps) {
         <table>
           <thead>
             <tr>
-              <th>Product / Region</th>
-              <th className="right">Impr</th>
-              <th className="right">Clicks</th>
-              <th className="right">CTR</th>
-              <th className="right">Spend</th>
-              <th className="right">CPC</th>
-              <th className="right">Conv</th>
-              <th className="right">CPA</th>
+              <SortableHeader
+                label="Product / Region"
+                column="product_region"
+                sortDirection={getSortDirection('product_region')}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Impr"
+                column="impressions"
+                sortDirection={getSortDirection('impressions')}
+                onSort={handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="Clicks"
+                column="clicks"
+                sortDirection={getSortDirection('clicks')}
+                onSort={handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="CTR"
+                column="ctr_pct"
+                sortDirection={getSortDirection('ctr_pct')}
+                onSort={handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="Spend"
+                column="ad_spend_usd"
+                sortDirection={getSortDirection('ad_spend_usd')}
+                onSort={handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="CPC"
+                column="cpc_usd"
+                sortDirection={getSortDirection('cpc_usd')}
+                onSort={handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="Conv"
+                column="conversions"
+                sortDirection={getSortDirection('conversions')}
+                onSort={handleSort}
+                className="right"
+              />
+              <SortableHeader
+                label="CPA"
+                column="cpa_usd"
+                sortDirection={getSortDirection('cpa_usd')}
+                onSort={handleSort}
+                className="right"
+              />
             </tr>
           </thead>
           <tbody>
-            {/* POR Section */}
-            {porTotal && (
-              <>
-                {renderRow('POR', porTotal)}
-                {showRegionalBreakdown && activeRegions.map(region => {
-                  const regionData = getRegionalData(google_ads.POR || [], region);
-                  return regionData ? renderRow(`↳ ${region}`, regionData, true) : null;
-                })}
-              </>
-            )}
-
-            {/* R360 Section */}
-            {r360Total && (
-              <>
-                {renderRow('R360', r360Total)}
-                {showRegionalBreakdown && activeRegions.map(region => {
-                  const regionData = getRegionalData(google_ads.R360 || [], region);
-                  return regionData ? renderRow(`↳ ${region}`, regionData, true) : null;
-                })}
-              </>
-            )}
+            {sortedData.map((row, index) => (
+              <tr key={`${row.product}-${row.region || 'total'}-${index}`} className={row.isSubRow ? 'sub-row' : ''}>
+                <td style={row.isSubRow ? { paddingLeft: '20px', fontSize: '0.9em' } : {}}>
+                  {row.region ? `↳ ${row.region}` : row.product}
+                </td>
+                <td className="right">{formatNumber(row.impressions)}</td>
+                <td className="right">{formatNumber(row.clicks)}</td>
+                <td className="right">{formatPercentDecimal(row.ctr_pct)}</td>
+                <td className="right">{formatCurrency(row.ad_spend_usd)}</td>
+                <td className="right">${(row.cpc_usd || 0).toFixed(2)}</td>
+                <td className="right">{Math.round(row.conversions || 0)}</td>
+                <td className="right">${Math.round(row.cpa_usd || 0)}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
