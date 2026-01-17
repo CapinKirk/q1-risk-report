@@ -999,81 +999,113 @@ async function getMQLDetails(filters: ReportFilters) {
       }).join(', ')})`
     : '';
 
-  // MQL Query - NEW LOGO from InboundFunnel
+  // MQL Query - NEW LOGO from InboundFunnel (deduplicated by Company + Date + Division)
+  // Uses ROW_NUMBER() to pick one record per company per day, preferring records with LeadId/ContactId
   const porMqlQuery = `
-    SELECT
-      'POR' AS product,
-      CASE Division
-        WHEN 'US' THEN 'AMER'
-        WHEN 'UK' THEN 'EMEA'
-        WHEN 'AU' THEN 'APAC'
-      END AS region,
-      COALESCE(LeadId, ContactId) AS record_id,
-      CASE
-        WHEN LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', LeadId)
-        ELSE CONCAT('https://por.my.salesforce.com/', ContactId)
-      END AS salesforce_url,
-      COALESCE(Company, 'Unknown') AS company_name,
-      COALESCE(LeadEmail, ContactEmail, 'N/A') AS email,
-      COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
-      CAST(MQL_DT AS STRING) AS mql_date,
-      CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
-      CASE
-        WHEN MQL_Reverted = true THEN 'REVERTED'
-        WHEN SQL_DT IS NOT NULL THEN 'CONVERTED'
-        WHEN DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) > 30 THEN 'STALLED'
-        ELSE 'ACTIVE'
-      END AS mql_status,
-      COALESCE(MQL_Reverted, false) AS was_reverted,
-      DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage,
-      'MQL' AS lead_type,
-      'NEW LOGO' AS category
-    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
-    WHERE Division IN ('US', 'UK', 'AU')
-      AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
-      AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
-      AND SDRSource = 'Inbound'
-      AND MQL_DT IS NOT NULL
-      AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
-      AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
-      ${regionClause}
-    ORDER BY MQL_DT DESC
+    WITH ranked_mqls AS (
+      SELECT
+        'POR' AS product,
+        CASE Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        COALESCE(LeadId, ContactId) AS record_id,
+        CASE
+          WHEN LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', LeadId)
+          WHEN ContactId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', ContactId)
+          ELSE 'https://por.my.salesforce.com/'
+        END AS salesforce_url,
+        COALESCE(Company, 'Unknown') AS company_name,
+        COALESCE(LeadEmail, ContactEmail, 'N/A') AS email,
+        COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
+        CAST(MQL_DT AS STRING) AS mql_date,
+        CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
+        CASE
+          WHEN MQL_Reverted = true THEN 'REVERTED'
+          WHEN SQL_DT IS NOT NULL THEN 'CONVERTED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) > 30 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS mql_status,
+        COALESCE(MQL_Reverted, false) AS was_reverted,
+        DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage,
+        'MQL' AS lead_type,
+        'NEW LOGO' AS category,
+        -- Prioritize records with LeadId/ContactId, then by most recent
+        ROW_NUMBER() OVER (
+          PARTITION BY COALESCE(Company, 'Unknown'), CAST(MQL_DT AS DATE), Division
+          ORDER BY
+            CASE WHEN LeadId IS NOT NULL OR ContactId IS NOT NULL THEN 0 ELSE 1 END,
+            CASE WHEN SQL_DT IS NOT NULL THEN 0 ELSE 1 END
+        ) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
+      WHERE Division IN ('US', 'UK', 'AU')
+        AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
+        AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
+        AND SDRSource = 'Inbound'
+        AND MQL_DT IS NOT NULL
+        AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
+        AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
+        ${regionClause}
+    )
+    SELECT product, region, record_id, salesforce_url, company_name, email, source,
+           mql_date, converted_to_sql, mql_status, was_reverted, days_in_stage, lead_type, category
+    FROM ranked_mqls
+    WHERE rn = 1
+    ORDER BY mql_date DESC
   `;
 
   const r360RegionClause = filters.regions && filters.regions.length > 0
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
+  // R360 MQL Query - deduplicated by Company + Date + Region
   const r360MqlQuery = `
-    SELECT
-      'R360' AS product,
-      Region AS region,
-      LeadId AS record_id,
-      CONCAT('https://por.my.salesforce.com/', LeadId) AS salesforce_url,
-      COALESCE(Company, 'Unknown') AS company_name,
-      Email AS email,
-      COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
-      CAST(MQL_DT AS STRING) AS mql_date,
-      CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
-      CASE
-        WHEN MQL_Reverted = true THEN 'REVERTED'
-        WHEN SQL_DT IS NOT NULL THEN 'CONVERTED'
-        WHEN DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) > 30 THEN 'STALLED'
-        ELSE 'ACTIVE'
-      END AS mql_status,
-      COALESCE(MQL_Reverted, false) AS was_reverted,
-      DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage,
-      'MQL' AS lead_type,
-      'NEW LOGO' AS category
-    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
-    WHERE Region IS NOT NULL
-      AND MQL_Reverted = false
-      AND SDRSource = 'Inbound'
-      AND MQL_DT IS NOT NULL
-      AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
-      AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
-      ${r360RegionClause}
-    ORDER BY MQL_DT DESC
+    WITH ranked_mqls AS (
+      SELECT
+        'R360' AS product,
+        Region AS region,
+        LeadId AS record_id,
+        CASE
+          WHEN LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', LeadId)
+          ELSE 'https://por.my.salesforce.com/'
+        END AS salesforce_url,
+        COALESCE(Company, 'Unknown') AS company_name,
+        Email AS email,
+        COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
+        CAST(MQL_DT AS STRING) AS mql_date,
+        CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
+        CASE
+          WHEN MQL_Reverted = true THEN 'REVERTED'
+          WHEN SQL_DT IS NOT NULL THEN 'CONVERTED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) > 30 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS mql_status,
+        COALESCE(MQL_Reverted, false) AS was_reverted,
+        DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage,
+        'MQL' AS lead_type,
+        'NEW LOGO' AS category,
+        -- Prioritize records with LeadId, then by conversion status
+        ROW_NUMBER() OVER (
+          PARTITION BY COALESCE(Company, 'Unknown'), CAST(MQL_DT AS DATE), Region
+          ORDER BY
+            CASE WHEN LeadId IS NOT NULL THEN 0 ELSE 1 END,
+            CASE WHEN SQL_DT IS NOT NULL THEN 0 ELSE 1 END
+        ) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
+      WHERE Region IS NOT NULL
+        AND MQL_Reverted = false
+        AND SDRSource = 'Inbound'
+        AND MQL_DT IS NOT NULL
+        AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
+        AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
+        ${r360RegionClause}
+    )
+    SELECT product, region, record_id, salesforce_url, company_name, email, source,
+           mql_date, converted_to_sql, mql_status, was_reverted, days_in_stage, lead_type, category
+    FROM ranked_mqls
+    WHERE rn = 1
+    ORDER BY mql_date DESC
   `;
 
   // EQL Query - EXPANSION/MIGRATION from OpportunityViewTable
