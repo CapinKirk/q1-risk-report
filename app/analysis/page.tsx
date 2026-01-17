@@ -6,6 +6,7 @@ import type { Region, Product, Category, Source, TrendAnalysisData, MetricCompar
 import { parseRegionsFromURL, parseProductsFromURL, parseCategoriesFromURL, parseSourcesFromURL } from '@/lib/filterData';
 import ReportFilter from '@/components/ReportFilter';
 import UserMenu from '@/components/UserMenu';
+import ThemeToggle from '@/components/ThemeToggle';
 import DateRangePicker from '@/components/DateRangePicker';
 import TrendKPICards from '@/components/TrendKPICards';
 import TrendChart from '@/components/TrendChart';
@@ -182,6 +183,7 @@ function AnalysisContent() {
           </div>
         </div>
         <div className="header-actions">
+          <ThemeToggle />
           <UserMenu />
         </div>
       </div>

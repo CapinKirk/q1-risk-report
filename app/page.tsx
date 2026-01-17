@@ -24,6 +24,7 @@ import OpportunitiesTable from '@/components/OpportunitiesTable';
 import LoadingOverlay from '@/components/LoadingOverlay';
 import AIAnalysis from '@/components/AIAnalysis';
 import RenewalsSection from '@/components/RenewalsSection';
+import ThemeToggle from '@/components/ThemeToggle';
 
 // Import the pre-generated data as fallback
 import reportDataJson from '@/data/report-data.json';
@@ -498,6 +499,7 @@ function ReportContent() {
             <span className={`refresh-icon ${isRefreshing ? 'spinning' : ''}`}>↻</span>
             {isRefreshing ? 'Loading...' : (useLiveData ? 'Refresh' : 'Go Live')}
           </button>
+          <ThemeToggle />
           <UserMenu />
         </div>
       </div>
