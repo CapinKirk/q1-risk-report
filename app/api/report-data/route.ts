@@ -986,7 +986,9 @@ async function getLossReasonRCA(filters: ReportFilters) {
   }
 }
 
-// Query for MQL details
+// Query for MQL + EQL details
+// MQL = Marketing Qualified Lead (NEW LOGO - from InboundFunnel)
+// EQL = Existing Qualified Lead (EXPANSION/MIGRATION - from OpportunityViewTable)
 async function getMQLDetails(filters: ReportFilters) {
   const regionClause = filters.regions && filters.regions.length > 0
     ? `AND Division IN (${filters.regions.map(r => {
@@ -995,7 +997,8 @@ async function getMQLDetails(filters: ReportFilters) {
       }).join(', ')})`
     : '';
 
-  const porQuery = `
+  // MQL Query - NEW LOGO from InboundFunnel
+  const porMqlQuery = `
     SELECT
       'POR' AS product,
       CASE Division
@@ -1020,7 +1023,9 @@ async function getMQLDetails(filters: ReportFilters) {
         ELSE 'ACTIVE'
       END AS mql_status,
       COALESCE(MQL_Reverted, false) AS was_reverted,
-      DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage
+      DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage,
+      'MQL' AS lead_type,
+      'NEW LOGO' AS category
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
     WHERE Division IN ('US', 'UK', 'AU')
       AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
@@ -1036,7 +1041,7 @@ async function getMQLDetails(filters: ReportFilters) {
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
-  const r360Query = `
+  const r360MqlQuery = `
     SELECT
       'R360' AS product,
       Region AS region,
@@ -1054,7 +1059,9 @@ async function getMQLDetails(filters: ReportFilters) {
         ELSE 'ACTIVE'
       END AS mql_status,
       COALESCE(MQL_Reverted, false) AS was_reverted,
-      DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage
+      DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage,
+      'MQL' AS lead_type,
+      'NEW LOGO' AS category
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
     WHERE Region IS NOT NULL
       AND MQL_Reverted = false
@@ -1065,21 +1072,75 @@ async function getMQLDetails(filters: ReportFilters) {
     ORDER BY MQL_DT DESC
   `;
 
+  // EQL Query - EXPANSION/MIGRATION from OpportunityViewTable
+  // EQLs are qualified opportunities from existing customers (tracked by CreatedDate)
+  const { productClause, regionClause: oppRegionClause } = buildOpportunityFilterClause(filters);
+
+  const eqlQuery = `
+    SELECT
+      CASE WHEN por_record__c THEN 'POR' ELSE 'R360' END AS product,
+      CASE Division
+        WHEN 'US' THEN 'AMER'
+        WHEN 'UK' THEN 'EMEA'
+        WHEN 'AU' THEN 'APAC'
+      END AS region,
+      Id AS record_id,
+      CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url,
+      COALESCE(AccountName, 'Unknown') AS company_name,
+      COALESCE(Account_Main_Contact_Email__c, 'N/A') AS email,
+      COALESCE(NULLIF(SDRSource, ''), NULLIF(POR_SDRSource, ''), 'INBOUND') AS source,
+      CAST(CreatedDate AS STRING) AS mql_date,
+      CASE WHEN Won THEN 'Yes' WHEN StageName LIKE '%SQL%' OR StageName LIKE '%SAL%' OR StageName LIKE '%SQO%' THEN 'Yes' ELSE 'No' END AS converted_to_sql,
+      CASE
+        WHEN Won THEN 'CONVERTED'
+        WHEN IsClosed AND NOT Won THEN 'REVERTED'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY) > 30 AND NOT IsClosed THEN 'STALLED'
+        ELSE 'ACTIVE'
+      END AS mql_status,
+      CASE WHEN IsClosed AND NOT Won THEN true ELSE false END AS was_reverted,
+      DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY) AS days_in_stage,
+      'EQL' AS lead_type,
+      CASE Type
+        WHEN 'Existing Business' THEN 'EXPANSION'
+        WHEN 'Migration' THEN 'MIGRATION'
+      END AS category
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+    WHERE Division IN ('US', 'UK', 'AU')
+      AND Type IN ('Existing Business', 'Migration')
+      AND ACV > 0
+      AND CAST(CreatedDate AS DATE) >= '${filters.startDate}'
+      AND CAST(CreatedDate AS DATE) <= '${filters.endDate}'
+      ${productClause}
+      ${oppRegionClause}
+    ORDER BY CreatedDate DESC
+  `;
+
   try {
     const shouldFetchPOR = filters.products.length === 0 || filters.products.includes('POR');
     const shouldFetchR360 = filters.products.length === 0 || filters.products.includes('R360');
 
-    const [porRows, r360Rows] = await Promise.all([
-      shouldFetchPOR ? getBigQuery().query({ query: porQuery }).then(r => r[0]) : Promise.resolve([]),
-      shouldFetchR360 ? getBigQuery().query({ query: r360Query }).then(r => r[0]) : Promise.resolve([]),
+    const [porMqlRows, r360MqlRows, eqlRows] = await Promise.all([
+      shouldFetchPOR ? getBigQuery().query({ query: porMqlQuery }).then(r => r[0]) : Promise.resolve([]),
+      shouldFetchR360 ? getBigQuery().query({ query: r360MqlQuery }).then(r => r[0]) : Promise.resolve([]),
+      getBigQuery().query({ query: eqlQuery }).then(r => r[0]),
     ]);
 
+    // Combine MQL and EQL data, split by product
+    const porData = [
+      ...(porMqlRows as any[]),
+      ...(eqlRows as any[]).filter((r: any) => r.product === 'POR'),
+    ];
+    const r360Data = [
+      ...(r360MqlRows as any[]),
+      ...(eqlRows as any[]).filter((r: any) => r.product === 'R360'),
+    ];
+
     return {
-      POR: porRows as any[],
-      R360: r360Rows as any[],
+      POR: porData,
+      R360: r360Data,
     };
   } catch (error) {
-    console.warn('MQL details query failed:', error);
+    console.warn('MQL/EQL details query failed:', error);
     return { POR: [], R360: [] };
   }
 }

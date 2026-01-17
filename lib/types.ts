@@ -477,7 +477,12 @@ export interface TopRiskPocket {
   pipeline_coverage_x: number;
 }
 
-// MQL Detail row for drill-down
+// Lead type for distinguishing MQL vs EQL
+export type LeadType = 'MQL' | 'EQL';
+
+// MQL/EQL Detail row for drill-down
+// MQL = Marketing Qualified Lead (NEW LOGO - new business)
+// EQL = Existing Qualified Lead (EXPANSION/MIGRATION - existing customers)
 export interface MQLDetailRow {
   product: Product;
   region: Region;
@@ -492,6 +497,9 @@ export interface MQLDetailRow {
   mql_status?: 'ACTIVE' | 'CONVERTED' | 'REVERTED' | 'STALLED';
   was_reverted?: boolean;
   days_in_stage?: number;
+  // NEW: Lead type and category for filtering
+  lead_type: LeadType;  // MQL for new business, EQL for existing
+  category: 'NEW LOGO' | 'EXPANSION' | 'MIGRATION';
 }
 
 // SQL Detail row for drill-down

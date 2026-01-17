@@ -491,6 +491,7 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
 // Calculate renewal summary from opportunities and contracts
 // IMPORTANT: For bookings forecast, only UPLIFT counts as new bookings, not full ACV!
 // targets now includes regional breakdown for accurate filtering
+// missingUpliftContractsList: Pass pre-built list to ensure 100% consistency with response
 function calculateRenewalSummary(
   wonOpps: RenewalOpportunity[],
   lostOpps: RenewalOpportunity[],
@@ -500,7 +501,8 @@ function calculateRenewalSummary(
     total: { q1Target: number; qtdTarget: number };
     byRegion: Record<Region, RegionalTargets>;
   },
-  regionFilter?: Region[]
+  regionFilter?: Region[],
+  missingUpliftContractsList?: SalesforceContract[]
 ): RenewalSummary {
   // Calculate effective targets based on region filter
   // If filtering by specific regions, sum only those regional targets
@@ -590,7 +592,8 @@ function calculateRenewalSummary(
   console.log(`Renewal Forecast (P75): Won=${wonRenewalACV}, Q1 Uplift=${q1ExpectedUplift}, Total Forecast=${forecastedBookings}, Q1 Target=${effectiveQ1Target}, Attainment=${qtdAttainmentPct}%, RAG=${ragStatus}`);
 
   // Track contracts with ACV but missing uplift - these are revenue leakage!
-  const missingUpliftContracts = contracts.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0);
+  // CRITICAL: Use passed-in list if provided to ensure 100% consistency with response
+  const missingUpliftContracts = missingUpliftContractsList || contracts.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0);
   const missingUpliftCount = missingUpliftContracts.length;
   const missingUpliftACV = missingUpliftContracts.reduce((sum, c) => sum + c.CurrentACV, 0);
   const potentialLostUplift = Math.round(missingUpliftACV * (DEFAULT_RENEWAL_UPLIFT_PCT / 100) * 100) / 100;
@@ -690,14 +693,21 @@ export async function GET(request: Request) {
       ? filters.regions as Region[]
       : undefined;
 
-    // Calculate summaries with P75 targets for RAG status
+    // CRITICAL: Build contract lists FIRST, then calculate summary FROM those lists
+  // This ensures 100% consistency between displayed contracts and summary numbers
+  const missingUpliftContractsPOR = filteredContractsByProduct.POR.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0);
+  const missingUpliftContractsR360 = filteredContractsByProduct.R360.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0);
+
+  // Calculate summaries with P75 targets for RAG status
+  // Pass the pre-built missingUpliftContracts to ensure consistency
     const porSummary = calculateRenewalSummary(
       wonByProduct.POR,
       lostByProduct.POR,
       pipelineByProduct.POR,
       filteredContractsByProduct.POR,
       renewalTargets.POR,
-      regionFilter
+      regionFilter,
+      missingUpliftContractsPOR
     );
 
     const r360Summary = calculateRenewalSummary(
@@ -706,7 +716,8 @@ export async function GET(request: Request) {
       pipelineByProduct.R360,
       filteredContractsByProduct.R360,
       renewalTargets.R360,
-      regionFilter
+      regionFilter,
+      missingUpliftContractsR360
     );
 
     // Build response
@@ -724,8 +735,8 @@ export async function GET(request: Request) {
         R360: filteredContractsByProduct.R360.filter(c => c.IsAtRisk),
       },
       missingUpliftContracts: {
-        POR: filteredContractsByProduct.POR.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0),
-        R360: filteredContractsByProduct.R360.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0),
+        POR: missingUpliftContractsPOR,
+        R360: missingUpliftContractsR360,
       },
       sfAvailable,
       bqDataOnly: !sfAvailable,
