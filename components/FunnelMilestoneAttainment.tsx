@@ -201,8 +201,9 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 100;
       const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 100;
 
-      // Skip sources with no targets
-      if (data.mqlTarget === 0 && data.sqlTarget === 0 && data.salTarget === 0 && data.sqoTarget === 0) return;
+      // Skip sources with no activity (all actuals are 0)
+      // Note: Source-level targets are 0 because targets exist at category level, not source level
+      if (data.mqlActual === 0 && data.sqlActual === 0 && data.salActual === 0 && data.sqoActual === 0) return;
 
       result.push({
         source,
