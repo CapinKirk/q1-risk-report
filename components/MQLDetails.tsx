@@ -89,12 +89,14 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
     return { total, mqlCount, eqlCount, converted, reverted, stalled, active, conversionRate, revertedRate, newLogo, expansion, migration };
   }, [filteredMQLs]);
 
-  // Pagination
+  // Pagination - memoized to ensure proper re-rendering
   const totalPages = Math.ceil(filteredMQLs.length / ITEMS_PER_PAGE);
-  const paginatedMQLs = filteredMQLs.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const paginatedMQLs = useMemo(() => {
+    return filteredMQLs.slice(
+      (currentPage - 1) * ITEMS_PER_PAGE,
+      currentPage * ITEMS_PER_PAGE
+    );
+  }, [filteredMQLs, currentPage]);
 
   // Reset page when filters change
   const handleFilterChange = (setter: (v: any) => void, value: any) => {
@@ -243,7 +245,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
               </tr>
             ) : (
               paginatedMQLs.map((mql, idx) => (
-                <tr key={`${mql.record_id}-${idx}`}>
+                <tr key={`${mql.lead_type}-${mql.product}-${mql.company_name}-${mql.mql_date}-${idx}`}>
                   <td>
                     <span className={`lead-type-badge ${(mql.lead_type || 'MQL').toLowerCase()}`}>
                       {mql.lead_type || 'MQL'}

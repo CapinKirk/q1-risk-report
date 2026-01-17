@@ -127,11 +127,27 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
       qtdAttainmentPct,
       forecastedBookings,
       ragStatus: getRAG(qtdAttainmentPct),
-      // Missing uplift tracking
+      // Missing uplift tracking - will be recalculated from filtered contracts below
       missingUpliftCount: summaries.reduce((sum, s) => sum + (s.missingUpliftCount || 0), 0),
       missingUpliftACV: summaries.reduce((sum, s) => sum + (s.missingUpliftACV || 0), 0),
       potentialLostUplift: summaries.reduce((sum, s) => sum + (s.potentialLostUplift || 0), 0),
     };
+  };
+
+  // Helper to get all missing uplift contracts (for summary recalculation)
+  const getMissingUpliftContractsFiltered = (): SalesforceContract[] => {
+    if (!renewalsData) return [];
+
+    const selectedProducts = products.length > 0 ? products : ['POR', 'R360'] as Product[];
+    const selectedRegions = regions.length > 0 ? regions : ['AMER', 'EMEA', 'APAC'] as Region[];
+
+    let contracts: SalesforceContract[] = [];
+    for (const p of selectedProducts) {
+      const data = renewalsData.missingUpliftContracts?.[p] || [];
+      contracts = [...contracts, ...data];
+    }
+
+    return contracts.filter(c => selectedRegions.includes(c.Region));
   };
 
   // Get filtered data based on selected products/regions
@@ -175,6 +191,13 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
   };
 
   const summary = getCombinedSummary();
+
+  // CRITICAL: Calculate missing uplift stats FROM FILTERED CONTRACTS
+  // This ensures the warning banner matches the table exactly
+  const filteredMissingUpliftContracts = getMissingUpliftContractsFiltered();
+  const filteredMissingUpliftCount = filteredMissingUpliftContracts.length;
+  const filteredMissingUpliftACV = filteredMissingUpliftContracts.reduce((sum, c) => sum + (c.CurrentACV || 0), 0);
+  const filteredPotentialLostUplift = filteredMissingUpliftContracts.reduce((sum, c) => sum + (c.CurrentACV || 0) * 0.05, 0);
 
   if (loading) {
     return (
@@ -358,18 +381,20 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
       </div>
 
       {/* Missing Uplift Warning - only show if there are contracts missing uplift */}
-      {(safeSummary.missingUpliftCount || 0) > 0 && (
+      {/* CRITICAL: Use filteredMissingUplift* values (calculated from filtered contracts) */}
+      {/* This ensures the warning banner MATCHES the table exactly */}
+      {filteredMissingUpliftCount > 0 && (
         <div className="missing-uplift-warning">
           <div className="warning-icon">⚠️</div>
           <div className="warning-content">
             <div className="warning-title">
-              Revenue Leakage: {safeSummary.missingUpliftCount} Contracts Missing Uplift
+              Revenue Leakage: {filteredMissingUpliftCount} Contracts Missing Uplift
             </div>
             <div className="warning-details">
-              <span>{formatCurrency(safeSummary.missingUpliftACV || 0)} ACV without configured uplift</span>
+              <span>{formatCurrency(filteredMissingUpliftACV)} ACV without configured uplift</span>
               <span className="separator">•</span>
               <span className="lost-revenue">
-                {formatCurrency(safeSummary.potentialLostUplift || 0)} potential lost bookings (5% uplift)
+                {formatCurrency(filteredPotentialLostUplift)} potential lost bookings (5% uplift)
               </span>
             </div>
             <button
@@ -408,12 +433,12 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
         >
           At Risk ({safeSummary.atRiskCount})
         </button>
-        {(safeSummary.missingUpliftCount || 0) > 0 && (
+        {filteredMissingUpliftCount > 0 && (
           <button
             className={`tab warning-tab ${activeTab === 'missinguplift' ? 'active' : ''}`}
             onClick={() => setActiveTab('missinguplift')}
           >
-            ⚠️ Missing Uplift ({safeSummary.missingUpliftCount})
+            ⚠️ Missing Uplift ({filteredMissingUpliftCount})
           </button>
         )}
       </div>

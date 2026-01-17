@@ -1087,8 +1087,8 @@ async function getMQLDetails(filters: ReportFilters) {
       Id AS record_id,
       CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url,
       COALESCE(AccountName, 'Unknown') AS company_name,
-      COALESCE(Account_Main_Contact_Email__c, 'N/A') AS email,
-      COALESCE(NULLIF(SDRSource, ''), NULLIF(POR_SDRSource, ''), 'INBOUND') AS source,
+      'N/A' AS email,
+      COALESCE(NULLIF(COALESCE(SDRSource, POR_SDRSource), ''), 'INBOUND') AS source,
       CAST(CreatedDate AS STRING) AS mql_date,
       CASE WHEN Won THEN 'Yes' WHEN StageName LIKE '%SQL%' OR StageName LIKE '%SAL%' OR StageName LIKE '%SQO%' THEN 'Yes' ELSE 'No' END AS converted_to_sql,
       CASE
