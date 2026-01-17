@@ -506,6 +506,28 @@ h4 {
   border-color: var(--header-bg);
 }
 
+/* Status Colors - Light Mode (default) */
+.status-green {
+  color: #16a34a !important;
+}
+.status-yellow {
+  color: #ca8a04 !important;
+}
+.status-red {
+  color: #dc2626 !important;
+}
+
+/* Status Colors - Dark Mode */
+[data-theme="dark"] .status-green {
+  color: #4ade80 !important;
+}
+[data-theme="dark"] .status-yellow {
+  color: #fbbf24 !important;
+}
+[data-theme="dark"] .status-red {
+  color: #f87171 !important;
+}
+
 /* Tables */
 .table-wrap {
   overflow-x: auto;

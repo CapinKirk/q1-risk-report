@@ -2,7 +2,7 @@
 
 import { useMemo, useCallback } from 'react';
 import { ReportData, AttainmentRow } from '@/lib/types';
-import { formatCurrency, formatPercent, formatCoverage, getRAGColor, getAttainmentColor } from '@/lib/formatters';
+import { formatCurrency, formatPercent, formatCoverage } from '@/lib/formatters';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
 
@@ -38,18 +38,13 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
   const misses = allAttainment.filter(a => a.rag_status === 'RED' || a.rag_status === 'YELLOW');
 
   const qtdAtt = grand_total.total_qtd_attainment_pct || 0;
-  const attColor = getAttainmentColor(qtdAtt);
-
   const cov = grand_total.total_pipeline_coverage_x || 0;
-  const covColor = cov >= 3 ? '#16a34a' : cov >= 2 ? '#ca8a04' : '#dc2626';
 
   const por = product_totals.POR;
   const porAtt = por?.total_qtd_attainment_pct || 0;
-  const porColor = getAttainmentColor(porAtt);
 
   const r360 = product_totals.R360;
   const r360Att = r360?.total_qtd_attainment_pct || 0;
-  const r360Color = getAttainmentColor(r360Att);
 
   // Create detailed breakdown data for sorting
   const detailRows = useMemo<DetailRow[]>(() => {
@@ -204,15 +199,35 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
           </tr>
           <tr>
             <td>QTD Attainment</td>
-            <td className="right" style={{ color: attColor }}><strong>{formatPercent(qtdAtt)}</strong></td>
-            {hasPOR && <td className="right" style={{ color: porColor }}><strong>{formatPercent(porAtt)}</strong></td>}
-            {hasR360 && <td className="right" style={{ color: r360Color }}><strong>{formatPercent(r360Att)}</strong></td>}
+            <td className={`right attainment-cell ${qtdAtt >= 90 ? 'status-green' : qtdAtt >= 70 ? 'status-yellow' : 'status-red'}`}>
+              <strong>{formatPercent(qtdAtt)}</strong>
+            </td>
+            {hasPOR && (
+              <td className={`right attainment-cell ${porAtt >= 90 ? 'status-green' : porAtt >= 70 ? 'status-yellow' : 'status-red'}`}>
+                <strong>{formatPercent(porAtt)}</strong>
+              </td>
+            )}
+            {hasR360 && (
+              <td className={`right attainment-cell ${r360Att >= 90 ? 'status-green' : r360Att >= 70 ? 'status-yellow' : 'status-red'}`}>
+                <strong>{formatPercent(r360Att)}</strong>
+              </td>
+            )}
           </tr>
           <tr>
             <td>Pipeline Coverage</td>
-            <td className="right" style={{ color: covColor }}><strong>{formatCoverage(cov)}</strong></td>
-            {hasPOR && <td className="right">{formatCoverage(por?.total_pipeline_coverage_x)}</td>}
-            {hasR360 && <td className="right">{formatCoverage(r360?.total_pipeline_coverage_x)}</td>}
+            <td className={`right coverage-cell ${cov >= 3 ? 'status-green' : cov >= 2 ? 'status-yellow' : 'status-red'}`}>
+              <strong>{formatCoverage(cov)}</strong>
+            </td>
+            {hasPOR && (
+              <td className={`right coverage-cell ${(por?.total_pipeline_coverage_x || 0) >= 3 ? 'status-green' : (por?.total_pipeline_coverage_x || 0) >= 2 ? 'status-yellow' : 'status-red'}`}>
+                {formatCoverage(por?.total_pipeline_coverage_x)}
+              </td>
+            )}
+            {hasR360 && (
+              <td className={`right coverage-cell ${(r360?.total_pipeline_coverage_x || 0) >= 3 ? 'status-green' : (r360?.total_pipeline_coverage_x || 0) >= 2 ? 'status-yellow' : 'status-red'}`}>
+                {formatCoverage(r360?.total_pipeline_coverage_x)}
+              </td>
+            )}
           </tr>
           <tr>
             <td>Win Rate</td>
@@ -301,8 +316,9 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
               </thead>
               <tbody>
                 {sortedData.map((row, idx) => {
-                  const attColor = getAttainmentColor(row.attainment_pct);
-                  const covColor = row.pipeline_coverage >= 3 ? '#16a34a' : row.pipeline_coverage >= 2 ? '#ca8a04' : '#dc2626';
+                  const attClass = row.attainment_pct >= 90 ? 'status-green' : row.attainment_pct >= 70 ? 'status-yellow' : 'status-red';
+                  const covClass = row.pipeline_coverage >= 3 ? 'status-green' : row.pipeline_coverage >= 2 ? 'status-yellow' : 'status-red';
+                  const winClass = row.win_rate_pct >= 90 ? 'status-green' : row.win_rate_pct >= 70 ? 'status-yellow' : 'status-red';
 
                   return (
                     <tr key={`${row.product}-${row.region}-${idx}`}>
@@ -312,13 +328,13 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
                       <td className="right">{formatCurrency(row.q1_target)}</td>
                       <td className="right">{formatCurrency(row.qtd_target)}</td>
                       <td className="right"><strong>{formatCurrency(row.qtd_actual)}</strong></td>
-                      <td className="right" style={{ color: attColor }}>
+                      <td className={`right attainment-cell ${attClass}`}>
                         <strong>{formatPercent(row.attainment_pct)}</strong>
                       </td>
-                      <td className="right" style={{ color: covColor }}>
+                      <td className={`right coverage-cell ${covClass}`}>
                         <strong>{formatCoverage(row.pipeline_coverage)}</strong>
                       </td>
-                      <td className="right" style={{ color: getAttainmentColor(row.win_rate_pct) }}>
+                      <td className={`right ${winClass}`}>
                         {formatPercent(row.win_rate_pct)}
                       </td>
                     </tr>
