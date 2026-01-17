@@ -8,6 +8,7 @@ import type {
   SourceAttainmentRow,
   FunnelByCategoryRow,
   FunnelBySourceRow,
+  FunnelBySourceActuals,
   PipelineRCARow,
   LossReasonRow,
   MQLDetailRow,
@@ -343,6 +344,15 @@ export function filterReportData(
       POR: filterFunnelSourceRows(data.funnel_by_source.POR, includePOR),
       R360: filterFunnelSourceRows(data.funnel_by_source.R360, includeR360),
     },
+    // Funnel by source actuals for the Full Funnel Pacing "By Source" view
+    funnel_by_source_actuals: data.funnel_by_source_actuals ? {
+      POR: includePOR
+        ? (allRegions ? data.funnel_by_source_actuals.POR || [] : filterByRegion(data.funnel_by_source_actuals.POR || [], regions))
+        : [],
+      R360: includeR360
+        ? (allRegions ? data.funnel_by_source_actuals.R360 || [] : filterByRegion(data.funnel_by_source_actuals.R360 || [], regions))
+        : [],
+    } : undefined,
     pipeline_rca: {
       POR: filterProductRegion(data.pipeline_rca.POR, includePOR),
       R360: filterProductRegion(data.pipeline_rca.R360, includeR360),
