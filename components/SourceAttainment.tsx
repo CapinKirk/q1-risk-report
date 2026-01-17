@@ -150,7 +150,7 @@ function FunnelByCategoryTable({ product, rows }: { product: Product; rows: Funn
                       <td rowSpan={stages.length}><strong>{category}</strong></td>
                       <td rowSpan={stages.length}>{row.region}</td>
                       <td rowSpan={stages.length} className="right">
-                        <span className="tof-score-tile" style={{ backgroundColor: getAttainmentColor(row.weighted_tof_score) }}>
+                        <span className="rag-tile" style={{ backgroundColor: getAttainmentColor(row.weighted_tof_score), padding: '4px 10px' }}>
                           {formatPercent(row.weighted_tof_score)}
                         </span>
                       </td>

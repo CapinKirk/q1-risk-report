@@ -312,33 +312,33 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       <td className="number-cell">{isBold ? <strong>{row.mqlActual.toLocaleString()}</strong> : row.mqlActual.toLocaleString()}</td>
       <td className="number-cell target-cell">{isBold ? <strong>{row.mqlTarget.toLocaleString()}</strong> : row.mqlTarget.toLocaleString()}</td>
       <td className="pacing-cell">
-        <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.mqlPacingPct)) }}>
+        <span className="rag-tile" style={{ backgroundColor: getRagColor(getRAG(row.mqlPacingPct)) }}>
           {isBold ? <strong>{row.mqlPacingPct}%</strong> : `${row.mqlPacingPct}%`}
         </span>
       </td>
       <td className="number-cell">{isBold ? <strong>{row.sqlActual.toLocaleString()}</strong> : row.sqlActual.toLocaleString()}</td>
       <td className="number-cell target-cell">{isBold ? <strong>{row.sqlTarget.toLocaleString()}</strong> : row.sqlTarget.toLocaleString()}</td>
       <td className="pacing-cell">
-        <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.sqlPacingPct)) }}>
+        <span className="rag-tile" style={{ backgroundColor: getRagColor(getRAG(row.sqlPacingPct)) }}>
           {isBold ? <strong>{row.sqlPacingPct}%</strong> : `${row.sqlPacingPct}%`}
         </span>
       </td>
       <td className="number-cell">{isBold ? <strong>{row.salActual.toLocaleString()}</strong> : row.salActual.toLocaleString()}</td>
       <td className="number-cell target-cell">{isBold ? <strong>{row.salTarget.toLocaleString()}</strong> : row.salTarget.toLocaleString()}</td>
       <td className="pacing-cell">
-        <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.salPacingPct)) }}>
+        <span className="rag-tile" style={{ backgroundColor: getRagColor(getRAG(row.salPacingPct)) }}>
           {isBold ? <strong>{row.salPacingPct}%</strong> : `${row.salPacingPct}%`}
         </span>
       </td>
       <td className="number-cell">{isBold ? <strong>{row.sqoActual.toLocaleString()}</strong> : row.sqoActual.toLocaleString()}</td>
       <td className="number-cell target-cell">{isBold ? <strong>{row.sqoTarget.toLocaleString()}</strong> : row.sqoTarget.toLocaleString()}</td>
       <td className="pacing-cell">
-        <span className="pacing-badge" style={{ backgroundColor: getRagColor(getRAG(row.sqoPacingPct)) }}>
+        <span className="rag-tile" style={{ backgroundColor: getRagColor(getRAG(row.sqoPacingPct)) }}>
           {isBold ? <strong>{row.sqoPacingPct}%</strong> : `${row.sqoPacingPct}%`}
         </span>
       </td>
       <td className="tof-score-cell">
-        <span className="tof-score" style={{ backgroundColor: getRagColor(getRAG(row.tofScore)) }}>
+        <span className="rag-tile" style={{ backgroundColor: getRagColor(getRAG(row.tofScore)), padding: '4px 10px' }}>
           {isBold ? <strong>{row.tofScore}%</strong> : `${row.tofScore}%`}
         </span>
       </td>
@@ -527,26 +527,9 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         .pacing-cell {
           padding: 3px;
         }
-        .pacing-badge {
-          display: inline-block;
-          padding: 2px 5px;
-          border-radius: 3px;
-          color: white;
-          font-size: 0.6rem;
-          font-weight: bold;
-          min-width: 32px;
-        }
         .tof-score-cell {
           background-color: #f9fafb;
           padding: 3px;
-        }
-        .tof-score {
-          display: inline-block;
-          padding: 3px 8px;
-          border-radius: 4px;
-          color: white;
-          font-weight: bold;
-          font-size: 0.7rem;
         }
         .totals-row {
           background-color: #f3f4f6;
