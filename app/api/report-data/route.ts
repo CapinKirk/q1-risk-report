@@ -355,89 +355,214 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
   }
 }
 
-// Query for funnel actuals by source using DailyRevenueFunnel
+// Query for funnel actuals by source using InboundFunnel (same source as MQL Details for consistency)
 async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360') {
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
-    : '';
+  if (product === 'POR') {
+    const regionClause = filters.regions && filters.regions.length > 0
+      ? `AND Division IN (${filters.regions.map(r => {
+          const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
+          return `'${map[r]}'`;
+        }).join(', ')})`
+      : '';
 
-  const query = `
-    WITH actuals AS (
+    const query = `
       SELECT
-        RecordType AS product,
-        Region AS region,
-        UPPER(Source) AS source,
-        COALESCE(SUM(MQL), 0) AS actual_mql,
-        COALESCE(SUM(SQL), 0) AS actual_sql,
-        COALESCE(SUM(SAL), 0) AS actual_sal,
-        COALESCE(SUM(SQO), 0) AS actual_sqo
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\`
-      WHERE RecordType = '${product}'
-        AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
-        AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
-        AND Source IS NOT NULL
+        'POR' AS product,
+        CASE Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        UPPER(COALESCE(NULLIF(SDRSource, ''), 'INBOUND')) AS source,
+        COUNT(DISTINCT CASE
+          WHEN MQL_DT IS NOT NULL
+            AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
+          THEN COALESCE(LeadEmail, ContactEmail)
+        END) AS actual_mql,
+        COUNT(DISTINCT CASE
+          WHEN SQL_DT IS NOT NULL
+            AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
+          THEN COALESCE(LeadEmail, ContactEmail)
+        END) AS actual_sql,
+        COUNT(DISTINCT CASE
+          WHEN SAL_DT IS NOT NULL
+            AND CAST(SAL_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(SAL_DT AS DATE) <= '${filters.endDate}'
+          THEN COALESCE(LeadEmail, ContactEmail)
+        END) AS actual_sal,
+        COUNT(DISTINCT CASE
+          WHEN SQO_DT IS NOT NULL
+            AND CAST(SQO_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(SQO_DT AS DATE) <= '${filters.endDate}'
+          THEN COALESCE(LeadEmail, ContactEmail)
+        END) AS actual_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
+      WHERE Division IN ('US', 'UK', 'AU')
+        AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
+        AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
         ${regionClause}
-      GROUP BY RecordType, Region, UPPER(Source)
-    )
-    SELECT
-      product,
-      region,
-      source,
-      actual_mql,
-      actual_sql,
-      actual_sal,
-      actual_sqo,
-      ROUND(SAFE_DIVIDE(actual_sql, NULLIF(actual_mql, 0)) * 100, 1) AS mql_to_sql_rate,
-      ROUND(SAFE_DIVIDE(actual_sal, NULLIF(actual_sql, 0)) * 100, 1) AS sql_to_sal_rate,
-      ROUND(SAFE_DIVIDE(actual_sqo, NULLIF(actual_sal, 0)) * 100, 1) AS sal_to_sqo_rate
-    FROM actuals
-    ORDER BY region, source
-  `;
+      GROUP BY 1, 2, 3
+      HAVING actual_mql > 0 OR actual_sql > 0 OR actual_sal > 0 OR actual_sqo > 0
+      ORDER BY region, source
+    `;
 
-  const [rows] = await getBigQuery().query({ query });
-  return rows;
+    const [rows] = await getBigQuery().query({ query });
+    // Add conversion rates
+    return (rows as any[]).map(row => ({
+      ...row,
+      mql_to_sql_rate: row.actual_mql > 0 ? Math.round((row.actual_sql / row.actual_mql) * 1000) / 10 : 0,
+      sql_to_sal_rate: row.actual_sql > 0 ? Math.round((row.actual_sal / row.actual_sql) * 1000) / 10 : 0,
+      sal_to_sqo_rate: row.actual_sal > 0 ? Math.round((row.actual_sqo / row.actual_sal) * 1000) / 10 : 0,
+    }));
+  } else {
+    // R360
+    const regionClause = filters.regions && filters.regions.length > 0
+      ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+      : '';
+
+    const query = `
+      SELECT
+        'R360' AS product,
+        Region AS region,
+        UPPER(COALESCE(NULLIF(SDRSource, ''), 'INBOUND')) AS source,
+        COUNT(DISTINCT CASE
+          WHEN MQL_DT IS NOT NULL
+            AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
+          THEN Email
+        END) AS actual_mql,
+        COUNT(DISTINCT CASE
+          WHEN SQL_DT IS NOT NULL
+            AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
+          THEN Email
+        END) AS actual_sql,
+        0 AS actual_sal,
+        COUNT(DISTINCT CASE
+          WHEN SQO_DT IS NOT NULL
+            AND CAST(SQO_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(SQO_DT AS DATE) <= '${filters.endDate}'
+          THEN Email
+        END) AS actual_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
+      WHERE MQL_Reverted = false
+        AND Region IS NOT NULL
+        ${regionClause}
+      GROUP BY 1, 2, 3
+      HAVING actual_mql > 0 OR actual_sql > 0 OR actual_sqo > 0
+      ORDER BY region, source
+    `;
+
+    const [rows] = await getBigQuery().query({ query });
+    // Add conversion rates
+    return (rows as any[]).map(row => ({
+      ...row,
+      mql_to_sql_rate: row.actual_mql > 0 ? Math.round((row.actual_sql / row.actual_mql) * 1000) / 10 : 0,
+      sql_to_sal_rate: 0,
+      sal_to_sqo_rate: row.actual_sql > 0 ? Math.round((row.actual_sqo / row.actual_sql) * 1000) / 10 : 0,
+    }));
+  }
 }
 
-// Query for funnel actuals by category using DailyRevenueFunnel
+// Query for funnel actuals by category using InboundFunnel (same source as MQL Details for consistency)
+// Note: InboundFunnel contains NEW LOGO (inbound marketing leads) data
+// EXPANSION/MIGRATION EQLs come from separate sources and are handled via RevOps data
 async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R360') {
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
-    : '';
+  if (product === 'POR') {
+    const regionClause = filters.regions && filters.regions.length > 0
+      ? `AND Division IN (${filters.regions.map(r => {
+          const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
+          return `'${map[r]}'`;
+        }).join(', ')})`
+      : '';
 
-  const query = `
-    SELECT
-      RecordType AS product,
-      Region AS region,
-      CASE
-        WHEN UPPER(FunnelType) IN ('INBOUND', 'R360 INBOUND', 'NEW LOGO', 'R360 NEW LOGO') THEN 'NEW LOGO'
-        WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
-        WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
-        WHEN UPPER(FunnelType) IN ('RENEWAL', 'R360 RENEWAL') THEN 'RENEWAL'
-        ELSE 'OTHER'
-      END AS category,
-      COALESCE(SUM(MQL), 0) AS actual_mql,
-      COALESCE(SUM(SQL), 0) AS actual_sql,
-      COALESCE(SUM(SAL), 0) AS actual_sal,
-      COALESCE(SUM(SQO), 0) AS actual_sqo
-    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\`
-    WHERE RecordType = '${product}'
-      AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
-      AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
-      AND Region IN ('AMER', 'EMEA', 'APAC')
-      ${regionClause}
-    GROUP BY RecordType, Region,
-      CASE
-        WHEN UPPER(FunnelType) IN ('INBOUND', 'R360 INBOUND', 'NEW LOGO', 'R360 NEW LOGO') THEN 'NEW LOGO'
-        WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
-        WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
-        WHEN UPPER(FunnelType) IN ('RENEWAL', 'R360 RENEWAL') THEN 'RENEWAL'
-        ELSE 'OTHER'
-      END
-    ORDER BY region, category
-  `;
+    const query = `
+      SELECT
+        'POR' AS product,
+        CASE Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        'NEW LOGO' AS category,
+        COUNT(DISTINCT CASE
+          WHEN MQL_DT IS NOT NULL
+            AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
+          THEN COALESCE(LeadEmail, ContactEmail)
+        END) AS actual_mql,
+        COUNT(DISTINCT CASE
+          WHEN SQL_DT IS NOT NULL
+            AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
+          THEN COALESCE(LeadEmail, ContactEmail)
+        END) AS actual_sql,
+        COUNT(DISTINCT CASE
+          WHEN SAL_DT IS NOT NULL
+            AND CAST(SAL_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(SAL_DT AS DATE) <= '${filters.endDate}'
+          THEN COALESCE(LeadEmail, ContactEmail)
+        END) AS actual_sal,
+        COUNT(DISTINCT CASE
+          WHEN SQO_DT IS NOT NULL
+            AND CAST(SQO_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(SQO_DT AS DATE) <= '${filters.endDate}'
+          THEN COALESCE(LeadEmail, ContactEmail)
+        END) AS actual_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
+      WHERE Division IN ('US', 'UK', 'AU')
+        AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
+        AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
+        ${regionClause}
+      GROUP BY 1, 2
+      ORDER BY region
+    `;
 
-  const [rows] = await getBigQuery().query({ query });
-  return rows;
+    const [rows] = await getBigQuery().query({ query });
+    return rows;
+  } else {
+    // R360
+    const regionClause = filters.regions && filters.regions.length > 0
+      ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+      : '';
+
+    const query = `
+      SELECT
+        'R360' AS product,
+        Region AS region,
+        'NEW LOGO' AS category,
+        COUNT(DISTINCT CASE
+          WHEN MQL_DT IS NOT NULL
+            AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
+          THEN Email
+        END) AS actual_mql,
+        COUNT(DISTINCT CASE
+          WHEN SQL_DT IS NOT NULL
+            AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
+          THEN Email
+        END) AS actual_sql,
+        0 AS actual_sal,
+        COUNT(DISTINCT CASE
+          WHEN SQO_DT IS NOT NULL
+            AND CAST(SQO_DT AS DATE) >= '${filters.startDate}'
+            AND CAST(SQO_DT AS DATE) <= '${filters.endDate}'
+          THEN Email
+        END) AS actual_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
+      WHERE MQL_Reverted = false
+        AND Region IS NOT NULL
+        ${regionClause}
+      GROUP BY 1, 2
+      ORDER BY region
+    `;
+
+    const [rows] = await getBigQuery().query({ query });
+    return rows;
+  }
 }
 
 // Query for POR funnel actuals (aggregated INBOUND)
@@ -576,7 +701,6 @@ async function getWonDeals(filters: ReportFilters) {
       ${productClause}
       ${regionClause}
     ORDER BY ACV DESC
-    LIMIT 100
   `;
 
   const [rows] = await getBigQuery().query({ query });
@@ -622,7 +746,6 @@ async function getLostDeals(filters: ReportFilters) {
       ${productClause}
       ${regionClause}
     ORDER BY ACV DESC
-    LIMIT 100
   `;
 
   const [rows] = await getBigQuery().query({ query });
@@ -667,7 +790,6 @@ async function getPipelineDeals(filters: ReportFilters) {
       ${productClause}
       ${regionClause}
     ORDER BY ACV DESC
-    LIMIT 200
   `;
 
   const [rows] = await getBigQuery().query({ query });
@@ -833,12 +955,12 @@ async function getMQLDetails(filters: ReportFilters) {
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
     WHERE Division IN ('US', 'UK', 'AU')
       AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
+      AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
       AND MQL_DT IS NOT NULL
       AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
       AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
       ${regionClause}
     ORDER BY MQL_DT DESC
-    LIMIT 200
   `;
 
   const r360RegionClause = filters.regions && filters.regions.length > 0
@@ -866,12 +988,12 @@ async function getMQLDetails(filters: ReportFilters) {
       DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
     WHERE Region IS NOT NULL
+      AND MQL_Reverted = false
       AND MQL_DT IS NOT NULL
       AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
       AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
       ${r360RegionClause}
     ORDER BY MQL_DT DESC
-    LIMIT 200
   `;
 
   try {
