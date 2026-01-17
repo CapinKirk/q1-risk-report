@@ -58,55 +58,56 @@
 
 /* Dark Mode Colors */
 [data-theme="dark"] {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --bg-hover: #475569;
+  --bg-primary: #0a0f1a;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --bg-hover: #374151;
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --text-tertiary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: #f9fafb;
+  --text-secondary: #e5e7eb;
+  --text-tertiary: #d1d5db;
+  --text-muted: #9ca3af;
 
-  --border-primary: #475569;
-  --border-secondary: #64748b;
-  --border-tertiary: #334155;
+  --border-primary: #374151;
+  --border-secondary: #4b5563;
+  --border-tertiary: #1f2937;
 
-  --header-bg: #0f172a;
-  --header-text: #f1f5f9;
+  --header-bg: #0a0f1a;
+  --header-text: #f9fafb;
   --header-border: #3b82f6;
 
   --accent-blue: #60a5fa;
   --accent-blue-dark: #3b82f6;
   --accent-blue-darker: #2563eb;
 
-  --success-bg: #064e3b;
-  --success-text: #6ee7b7;
-  --success-border: #10b981;
+  --success-bg: #052e16;
+  --success-text: #86efac;
+  --success-border: #22c55e;
 
-  --warning-bg: #78350f;
-  --warning-text: #fcd34d;
-  --warning-border: #f59e0b;
+  --warning-bg: #451a03;
+  --warning-text: #fde047;
+  --warning-border: #facc15;
 
-  --danger-bg: #7f1d1d;
+  --danger-bg: #450a0a;
   --danger-text: #fca5a5;
-  --danger-border: #ef4444;
+  --danger-border: #f87171;
 
-  --green: #22c55e;
-  --yellow: #eab308;
-  --red: #ef4444;
+  /* HIGH CONTRAST RAG colors for numbers - must be very bright on dark bg */
+  --green: #4ade80;
+  --yellow: #fde047;
+  --red: #f87171;
 
-  --shadow-sm: rgba(0, 0, 0, 0.3);
-  --shadow-md: rgba(0, 0, 0, 0.4);
+  --shadow-sm: rgba(0, 0, 0, 0.4);
+  --shadow-md: rgba(0, 0, 0, 0.5);
 
   --link-color: #60a5fa;
   --link-hover: #93c5fd;
 
-  --table-stripe: #1e293b;
-  --table-hover: #334155;
+  --table-stripe: #0f1629;
+  --table-hover: #1f2937;
 
-  --input-bg: #1e293b;
-  --input-border: #475569;
+  --input-bg: #111827;
+  --input-border: #374151;
   --input-focus: rgba(96, 165, 250, 0.3);
 }
 
