@@ -3,9 +3,16 @@ import { NextResponse } from 'next/server';
 // OpenAI API endpoint
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
+interface FilterContext {
+  products: string[];
+  regions: string[];
+  isFiltered: boolean;
+}
+
 interface AnalysisRequest {
   reportData: any;
   analysisType: 'bookings_miss' | 'pipeline_risk' | 'full_report';
+  filterContext?: FilterContext;
 }
 
 // Normalize attainment_detail to flat array (handles both API and frontend formats)
@@ -19,13 +26,18 @@ function normalizeAttainmentDetail(attainment_detail: any): any[] {
 }
 
 // Build the analysis prompt based on report data
-function buildAnalysisPrompt(reportData: any, analysisType: string): string {
+function buildAnalysisPrompt(reportData: any, analysisType: string, filterContext?: FilterContext): string {
   const {
     period, grand_total, product_totals, attainment_detail,
     funnel_by_category, funnel_by_source, pipeline_rca, loss_reason_rca,
     source_attainment, google_ads, google_ads_rca,
     mql_details, sql_details, mql_disqualification_summary
   } = reportData;
+
+  // Build filter context string for the prompt
+  const filterDescription = filterContext?.isFiltered
+    ? `**IMPORTANT: This analysis is FILTERED to show only ${filterContext.products.join(' and ')} data for ${filterContext.regions.join(', ')} region(s). Focus your analysis on these specific segments only.**`
+    : 'This analysis covers ALL products (POR and R360) and ALL regions (AMER, EMEA, APAC).';
 
   // Calculate key metrics for context
   const porTotal = product_totals?.POR || {};
@@ -72,6 +84,9 @@ function buildAnalysisPrompt(reportData: any, analysisType: string): string {
 2. **Critical Misses Analysis** - For each underperforming segment, explain WHY it's missing and the root cause
 3. **Recommended Actions** - Specific, actionable recommendations with owner suggestions
 4. **Risk Assessment** - Likelihood of hitting Q1 targets based on current trajectory
+
+## Filter Context
+${filterDescription}
 
 ## Current Period
 - As of Date: ${period?.as_of_date || 'N/A'}
@@ -204,7 +219,7 @@ export async function POST(request: Request) {
     }
 
     const body: AnalysisRequest = await request.json();
-    const { reportData, analysisType = 'bookings_miss' } = body;
+    const { reportData, analysisType = 'bookings_miss', filterContext } = body;
 
     if (!reportData) {
       return NextResponse.json(
@@ -213,7 +228,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const prompt = buildAnalysisPrompt(reportData, analysisType);
+    const prompt = buildAnalysisPrompt(reportData, analysisType, filterContext);
 
     // Call OpenAI API
     const response = await fetch(OPENAI_API_URL, {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ReportData, Product, Region } from '@/lib/types';
+import { ReportData, Product, Region, AttainmentRow, ProductTotal } from '@/lib/types';
 
 interface AIAnalysisProps {
   reportData: ReportData | null;
@@ -16,7 +16,32 @@ interface AnalysisState {
   generatedAt: string | null;
 }
 
-// Filter report data by products and regions
+// Recalculate product totals based on filtered attainment data
+function recalculateProductTotals(attainmentRows: AttainmentRow[]): ProductTotal {
+  const fyTarget = attainmentRows.reduce((sum, row) => sum + (row.fy_target || 0), 0);
+  const q1Target = attainmentRows.reduce((sum, row) => sum + (row.q1_target || 0), 0);
+  const qtdTarget = attainmentRows.reduce((sum, row) => sum + (row.qtd_target || 0), 0);
+  const qtdAcv = attainmentRows.reduce((sum, row) => sum + (row.qtd_acv || 0), 0);
+  const pipelineAcv = attainmentRows.reduce((sum, row) => sum + (row.pipeline_acv || 0), 0);
+  const lostDeals = attainmentRows.reduce((sum, row) => sum + (row.qtd_lost_deals || 0), 0);
+  const lostAcv = attainmentRows.reduce((sum, row) => sum + (row.qtd_lost_acv || 0), 0);
+  const remaining = q1Target - qtdAcv;
+
+  return {
+    total_fy_target: fyTarget,
+    total_q1_target: q1Target,
+    total_qtd_target: qtdTarget,
+    total_qtd_acv: qtdAcv,
+    total_qtd_attainment_pct: qtdTarget > 0 ? Math.round((qtdAcv / qtdTarget) * 100) : 100,
+    total_pipeline_acv: pipelineAcv,
+    total_pipeline_coverage_x: remaining > 0 ? Math.round((pipelineAcv / remaining) * 10) / 10 : 0,
+    total_win_rate_pct: 0,
+    total_lost_deals: lostDeals,
+    total_lost_acv: lostAcv,
+  };
+}
+
+// Filter report data by products and regions with proper recalculation
 function filterReportData(
   reportData: ReportData,
   products: Product[],
@@ -25,39 +50,82 @@ function filterReportData(
   const filterByRegion = <T extends { region?: Region }>(arr: T[] | undefined): T[] =>
     arr?.filter(item => !item.region || regions.length === 0 || regions.includes(item.region)) || [];
 
-  const filterByProduct = (product: Product) =>
-    products.length === 0 || products.includes(product);
+  const includePOR = products.length === 0 || products.includes('POR');
+  const includeR360 = products.length === 0 || products.includes('R360');
+
+  // Filter attainment data
+  const filteredPOR = includePOR ? filterByRegion(reportData.attainment_detail?.POR) : [];
+  const filteredR360 = includeR360 ? filterByRegion(reportData.attainment_detail?.R360) : [];
+
+  // Recalculate product totals based on filtered data
+  const emptyTotal: ProductTotal = {
+    total_fy_target: 0, total_q1_target: 0, total_qtd_target: 0, total_qtd_acv: 0,
+    total_qtd_attainment_pct: 0, total_pipeline_acv: 0, total_pipeline_coverage_x: 0,
+    total_win_rate_pct: 0, total_lost_deals: 0, total_lost_acv: 0,
+  };
+
+  const porTotals = includePOR ? recalculateProductTotals(filteredPOR) : emptyTotal;
+  const r360Totals = includeR360 ? recalculateProductTotals(filteredR360) : emptyTotal;
+
+  // Calculate grand totals
+  const combinedQtdTarget = porTotals.total_qtd_target + r360Totals.total_qtd_target;
+  const combinedQtdAcv = porTotals.total_qtd_acv + r360Totals.total_qtd_acv;
+  const combinedPipeline = porTotals.total_pipeline_acv + r360Totals.total_pipeline_acv;
+  const totalQ1Target = porTotals.total_q1_target + r360Totals.total_q1_target;
+  const totalRemaining = totalQ1Target - combinedQtdAcv;
 
   return {
     ...reportData,
+    grand_total: {
+      total_fy_target: porTotals.total_fy_target + r360Totals.total_fy_target,
+      total_q1_target: totalQ1Target,
+      total_qtd_target: combinedQtdTarget,
+      total_qtd_acv: combinedQtdAcv,
+      total_qtd_attainment_pct: combinedQtdTarget > 0 ? Math.round((combinedQtdAcv / combinedQtdTarget) * 100) : 100,
+      total_pipeline_acv: combinedPipeline,
+      total_pipeline_coverage_x: totalRemaining > 0 ? Math.round((combinedPipeline / totalRemaining) * 10) / 10 : 0,
+      total_win_rate_pct: 0,
+    },
+    product_totals: {
+      POR: porTotals,
+      R360: r360Totals,
+    },
     attainment_detail: {
-      POR: filterByProduct('POR') ? filterByRegion(reportData.attainment_detail?.POR) : [],
-      R360: filterByProduct('R360') ? filterByRegion(reportData.attainment_detail?.R360) : [],
+      POR: filteredPOR,
+      R360: filteredR360,
     },
     source_attainment: {
-      POR: filterByProduct('POR') ? filterByRegion(reportData.source_attainment?.POR) : [],
-      R360: filterByProduct('R360') ? filterByRegion(reportData.source_attainment?.R360) : [],
+      POR: includePOR ? filterByRegion(reportData.source_attainment?.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.source_attainment?.R360) : [],
     },
     funnel_by_category: {
-      POR: filterByProduct('POR') ? filterByRegion(reportData.funnel_by_category?.POR) : [],
-      R360: filterByProduct('R360') ? filterByRegion(reportData.funnel_by_category?.R360) : [],
+      POR: includePOR ? filterByRegion(reportData.funnel_by_category?.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.funnel_by_category?.R360) : [],
     },
     funnel_by_source: {
-      POR: filterByProduct('POR') ? filterByRegion(reportData.funnel_by_source?.POR) : [],
-      R360: filterByProduct('R360') ? filterByRegion(reportData.funnel_by_source?.R360) : [],
+      POR: includePOR ? filterByRegion(reportData.funnel_by_source?.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.funnel_by_source?.R360) : [],
     },
     pipeline_rca: {
-      POR: filterByProduct('POR') ? filterByRegion(reportData.pipeline_rca?.POR) : [],
-      R360: filterByProduct('R360') ? filterByRegion(reportData.pipeline_rca?.R360) : [],
+      POR: includePOR ? filterByRegion(reportData.pipeline_rca?.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.pipeline_rca?.R360) : [],
     },
     loss_reason_rca: {
-      POR: filterByProduct('POR') ? filterByRegion(reportData.loss_reason_rca?.POR) : [],
-      R360: filterByProduct('R360') ? filterByRegion(reportData.loss_reason_rca?.R360) : [],
+      POR: includePOR ? filterByRegion(reportData.loss_reason_rca?.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.loss_reason_rca?.R360) : [],
     },
     google_ads: {
-      POR: filterByProduct('POR') ? filterByRegion(reportData.google_ads?.POR) : [],
-      R360: filterByProduct('R360') ? filterByRegion(reportData.google_ads?.R360) : [],
+      POR: includePOR ? filterByRegion(reportData.google_ads?.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.google_ads?.R360) : [],
     },
+    mql_details: reportData.mql_details ? {
+      POR: includePOR ? filterByRegion(reportData.mql_details.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.mql_details.R360) : [],
+    } : undefined,
+    sql_details: reportData.sql_details ? {
+      POR: includePOR ? filterByRegion(reportData.sql_details.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.sql_details.R360) : [],
+    } : undefined,
   };
 }
 
@@ -132,6 +200,11 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
         body: JSON.stringify({
           reportData: filteredData,
           analysisType: 'bookings_miss',
+          filterContext: {
+            products: selectedProducts.length === 0 ? ['POR', 'R360'] : selectedProducts,
+            regions: selectedRegions.length === 0 ? ['AMER', 'EMEA', 'APAC'] : selectedRegions,
+            isFiltered: selectedProducts.length > 0 || selectedRegions.length > 0,
+          },
         }),
       });
 
