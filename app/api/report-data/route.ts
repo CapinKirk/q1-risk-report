@@ -481,8 +481,32 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
         }).join(', ')})`
       : '';
 
-    // NEW LOGO from InboundFunnel - COUNT(*) to match MQL Details record count
+    // NEW LOGO from InboundFunnel - deduplicated by Company + Date + Division
+    // Uses CTE to deduplicate, then counts unique leads at each funnel stage
     const newLogoQuery = `
+      WITH deduped_leads AS (
+        SELECT
+          Division,
+          COALESCE(Company, 'Unknown') AS company_key,
+          CAST(MQL_DT AS DATE) AS mql_date_key,
+          MQL_DT,
+          SQL_DT,
+          SAL_DT,
+          SQO_DT,
+          ROW_NUMBER() OVER (
+            PARTITION BY COALESCE(Company, 'Unknown'), CAST(MQL_DT AS DATE), Division
+            ORDER BY
+              CASE WHEN LeadId IS NOT NULL OR ContactId IS NOT NULL THEN 0 ELSE 1 END,
+              CASE WHEN SQL_DT IS NOT NULL THEN 0 ELSE 1 END
+          ) AS rn
+        FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
+        WHERE Division IN ('US', 'UK', 'AU')
+          AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
+          AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
+          -- Removed SDRSource filter to include all MQL sources
+          AND MQL_DT IS NOT NULL
+          ${divisionClause}
+      )
       SELECT
         'POR' AS product,
         CASE Division
@@ -492,9 +516,8 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
         END AS region,
         'NEW LOGO' AS category,
         COUNT(CASE
-          WHEN MQL_DT IS NOT NULL
-            AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
-            AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
+          WHEN mql_date_key >= '${filters.startDate}'
+            AND mql_date_key <= '${filters.endDate}'
           THEN 1
         END) AS actual_mql,
         COUNT(CASE
@@ -515,12 +538,8 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
             AND CAST(SQO_DT AS DATE) <= '${filters.endDate}'
           THEN 1
         END) AS actual_sqo
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
-      WHERE Division IN ('US', 'UK', 'AU')
-        AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
-        AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
-        AND SDRSource = 'Inbound'
-        ${divisionClause}
+      FROM deduped_leads
+      WHERE rn = 1
       GROUP BY 1, 2
       ORDER BY region
     `;
@@ -566,16 +585,36 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
       ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
       : '';
 
-    // NEW LOGO from R360InboundFunnel - COUNT(*) to match MQL Details record count
+    // NEW LOGO from R360InboundFunnel - deduplicated by Company + Date + Region
+    // Uses CTE to deduplicate, then counts unique leads at each funnel stage
     const newLogoQuery = `
+      WITH deduped_leads AS (
+        SELECT
+          Region,
+          COALESCE(Company, 'Unknown') AS company_key,
+          CAST(MQL_DT AS DATE) AS mql_date_key,
+          MQL_DT,
+          SQL_DT,
+          SQO_DT,
+          ROW_NUMBER() OVER (
+            PARTITION BY COALESCE(Company, 'Unknown'), CAST(MQL_DT AS DATE), Region
+            ORDER BY
+              CASE WHEN LeadId IS NOT NULL THEN 0 ELSE 1 END,
+              CASE WHEN SQL_DT IS NOT NULL THEN 0 ELSE 1 END
+          ) AS rn
+        FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
+        WHERE MQL_Reverted = false
+          AND Region IS NOT NULL
+          AND MQL_DT IS NOT NULL
+          ${regionClause}
+      )
       SELECT
         'R360' AS product,
         Region AS region,
         'NEW LOGO' AS category,
         COUNT(CASE
-          WHEN MQL_DT IS NOT NULL
-            AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
-            AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
+          WHEN mql_date_key >= '${filters.startDate}'
+            AND mql_date_key <= '${filters.endDate}'
           THEN 1
         END) AS actual_mql,
         COUNT(CASE
@@ -591,11 +630,8 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
             AND CAST(SQO_DT AS DATE) <= '${filters.endDate}'
           THEN 1
         END) AS actual_sqo
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
-      WHERE MQL_Reverted = false
-        AND Region IS NOT NULL
-        AND SDRSource = 'Inbound'
-        ${regionClause}
+      FROM deduped_leads
+      WHERE rn = 1
       GROUP BY 1, 2
       ORDER BY region
     `;
@@ -1042,7 +1078,7 @@ async function getMQLDetails(filters: ReportFilters) {
       WHERE Division IN ('US', 'UK', 'AU')
         AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
         AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
-        AND SDRSource = 'Inbound'
+        -- Removed SDRSource filter to include all MQL sources
         AND MQL_DT IS NOT NULL
         AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
         AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
@@ -1095,7 +1131,7 @@ async function getMQLDetails(filters: ReportFilters) {
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
       WHERE Region IS NOT NULL
         AND MQL_Reverted = false
-        AND SDRSource = 'Inbound'
+        -- Removed SDRSource filter to include all MQL sources
         AND MQL_DT IS NOT NULL
         AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
         AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
@@ -1229,7 +1265,7 @@ async function getSQLDetails(filters: ReportFilters) {
     WHERE Division IN ('US', 'UK', 'AU')
       AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
       AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
-      AND SDRSource = 'Inbound'
+      -- Removed SDRSource filter to include all MQL sources
       AND SQL_DT IS NOT NULL
       AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
       AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
@@ -1273,7 +1309,7 @@ async function getSQLDetails(filters: ReportFilters) {
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
     WHERE MQL_Reverted = false
       AND Region IS NOT NULL
-      AND SDRSource = 'Inbound'
+      -- Removed SDRSource filter to include all MQL sources
       AND SQL_DT IS NOT NULL
       AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
       AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
