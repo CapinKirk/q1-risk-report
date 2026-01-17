@@ -519,6 +519,7 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
       WHERE Division IN ('US', 'UK', 'AU')
         AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
         AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
+        AND SDRSource = 'Inbound'
         ${divisionClause}
       GROUP BY 1, 2
       ORDER BY region
@@ -593,6 +594,7 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
       WHERE MQL_Reverted = false
         AND Region IS NOT NULL
+        AND SDRSource = 'Inbound'
         ${regionClause}
       GROUP BY 1, 2
       ORDER BY region
@@ -1030,6 +1032,7 @@ async function getMQLDetails(filters: ReportFilters) {
     WHERE Division IN ('US', 'UK', 'AU')
       AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
       AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
+      AND SDRSource = 'Inbound'
       AND MQL_DT IS NOT NULL
       AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
       AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
@@ -1065,6 +1068,7 @@ async function getMQLDetails(filters: ReportFilters) {
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
     WHERE Region IS NOT NULL
       AND MQL_Reverted = false
+      AND SDRSource = 'Inbound'
       AND MQL_DT IS NOT NULL
       AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
       AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
@@ -1193,6 +1197,7 @@ async function getSQLDetails(filters: ReportFilters) {
     WHERE Division IN ('US', 'UK', 'AU')
       AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
       AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
+      AND SDRSource = 'Inbound'
       AND SQL_DT IS NOT NULL
       AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
       AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
@@ -1236,6 +1241,7 @@ async function getSQLDetails(filters: ReportFilters) {
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
     WHERE MQL_Reverted = false
       AND Region IS NOT NULL
+      AND SDRSource = 'Inbound'
       AND SQL_DT IS NOT NULL
       AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
       AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
