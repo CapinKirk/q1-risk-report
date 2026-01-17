@@ -201,6 +201,104 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
   const filteredMissingUpliftACV = filteredMissingUpliftContracts.reduce((sum, c) => sum + (c.CurrentACV || 0), 0);
   const filteredPotentialLostUplift = filteredMissingUpliftContracts.reduce((sum, c) => sum + (c.CurrentACV || 0) * 0.05, 0);
 
+  // IMPORTANT: All hooks MUST be called before any early returns (React hooks rules)
+  // Get filtered data for sorting hooks
+  const wonOpps = getFilteredOpps('won');
+  const pipelineOpps = getFilteredOpps('pipeline');
+  const upcomingContracts = getFilteredContracts('upcoming');
+  const atRiskContracts = getFilteredContracts('atrisk');
+  const missingUpliftContractsData = getFilteredContracts('missinguplift');
+
+  // Sorting hooks for each table
+  const renewalsTableWon = useSortableTable(
+    wonOpps,
+    wonOpps,
+    (item: RenewalOpportunity, column: string) => {
+      switch (column) {
+        case 'account_name': return item.account_name;
+        case 'product': return item.product;
+        case 'region': return item.region;
+        case 'acv': return item.acv;
+        case 'uplift_amount': return item.uplift_amount || 0;
+        case 'close_date': return item.close_date;
+        case 'owner_name': return item.owner_name;
+        default: return '';
+      }
+    }
+  );
+
+  const renewalsTablePipeline = useSortableTable(
+    pipelineOpps,
+    pipelineOpps,
+    (item: RenewalOpportunity, column: string) => {
+      switch (column) {
+        case 'account_name': return item.account_name;
+        case 'product': return item.product;
+        case 'region': return item.region;
+        case 'acv': return item.acv;
+        case 'uplift_amount': return item.uplift_amount || 0;
+        case 'close_date': return item.close_date;
+        case 'owner_name': return item.owner_name;
+        default: return '';
+      }
+    }
+  );
+
+  const contractsTableUpcoming = useSortableTable(
+    upcomingContracts,
+    upcomingContracts,
+    (item: SalesforceContract, column: string) => {
+      switch (column) {
+        case 'ContractNumber': return item.ContractNumber;
+        case 'AccountName': return item.AccountName;
+        case 'Product': return item.Product;
+        case 'Region': return item.Region;
+        case 'EndDate': return item.EndDate;
+        case 'DaysUntilRenewal': return item.DaysUntilRenewal;
+        case 'AutoRenewal': return item.AutoRenewal;
+        case 'IsAtRisk': return item.IsAtRisk;
+        default: return '';
+      }
+    }
+  );
+
+  const contractsTableAtRisk = useSortableTable(
+    atRiskContracts,
+    atRiskContracts,
+    (item: SalesforceContract, column: string) => {
+      switch (column) {
+        case 'ContractNumber': return item.ContractNumber;
+        case 'AccountName': return item.AccountName;
+        case 'Product': return item.Product;
+        case 'Region': return item.Region;
+        case 'EndDate': return item.EndDate;
+        case 'DaysUntilRenewal': return item.DaysUntilRenewal;
+        case 'AutoRenewal': return item.AutoRenewal;
+        case 'IsAtRisk': return item.IsAtRisk;
+        default: return '';
+      }
+    }
+  );
+
+  const missingUpliftTable = useSortableTable(
+    missingUpliftContractsData,
+    missingUpliftContractsData,
+    (item: SalesforceContract, column: string) => {
+      switch (column) {
+        case 'ContractNumber': return item.ContractNumber;
+        case 'AccountName': return item.AccountName;
+        case 'Product': return item.Product;
+        case 'Region': return item.Region;
+        case 'CurrentACV': return item.CurrentACV;
+        case 'UpliftAmount': return item.UpliftAmount;
+        case 'PotentialLost': return item.CurrentACV * 0.05;
+        case 'EndDate': return item.EndDate;
+        case 'DaysUntilRenewal': return item.DaysUntilRenewal;
+        default: return '';
+      }
+    }
+  );
+
   if (loading) {
     return (
       <section className="renewals-section">
@@ -274,101 +372,6 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
 
   // Get RAG color for display
   const ragColor = RAG_COLORS[safeSummary.ragStatus] || RAG_COLORS.RED;
-
-  // Sorting hooks for each table (must be called unconditionally per React hooks rules)
-  const wonOpps = getFilteredOpps('won');
-  const renewalsTableWon = useSortableTable(
-    wonOpps,
-    wonOpps,
-    (item: RenewalOpportunity, column: string) => {
-      switch (column) {
-        case 'account_name': return item.account_name;
-        case 'product': return item.product;
-        case 'region': return item.region;
-        case 'acv': return item.acv;
-        case 'uplift_amount': return item.uplift_amount || 0;
-        case 'close_date': return item.close_date;
-        case 'owner_name': return item.owner_name;
-        default: return '';
-      }
-    }
-  );
-
-  const pipelineOpps = getFilteredOpps('pipeline');
-  const renewalsTablePipeline = useSortableTable(
-    pipelineOpps,
-    pipelineOpps,
-    (item: RenewalOpportunity, column: string) => {
-      switch (column) {
-        case 'account_name': return item.account_name;
-        case 'product': return item.product;
-        case 'region': return item.region;
-        case 'acv': return item.acv;
-        case 'uplift_amount': return item.uplift_amount || 0;
-        case 'close_date': return item.close_date;
-        case 'owner_name': return item.owner_name;
-        default: return '';
-      }
-    }
-  );
-
-  const upcomingContracts = getFilteredContracts('upcoming');
-  const contractsTableUpcoming = useSortableTable(
-    upcomingContracts,
-    upcomingContracts,
-    (item: SalesforceContract, column: string) => {
-      switch (column) {
-        case 'ContractNumber': return item.ContractNumber;
-        case 'AccountName': return item.AccountName;
-        case 'Product': return item.Product;
-        case 'Region': return item.Region;
-        case 'EndDate': return item.EndDate;
-        case 'DaysUntilRenewal': return item.DaysUntilRenewal;
-        case 'AutoRenewal': return item.AutoRenewal;
-        case 'IsAtRisk': return item.IsAtRisk;
-        default: return '';
-      }
-    }
-  );
-
-  const atRiskContracts = getFilteredContracts('atrisk');
-  const contractsTableAtRisk = useSortableTable(
-    atRiskContracts,
-    atRiskContracts,
-    (item: SalesforceContract, column: string) => {
-      switch (column) {
-        case 'ContractNumber': return item.ContractNumber;
-        case 'AccountName': return item.AccountName;
-        case 'Product': return item.Product;
-        case 'Region': return item.Region;
-        case 'EndDate': return item.EndDate;
-        case 'DaysUntilRenewal': return item.DaysUntilRenewal;
-        case 'AutoRenewal': return item.AutoRenewal;
-        case 'IsAtRisk': return item.IsAtRisk;
-        default: return '';
-      }
-    }
-  );
-
-  const missingUpliftContracts = getFilteredContracts('missinguplift');
-  const missingUpliftTable = useSortableTable(
-    missingUpliftContracts,
-    missingUpliftContracts,
-    (item: SalesforceContract, column: string) => {
-      switch (column) {
-        case 'ContractNumber': return item.ContractNumber;
-        case 'AccountName': return item.AccountName;
-        case 'Product': return item.Product;
-        case 'Region': return item.Region;
-        case 'CurrentACV': return item.CurrentACV;
-        case 'UpliftAmount': return item.UpliftAmount;
-        case 'PotentialLost': return item.CurrentACV * 0.05;
-        case 'EndDate': return item.EndDate;
-        case 'DaysUntilRenewal': return item.DaysUntilRenewal;
-        default: return '';
-      }
-    }
-  );
 
   return (
     <section className="renewals-section" data-testid="renewals-section">
