@@ -88,59 +88,70 @@ function transformAPIResponse(apiData: any): ReportData {
   // Transform Pipeline RCA data (already grouped by product from API)
   const pipelineRcaData = apiData.pipeline_rca || { POR: [], R360: [] };
 
-  // Group funnel pacing by product
-  const funnelByProduct: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
+  // Use API's funnel_by_category directly if available (preferred - already properly formatted)
+  // Otherwise fall back to transforming funnel_pacing (legacy support)
+  let funnelByProduct: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
 
-  for (const row of apiData.funnel_pacing || []) {
-    // Get targets and actuals
-    const qtdTargetMql = row.target_mql || 0;
-    const qtdTargetSql = row.target_sql || 0;
-    const qtdTargetSal = row.target_sal || 0;
-    const qtdTargetSqo = row.target_sqo || 0;
-    const actualMql = row.actual_mql || 0;
-    const actualSql = row.actual_sql || 0;
-    const actualSal = row.actual_sal || 0;
-    const actualSqo = row.actual_sqo || 0;
-
-    // Calculate pacing: target=0 means 100% (met zero target). Rounded for display.
-    const mqlPct = qtdTargetMql > 0 ? Math.round((actualMql / qtdTargetMql) * 100) : 100;
-    const sqlPct = qtdTargetSql > 0 ? Math.round((actualSql / qtdTargetSql) * 100) : 100;
-    const salPct = qtdTargetSal > 0 ? Math.round((actualSal / qtdTargetSal) * 100) : 100;
-    const sqoPct = qtdTargetSqo > 0 ? Math.round((actualSqo / qtdTargetSqo) * 100) : 100;
-
-    // Calculate weighted TOF score: MQL=10%, SQL=20%, SAL=30%, SQO=40%
-    const weightedTofScore = (mqlPct * 0.10) + (sqlPct * 0.20) + (salPct * 0.30) + (sqoPct * 0.40);
-
-    const funnelRow = {
-      category: (row.category || 'NEW LOGO') as Category,
-      region: row.region,
-      weighted_tof_score: Math.round(weightedTofScore),
-      q1_target_mql: row.q1_target_mql || 0,
-      qtd_target_mql: qtdTargetMql,
-      actual_mql: actualMql,
-      mql_pacing_pct: mqlPct,
-      mql_gap: actualMql - qtdTargetMql,
-      q1_target_sql: row.q1_target_sql || 0,
-      qtd_target_sql: qtdTargetSql,
-      actual_sql: actualSql,
-      sql_pacing_pct: sqlPct,
-      sql_gap: actualSql - qtdTargetSql,
-      q1_target_sal: row.q1_target_sal || 0,
-      qtd_target_sal: qtdTargetSal,
-      actual_sal: actualSal,
-      sal_pacing_pct: salPct,
-      sal_gap: actualSal - qtdTargetSal,
-      q1_target_sqo: row.q1_target_sqo || 0,
-      qtd_target_sqo: qtdTargetSqo,
-      actual_sqo: actualSqo,
-      sqo_pacing_pct: sqoPct,
-      sqo_gap: actualSqo - qtdTargetSqo,
+  // Check if API returned funnel_by_category in the correct POR/R360 format
+  if (apiData.funnel_by_category?.POR?.length > 0 || apiData.funnel_by_category?.R360?.length > 0) {
+    // Use API's funnel_by_category directly - it's already properly structured
+    funnelByProduct = {
+      POR: apiData.funnel_by_category.POR || [],
+      R360: apiData.funnel_by_category.R360 || [],
     };
+  } else if (apiData.funnel_pacing && apiData.funnel_pacing.length > 0) {
+    // Fallback: Transform funnel_pacing if funnel_by_category not available
+    for (const row of apiData.funnel_pacing) {
+      // Get targets and actuals
+      const qtdTargetMql = row.target_mql || 0;
+      const qtdTargetSql = row.target_sql || 0;
+      const qtdTargetSal = row.target_sal || 0;
+      const qtdTargetSqo = row.target_sqo || 0;
+      const actualMql = row.actual_mql || 0;
+      const actualSql = row.actual_sql || 0;
+      const actualSal = row.actual_sal || 0;
+      const actualSqo = row.actual_sqo || 0;
 
-    if (row.product === 'POR') {
-      funnelByProduct.POR.push(funnelRow);
-    } else {
-      funnelByProduct.R360.push(funnelRow);
+      // Calculate pacing: target=0 means 100% (met zero target). Rounded for display.
+      const mqlPct = qtdTargetMql > 0 ? Math.round((actualMql / qtdTargetMql) * 100) : 100;
+      const sqlPct = qtdTargetSql > 0 ? Math.round((actualSql / qtdTargetSql) * 100) : 100;
+      const salPct = qtdTargetSal > 0 ? Math.round((actualSal / qtdTargetSal) * 100) : 100;
+      const sqoPct = qtdTargetSqo > 0 ? Math.round((actualSqo / qtdTargetSqo) * 100) : 100;
+
+      // Calculate weighted TOF score: MQL=10%, SQL=20%, SAL=30%, SQO=40%
+      const weightedTofScore = (mqlPct * 0.10) + (sqlPct * 0.20) + (salPct * 0.30) + (sqoPct * 0.40);
+
+      const funnelRow = {
+        category: (row.category || 'NEW LOGO') as Category,
+        region: row.region,
+        weighted_tof_score: Math.round(weightedTofScore),
+        q1_target_mql: row.q1_target_mql || 0,
+        qtd_target_mql: qtdTargetMql,
+        actual_mql: actualMql,
+        mql_pacing_pct: mqlPct,
+        mql_gap: actualMql - qtdTargetMql,
+        q1_target_sql: row.q1_target_sql || 0,
+        qtd_target_sql: qtdTargetSql,
+        actual_sql: actualSql,
+        sql_pacing_pct: sqlPct,
+        sql_gap: actualSql - qtdTargetSql,
+        q1_target_sal: row.q1_target_sal || 0,
+        qtd_target_sal: qtdTargetSal,
+        actual_sal: actualSal,
+        sal_pacing_pct: salPct,
+        sal_gap: actualSal - qtdTargetSal,
+        q1_target_sqo: row.q1_target_sqo || 0,
+        qtd_target_sqo: qtdTargetSqo,
+        actual_sqo: actualSqo,
+        sqo_pacing_pct: sqoPct,
+        sqo_gap: actualSqo - qtdTargetSqo,
+      };
+
+      if (row.product === 'POR') {
+        funnelByProduct.POR.push(funnelRow);
+      } else {
+        funnelByProduct.R360.push(funnelRow);
+      }
     }
   }
 
