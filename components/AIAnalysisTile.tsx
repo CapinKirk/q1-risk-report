@@ -163,7 +163,7 @@ export default function AIAnalysisTile({ product, region, reportData, isActive, 
 
   return (
     <div
-      className={`ai-tile ${!isActive ? 'inactive' : ''}`}
+      className={`ai-tile tile-info ${!isActive ? 'inactive' : ''}`}
       style={{
         border: `1px solid ${isActive ? productColor.border : 'var(--border-primary)'}`,
         opacity: isActive ? 1 : 0.5,

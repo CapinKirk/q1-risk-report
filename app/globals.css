@@ -46,9 +46,19 @@
   --link-color: #2563eb;
   --link-hover: #1d4ed8;
 
-  /* Table colors */
-  --table-stripe: #f9fafb;
-  --table-hover: #f3f4f6;
+  /* Table colors - enhanced alternating rows */
+  --table-stripe: #f1f5f9;
+  --table-stripe-alt: #e2e8f0;
+  --table-hover: #dbeafe;
+  --table-header-bg: var(--header-bg);
+
+  /* Semantic tile borders */
+  --tile-border-success: #22c55e;
+  --tile-border-warning: #f59e0b;
+  --tile-border-danger: #ef4444;
+  --tile-border-info: #3b82f6;
+  --tile-border-neutral: #6b7280;
+  --tile-border-purple: #8b5cf6;
 
   /* Input colors */
   --input-bg: #ffffff;
@@ -103,8 +113,19 @@
   --link-color: #60a5fa;
   --link-hover: #93c5fd;
 
-  --table-stripe: #0f1629;
-  --table-hover: #1f2937;
+  /* Table colors - enhanced alternating rows for dark mode */
+  --table-stripe: #131c2e;
+  --table-stripe-alt: #1a2744;
+  --table-hover: #1e3a5f;
+  --table-header-bg: #0f172a;
+
+  /* Semantic tile borders - brighter for dark mode */
+  --tile-border-success: #4ade80;
+  --tile-border-warning: #fbbf24;
+  --tile-border-danger: #f87171;
+  --tile-border-info: #60a5fa;
+  --tile-border-neutral: #9ca3af;
+  --tile-border-purple: #a78bfa;
 
   --input-bg: #111827;
   --input-border: #374151;
@@ -526,12 +547,29 @@ td {
   word-wrap: break-word;
 }
 
+/* Enhanced alternating row colors - more visible */
+tr:nth-child(odd) {
+  background: var(--bg-secondary);
+}
+
 tr:nth-child(even) {
   background: var(--table-stripe);
 }
 
+/* Third-level striping for extra visibility */
+tr:nth-child(4n) {
+  background: var(--table-stripe-alt);
+}
+
 tr:hover {
-  background: var(--table-hover);
+  background: var(--table-hover) !important;
+}
+
+/* Ensure header rows don't get striping */
+thead tr,
+thead tr:nth-child(even),
+thead tr:nth-child(4n) {
+  background: var(--header-bg) !important;
 }
 
 .green {
@@ -795,6 +833,189 @@ button {
   th, td {
     padding: 2px 3px;
   }
+}
+
+/* ============================================
+   SEMANTIC TILE BORDERS
+   Color-coded borders that reflect content type
+   ============================================ */
+
+/* Base tile styling with left accent border */
+.tile-success,
+.card-success,
+.kpi-card.success {
+  border-left: 4px solid var(--tile-border-success) !important;
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0.05) 0%, transparent 20%) !important;
+}
+
+.tile-warning,
+.card-warning,
+.kpi-card.warning {
+  border-left: 4px solid var(--tile-border-warning) !important;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.05) 0%, transparent 20%) !important;
+}
+
+.tile-danger,
+.card-danger,
+.kpi-card.danger {
+  border-left: 4px solid var(--tile-border-danger) !important;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.05) 0%, transparent 20%) !important;
+}
+
+.tile-info,
+.card-info,
+.kpi-card.info {
+  border-left: 4px solid var(--tile-border-info) !important;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.05) 0%, transparent 20%) !important;
+}
+
+.tile-neutral,
+.card-neutral,
+.kpi-card.neutral {
+  border-left: 4px solid var(--tile-border-neutral) !important;
+}
+
+.tile-purple,
+.card-purple,
+.kpi-card.purple {
+  border-left: 4px solid var(--tile-border-purple) !important;
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.05) 0%, transparent 20%) !important;
+}
+
+/* Dark mode semantic tile backgrounds */
+[data-theme="dark"] .tile-success,
+[data-theme="dark"] .card-success,
+[data-theme="dark"] .kpi-card.success {
+  background: linear-gradient(90deg, rgba(74, 222, 128, 0.08) 0%, var(--bg-tertiary) 20%) !important;
+}
+
+[data-theme="dark"] .tile-warning,
+[data-theme="dark"] .card-warning,
+[data-theme="dark"] .kpi-card.warning {
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.08) 0%, var(--bg-tertiary) 20%) !important;
+}
+
+[data-theme="dark"] .tile-danger,
+[data-theme="dark"] .card-danger,
+[data-theme="dark"] .kpi-card.danger {
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.08) 0%, var(--bg-tertiary) 20%) !important;
+}
+
+[data-theme="dark"] .tile-info,
+[data-theme="dark"] .card-info,
+[data-theme="dark"] .kpi-card.info {
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.08) 0%, var(--bg-tertiary) 20%) !important;
+}
+
+[data-theme="dark"] .tile-purple,
+[data-theme="dark"] .card-purple,
+[data-theme="dark"] .kpi-card.purple {
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.08) 0%, var(--bg-tertiary) 20%) !important;
+}
+
+/* ============================================
+   ENHANCED DARK MODE FEATURES
+   Additional polish and UX improvements
+   ============================================ */
+
+/* Improved focus states for accessibility */
+[data-theme="dark"] *:focus-visible {
+  outline: 2px solid var(--accent-blue) !important;
+  outline-offset: 2px;
+}
+
+/* Better shadows for depth perception in dark mode */
+[data-theme="dark"] .container {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .dropdown-menu,
+[data-theme="dark"] .popup {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Glow effect on interactive elements in dark mode */
+[data-theme="dark"] .filter-btn:hover,
+[data-theme="dark"] .preset-btn:hover,
+[data-theme="dark"] button:hover:not(:disabled) {
+  box-shadow: 0 0 12px rgba(96, 165, 250, 0.15);
+}
+
+[data-theme="dark"] .filter-btn.active {
+  box-shadow: 0 0 16px rgba(96, 165, 250, 0.25);
+}
+
+/* Improved tooltip styling */
+[data-theme="dark"] [data-tooltip]:hover::after,
+[data-theme="dark"] .tooltip {
+  background: #1f2937 !important;
+  color: #f9fafb !important;
+  border: 1px solid #374151 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Better divider lines */
+[data-theme="dark"] hr,
+[data-theme="dark"] .divider {
+  border-color: var(--border-secondary) !important;
+  opacity: 0.5;
+}
+
+/* Improved selection highlight */
+[data-theme="dark"] ::selection {
+  background: rgba(96, 165, 250, 0.4);
+  color: #ffffff;
+}
+
+/* Code/monospace text styling */
+[data-theme="dark"] code,
+[data-theme="dark"] pre,
+[data-theme="dark"] .mono {
+  background: #0d1117 !important;
+  border: 1px solid #30363d !important;
+  color: #e6edf3 !important;
+}
+
+/* Improved disabled state visibility */
+[data-theme="dark"] button:disabled,
+[data-theme="dark"] input:disabled,
+[data-theme="dark"] select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-tertiary) !important;
+}
+
+/* Better placeholder text */
+[data-theme="dark"] ::placeholder {
+  color: #6b7280 !important;
+  opacity: 1;
+}
+
+/* Skeleton loading animation for dark mode */
+[data-theme="dark"] .skeleton,
+[data-theme="dark"] .loading-skeleton {
+  background: linear-gradient(90deg, #1f2937 0%, #374151 50%, #1f2937 100%);
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Improved link underlines in dark mode */
+[data-theme="dark"] a:hover {
+  text-decoration-color: var(--accent-blue) !important;
+  text-underline-offset: 3px;
+}
+
+/* Better number/stat highlighting */
+[data-theme="dark"] .stat-value,
+[data-theme="dark"] .kpi-value,
+[data-theme="dark"] .metric-value {
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
 }
 
 /* ============================================

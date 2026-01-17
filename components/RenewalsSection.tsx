@@ -348,12 +348,12 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
 
       {/* KPI Cards */}
       <div className="kpi-grid">
-        <div className="kpi-card green">
+        <div className="kpi-card green card-success">
           <div className="kpi-label">Won Renewals (QTD)</div>
           <div className="kpi-value">{formatCurrency(safeSummary.wonRenewalACV)}</div>
           <div className="kpi-sub">{safeSummary.wonRenewalCount} deals</div>
         </div>
-        <div className="kpi-card blue">
+        <div className="kpi-card blue card-info">
           <div className="kpi-label">Pipeline Renewals</div>
           <div className="kpi-value">{formatCurrency(safeSummary.pipelineRenewalACV)}</div>
           <div className="kpi-sub">{safeSummary.pipelineRenewalCount} deals</div>
@@ -363,17 +363,17 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           <div className="kpi-value">{safeSummary.avgUpliftPct}%</div>
           <div className="kpi-sub">{formatCurrency(safeSummary.totalUpliftAmount)} total</div>
         </div>
-        <div className="kpi-card orange">
+        <div className="kpi-card orange card-warning">
           <div className="kpi-label">Upcoming (30d)</div>
           <div className="kpi-value">{safeSummary.upcomingRenewals30}</div>
           <div className="kpi-sub">{formatCurrency(safeSummary.upcomingRenewals30ACV)} ACV</div>
         </div>
-        <div className="kpi-card red">
+        <div className="kpi-card red card-danger">
           <div className="kpi-label">At-Risk Contracts</div>
           <div className="kpi-value">{safeSummary.atRiskCount}</div>
           <div className="kpi-sub">{formatCurrency(safeSummary.atRiskACV)} at risk</div>
         </div>
-        <div className="kpi-card gray">
+        <div className="kpi-card gray card-danger">
           <div className="kpi-label">Lost Renewals</div>
           <div className="kpi-value">{formatCurrency(safeSummary.lostRenewalACV)}</div>
           <div className="kpi-sub">{safeSummary.lostRenewalCount} deals</div>

@@ -131,9 +131,19 @@ function ActionItemCard({
   const cleanedAction = cleanActionText(item.action);
   const hasEnhancedData = item.reason || item.metric || item.recommendedAction;
 
+  // Map urgency to semantic border class
+  const getUrgencyClass = (urgency: string): string => {
+    switch (urgency) {
+      case 'IMMEDIATE': return 'card-danger';
+      case 'SHORT_TERM': return 'card-warning';
+      case 'STRATEGIC': return 'card-info';
+      default: return '';
+    }
+  };
+
   return (
     <div
-      className="action-card"
+      className={`action-card ${getUrgencyClass(item.urgency)}`}
       style={{
         backgroundColor: urgencyStyle.bg,
         borderColor: urgencyStyle.border,

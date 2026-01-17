@@ -39,7 +39,7 @@ export default function BrightSpots({ wins }: BrightSpotsProps) {
       <h2>Wins & Bright Spots</h2>
       <div className="bright-spots-grid">
         {sortedWins.slice(0, 6).map((win, idx) => (
-          <div key={idx} className="bright-spot-card">
+          <div key={idx} className="bright-spot-card card-success">
             <div className="spot-header">
               <span
                 className="tier-badge"

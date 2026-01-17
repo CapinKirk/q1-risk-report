@@ -11,24 +11,28 @@ export default function ExecutiveKPICards({ counts }: ExecutiveKPICardsProps) {
       value: counts.areas_exceeding_target,
       color: '#22c55e',
       bgColor: '#dcfce7',
+      semanticClass: 'card-success',
     },
     {
       label: 'At Risk',
       value: counts.areas_at_risk,
       color: '#ef4444',
       bgColor: '#fee2e2',
+      semanticClass: 'card-danger',
     },
     {
       label: 'Needs Attention',
       value: counts.areas_needing_attention,
       color: '#f59e0b',
       bgColor: '#fef3c7',
+      semanticClass: 'card-warning',
     },
     {
       label: 'With Momentum',
       value: counts.areas_with_momentum,
       color: '#3b82f6',
       bgColor: '#dbeafe',
+      semanticClass: 'card-info',
     },
   ];
 
@@ -37,7 +41,7 @@ export default function ExecutiveKPICards({ counts }: ExecutiveKPICardsProps) {
       {cards.map((card) => (
         <div
           key={card.label}
-          className="kpi-card"
+          className={`kpi-card ${card.semanticClass}`}
           style={{
             backgroundColor: card.bgColor,
             borderColor: card.color,

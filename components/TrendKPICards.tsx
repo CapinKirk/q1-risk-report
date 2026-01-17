@@ -45,6 +45,12 @@ function getTrendColor(trend: 'UP' | 'DOWN' | 'FLAT', isPositiveGood: boolean = 
   return isPositiveGood ? '#dc2626' : '#16a34a';
 }
 
+function getTrendClass(trend: 'UP' | 'DOWN' | 'FLAT', isPositiveGood: boolean = true): string {
+  if (trend === 'FLAT') return 'card-neutral';
+  if (trend === 'UP') return isPositiveGood ? 'card-success' : 'card-danger';
+  return isPositiveGood ? 'card-danger' : 'card-success';
+}
+
 interface KPICardProps {
   title: string;
   metric: MetricComparison<number>;
@@ -56,6 +62,7 @@ function KPICard({ title, metric, format, isPositiveGood = true }: KPICardProps)
   const formatFn = format === 'currency' ? formatCurrency : formatNumber;
   const trendColor = getTrendColor(metric.trend, isPositiveGood);
   const trendIcon = getTrendIcon(metric.trend);
+  const trendClass = getTrendClass(metric.trend, isPositiveGood);
   const bgColor = metric.trend === 'UP'
     ? (isPositiveGood ? 'rgba(22, 163, 74, 0.05)' : 'rgba(220, 38, 38, 0.05)')
     : metric.trend === 'DOWN'
@@ -63,7 +70,7 @@ function KPICard({ title, metric, format, isPositiveGood = true }: KPICardProps)
     : 'rgba(107, 114, 128, 0.05)';
 
   return (
-    <div className="kpi-card" style={{ backgroundColor: bgColor }}>
+    <div className={`kpi-card ${trendClass}`} style={{ backgroundColor: bgColor }}>
       <div className="kpi-title">{title}</div>
       <div className="kpi-value">{formatFn(metric.current)}</div>
       <div className="kpi-comparison">

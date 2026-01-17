@@ -50,6 +50,20 @@ function getMomentumTierStyle(tier: string): { bg: string; text: string; border:
   }
 }
 
+function getMomentumSemanticClass(tier: string): string {
+  switch (tier) {
+    case 'STRONG_MOMENTUM':
+      return 'card-success'; // High momentum → green
+    case 'MODERATE_MOMENTUM':
+      return 'card-info'; // Medium momentum → blue
+    case 'NO_MOMENTUM':
+    case 'RISING':
+      return 'card-warning'; // Low/rising momentum → yellow
+    default:
+      return '';
+  }
+}
+
 /**
  * Improve commentary based on sample size
  */
@@ -144,6 +158,7 @@ export default function MomentumTracker({ momentum, period }: MomentumTrackerPro
       <div className="momentum-grid">
         {sorted.map((indicator, idx) => {
           const style = getMomentumTierStyle(indicator.momentum_tier);
+          const semanticClass = getMomentumSemanticClass(indicator.momentum_tier);
           const improvedCommentary = improveCommentary(indicator.momentum_commentary, quarterPct);
           const attainmentPct = indicator.current_attainment_pct?.toFixed(0) || '?';
           const gapToGreen = indicator.gap_to_green || 0;
@@ -152,7 +167,7 @@ export default function MomentumTracker({ momentum, period }: MomentumTrackerPro
           return (
             <div
               key={idx}
-              className="momentum-card"
+              className={`momentum-card ${semanticClass}`}
               style={{
                 backgroundColor: style.bg,
                 borderColor: style.border,
