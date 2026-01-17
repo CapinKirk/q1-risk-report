@@ -208,8 +208,8 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           <p>Loading renewals data...</p>
         </div>
         <style jsx>{`
-          .renewals-section { margin-top: 24px; padding: 20px; background: white; border-radius: 8px; border: 1px solid #e2e8f0; }
-          .loading-state { display: flex; flex-direction: column; align-items: center; padding: 40px; color: #64748b; }
+          .renewals-section { margin-top: 24px; padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-primary); }
+          .loading-state { display: flex; flex-direction: column; align-items: center; padding: 40px; color: var(--text-tertiary); }
           .spinner { width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 12px; }
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         `}</style>
@@ -225,8 +225,8 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           <p>Error loading renewals: {error}</p>
         </div>
         <style jsx>{`
-          .renewals-section { margin-top: 24px; padding: 20px; background: white; border-radius: 8px; border: 1px solid #e2e8f0; }
-          .error-state { padding: 20px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; color: #dc2626; }
+          .renewals-section { margin-top: 24px; padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-primary); }
+          .error-state { padding: 20px; background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: 6px; color: var(--danger-text); }
         `}</style>
       </section>
     );
@@ -745,32 +745,32 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           border-radius: 8px;
           text-align: center;
         }
-        .kpi-card.green { background: #f0fdf4; border: 1px solid #86efac; }
-        .kpi-card.blue { background: #eff6ff; border: 1px solid #93c5fd; }
-        .kpi-card.purple { background: #faf5ff; border: 1px solid #c4b5fd; }
-        .kpi-card.orange { background: #fff7ed; border: 1px solid #fdba74; }
-        .kpi-card.red { background: #fef2f2; border: 1px solid #fca5a5; }
-        .kpi-card.gray { background: #f8fafc; border: 1px solid #cbd5e1; }
+        .kpi-card.green { background: var(--success-bg); border: 1px solid var(--success-border); }
+        .kpi-card.blue { background: var(--bg-tertiary); border: 1px solid var(--accent-blue); }
+        .kpi-card.purple { background: var(--bg-tertiary); border: 1px solid #a78bfa; }
+        .kpi-card.orange { background: var(--warning-bg); border: 1px solid var(--warning-border); }
+        .kpi-card.red { background: var(--danger-bg); border: 1px solid var(--danger-border); }
+        .kpi-card.gray { background: var(--bg-tertiary); border: 1px solid var(--border-secondary); }
         .kpi-label {
           font-size: 0.75em;
-          color: #64748b;
+          color: var(--text-tertiary);
           font-weight: 500;
           margin-bottom: 6px;
         }
         .kpi-value {
           font-size: 1.3em;
           font-weight: 700;
-          color: #1e293b;
+          color: var(--text-primary);
         }
         .kpi-sub {
           font-size: 0.7em;
-          color: #94a3b8;
+          color: var(--text-muted);
           margin-top: 4px;
         }
         .tabs {
           display: flex;
           gap: 4px;
-          border-bottom: 1px solid #e2e8f0;
+          border-bottom: 1px solid var(--border-primary);
           margin-bottom: 16px;
         }
         .tab {
@@ -781,15 +781,15 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           cursor: pointer;
           font-size: 0.85em;
           font-weight: 500;
-          color: #64748b;
+          color: var(--text-tertiary);
           transition: all 0.15s ease;
         }
         .tab:hover {
-          color: #2563eb;
+          color: var(--accent-blue);
         }
         .tab.active {
-          color: #2563eb;
-          border-bottom-color: #2563eb;
+          color: var(--accent-blue);
+          border-bottom-color: var(--accent-blue);
         }
         .table-container {
           overflow-x: auto;
@@ -802,17 +802,18 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
         .renewals-table th {
           text-align: left;
           padding: 10px 12px;
-          background: #f8fafc;
-          color: #64748b;
+          background: var(--bg-tertiary);
+          color: var(--text-secondary);
           font-weight: 600;
-          border-bottom: 1px solid #e2e8f0;
+          border-bottom: 1px solid var(--border-primary);
         }
         .renewals-table td {
           padding: 10px 12px;
-          border-bottom: 1px solid #f1f5f9;
+          border-bottom: 1px solid var(--border-tertiary);
+          color: var(--text-primary);
         }
         .renewals-table a {
-          color: #2563eb;
+          color: var(--link-color);
           text-decoration: none;
         }
         .renewals-table a:hover {
@@ -830,10 +831,10 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           text-align: right;
         }
         .money.positive {
-          color: #16a34a;
+          color: var(--green);
         }
         .urgent {
-          color: #dc2626;
+          color: var(--red);
           font-weight: 600;
         }
         .auto-badge {
@@ -842,19 +843,19 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           font-size: 0.75em;
           font-weight: 600;
         }
-        .auto-badge.yes { background: #dcfce7; color: #166534; }
-        .auto-badge.no { background: #fef3c7; color: #92400e; }
+        .auto-badge.yes { background: var(--success-bg); color: var(--success-text); }
+        .auto-badge.no { background: var(--warning-bg); color: var(--warning-text); }
         .status-badge {
           padding: 3px 8px;
           border-radius: 10px;
           font-size: 0.75em;
           font-weight: 600;
         }
-        .status-badge.ok { background: #dcfce7; color: #166534; }
-        .status-badge.atrisk { background: #fef2f2; color: #dc2626; }
+        .status-badge.ok { background: var(--success-bg); color: var(--success-text); }
+        .status-badge.atrisk { background: var(--danger-bg); color: var(--danger-text); }
         .empty-row {
           text-align: center;
-          color: #94a3b8;
+          color: var(--text-muted);
           padding: 30px !important;
         }
         /* Missing Uplift Warning Styles */
@@ -863,8 +864,8 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           align-items: flex-start;
           gap: 12px;
           padding: 16px;
-          background: linear-gradient(135deg, #fef3c7 0%, #fef2f2 100%);
-          border: 2px solid #f59e0b;
+          background: var(--warning-bg);
+          border: 2px solid var(--warning-border);
           border-radius: 10px;
           margin-bottom: 20px;
         }
@@ -877,28 +878,28 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
         .warning-title {
           font-size: 1em;
           font-weight: 700;
-          color: #92400e;
+          color: var(--warning-text);
           margin-bottom: 6px;
         }
         .warning-details {
           font-size: 0.85em;
-          color: #78350f;
+          color: var(--text-secondary);
           display: flex;
           flex-wrap: wrap;
           gap: 8px;
           align-items: center;
         }
         .warning-details .separator {
-          color: #d97706;
+          color: var(--warning-border);
         }
         .warning-details .lost-revenue {
-          color: #dc2626;
+          color: var(--red);
           font-weight: 600;
         }
         .view-contracts-btn {
           margin-top: 10px;
           padding: 6px 14px;
-          background: #f59e0b;
+          background: var(--warning-border);
           color: white;
           border: none;
           border-radius: 6px;
@@ -911,20 +912,20 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           background: #d97706;
         }
         .tab.warning-tab {
-          color: #dc2626;
+          color: var(--red);
         }
         .tab.warning-tab.active {
-          color: #dc2626;
-          border-bottom-color: #dc2626;
+          color: var(--red);
+          border-bottom-color: var(--red);
         }
         .warning-row {
-          background: #fffbeb;
+          background: var(--warning-bg);
         }
         .warning-row:hover {
-          background: #fef3c7;
+          background: var(--bg-hover);
         }
         .warning-cell {
-          color: #dc2626;
+          color: var(--red);
           font-weight: 600;
         }
         .lost-revenue {

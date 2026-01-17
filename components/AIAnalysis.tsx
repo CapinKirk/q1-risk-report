@@ -284,7 +284,7 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
           margin: 0;
           font-size: 1.35em;
           font-weight: 600;
-          color: #1f2937;
+          color: var(--text-primary);
         }
 
         .header-actions {
@@ -321,18 +321,18 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
 
         .btn-ghost {
           background: transparent;
-          color: #64748b;
+          color: var(--text-tertiary);
         }
 
         .btn-ghost:hover {
-          background: #f1f5f9;
-          color: #374151;
+          background: var(--bg-hover);
+          color: var(--text-primary);
         }
 
         /* Content Panel */
         .content-panel {
-          background: white;
-          border: 2px solid #e5e7eb;
+          background: var(--bg-secondary);
+          border: 2px solid var(--border-primary);
           border-radius: 12px;
           min-height: 200px;
         }
@@ -342,29 +342,30 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
           align-items: center;
           gap: 12px;
           padding: 16px 24px;
-          border-bottom: 1px solid #f1f5f9;
-          background: #fafafa;
+          border-bottom: 1px solid var(--border-tertiary);
+          background: var(--bg-tertiary);
           border-radius: 10px 10px 0 0;
           flex-wrap: wrap;
         }
 
         .filter-label {
           font-size: 0.9em;
-          color: #6b7280;
+          color: var(--text-tertiary);
         }
 
         .filter-value {
           font-size: 0.95em;
           font-weight: 600;
-          color: #1f2937;
+          color: var(--text-primary);
           padding: 4px 12px;
-          background: #e0e7ff;
+          background: var(--accent-blue);
+          color: white;
           border-radius: 6px;
         }
 
         .timestamp {
           font-size: 0.85em;
-          color: #94a3b8;
+          color: var(--text-muted);
           margin-left: auto;
         }
 
@@ -378,10 +379,10 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
           align-items: center;
           gap: 12px;
           padding: 16px 20px;
-          background: #fef2f2;
-          border: 1px solid #fecaca;
+          background: var(--danger-bg);
+          border: 1px solid var(--danger-border);
           border-radius: 8px;
-          color: #dc2626;
+          color: var(--danger-text);
           font-size: 0.95em;
         }
 
@@ -424,7 +425,7 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
 
         .placeholder-text {
           font-size: 1em;
-          color: #374151;
+          color: var(--text-primary);
           max-width: 450px;
           line-height: 1.6;
           margin-bottom: 8px;
@@ -432,7 +433,7 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
 
         .placeholder-hint {
           font-size: 0.9em;
-          color: #9ca3af;
+          color: var(--text-muted);
         }
 
         /* Loading State */
@@ -442,7 +443,7 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
           align-items: center;
           justify-content: center;
           padding: 48px 24px;
-          color: #64748b;
+          color: var(--text-tertiary);
         }
 
         .loading-state p {
@@ -453,8 +454,8 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
         .spinner {
           width: 40px;
           height: 40px;
-          border: 4px solid #e2e8f0;
-          border-top-color: #2563eb;
+          border: 4px solid var(--border-primary);
+          border-top-color: var(--accent-blue);
           border-radius: 50%;
           animation: spin 1s linear infinite;
         }
@@ -478,16 +479,16 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
         .analysis-content {
           font-size: 1em;
           line-height: 1.75;
-          color: #374151;
+          color: var(--text-primary);
         }
 
         .analysis-content :global(.analysis-h3) {
           font-size: 1.25em;
           font-weight: 600;
           margin: 28px 0 14px;
-          color: #1e40af;
+          color: var(--accent-blue);
           padding-bottom: 8px;
-          border-bottom: 1px solid #e5e7eb;
+          border-bottom: 1px solid var(--border-primary);
         }
 
         .analysis-content :global(.analysis-h3:first-child) {
@@ -498,13 +499,13 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
           font-size: 1.1em;
           font-weight: 600;
           margin: 22px 0 12px;
-          color: #374151;
+          color: var(--text-primary);
         }
 
         .analysis-content :global(.analysis-bold) {
           font-weight: 600;
           margin: 14px 0 8px;
-          color: #1f2937;
+          color: var(--text-primary);
         }
 
         .analysis-content :global(.analysis-p) {

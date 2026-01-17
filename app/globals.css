@@ -797,6 +797,257 @@ button {
   }
 }
 
+/* ============================================
+   DARK MODE COMPONENT OVERRIDES
+   Override hardcoded colors in component styles
+   ============================================ */
+
+/* Renewals Section */
+[data-theme="dark"] .renewals-section {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+[data-theme="dark"] .kpi-card,
+[data-theme="dark"] .kpi-card.green,
+[data-theme="dark"] .kpi-card.blue,
+[data-theme="dark"] .kpi-card.purple,
+[data-theme="dark"] .kpi-card.orange,
+[data-theme="dark"] .kpi-card.red,
+[data-theme="dark"] .kpi-card.gray {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-secondary) !important;
+}
+
+[data-theme="dark"] .kpi-label {
+  color: var(--text-tertiary) !important;
+}
+
+[data-theme="dark"] .kpi-value {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .kpi-sub {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .renewals-table th {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+[data-theme="dark"] .renewals-table td {
+  border-color: var(--border-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .tabs {
+  border-color: var(--border-primary) !important;
+}
+
+[data-theme="dark"] .tab {
+  color: var(--text-tertiary) !important;
+}
+
+[data-theme="dark"] .tab:hover,
+[data-theme="dark"] .tab.active {
+  color: var(--accent-blue) !important;
+}
+
+[data-theme="dark"] .missing-uplift-warning {
+  background: linear-gradient(135deg, #451a03 0%, #450a0a 100%) !important;
+  border-color: var(--warning-border) !important;
+}
+
+[data-theme="dark"] .warning-title {
+  color: var(--warning-text) !important;
+}
+
+[data-theme="dark"] .warning-details {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .warning-row {
+  background: #1a1510 !important;
+}
+
+[data-theme="dark"] .warning-row:hover {
+  background: #2a2015 !important;
+}
+
+/* AI Analysis Section */
+[data-theme="dark"] .ai-analysis-section,
+[data-theme="dark"] .ai-tile,
+[data-theme="dark"] .analysis-tile {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+[data-theme="dark"] .insight-card,
+[data-theme="dark"] .analysis-card {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-secondary) !important;
+}
+
+[data-theme="dark"] .insight-title,
+[data-theme="dark"] .analysis-title {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .insight-content,
+[data-theme="dark"] .analysis-content {
+  color: var(--text-secondary) !important;
+}
+
+/* Tables - Alternating Rows - HIGH PRIORITY */
+[data-theme="dark"] table tr:nth-child(even),
+[data-theme="dark"] .data-table tr:nth-child(even) {
+  background: var(--table-stripe) !important;
+}
+
+[data-theme="dark"] table tr:hover,
+[data-theme="dark"] .data-table tr:hover {
+  background: var(--table-hover) !important;
+}
+
+[data-theme="dark"] table td,
+[data-theme="dark"] .data-table td {
+  color: var(--text-primary) !important;
+  border-color: var(--border-tertiary) !important;
+}
+
+/* MQL/SQL Details */
+[data-theme="dark"] .details-container,
+[data-theme="dark"] .mql-details,
+[data-theme="dark"] .sql-details {
+  background: var(--bg-secondary) !important;
+}
+
+[data-theme="dark"] .detail-card {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-secondary) !important;
+}
+
+/* Funnel Components */
+[data-theme="dark"] .funnel-section,
+[data-theme="dark"] .funnel-card {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+/* Opportunities Table */
+[data-theme="dark"] .opportunities-container,
+[data-theme="dark"] .deals-container {
+  background: var(--bg-secondary) !important;
+}
+
+/* Badges - make them work on dark backgrounds */
+[data-theme="dark"] .category-badge,
+[data-theme="dark"] .lead-badge,
+[data-theme="dark"] .source-badge,
+[data-theme="dark"] .product-badge,
+[data-theme="dark"] .auto-badge,
+[data-theme="dark"] .status-badge {
+  opacity: 0.9;
+}
+
+[data-theme="dark"] .auto-badge.yes,
+[data-theme="dark"] .status-badge.ok {
+  background: #064e3b !important;
+  color: #86efac !important;
+}
+
+[data-theme="dark"] .auto-badge.no {
+  background: #451a03 !important;
+  color: #fde047 !important;
+}
+
+[data-theme="dark"] .status-badge.atrisk {
+  background: #450a0a !important;
+  color: #fca5a5 !important;
+}
+
+/* Action Items Dashboard */
+[data-theme="dark"] .action-card,
+[data-theme="dark"] .action-item {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-secondary) !important;
+}
+
+/* Bright Spots */
+[data-theme="dark"] .bright-spot,
+[data-theme="dark"] .spot-card {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-secondary) !important;
+}
+
+/* Lost Opportunities */
+[data-theme="dark"] .lost-opportunities-section {
+  background: var(--bg-secondary) !important;
+}
+
+/* Date Range Picker */
+[data-theme="dark"] .date-picker-popup,
+[data-theme="dark"] .calendar-popup {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+/* Deal List Modal */
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .modal-body {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .modal-header {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+/* Executive KPI Cards */
+[data-theme="dark"] .exec-kpi-card,
+[data-theme="dark"] .kpi-tile {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-secondary) !important;
+}
+
+/* Pipeline Coverage */
+[data-theme="dark"] .pipeline-section,
+[data-theme="dark"] .coverage-card {
+  background: var(--bg-secondary) !important;
+}
+
+/* Trend Chart */
+[data-theme="dark"] .chart-container,
+[data-theme="dark"] .trend-chart {
+  background: var(--bg-secondary) !important;
+}
+
+/* Loading States */
+[data-theme="dark"] .loading-state,
+[data-theme="dark"] .empty-state {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-tertiary) !important;
+}
+
+/* Error States */
+[data-theme="dark"] .error-state {
+  background: var(--danger-bg) !important;
+  color: var(--danger-text) !important;
+  border-color: var(--danger-border) !important;
+}
+
+/* Money/Number styling in dark mode */
+[data-theme="dark"] .money.positive {
+  color: var(--green) !important;
+}
+
+[data-theme="dark"] .urgent {
+  color: var(--red) !important;
+}
+
 /* Accessibility - Ensure minimum contrast ratios */
 @media (prefers-contrast: high) {
   :root {
