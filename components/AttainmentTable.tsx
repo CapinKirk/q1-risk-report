@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ReportData, AttainmentRow, Product, DealDetail, Region, Category } from '@/lib/types';
 import { formatCurrency, formatPercent, formatCoverage, getRAGClass, getGapColor, getAttainmentColor, getRAGBadgeColor } from '@/lib/formatters';
+import { useSortableTable } from '@/lib/useSortableTable';
+import SortableHeader from './SortableHeader';
 import DealListModal from './DealListModal';
 
 interface AttainmentTableProps {
@@ -29,35 +31,59 @@ function ProductAttainmentTable({
   onCellClick: (type: 'won' | 'lost' | 'pipeline', row: AttainmentRow) => void;
   hasDeals: boolean;
 }) {
-  // Sort by attainment % (worst first)
-  const sorted = [...rows].sort((a, b) => (a.qtd_attainment_pct || 0) - (b.qtd_attainment_pct || 0));
+  // Default sort by attainment % (worst first)
+  const defaultSorted = useMemo(() =>
+    [...rows].sort((a, b) => (a.qtd_attainment_pct || 0) - (b.qtd_attainment_pct || 0)),
+    [rows]
+  );
+
+  const getColumnValue = useCallback((row: AttainmentRow, column: string) => {
+    switch (column) {
+      case 'region': return row.region;
+      case 'category': return row.category;
+      case 'fy_target': return (row as any).fy_target || 0;
+      case 'q1_target': return row.q1_target || 0;
+      case 'qtd_acv': return row.qtd_acv || 0;
+      case 'qtd_attainment_pct': return row.qtd_attainment_pct || 0;
+      case 'fy_progress_pct': return (row as any).fy_progress_pct || 0;
+      case 'qtd_gap': return row.qtd_gap || 0;
+      case 'qtd_lost_acv': return row.qtd_lost_acv || 0;
+      case 'pipeline_acv': return row.pipeline_acv || 0;
+      case 'pipeline_coverage_x': return row.pipeline_coverage_x || 0;
+      case 'win_rate_pct': return row.win_rate_pct || 0;
+      case 'rag_status': return row.rag_status || '';
+      default: return null;
+    }
+  }, []);
+
+  const { sortedData, handleSort, getSortDirection } = useSortableTable(rows, defaultSorted, getColumnValue);
 
   const productName = product === 'POR' ? 'Point of Rental' : 'Record360';
 
   return (
     <>
-      <h3>{product} - {productName} (sorted worst → best)</h3>
+      <h3>{product} - {productName}</h3>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Region</th>
-              <th>Cat</th>
-              <th className="right">FY Tgt</th>
-              <th className="right">Q1 Tgt</th>
-              <th className="right">QTD Act</th>
-              <th className="right">Att%</th>
-              <th className="right">FY%</th>
-              <th className="right">QTD Var</th>
-              <th className="right">Lost</th>
-              <th className="right">Pipe</th>
-              <th className="right">Cov</th>
-              <th className="right">Win%</th>
-              <th className="center">RAG</th>
+              <SortableHeader label="Region" column="region" sortDirection={getSortDirection('region')} onSort={handleSort} />
+              <SortableHeader label="Cat" column="category" sortDirection={getSortDirection('category')} onSort={handleSort} />
+              <SortableHeader label="FY Tgt" column="fy_target" sortDirection={getSortDirection('fy_target')} onSort={handleSort} className="right" />
+              <SortableHeader label="Q1 Tgt" column="q1_target" sortDirection={getSortDirection('q1_target')} onSort={handleSort} className="right" />
+              <SortableHeader label="QTD Act" column="qtd_acv" sortDirection={getSortDirection('qtd_acv')} onSort={handleSort} className="right" />
+              <SortableHeader label="Att%" column="qtd_attainment_pct" sortDirection={getSortDirection('qtd_attainment_pct')} onSort={handleSort} className="right" />
+              <SortableHeader label="FY%" column="fy_progress_pct" sortDirection={getSortDirection('fy_progress_pct')} onSort={handleSort} className="right" />
+              <SortableHeader label="QTD Var" column="qtd_gap" sortDirection={getSortDirection('qtd_gap')} onSort={handleSort} className="right" />
+              <SortableHeader label="Lost" column="qtd_lost_acv" sortDirection={getSortDirection('qtd_lost_acv')} onSort={handleSort} className="right" />
+              <SortableHeader label="Pipe" column="pipeline_acv" sortDirection={getSortDirection('pipeline_acv')} onSort={handleSort} className="right" />
+              <SortableHeader label="Cov" column="pipeline_coverage_x" sortDirection={getSortDirection('pipeline_coverage_x')} onSort={handleSort} className="right" />
+              <SortableHeader label="Win%" column="win_rate_pct" sortDirection={getSortDirection('win_rate_pct')} onSort={handleSort} className="right" />
+              <SortableHeader label="RAG" column="rag_status" sortDirection={getSortDirection('rag_status')} onSort={handleSort} className="center" />
             </tr>
           </thead>
           <tbody>
-            {sorted.map((row, idx) => {
+            {sortedData.map((row, idx) => {
               const rag = row.rag_status || 'RED';
               const coverage = row.pipeline_coverage_x || 0;
               const winRate = row.win_rate_pct || 0;

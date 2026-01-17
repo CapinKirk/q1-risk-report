@@ -1,16 +1,41 @@
+'use client';
+
+import { useMemo, useCallback } from 'react';
 import { ReportData, Product, SourceAttainmentRow, FunnelByCategoryRow, FunnelBySourceRow } from '@/lib/types';
 import { formatCurrency, formatPercent, getRAGClass, getGapColor, getPctClass, getAttainmentColor, getRAGBadgeColor } from '@/lib/formatters';
+import { useSortableTable } from '@/lib/useSortableTable';
+import SortableHeader from './SortableHeader';
 
 interface SourceAttainmentProps {
   data: ReportData;
 }
 
 function SourceACVTable({ product, rows, period }: { product: Product; rows: SourceAttainmentRow[]; period: { as_of_date: string; quarter_pct_complete: number; days_elapsed: number; total_days: number } }) {
-  const sorted = [...rows].sort((a, b) => (a.attainment_pct || 0) - (b.attainment_pct || 0));
+  // Default sort by attainment (worst first)
+  const defaultSorted = useMemo(() =>
+    [...rows].sort((a, b) => (a.attainment_pct || 0) - (b.attainment_pct || 0)),
+    [rows]
+  );
+
+  const getColumnValue = useCallback((row: SourceAttainmentRow, column: string) => {
+    switch (column) {
+      case 'region': return row.region;
+      case 'source': return row.source;
+      case 'q1_target': return row.q1_target || 0;
+      case 'qtd_target': return row.qtd_target || 0;
+      case 'qtd_acv': return row.qtd_acv || 0;
+      case 'attainment_pct': return row.attainment_pct || 0;
+      case 'gap': return row.gap || 0;
+      case 'rag_status': return row.rag_status || '';
+      default: return null;
+    }
+  }, []);
+
+  const { sortedData, handleSort, getSortDirection } = useSortableTable(rows, defaultSorted, getColumnValue);
 
   return (
     <>
-      <h3>{product} ACV by Source (sorted worst → best)</h3>
+      <h3>{product} ACV by Source</h3>
       <p style={{ fontSize: '10px', color: '#666', margin: '3px 0' }}>
         As of {period.as_of_date} ({period.quarter_pct_complete.toFixed(1)}% Q1 - Day {period.days_elapsed}/{period.total_days})
       </p>
@@ -18,18 +43,18 @@ function SourceACVTable({ product, rows, period }: { product: Product; rows: Sou
         <table>
           <thead>
             <tr>
-              <th>Region</th>
-              <th>Source</th>
-              <th className="right">Q1 Tgt</th>
-              <th className="right">QTD Tgt</th>
-              <th className="right">QTD Act</th>
-              <th className="right">Att%</th>
-              <th className="right">QTD Var</th>
-              <th className="center">RAG</th>
+              <SortableHeader label="Region" column="region" sortDirection={getSortDirection('region')} onSort={handleSort} />
+              <SortableHeader label="Source" column="source" sortDirection={getSortDirection('source')} onSort={handleSort} />
+              <SortableHeader label="Q1 Tgt" column="q1_target" sortDirection={getSortDirection('q1_target')} onSort={handleSort} className="right" />
+              <SortableHeader label="QTD Tgt" column="qtd_target" sortDirection={getSortDirection('qtd_target')} onSort={handleSort} className="right" />
+              <SortableHeader label="QTD Act" column="qtd_acv" sortDirection={getSortDirection('qtd_acv')} onSort={handleSort} className="right" />
+              <SortableHeader label="Att%" column="attainment_pct" sortDirection={getSortDirection('attainment_pct')} onSort={handleSort} className="right" />
+              <SortableHeader label="QTD Var" column="gap" sortDirection={getSortDirection('gap')} onSort={handleSort} className="right" />
+              <SortableHeader label="RAG" column="rag_status" sortDirection={getSortDirection('rag_status')} onSort={handleSort} className="center" />
             </tr>
           </thead>
           <tbody>
-            {sorted.map((row, idx) => {
+            {sortedData.map((row, idx) => {
               const attPct = row.attainment_pct || 0;
               const gap = row.gap || 0;
               const rag = row.rag_status || 'RED';
@@ -58,11 +83,25 @@ function SourceACVTable({ product, rows, period }: { product: Product; rows: Sou
 
 function FunnelByCategoryTable({ product, rows }: { product: Product; rows: FunnelByCategoryRow[] }) {
   // Sort by average pacing % (worst first)
-  const sorted = [...rows].sort((a, b) => {
-    const avgA = ((a.mql_pacing_pct || 0) + (a.sql_pacing_pct || 0) + (a.sal_pacing_pct || 0) + (a.sqo_pacing_pct || 0)) / 4;
-    const avgB = ((b.mql_pacing_pct || 0) + (b.sql_pacing_pct || 0) + (b.sal_pacing_pct || 0) + (b.sqo_pacing_pct || 0)) / 4;
-    return avgA - avgB;
-  });
+  const defaultSorted = useMemo(() =>
+    [...rows].sort((a, b) => {
+      const avgA = ((a.mql_pacing_pct || 0) + (a.sql_pacing_pct || 0) + (a.sal_pacing_pct || 0) + (a.sqo_pacing_pct || 0)) / 4;
+      const avgB = ((b.mql_pacing_pct || 0) + (b.sql_pacing_pct || 0) + (b.sal_pacing_pct || 0) + (b.sqo_pacing_pct || 0)) / 4;
+      return avgA - avgB;
+    }),
+    [rows]
+  );
+
+  const getColumnValue = useCallback((row: FunnelByCategoryRow, column: string) => {
+    switch (column) {
+      case 'category': return row.category;
+      case 'region': return row.region;
+      case 'weighted_tof_score': return row.weighted_tof_score || 0;
+      default: return null;
+    }
+  }, []);
+
+  const { sortedData, handleSort, getSortDirection } = useSortableTable(rows, defaultSorted, getColumnValue);
 
   return (
     <>
@@ -71,9 +110,9 @@ function FunnelByCategoryTable({ product, rows }: { product: Product; rows: Funn
         <table>
           <thead>
             <tr>
-              <th>Cat</th>
-              <th>Region</th>
-              <th className="right">TOF Score</th>
+              <SortableHeader label="Cat" column="category" sortDirection={getSortDirection('category')} onSort={handleSort} />
+              <SortableHeader label="Region" column="region" sortDirection={getSortDirection('region')} onSort={handleSort} />
+              <SortableHeader label="TOF Score" column="weighted_tof_score" sortDirection={getSortDirection('weighted_tof_score')} onSort={handleSort} className="right" />
               <th>Stage</th>
               <th className="right">Q1 Tgt</th>
               <th className="right">QTD Tgt</th>
@@ -83,7 +122,7 @@ function FunnelByCategoryTable({ product, rows }: { product: Product; rows: Funn
             </tr>
           </thead>
           <tbody>
-            {sorted.map((row, idx) => {
+            {sortedData.map((row, idx) => {
               const category = row.category || '';
               const mqlLabel = ['EXPANSION', 'MIGRATION'].includes(category.toUpperCase()) ? 'EQL' : 'MQL';
 
