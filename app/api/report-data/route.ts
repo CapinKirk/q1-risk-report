@@ -2111,9 +2111,17 @@ export async function POST(request: Request) {
       lost_deals: lostDeals,
       pipeline_deals: pipelineDeals,
       momentum_indicators: momentumIndicators,
+      // Version to track deployments and help debug caching issues
+      api_version: '3.1.0-fix-zero-pacing',
     };
 
-    return NextResponse.json(response);
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
 
   } catch (error: any) {
     console.error('BigQuery error:', error);
