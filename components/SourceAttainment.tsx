@@ -24,7 +24,7 @@ function SourceACVTable({ product, rows, period }: { product: Product; rows: Sou
               <th className="right">QTD Tgt</th>
               <th className="right">QTD Act</th>
               <th className="right">Att%</th>
-              <th className="right">Gap</th>
+              <th className="right">QTD Var</th>
               <th className="center">RAG</th>
             </tr>
           </thead>
@@ -79,7 +79,7 @@ function FunnelByCategoryTable({ product, rows }: { product: Product; rows: Funn
               <th className="right">QTD Tgt</th>
               <th className="right">Actual</th>
               <th className="right">Att%</th>
-              <th className="right">Gap</th>
+              <th className="right">QTD Var</th>
             </tr>
           </thead>
           <tbody>

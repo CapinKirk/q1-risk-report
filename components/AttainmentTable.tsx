@@ -48,7 +48,7 @@ function ProductAttainmentTable({
               <th className="right">QTD Act</th>
               <th className="right">Att%</th>
               <th className="right">FY%</th>
-              <th className="right">Gap</th>
+              <th className="right">QTD Var</th>
               <th className="right">Lost</th>
               <th className="right">Pipe</th>
               <th className="right">Cov</th>

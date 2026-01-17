@@ -122,7 +122,7 @@ export default function HitsMisses({ data }: HitsMissesProps) {
                   <th style={{ width: '7%' }}>Region</th>
                   <th style={{ width: '9%' }}>Cat</th>
                   <th style={{ width: '7%' }} className="right">Att%</th>
-                  <th style={{ width: '9%' }} className="right">Gap</th>
+                  <th style={{ width: '9%' }} className="right">QTD Var</th>
                   <th style={{ width: '7%' }} className="right">Cov</th>
                   <th style={{ width: '54%' }}>RCA / Action (incl. funnel & loss analysis)</th>
                 </tr>
