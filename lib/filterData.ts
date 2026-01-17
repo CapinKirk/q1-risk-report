@@ -418,15 +418,16 @@ export function filterReportData(
  */
 export function parseRegionsFromURL(searchParams: URLSearchParams): Region[] {
   const regionParam = searchParams.get('region');
+  // No param or 'ALL' means no filter applied (show all, no checkboxes checked)
   if (!regionParam || regionParam === 'ALL') {
-    return ['AMER', 'EMEA', 'APAC'];
+    return [];
   }
 
   const regions = regionParam.split(',').filter(r =>
     ['AMER', 'EMEA', 'APAC'].includes(r)
   ) as Region[];
 
-  return regions.length > 0 ? regions : ['AMER', 'EMEA', 'APAC'];
+  return regions;
 }
 
 /**
@@ -444,15 +445,16 @@ export function buildRegionURL(regions: Region[]): string {
  */
 export function parseProductsFromURL(searchParams: URLSearchParams): Product[] {
   const productParam = searchParams.get('product');
+  // No param or 'ALL' means no filter applied (show all, no checkboxes checked)
   if (!productParam || productParam === 'ALL') {
-    return ALL_PRODUCTS;
+    return [];
   }
 
   const products = productParam.split(',').filter(p =>
     ['POR', 'R360'].includes(p)
   ) as Product[];
 
-  return products.length > 0 ? products : ALL_PRODUCTS;
+  return products;
 }
 
 /**
@@ -460,15 +462,16 @@ export function parseProductsFromURL(searchParams: URLSearchParams): Product[] {
  */
 export function parseCategoriesFromURL(searchParams: URLSearchParams): Category[] {
   const categoryParam = searchParams.get('category');
+  // No param or 'ALL' means no filter applied (show all, no checkboxes checked)
   if (!categoryParam || categoryParam === 'ALL') {
-    return ALL_CATEGORIES;
+    return [];
   }
 
   const categories = categoryParam.split(',').filter(c =>
     ALL_CATEGORIES.includes(c as Category)
   ) as Category[];
 
-  return categories.length > 0 ? categories : ALL_CATEGORIES;
+  return categories;
 }
 
 /**
@@ -476,15 +479,16 @@ export function parseCategoriesFromURL(searchParams: URLSearchParams): Category[
  */
 export function parseSourcesFromURL(searchParams: URLSearchParams): Source[] {
   const sourceParam = searchParams.get('source');
+  // No param or 'ALL' means no filter applied (show all, no checkboxes checked)
   if (!sourceParam || sourceParam === 'ALL') {
-    return ALL_SOURCES;
+    return [];
   }
 
   const sources = sourceParam.split(',').filter(s =>
     ALL_SOURCES.includes(s as Source)
   ) as Source[];
 
-  return sources.length > 0 ? sources : ALL_SOURCES;
+  return sources;
 }
 
 /**
