@@ -469,7 +469,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
 
 // Query for funnel actuals by category
 // NEW LOGO: Uses InboundFunnel record count (matches MQL Details exactly)
-// EXPANSION/MIGRATION: Uses DailyRevenueFunnel (EQLs from existing customers)
+// EXPANSION/MIGRATION: Uses OpportunityViewTable (matches EQL Details exactly)
 async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R360') {
   const results: any[] = [];
 
@@ -544,31 +544,36 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
       ORDER BY region
     `;
 
-    const regionClause = filters.regions && filters.regions.length > 0
-      ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
-      : '';
-
-    // EXPANSION and MIGRATION from DailyRevenueFunnel (EQLs from existing customers)
+    // EXPANSION and MIGRATION from OpportunityViewTable (matches EQL Details exactly)
+    // EQLs are qualified opportunities from existing customers (tracked by CreatedDate)
     const expansionMigrationQuery = `
       SELECT
-        RecordType AS product,
-        Region AS region,
-        CASE
-          WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
-          WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
+        'POR' AS product,
+        CASE Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        CASE Type
+          WHEN 'Existing Business' THEN 'EXPANSION'
+          WHEN 'Migration' THEN 'MIGRATION'
         END AS category,
-        COALESCE(SUM(MQL), 0) AS actual_mql,
-        COALESCE(SUM(SQL), 0) AS actual_sql,
-        COALESCE(SUM(SAL), 0) AS actual_sal,
-        COALESCE(SUM(SQO), 0) AS actual_sqo
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\`
-      WHERE RecordType = 'POR'
-        AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
-        AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
-        AND Region IN ('AMER', 'EMEA', 'APAC')
-        AND UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION', 'MIGRATION', 'R360 MIGRATION')
-        ${regionClause}
-      GROUP BY RecordType, Region, category
+        COUNT(*) AS actual_mql,
+        -- SQL: opportunities that progressed past initial stage
+        COUNT(CASE WHEN StageName NOT IN ('Discovery', 'Qualification') OR Won THEN 1 END) AS actual_sql,
+        -- SAL: opportunities accepted by sales
+        COUNT(CASE WHEN StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') OR Won THEN 1 END) AS actual_sal,
+        -- SQO: opportunities that are Won or in final stages
+        COUNT(CASE WHEN Won OR StageName IN ('Proposal', 'Negotiation', 'Closed Won') THEN 1 END) AS actual_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+      WHERE por_record__c = true
+        AND Division IN ('US', 'UK', 'AU')
+        AND Type IN ('Existing Business', 'Migration')
+        AND ACV > 0
+        AND CAST(CreatedDate AS DATE) >= '${filters.startDate}'
+        AND CAST(CreatedDate AS DATE) <= '${filters.endDate}'
+        ${divisionClause}
+      GROUP BY product, region, category
       HAVING category IS NOT NULL
       ORDER BY region, category
     `;
@@ -636,27 +641,35 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
       ORDER BY region
     `;
 
-    // EXPANSION and MIGRATION from DailyRevenueFunnel (EQLs from existing customers)
+    // EXPANSION and MIGRATION from OpportunityViewTable (matches EQL Details exactly)
+    // EQLs are qualified opportunities from existing customers (tracked by CreatedDate)
     const expansionMigrationQuery = `
       SELECT
-        RecordType AS product,
-        Region AS region,
-        CASE
-          WHEN UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
-          WHEN UPPER(FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
+        'R360' AS product,
+        CASE Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        CASE Type
+          WHEN 'Existing Business' THEN 'EXPANSION'
+          WHEN 'Migration' THEN 'MIGRATION'
         END AS category,
-        COALESCE(SUM(MQL), 0) AS actual_mql,
-        COALESCE(SUM(SQL), 0) AS actual_sql,
+        COUNT(*) AS actual_mql,
+        -- SQL: opportunities that progressed past initial stage
+        COUNT(CASE WHEN StageName NOT IN ('Discovery', 'Qualification') OR Won THEN 1 END) AS actual_sql,
         0 AS actual_sal,
-        COALESCE(SUM(SQO), 0) AS actual_sqo
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\`
-      WHERE RecordType = 'R360'
-        AND CAST(CaptureDate AS DATE) >= '${filters.startDate}'
-        AND CAST(CaptureDate AS DATE) <= '${filters.endDate}'
-        AND Region IN ('AMER', 'EMEA', 'APAC')
-        AND UPPER(FunnelType) IN ('EXPANSION', 'R360 EXPANSION', 'MIGRATION', 'R360 MIGRATION')
-        ${regionClause}
-      GROUP BY RecordType, Region, category
+        -- SQO: opportunities that are Won or in final stages
+        COUNT(CASE WHEN Won OR StageName IN ('Proposal', 'Negotiation', 'Closed Won') THEN 1 END) AS actual_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+      WHERE r360_record__c = true
+        AND Division IN ('US', 'UK', 'AU')
+        AND Type IN ('Existing Business', 'Migration')
+        AND ACV > 0
+        AND CAST(CreatedDate AS DATE) >= '${filters.startDate}'
+        AND CAST(CreatedDate AS DATE) <= '${filters.endDate}'
+        ${regionClause.replace(/Region/g, 'Division').replace(/'AMER'/g, "'US'").replace(/'EMEA'/g, "'UK'").replace(/'APAC'/g, "'AU'")}
+      GROUP BY product, region, category
       HAVING category IS NOT NULL
       ORDER BY region, category
     `;
