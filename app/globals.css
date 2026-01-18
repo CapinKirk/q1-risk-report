@@ -1448,3 +1448,277 @@ button {
     --border-primary: #ffffff;
   }
 }
+
+/* ==================== Momentum Tracker ==================== */
+.momentum-section {
+  margin-bottom: 24px;
+}
+
+.momentum-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: -6px;
+  margin-bottom: 8px;
+}
+
+.momentum-caveat {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.momentum-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.momentum-card {
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.momentum-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.momentum-card .region-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.momentum-tier-label {
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+
+.momentum-card .category-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.attainment-row {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+}
+
+.attainment-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-value {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.stat-value.stat-yellow {
+  color: #ca8a04;
+}
+
+.stat-label {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.trend-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  padding: 6px;
+}
+
+.trend-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px;
+  min-width: 55px;
+}
+
+.trend-label {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.trend-value {
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.momentum-commentary {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* Momentum Card Tiers - Light Mode */
+.momentum-strong {
+  background-color: #dcfce7;
+  border-color: #86efac;
+}
+
+.momentum-strong .momentum-tier-label {
+  color: #166534;
+}
+
+.momentum-moderate {
+  background-color: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.momentum-moderate .momentum-tier-label {
+  color: #1e40af;
+}
+
+.momentum-none {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.momentum-none .momentum-tier-label {
+  color: #4b5563;
+}
+
+.momentum-declining {
+  background-color: #fee2e2;
+  border-color: #fecaca;
+}
+
+.momentum-declining .momentum-tier-label {
+  color: #991b1b;
+}
+
+.momentum-default {
+  background-color: #f9fafb;
+  border-color: #e5e7eb;
+}
+
+.momentum-default .momentum-tier-label {
+  color: #6b7280;
+}
+
+/* Trend Colors - Light Mode */
+.trend-up { color: #16a34a; }
+.trend-down { color: #dc2626; }
+.trend-flat { color: #6b7280; }
+.trend-muted-up { color: #4ade80; }
+.trend-muted-down { color: #f87171; }
+.trend-muted-flat { color: #9ca3af; }
+
+/* ==================== Momentum Tracker - Dark Mode ==================== */
+[data-theme="dark"] .momentum-subtitle,
+[data-theme="dark"] .momentum-caveat {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .momentum-card .region-label {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .momentum-card .category-label {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .attainment-row {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .trend-row {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .stat-value {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .stat-value.stat-yellow {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .stat-label {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .trend-label {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .momentum-commentary {
+  color: var(--text-tertiary);
+}
+
+/* Momentum Card Tiers - Dark Mode */
+[data-theme="dark"] .momentum-strong {
+  background-color: rgba(34, 197, 94, 0.2);
+  border-color: #22c55e;
+}
+
+[data-theme="dark"] .momentum-strong .momentum-tier-label {
+  color: #4ade80;
+}
+
+[data-theme="dark"] .momentum-moderate {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+}
+
+[data-theme="dark"] .momentum-moderate .momentum-tier-label {
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .momentum-none {
+  background-color: rgba(107, 114, 128, 0.2);
+  border-color: #6b7280;
+}
+
+[data-theme="dark"] .momentum-none .momentum-tier-label {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .momentum-declining {
+  background-color: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+}
+
+[data-theme="dark"] .momentum-declining .momentum-tier-label {
+  color: #f87171;
+}
+
+[data-theme="dark"] .momentum-default {
+  background-color: rgba(75, 85, 99, 0.2);
+  border-color: #4b5563;
+}
+
+[data-theme="dark"] .momentum-default .momentum-tier-label {
+  color: #9ca3af;
+}
+
+/* Trend Colors - Dark Mode */
+[data-theme="dark"] .trend-up { color: #4ade80; }
+[data-theme="dark"] .trend-down { color: #f87171; }
+[data-theme="dark"] .trend-flat { color: #9ca3af; }
+[data-theme="dark"] .trend-muted-up { color: #86efac; }
+[data-theme="dark"] .trend-muted-down { color: #fca5a5; }
+[data-theme="dark"] .trend-muted-flat { color: #d1d5db; }
