@@ -36,9 +36,9 @@ function getBigQuery() {
 }
 
 /**
- * Get renewal targets from RAW_2026_Plan_by_Month using Q1_Actual_2025
- * RATIONALE: Renewal targets use prior year actuals as the baseline, not planned targets
- * This matches the 2026 Bookings Plan where Q1_Actual_2025 represents the renewal baseline
+ * Get renewal targets from RAW_2026_Plan_by_Month
+ * Uses Q1_Plan_2026 as primary target, falling back to Q1_Actual_2025 for POR regions
+ * R360 renewal targets must use Q1_Plan_2026 since R360 had no renewal revenue in 2025
  */
 async function getRenewalTargetsFromRawPlan(): Promise<Map<string, number>> {
   try {
@@ -46,7 +46,8 @@ async function getRenewalTargetsFromRawPlan(): Promise<Map<string, number>> {
       SELECT
         Division,
         Booking_Type,
-        ROUND(COALESCE(Q1_Actual_2025, 0), 2) AS q1_target
+        -- Use Q1_Plan_2026 as primary target; Q1_Actual_2025 may be 0 for new products like R360
+        ROUND(COALESCE(Q1_Plan_2026, Q1_Actual_2025, 0), 2) AS q1_target
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RAW_2026_Plan_by_Month\`
       WHERE LOWER(Booking_Type) = 'renewal'
     `;
