@@ -122,10 +122,12 @@ function recalculateProductTotals(
   const qtdTarget = attainmentRows.reduce((sum, row) => sum + (row.qtd_target || 0), 0);
   const qtdAcv = attainmentRows.reduce((sum, row) => sum + (row.qtd_acv || 0), 0);
   const pipelineAcv = attainmentRows.reduce((sum, row) => sum + (row.pipeline_acv || 0), 0);
+  const wonDeals = attainmentRows.reduce((sum, row) => sum + (row.qtd_deals || 0), 0);
   const lostDeals = attainmentRows.reduce((sum, row) => sum + (row.qtd_lost_deals || 0), 0);
   const lostAcv = attainmentRows.reduce((sum, row) => sum + (row.qtd_lost_acv || 0), 0);
 
   const remaining = q1Target - qtdAcv;
+  const totalDeals = wonDeals + lostDeals;
 
   return {
     total_fy_target: fyTarget,
@@ -136,7 +138,8 @@ function recalculateProductTotals(
     total_qtd_attainment_pct: qtdTarget > 0 ? Math.round((qtdAcv / qtdTarget) * 100) : 100,
     total_pipeline_acv: pipelineAcv,
     total_pipeline_coverage_x: remaining > 0 ? Math.round((pipelineAcv / remaining) * 10) / 10 : 0,
-    total_win_rate_pct: 0, // Would need deal counts to calculate
+    total_win_rate_pct: totalDeals > 0 ? Math.round((wonDeals / totalDeals) * 1000) / 10 : 0,
+    total_won_deals: wonDeals,
     total_lost_deals: lostDeals,
     total_lost_acv: lostAcv,
   };
@@ -270,6 +273,7 @@ export function filterReportData(
     total_pipeline_acv: 0,
     total_pipeline_coverage_x: 0,
     total_win_rate_pct: 0,
+    total_won_deals: 0,
     total_lost_deals: 0,
     total_lost_acv: 0,
   };
@@ -280,6 +284,9 @@ export function filterReportData(
   // Calculate grand totals based on selected products
   const combinedQtdTarget = porTotals.total_qtd_target + r360Totals.total_qtd_target;
   const combinedQtdAcv = porTotals.total_qtd_acv + r360Totals.total_qtd_acv;
+  const combinedWonDeals = porTotals.total_won_deals + r360Totals.total_won_deals;
+  const combinedLostDeals = porTotals.total_lost_deals + r360Totals.total_lost_deals;
+  const combinedTotalDeals = combinedWonDeals + combinedLostDeals;
   const grandTotal: GrandTotal = {
     total_fy_target: porTotals.total_fy_target + r360Totals.total_fy_target,
     total_q1_target: porTotals.total_q1_target + r360Totals.total_q1_target,
@@ -291,7 +298,11 @@ export function filterReportData(
       : 100,
     total_pipeline_acv: porTotals.total_pipeline_acv + r360Totals.total_pipeline_acv,
     total_pipeline_coverage_x: 0, // Calculated below
-    total_win_rate_pct: 0,
+    total_win_rate_pct: combinedTotalDeals > 0
+      ? Math.round((combinedWonDeals / combinedTotalDeals) * 1000) / 10
+      : 0,
+    total_won_deals: combinedWonDeals,
+    total_lost_deals: combinedLostDeals,
   };
 
   const totalRemaining = grandTotal.total_q1_target - grandTotal.total_qtd_acv;

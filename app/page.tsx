@@ -55,6 +55,7 @@ function transformAPIResponse(apiData: any): ReportData {
       fy_target: row.fy_target || 0,
       q1_target: row.q1_target || 0,
       qtd_target: row.qtd_target || 0,
+      qtd_deals: row.qtd_deals || 0,
       qtd_acv: row.qtd_acv || 0,
       qtd_attainment_pct: row.qtd_attainment_pct || 0,
       qtd_gap: row.qtd_gap || 0,
@@ -270,6 +271,8 @@ function transformAPIResponse(apiData: any): ReportData {
       total_pipeline_acv: apiData.grand_total?.total_pipeline_acv || 0,
       total_pipeline_coverage_x: apiData.grand_total?.total_pipeline_coverage_x || 0,
       total_win_rate_pct: apiData.grand_total?.total_win_rate_pct || 0,
+      total_won_deals: apiData.grand_total?.total_won_deals || 0,
+      total_lost_deals: apiData.grand_total?.total_lost_deals || 0,
     },
     product_totals: {
       POR: {
@@ -281,6 +284,7 @@ function transformAPIResponse(apiData: any): ReportData {
         total_pipeline_acv: apiData.product_totals?.POR?.total_pipeline_acv || 0,
         total_pipeline_coverage_x: apiData.product_totals?.POR?.total_pipeline_coverage_x || 0,
         total_win_rate_pct: apiData.product_totals?.POR?.total_win_rate_pct || 0,
+        total_won_deals: apiData.product_totals?.POR?.total_won_deals || 0,
         total_lost_deals: apiData.product_totals?.POR?.total_lost_deals || 0,
         total_lost_acv: apiData.product_totals?.POR?.total_lost_acv || 0,
       },
@@ -293,6 +297,7 @@ function transformAPIResponse(apiData: any): ReportData {
         total_pipeline_acv: apiData.product_totals?.R360?.total_pipeline_acv || 0,
         total_pipeline_coverage_x: apiData.product_totals?.R360?.total_pipeline_coverage_x || 0,
         total_win_rate_pct: apiData.product_totals?.R360?.total_win_rate_pct || 0,
+        total_won_deals: apiData.product_totals?.R360?.total_won_deals || 0,
         total_lost_deals: apiData.product_totals?.R360?.total_lost_deals || 0,
         total_lost_acv: apiData.product_totals?.R360?.total_lost_acv || 0,
       },

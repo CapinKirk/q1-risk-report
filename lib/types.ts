@@ -147,6 +147,8 @@ export interface GrandTotal {
   total_pipeline_acv: number;
   total_pipeline_coverage_x: number;
   total_win_rate_pct: number;
+  total_won_deals: number;
+  total_lost_deals: number;
 }
 
 // Product totals
@@ -159,6 +161,7 @@ export interface ProductTotal {
   total_pipeline_acv: number;
   total_pipeline_coverage_x: number;
   total_win_rate_pct: number;
+  total_won_deals: number;
   total_lost_deals: number;
   total_lost_acv: number;
 }
@@ -171,6 +174,7 @@ export interface AttainmentRow {
   fy_target?: number;
   q1_target: number;
   qtd_target: number;
+  qtd_deals: number;
   qtd_acv: number;
   qtd_attainment_pct: number;
   qtd_gap: number;

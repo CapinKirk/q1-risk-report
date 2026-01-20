@@ -31,7 +31,8 @@
     "total_lost_acv": 160008.3,
     "total_win_rate_pct": 82.5,
     "total_pipeline_acv": 6499341.86,
-    "total_pipeline_coverage_x": 2.1
+    "total_pipeline_coverage_x": 2.1,
+    "total_won_deals": 99
   },
   "product_totals": {
     "POR": {
@@ -48,7 +49,8 @@
       "total_lost_acv": 0,
       "total_win_rate_pct": 100,
       "total_pipeline_acv": 3714603.2799999993,
-      "total_pipeline_coverage_x": 1.7
+      "total_pipeline_coverage_x": 1.7,
+      "total_won_deals": 73
     },
     "R360": {
       "product": "R360",
@@ -64,7 +66,8 @@
       "total_lost_acv": 160008.3,
       "total_win_rate_pct": 55.3,
       "total_pipeline_acv": 2784738.58,
-      "total_pipeline_coverage_x": 3.4
+      "total_pipeline_coverage_x": 3.4,
+      "total_won_deals": 26
     }
   },
   "wins_bright_spots": {
@@ -3795,8 +3798,8 @@
     "POR": [
       {
         "opportunity_id": "006an00000ROLLVAA5",
-        "account_name": "The Pap\u00e9 Group Inc",
-        "opportunity_name": "Testing Environment Advanced Cloud Users & Basic POR One users - for The Pap\u00e9 Group Inc",
+        "account_name": "The Papé Group Inc",
+        "opportunity_name": "Testing Environment Advanced Cloud Users & Basic POR One users - for The Papé Group Inc",
         "product": "POR",
         "region": "AMER",
         "category": "EXPANSION",
@@ -10931,8 +10934,8 @@
       },
       {
         "opportunity_id": "0064u00001GrdCaAAJ",
-        "account_name": "Reyna\u2019s Party Rentals",
-        "opportunity_name": "New PartyCAD System for Reyna\u2019s Party Rentals",
+        "account_name": "Reyna’s Party Rentals",
+        "opportunity_name": "New PartyCAD System for Reyna’s Party Rentals",
         "product": "POR",
         "region": "AMER",
         "category": "NEW LOGO",
@@ -13840,8 +13843,8 @@
       },
       {
         "opportunity_id": "006Ki000004DXvBIAW",
-        "account_name": "Grupo Traxi\u00f3n",
-        "opportunity_name": "New Pending Record360 System for Grupo Traxi\u00f3n",
+        "account_name": "Grupo Traxión",
+        "opportunity_name": "New Pending Record360 System for Grupo Traxión",
         "product": "R360",
         "region": "AMER",
         "category": "NEW LOGO",
