@@ -358,114 +358,133 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
 // Query for funnel actuals by source using InboundFunnel (same source as MQL Details for consistency)
 // Uses COUNT(*) instead of COUNT(DISTINCT) to match MQL Details record count exactly
 async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360') {
-  if (product === 'POR') {
-    const regionClause = filters.regions && filters.regions.length > 0
-      ? `AND Division IN (${filters.regions.map(r => {
-          const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
-          return `'${map[r]}'`;
-        }).join(', ')})`
-      : '';
+  // Source normalization to standard names
+  const sourceNormCase = `
+    CASE UPPER(TRIM(Source))
+      WHEN 'INBOUND' THEN 'INBOUND'
+      WHEN 'OUTBOUND' THEN 'OUTBOUND'
+      WHEN 'AE SOURCED' THEN 'AE SOURCED'
+      WHEN 'AM SOURCED' THEN 'AM SOURCED'
+      WHEN 'TRADESHOW' THEN 'TRADESHOW'
+      WHEN 'PARTNERSHIPS' THEN 'PARTNERSHIPS'
+      WHEN 'N/A' THEN 'INBOUND'
+      ELSE UPPER(TRIM(Source))
+    END`;
 
-    const query = `
+  const recordType = product === 'POR' ? 'POR' : 'R360';
+
+  const regionFilter = filters.regions && filters.regions.length > 0
+    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+    : '';
+
+  // Use RevOpsReport for actuals - it has all source data including AM Sourced and Tradeshow
+  // Use MTD horizon for current month actuals, QTD for quarter totals
+  const query = `
+    WITH actuals AS (
+      -- Get actuals from RevOpsReport (MTD for current period)
       SELECT
-        'POR' AS product,
-        CASE Division
-          WHEN 'US' THEN 'AMER'
-          WHEN 'UK' THEN 'EMEA'
-          WHEN 'AU' THEN 'APAC'
-        END AS region,
-        UPPER(COALESCE(NULLIF(SDRSource, ''), 'INBOUND')) AS source,
-        COUNT(CASE
-          WHEN MQL_DT IS NOT NULL
-            AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
-            AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
-          THEN 1
-        END) AS actual_mql,
-        COUNT(CASE
-          WHEN SQL_DT IS NOT NULL
-            AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
-            AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
-          THEN 1
-        END) AS actual_sql,
-        COUNT(CASE
-          WHEN SAL_DT IS NOT NULL
-            AND CAST(SAL_DT AS DATE) >= '${filters.startDate}'
-            AND CAST(SAL_DT AS DATE) <= '${filters.endDate}'
-          THEN 1
-        END) AS actual_sal,
-        COUNT(CASE
-          WHEN SQO_DT IS NOT NULL
-            AND CAST(SQO_DT AS DATE) >= '${filters.startDate}'
-            AND CAST(SQO_DT AS DATE) <= '${filters.endDate}'
-          THEN 1
-        END) AS actual_sqo
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
-      WHERE Division IN ('US', 'UK', 'AU')
-        AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
-        AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
-        ${regionClause}
-      GROUP BY 1, 2, 3
-      HAVING actual_mql > 0 OR actual_sql > 0 OR actual_sal > 0 OR actual_sqo > 0
-      ORDER BY region, source
-    `;
-
-    const [rows] = await getBigQuery().query({ query });
-    // Add conversion rates
-    return (rows as any[]).map(row => ({
-      ...row,
-      mql_to_sql_rate: row.actual_mql > 0 ? Math.round((row.actual_sql / row.actual_mql) * 1000) / 10 : 0,
-      sql_to_sal_rate: row.actual_sql > 0 ? Math.round((row.actual_sal / row.actual_sql) * 1000) / 10 : 0,
-      sal_to_sqo_rate: row.actual_sal > 0 ? Math.round((row.actual_sqo / row.actual_sal) * 1000) / 10 : 0,
-    }));
-  } else {
-    // R360
-    const regionClause = filters.regions && filters.regions.length > 0
-      ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
-      : '';
-
-    const query = `
-      SELECT
-        'R360' AS product,
+        '${product}' AS product,
         Region AS region,
-        UPPER(COALESCE(NULLIF(SDRSource, ''), 'INBOUND')) AS source,
-        COUNT(CASE
-          WHEN MQL_DT IS NOT NULL
-            AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
-            AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
-          THEN 1
-        END) AS actual_mql,
-        COUNT(CASE
-          WHEN SQL_DT IS NOT NULL
-            AND CAST(SQL_DT AS DATE) >= '${filters.startDate}'
-            AND CAST(SQL_DT AS DATE) <= '${filters.endDate}'
-          THEN 1
-        END) AS actual_sql,
-        0 AS actual_sal,
-        COUNT(CASE
-          WHEN SQO_DT IS NOT NULL
-            AND CAST(SQO_DT AS DATE) >= '${filters.startDate}'
-            AND CAST(SQO_DT AS DATE) <= '${filters.endDate}'
-          THEN 1
-        END) AS actual_sqo
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
-      WHERE MQL_Reverted = false
-        AND Region IS NOT NULL
-        ${regionClause}
+        ${sourceNormCase} AS source,
+        SUM(COALESCE(Actual_MQL, 0)) AS actual_mql,
+        SUM(COALESCE(Actual_SQL, 0)) AS actual_sql,
+        SUM(COALESCE(Actual_SAL, 0)) AS actual_sal,
+        SUM(COALESCE(Actual_SQO, 0)) AS actual_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsReport\`
+      WHERE RecordType = '${recordType}'
+        AND RiskProfile = 'P75'
+        AND Horizon = 'QTD'
+        AND Period_Start_Date >= '${filters.startDate}'
+        AND Source IS NOT NULL
+        AND Source != ''
+        ${regionFilter}
       GROUP BY 1, 2, 3
-      HAVING actual_mql > 0 OR actual_sql > 0 OR actual_sqo > 0
-      ORDER BY region, source
-    `;
+    ),
+    plan_targets AS (
+      SELECT
+        Region AS region,
+        ${sourceNormCase} AS source,
+        CAST(Annual_Booking_Target AS FLOAT64) AS annual_target,
+        CAST(Target_ADS AS FLOAT64) AS target_ads,
+        CAST(Rate_MQL_SQL AS FLOAT64) AS mql_to_sql,
+        CAST(Rate_SQL_SAL AS FLOAT64) AS sql_to_sal,
+        CAST(Rate_SAL_SQO AS FLOAT64) AS sal_to_sqo,
+        CAST(Rate_SQL_SQO AS FLOAT64) AS sql_to_sqo,
+        CAST(Rate_SQO_Won AS FLOAT64) AS sqo_to_won
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.Source_2026_${recordType}_Targets\`
+      WHERE TRUE ${regionFilter}
+    ),
+    targets_calc AS (
+      SELECT
+        region,
+        source,
+        -- Calculate Q1 targets (annual / 4) for each funnel stage
+        SUM(SAFE_DIVIDE(annual_target, target_ads * sqo_to_won) / 4) AS target_sqo,
+        SUM(CASE
+          WHEN sal_to_sqo IS NOT NULL AND sal_to_sqo > 0
+          THEN SAFE_DIVIDE(annual_target, target_ads * sqo_to_won * sal_to_sqo) / 4
+          ELSE 0
+        END) AS target_sal,
+        SUM(CASE
+          WHEN sql_to_sal IS NOT NULL AND sql_to_sal > 0 AND sal_to_sqo IS NOT NULL AND sal_to_sqo > 0
+          THEN SAFE_DIVIDE(annual_target, target_ads * sqo_to_won * sal_to_sqo * sql_to_sal) / 4
+          WHEN sql_to_sqo IS NOT NULL AND sql_to_sqo > 0
+          THEN SAFE_DIVIDE(annual_target, target_ads * sqo_to_won * sql_to_sqo) / 4
+          ELSE 0
+        END) AS target_sql,
+        SUM(CASE
+          WHEN mql_to_sql IS NOT NULL AND mql_to_sql > 0 THEN
+            SAFE_DIVIDE(
+              CASE
+                WHEN sql_to_sal IS NOT NULL AND sql_to_sal > 0 AND sal_to_sqo IS NOT NULL AND sal_to_sqo > 0
+                THEN SAFE_DIVIDE(annual_target, target_ads * sqo_to_won * sal_to_sqo * sql_to_sal)
+                WHEN sql_to_sqo IS NOT NULL AND sql_to_sqo > 0
+                THEN SAFE_DIVIDE(annual_target, target_ads * sqo_to_won * sql_to_sqo)
+                ELSE 0
+              END,
+              mql_to_sql
+            ) / 4
+          ELSE 0
+        END) AS target_mql
+      FROM plan_targets
+      GROUP BY region, source
+    )
+    SELECT
+      '${product}' AS product,
+      COALESCE(a.region, t.region) AS region,
+      COALESCE(a.source, t.source) AS source,
+      COALESCE(a.actual_mql, 0) AS actual_mql,
+      COALESCE(CAST(ROUND(t.target_mql) AS INT64), 0) AS target_mql,
+      COALESCE(a.actual_sql, 0) AS actual_sql,
+      COALESCE(CAST(ROUND(t.target_sql) AS INT64), 0) AS target_sql,
+      COALESCE(a.actual_sal, 0) AS actual_sal,
+      COALESCE(CAST(ROUND(t.target_sal) AS INT64), 0) AS target_sal,
+      COALESCE(a.actual_sqo, 0) AS actual_sqo,
+      COALESCE(CAST(ROUND(t.target_sqo) AS INT64), 0) AS target_sqo
+    FROM targets_calc t
+    FULL OUTER JOIN actuals a ON a.region = t.region AND a.source = t.source
+    WHERE COALESCE(a.source, t.source) NOT IN ('N/A', '')
+      AND (COALESCE(a.actual_sql, 0) > 0 OR COALESCE(a.actual_sal, 0) > 0 OR COALESCE(a.actual_sqo, 0) > 0
+           OR COALESCE(t.target_sql, 0) > 0 OR COALESCE(t.target_sal, 0) > 0 OR COALESCE(t.target_sqo, 0) > 0
+           OR COALESCE(a.actual_mql, 0) > 0 OR COALESCE(t.target_mql, 0) > 0)
+    ORDER BY COALESCE(a.region, t.region), COALESCE(a.source, t.source)
+  `;
 
-    const [rows] = await getBigQuery().query({ query });
-    // Add conversion rates
-    return (rows as any[]).map(row => ({
-      ...row,
-      mql_to_sql_rate: row.actual_mql > 0 ? Math.round((row.actual_sql / row.actual_mql) * 1000) / 10 : 0,
-      sql_to_sal_rate: 0,
-      sal_to_sqo_rate: row.actual_sql > 0 ? Math.round((row.actual_sqo / row.actual_sql) * 1000) / 10 : 0,
-    }));
-  }
+  const [rows] = await getBigQuery().query({ query });
+
+  // Add conversion rates and attainment percentages
+  return (rows as any[]).map(row => ({
+    ...row,
+    mql_to_sql_rate: row.actual_mql > 0 ? Math.round((row.actual_sql / row.actual_mql) * 1000) / 10 : 0,
+    sql_to_sal_rate: row.actual_sql > 0 ? Math.round((row.actual_sal / row.actual_sql) * 1000) / 10 : 0,
+    sal_to_sqo_rate: row.actual_sal > 0 ? Math.round((row.actual_sqo / row.actual_sal) * 1000) / 10 : 0,
+    mql_attainment: row.target_mql > 0 ? Math.round((row.actual_mql / row.target_mql) * 100) : 100,
+    sql_attainment: row.target_sql > 0 ? Math.round((row.actual_sql / row.target_sql) * 100) : 100,
+    sal_attainment: row.target_sal > 0 ? Math.round((row.actual_sal / row.target_sal) * 100) : 100,
+    sqo_attainment: row.target_sqo > 0 ? Math.round((row.actual_sqo / row.target_sqo) * 100) : 100,
+  }));
 }
+
 
 // Query for funnel actuals by category
 // NEW LOGO: Uses InboundFunnel record count (matches MQL Details exactly)
@@ -876,6 +895,20 @@ async function getLostDeals(filters: ReportFilters) {
 async function getPipelineDeals(filters: ReportFilters) {
   const { productClause, regionClause } = buildOpportunityFilterClause(filters);
 
+  // Calculate quarter end date (Q1 ends March 31)
+  const startYear = parseInt(filters.startDate.split('-')[0]);
+  const startMonth = parseInt(filters.startDate.split('-')[1]);
+  let quarterEndDate: string;
+  if (startMonth >= 1 && startMonth <= 3) {
+    quarterEndDate = `${startYear}-03-31`;
+  } else if (startMonth >= 4 && startMonth <= 6) {
+    quarterEndDate = `${startYear}-06-30`;
+  } else if (startMonth >= 7 && startMonth <= 9) {
+    quarterEndDate = `${startYear}-09-30`;
+  } else {
+    quarterEndDate = `${startYear}-12-31`;
+  }
+
   const query = `
     SELECT
       Id AS opportunity_id,
@@ -907,6 +940,8 @@ async function getPipelineDeals(filters: ReportFilters) {
       AND Type NOT IN ('Credit Card', 'Consulting')
       AND ACV > 0
       AND Division IN ('US', 'UK', 'AU')
+      AND CloseDate >= '${filters.startDate}'
+      AND CloseDate <= '${quarterEndDate}'
       ${productClause}
       ${regionClause}
     ORDER BY ACV DESC
@@ -965,6 +1000,20 @@ async function getSourceActuals(filters: ReportFilters) {
 async function getPipelineAge(filters: ReportFilters) {
   const { productClause, regionClause } = buildOpportunityFilterClause(filters);
 
+  // Calculate quarter end date (Q1 ends March 31)
+  const startYear = parseInt(filters.startDate.split('-')[0]);
+  const startMonth = parseInt(filters.startDate.split('-')[1]);
+  let quarterEndDate: string;
+  if (startMonth >= 1 && startMonth <= 3) {
+    quarterEndDate = `${startYear}-03-31`;
+  } else if (startMonth >= 4 && startMonth <= 6) {
+    quarterEndDate = `${startYear}-06-30`;
+  } else if (startMonth >= 7 && startMonth <= 9) {
+    quarterEndDate = `${startYear}-09-30`;
+  } else {
+    quarterEndDate = `${startYear}-12-31`;
+  }
+
   const query = `
     SELECT
       CASE WHEN por_record__c THEN 'POR' ELSE 'R360' END AS product,
@@ -986,6 +1035,8 @@ async function getPipelineAge(filters: ReportFilters) {
       AND Type NOT IN ('Credit Card', 'Consulting')
       AND ACV > 0
       AND Division IN ('US', 'UK', 'AU')
+      AND CloseDate >= '${filters.startDate}'
+      AND CloseDate <= '${quarterEndDate}'
       ${productClause}
       ${regionClause}
     GROUP BY 1, 2, 3
@@ -1090,8 +1141,7 @@ async function getMQLDetails(filters: ReportFilters) {
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
       WHERE Division IN ('US', 'UK', 'AU')
         AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
-        AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
-        -- Removed SDRSource filter to include all MQL sources
+        -- Include reverted MQLs for disqualification analysis
         AND MQL_DT IS NOT NULL
         AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
         AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
@@ -1143,8 +1193,7 @@ async function getMQLDetails(filters: ReportFilters) {
         ) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
       WHERE Region IS NOT NULL
-        AND MQL_Reverted = false
-        -- Removed SDRSource filter to include all MQL sources
+        -- Include reverted MQLs for disqualification analysis
         AND MQL_DT IS NOT NULL
         AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
         AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
@@ -1240,9 +1289,63 @@ async function getSQLDetails(filters: ReportFilters) {
     : '';
 
   // POR SQL query - deduplicates by email to match summary COUNT(DISTINCT email)
-  // Supplements missing OpportunityID from Lead.ConvertedOpportunityId
+  // 6-tier enhanced linking: OpportunityID → ConvertedOpportunityId → Name match → ContactId-Account → Email-Account → Fuzzy name
   const porQuery = `
-    WITH ranked_sqls AS (
+    WITH name_matched_opps AS (
+      -- Tier 3: Pre-compute opportunity lookups by exact name
+      SELECT DISTINCT
+        OpportunityName,
+        FIRST_VALUE(Id) OVER (PARTITION BY OpportunityName ORDER BY CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+      WHERE OpportunityName IS NOT NULL AND OpportunityName != ''
+        AND por_record__c = true AND Division IN ('US', 'UK', 'AU')
+    ),
+    contact_account_opps AS (
+      -- Tier 4: Match via ContactId → Contact.AccountId → Opportunity
+      SELECT DISTINCT
+        c.Id AS contact_id,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY c.Id ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON c.AccountId = o.AccountId
+      WHERE c.AccountId IS NOT NULL
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    email_matched_opps AS (
+      -- Tier 5: Match via Email → Contact → Account → Opportunity
+      SELECT DISTINCT
+        LOWER(TRIM(c.Email)) AS email,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY LOWER(TRIM(c.Email)) ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON c.AccountId = o.AccountId
+      WHERE c.Email IS NOT NULL AND c.Email != '' AND c.AccountId IS NOT NULL
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    fuzzy_name_matched_opps AS (
+      -- Tier 6: Fuzzy company name match (remove Inc, LLC, Ltd, etc.)
+      SELECT DISTINCT
+        REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') AS normalized_name,
+        FIRST_VALUE(o.Id) OVER (
+          PARTITION BY REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '')
+          ORDER BY o.CreatedDate DESC
+        ) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+      WHERE o.AccountName IS NOT NULL AND o.AccountName != ''
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    account_matched_opps AS (
+      -- Tier 7: Direct Account.Name match → find any Opportunity on that Account
+      SELECT DISTINCT
+        LOWER(TRIM(a.Name)) AS account_name,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY a.Id ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON a.Id = o.AccountId
+      WHERE a.Name IS NOT NULL AND a.Name != ''
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    ranked_sqls AS (
       SELECT
         'POR' AS product,
         CASE f.Division
@@ -1251,11 +1354,18 @@ async function getSQLDetails(filters: ReportFilters) {
           WHEN 'AU' THEN 'APAC'
         END AS region,
         COALESCE(f.LeadId, f.ContactId) AS record_id,
+        -- 7-tier URL resolution
         CASE
           WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
           WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
-          WHEN f.LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
-          ELSE CONCAT('https://por.my.salesforce.com/', f.ContactId)
+          WHEN nmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', nmo.opp_id)
+          WHEN cao.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', cao.opp_id)
+          WHEN emo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', emo.opp_id)
+          WHEN fnmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', fnmo.opp_id)
+          WHEN amo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', amo.opp_id)
+          WHEN NULLIF(f.LeadId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
+          WHEN NULLIF(f.ContactId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.ContactId)
+          ELSE 'https://por.my.salesforce.com/'
         END AS salesforce_url,
         COALESCE(f.Company, 'Unknown') AS company_name,
         COALESCE(f.LeadEmail, f.ContactEmail, 'N/A') AS email,
@@ -1265,18 +1375,29 @@ async function getSQLDetails(filters: ReportFilters) {
         DATE_DIFF(CAST(f.SQL_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_mql_to_sql,
         CASE WHEN f.SAL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
         CASE WHEN f.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        CASE WHEN (f.OpportunityID IS NOT NULL AND f.OpportunityID != '') OR l.ConvertedOpportunityId IS NOT NULL THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        -- 7-tier has_opportunity check
+        CASE WHEN (f.OpportunityID IS NOT NULL AND f.OpportunityID != '')
+               OR l.ConvertedOpportunityId IS NOT NULL
+               OR nmo.opp_id IS NOT NULL
+               OR cao.opp_id IS NOT NULL
+               OR emo.opp_id IS NOT NULL
+               OR fnmo.opp_id IS NOT NULL
+               OR amo.opp_id IS NOT NULL
+        THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
+          WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'
           WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN f.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
+          WHEN COALESCE(o.IsClosed, o2.IsClosed, o3.IsClosed, o4.IsClosed, o5.IsClosed, o6.IsClosed, false) AND NOT COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'LOST'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
-        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) AS opportunity_id,
-        COALESCE(f.OpportunityName, o.OpportunityName) AS opportunity_name,
-        o.StageName AS opportunity_stage,
-        o.ACV AS opportunity_acv,
-        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+        -- 7-tier opportunity_id
+        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id) AS opportunity_id,
+        COALESCE(f.OpportunityName, o.OpportunityName, o2.OpportunityName, o3.OpportunityName, o4.OpportunityName, o5.OpportunityName, o6.OpportunityName) AS opportunity_name,
+        COALESCE(o.StageName, o2.StageName, o3.StageName, o4.StageName, o5.StageName, o6.StageName) AS opportunity_stage,
+        COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) AS days_in_stage,
         -- Deduplicate by email to match summary COUNT(DISTINCT email)
         ROW_NUMBER() OVER (
@@ -1289,8 +1410,39 @@ async function getSQLDetails(filters: ReportFilters) {
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\` f
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
         ON f.LeadId = l.Id
+      -- Tier 1-2: Direct OpportunityID or ConvertedOpportunityId
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
         ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
+      -- Tier 3: Name match (only if tiers 1-2 failed)
+      LEFT JOIN name_matched_opps nmo
+        ON f.OpportunityName = nmo.OpportunityName
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o2
+        ON nmo.opp_id = o2.Id
+      -- Tier 4: ContactId → Account (only if tiers 1-3 failed)
+      LEFT JOIN contact_account_opps cao
+        ON f.ContactId = cao.contact_id
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o3
+        ON cao.opp_id = o3.Id
+      -- Tier 5: Email → Contact → Account (only if tiers 1-4 failed)
+      LEFT JOIN email_matched_opps emo
+        ON LOWER(TRIM(COALESCE(f.LeadEmail, f.ContactEmail))) = emo.email
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o4
+        ON emo.opp_id = o4.Id
+      -- Tier 6: Fuzzy name match (only if all other tiers failed)
+      LEFT JOIN fuzzy_name_matched_opps fnmo
+        ON REGEXP_REPLACE(LOWER(TRIM(f.Company)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') = fnmo.normalized_name
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o5
+        ON fnmo.opp_id = o5.Id
+      -- Tier 7: Account.Name direct match (only if all other tiers failed)
+      LEFT JOIN account_matched_opps amo
+        ON LOWER(TRIM(f.Company)) = amo.account_name
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL AND fnmo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o6
+        ON amo.opp_id = o6.Id
       WHERE f.Division IN ('US', 'UK', 'AU')
         AND (f.SpiralyzeTest IS NULL OR f.SpiralyzeTest = false)
         AND (f.MQL_Reverted IS NULL OR f.MQL_Reverted = false)
@@ -1310,17 +1462,76 @@ async function getSQLDetails(filters: ReportFilters) {
     : '';
 
   // R360 SQL query - deduplicates by email to match summary COUNT(DISTINCT email)
-  // Supplements missing OpportunityID from Lead.ConvertedOpportunityId
+  // 6-tier enhanced linking: OpportunityID → ConvertedOpportunityId → Name match → ContactId-Account → Email-Account → Fuzzy name
   const r360Query = `
-    WITH ranked_sqls AS (
+    WITH name_matched_opps AS (
+      -- Tier 3: Pre-compute opportunity lookups by exact name
+      SELECT DISTINCT
+        OpportunityName,
+        FIRST_VALUE(Id) OVER (PARTITION BY OpportunityName ORDER BY CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+      WHERE OpportunityName IS NOT NULL AND OpportunityName != ''
+        AND por_record__c = false
+    ),
+    contact_account_opps AS (
+      -- Tier 4: Match via ContactId → Contact.AccountId → Opportunity
+      SELECT DISTINCT
+        c.Id AS contact_id,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY c.Id ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON c.AccountId = o.AccountId
+      WHERE c.AccountId IS NOT NULL AND o.por_record__c = false
+    ),
+    email_matched_opps AS (
+      -- Tier 5: Match via Email → Contact → Account → Opportunity
+      SELECT DISTINCT
+        LOWER(TRIM(c.Email)) AS email,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY LOWER(TRIM(c.Email)) ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON c.AccountId = o.AccountId
+      WHERE c.Email IS NOT NULL AND c.Email != '' AND c.AccountId IS NOT NULL
+        AND o.por_record__c = false
+    ),
+    fuzzy_name_matched_opps AS (
+      -- Tier 6: Fuzzy company name match (remove Inc, LLC, Ltd, etc.)
+      SELECT DISTINCT
+        REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') AS normalized_name,
+        FIRST_VALUE(o.Id) OVER (
+          PARTITION BY REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '')
+          ORDER BY o.CreatedDate DESC
+        ) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+      WHERE o.AccountName IS NOT NULL AND o.AccountName != '' AND o.por_record__c = false
+    ),
+    account_matched_opps AS (
+      -- Tier 7: Direct Account.Name match → find any Opportunity on that Account
+      SELECT DISTINCT
+        LOWER(TRIM(a.Name)) AS account_name,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY a.Id ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON a.Id = o.AccountId
+      WHERE a.Name IS NOT NULL AND a.Name != ''
+        AND o.por_record__c = false
+    ),
+    ranked_sqls AS (
       SELECT
         'R360' AS product,
         f.Region AS region,
         f.LeadId AS record_id,
+        -- 7-tier URL resolution
         CASE
           WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
           WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
-          ELSE COALESCE(f.LeadLink, CONCAT('https://por.my.salesforce.com/', f.LeadId))
+          WHEN nmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', nmo.opp_id)
+          WHEN cao.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', cao.opp_id)
+          WHEN emo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', emo.opp_id)
+          WHEN fnmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', fnmo.opp_id)
+          WHEN amo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', amo.opp_id)
+          WHEN NULLIF(f.LeadId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
+          ELSE 'https://por.my.salesforce.com/'
         END AS salesforce_url,
         COALESCE(f.Company, 'Unknown') AS company_name,
         f.Email AS email,
@@ -1330,17 +1541,28 @@ async function getSQLDetails(filters: ReportFilters) {
         DATE_DIFF(CAST(f.SQL_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_mql_to_sql,
         'N/A' AS converted_to_sal,
         CASE WHEN f.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        CASE WHEN (f.OpportunityID IS NOT NULL AND f.OpportunityID != '') OR l.ConvertedOpportunityId IS NOT NULL THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        -- 7-tier has_opportunity check
+        CASE WHEN (f.OpportunityID IS NOT NULL AND f.OpportunityID != '')
+               OR l.ConvertedOpportunityId IS NOT NULL
+               OR nmo.opp_id IS NOT NULL
+               OR cao.opp_id IS NOT NULL
+               OR emo.opp_id IS NOT NULL
+               OR fnmo.opp_id IS NOT NULL
+               OR amo.opp_id IS NOT NULL
+        THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
+          WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'
           WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN COALESCE(o.IsClosed, o2.IsClosed, o3.IsClosed, o4.IsClosed, o5.IsClosed, o6.IsClosed, false) AND NOT COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'LOST'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
-        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) AS opportunity_id,
-        COALESCE(f.OpportunityName, o.OpportunityName) AS opportunity_name,
-        o.StageName AS opportunity_stage,
-        o.ACV AS opportunity_acv,
-        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+        -- 7-tier opportunity_id
+        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id) AS opportunity_id,
+        COALESCE(f.OpportunityName, o.OpportunityName, o2.OpportunityName, o3.OpportunityName, o4.OpportunityName, o5.OpportunityName, o6.OpportunityName) AS opportunity_name,
+        COALESCE(o.StageName, o2.StageName, o3.StageName, o4.StageName, o5.StageName, o6.StageName) AS opportunity_stage,
+        COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) AS days_in_stage,
         -- Deduplicate by email to match summary COUNT(DISTINCT email)
         ROW_NUMBER() OVER (
@@ -1352,8 +1574,39 @@ async function getSQLDetails(filters: ReportFilters) {
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\` f
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
         ON f.LeadId = l.Id
+      -- Tier 1-2: Direct OpportunityID or ConvertedOpportunityId
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
         ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
+      -- Tier 3: Name match (only if tiers 1-2 failed)
+      LEFT JOIN name_matched_opps nmo
+        ON f.OpportunityName = nmo.OpportunityName
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o2
+        ON nmo.opp_id = o2.Id
+      -- Tier 4: ContactId → Account (only if tiers 1-3 failed)
+      LEFT JOIN contact_account_opps cao
+        ON f.ContactId = cao.contact_id
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o3
+        ON cao.opp_id = o3.Id
+      -- Tier 5: Email → Contact → Account (only if tiers 1-4 failed)
+      LEFT JOIN email_matched_opps emo
+        ON LOWER(TRIM(f.Email)) = emo.email
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o4
+        ON emo.opp_id = o4.Id
+      -- Tier 6: Fuzzy name match (only if all other tiers failed)
+      LEFT JOIN fuzzy_name_matched_opps fnmo
+        ON REGEXP_REPLACE(LOWER(TRIM(f.Company)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') = fnmo.normalized_name
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o5
+        ON fnmo.opp_id = o5.Id
+      -- Tier 7: Account.Name direct match (only if all other tiers failed)
+      LEFT JOIN account_matched_opps amo
+        ON LOWER(TRIM(f.Company)) = amo.account_name
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL AND fnmo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o6
+        ON amo.opp_id = o6.Id
       WHERE f.MQL_Reverted = false
         AND f.Region IS NOT NULL
         AND f.SQL_DT IS NOT NULL
@@ -1382,6 +1635,541 @@ async function getSQLDetails(filters: ReportFilters) {
     };
   } catch (error) {
     console.warn('SQL details query failed:', error);
+    return { POR: [], R360: [] };
+  }
+}
+
+// SAL Details Query (POR only - InboundFunnel has SAL_DT)
+// Enhanced: Uses OpportunityName lookup as fallback when OpportunityID and ConvertedOpportunityId are NULL
+async function getSALDetails(filters: ReportFilters) {
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND f.Division IN (${filters.regions.map(r => {
+        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
+        return `'${map[r]}'`;
+      }).join(', ')})`
+    : '';
+
+  // POR SAL query - deduplicates by email, JOINs to get opportunity details
+  // Note: R360 doesn't have SAL stage, so only POR query needed
+  // 6-tier enhanced linking: OpportunityID → ConvertedOpportunityId → Name match → ContactId-Account → Email-Account → Fuzzy name
+  const porQuery = `
+    WITH name_matched_opps AS (
+      -- Tier 3: Pre-compute opportunity lookups by exact name
+      SELECT DISTINCT
+        OpportunityName,
+        FIRST_VALUE(Id) OVER (PARTITION BY OpportunityName ORDER BY CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+      WHERE OpportunityName IS NOT NULL AND OpportunityName != ''
+        AND por_record__c = true AND Division IN ('US', 'UK', 'AU')
+    ),
+    contact_account_opps AS (
+      -- Tier 4: Match via ContactId → Contact.AccountId → Opportunity
+      SELECT DISTINCT
+        c.Id AS contact_id,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY c.Id ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON c.AccountId = o.AccountId
+      WHERE c.AccountId IS NOT NULL
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    email_matched_opps AS (
+      -- Tier 5: Match via Email → Contact → Account → Opportunity
+      SELECT DISTINCT
+        LOWER(TRIM(c.Email)) AS email,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY LOWER(TRIM(c.Email)) ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON c.AccountId = o.AccountId
+      WHERE c.Email IS NOT NULL AND c.Email != '' AND c.AccountId IS NOT NULL
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    fuzzy_name_matched_opps AS (
+      -- Tier 6: Fuzzy company name match (remove Inc, LLC, Ltd, etc.)
+      SELECT DISTINCT
+        REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') AS normalized_name,
+        FIRST_VALUE(o.Id) OVER (
+          PARTITION BY REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '')
+          ORDER BY o.CreatedDate DESC
+        ) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+      WHERE o.AccountName IS NOT NULL AND o.AccountName != ''
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    account_matched_opps AS (
+      -- Tier 7: Direct Account.Name match → find any Opportunity on that Account
+      SELECT DISTINCT
+        LOWER(TRIM(a.Name)) AS account_name,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY a.Id ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON a.Id = o.AccountId
+      WHERE a.Name IS NOT NULL AND a.Name != ''
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    ranked_sals AS (
+      SELECT
+        'POR' AS product,
+        CASE f.Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        COALESCE(f.LeadId, f.ContactId) AS record_id,
+        -- 7-tier URL resolution
+        CASE
+          WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
+          WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
+          WHEN nmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', nmo.opp_id)
+          WHEN cao.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', cao.opp_id)
+          WHEN emo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', emo.opp_id)
+          WHEN fnmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', fnmo.opp_id)
+          WHEN amo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', amo.opp_id)
+          WHEN NULLIF(f.LeadId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
+          WHEN NULLIF(f.ContactId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.ContactId)
+          ELSE 'https://por.my.salesforce.com/'
+        END AS salesforce_url,
+        COALESCE(f.Company, 'Unknown') AS company_name,
+        COALESCE(f.LeadEmail, f.ContactEmail, 'N/A') AS email,
+        COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND') AS source,
+        CAST(f.SAL_DT AS STRING) AS sal_date,
+        CAST(f.SQL_DT AS STRING) AS sql_date,
+        CAST(f.MQL_DT AS STRING) AS mql_date,
+        DATE_DIFF(CAST(f.SAL_DT AS DATE), CAST(f.SQL_DT AS DATE), DAY) AS days_sql_to_sal,
+        CASE WHEN f.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        -- 7-tier has_opportunity check
+        CASE WHEN (f.OpportunityID IS NOT NULL AND f.OpportunityID != '')
+               OR l.ConvertedOpportunityId IS NOT NULL
+               OR nmo.opp_id IS NOT NULL
+               OR cao.opp_id IS NOT NULL
+               OR emo.opp_id IS NOT NULL
+               OR fnmo.opp_id IS NOT NULL
+               OR amo.opp_id IS NOT NULL
+        THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        CASE
+          WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'
+          WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN COALESCE(o.IsClosed, o2.IsClosed, o3.IsClosed, o4.IsClosed, o5.IsClosed, o6.IsClosed, false) AND NOT COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'LOST'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SAL_DT AS DATE), DAY) > 45 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sal_status,
+        -- 7-tier opportunity_id
+        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id) AS opportunity_id,
+        COALESCE(f.OpportunityName, o.OpportunityName, o2.OpportunityName, o3.OpportunityName, o4.OpportunityName, o5.OpportunityName, o6.OpportunityName) AS opportunity_name,
+        COALESCE(o.StageName, o2.StageName, o3.StageName, o4.StageName, o5.StageName, o6.StageName) AS opportunity_stage,
+        COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(f.SAL_DT AS DATE), DAY) AS days_in_stage,
+        'NEW LOGO' AS category,
+        -- Deduplicate by email to match summary
+        ROW_NUMBER() OVER (
+          PARTITION BY COALESCE(f.LeadEmail, f.ContactEmail)
+          ORDER BY
+            CASE WHEN f.SQO_DT IS NOT NULL THEN 0 ELSE 1 END,
+            f.SAL_DT DESC
+        ) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\` f
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
+        ON f.LeadId = l.Id
+      -- Tier 1-2: Direct OpportunityID or ConvertedOpportunityId
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
+      -- Tier 3: Name match (only if tiers 1-2 failed)
+      LEFT JOIN name_matched_opps nmo
+        ON f.OpportunityName = nmo.OpportunityName
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o2
+        ON nmo.opp_id = o2.Id
+      -- Tier 4: ContactId → Account (only if tiers 1-3 failed)
+      LEFT JOIN contact_account_opps cao
+        ON f.ContactId = cao.contact_id
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o3
+        ON cao.opp_id = o3.Id
+      -- Tier 5: Email → Contact → Account (only if tiers 1-4 failed)
+      LEFT JOIN email_matched_opps emo
+        ON LOWER(TRIM(COALESCE(f.LeadEmail, f.ContactEmail))) = emo.email
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o4
+        ON emo.opp_id = o4.Id
+      -- Tier 6: Fuzzy name match (only if all other tiers failed)
+      LEFT JOIN fuzzy_name_matched_opps fnmo
+        ON REGEXP_REPLACE(LOWER(TRIM(f.Company)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') = fnmo.normalized_name
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o5
+        ON fnmo.opp_id = o5.Id
+      -- Tier 7: Account.Name direct match (only if all other tiers failed)
+      LEFT JOIN account_matched_opps amo
+        ON LOWER(TRIM(f.Company)) = amo.account_name
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL AND fnmo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o6
+        ON amo.opp_id = o6.Id
+      WHERE f.Division IN ('US', 'UK', 'AU')
+        AND (f.SpiralyzeTest IS NULL OR f.SpiralyzeTest = false)
+        AND (f.MQL_Reverted IS NULL OR f.MQL_Reverted = false)
+        AND f.SAL_DT IS NOT NULL
+        AND CAST(f.SAL_DT AS DATE) >= '${filters.startDate}'
+        AND CAST(f.SAL_DT AS DATE) <= '${filters.endDate}'
+        ${regionClause}
+    )
+    SELECT * EXCEPT(rn)
+    FROM ranked_sals
+    WHERE rn = 1
+    ORDER BY sal_date DESC
+  `;
+
+  try {
+    const [porRows] = await getBigQuery().query({ query: porQuery });
+    console.log(`SAL query returned ${porRows?.length || 0} rows`);
+    return {
+      POR: porRows as any[],
+      R360: [] as any[], // R360 doesn't have SAL stage
+    };
+  } catch (error) {
+    console.error('SAL details query failed:', error);
+    return { POR: [], R360: [] };
+  }
+}
+
+// SQO Details Query - Full implementation with JOINs and deduplication
+// Enhanced: Uses OpportunityName lookup as fallback when OpportunityID and ConvertedOpportunityId are NULL
+async function getSQODetails(filters: ReportFilters) {
+  const regionClause = filters.regions && filters.regions.length > 0
+    ? `AND f.Division IN (${filters.regions.map(r => {
+        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
+        return `'${map[r]}'`;
+      }).join(', ')})`
+    : '';
+
+  // POR SQO query - deduplicates by opportunity, JOINs for details
+  // 6-tier enhanced linking: OpportunityID → ConvertedOpportunityId → Name match → ContactId-Account → Email-Account → Fuzzy name
+  const porQuery = `
+    WITH name_matched_opps AS (
+      -- Tier 3: Pre-compute opportunity lookups by exact name
+      SELECT DISTINCT
+        OpportunityName,
+        FIRST_VALUE(Id) OVER (PARTITION BY OpportunityName ORDER BY CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+      WHERE OpportunityName IS NOT NULL AND OpportunityName != ''
+        AND por_record__c = true AND Division IN ('US', 'UK', 'AU')
+    ),
+    contact_account_opps AS (
+      -- Tier 4: Match via ContactId → Contact.AccountId → Opportunity
+      SELECT DISTINCT
+        c.Id AS contact_id,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY c.Id ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON c.AccountId = o.AccountId
+      WHERE c.AccountId IS NOT NULL
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    email_matched_opps AS (
+      -- Tier 5: Match via Email → Contact → Account → Opportunity
+      SELECT DISTINCT
+        LOWER(TRIM(c.Email)) AS email,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY LOWER(TRIM(c.Email)) ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON c.AccountId = o.AccountId
+      WHERE c.Email IS NOT NULL AND c.Email != '' AND c.AccountId IS NOT NULL
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    fuzzy_name_matched_opps AS (
+      -- Tier 6: Fuzzy company name match (remove Inc, LLC, Ltd, etc.)
+      SELECT DISTINCT
+        REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') AS normalized_name,
+        FIRST_VALUE(o.Id) OVER (
+          PARTITION BY REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '')
+          ORDER BY o.CreatedDate DESC
+        ) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+      WHERE o.AccountName IS NOT NULL AND o.AccountName != ''
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    account_matched_opps AS (
+      -- Tier 7: Direct Account.Name match → find any Opportunity on that Account
+      SELECT DISTINCT
+        LOWER(TRIM(a.Name)) AS account_name,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY a.Id ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON a.Id = o.AccountId
+      WHERE a.Name IS NOT NULL AND a.Name != ''
+        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
+    ),
+    ranked_sqos AS (
+      SELECT
+        'POR' AS product,
+        CASE f.Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        COALESCE(f.OpportunityID, f.LeadId, f.ContactId) AS record_id,
+        -- 7-tier URL resolution
+        CASE
+          WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
+          WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
+          WHEN nmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', nmo.opp_id)
+          WHEN cao.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', cao.opp_id)
+          WHEN emo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', emo.opp_id)
+          WHEN fnmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', fnmo.opp_id)
+          WHEN amo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', amo.opp_id)
+          WHEN NULLIF(f.LeadId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
+          WHEN NULLIF(f.ContactId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.ContactId)
+          ELSE 'https://por.my.salesforce.com/'
+        END AS salesforce_url,
+        COALESCE(f.Company, 'Unknown') AS company_name,
+        COALESCE(f.LeadEmail, f.ContactEmail, 'N/A') AS email,
+        COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND') AS source,
+        CAST(f.SQO_DT AS STRING) AS sqo_date,
+        CAST(f.SAL_DT AS STRING) AS sal_date,
+        CAST(f.SQL_DT AS STRING) AS sql_date,
+        CAST(f.MQL_DT AS STRING) AS mql_date,
+        DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.SAL_DT AS DATE), DAY) AS days_sal_to_sqo,
+        DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_total_cycle,
+        -- 7-tier sqo_status check
+        CASE
+          WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'
+          WHEN COALESCE(o.IsClosed, o2.IsClosed, o3.IsClosed, o4.IsClosed, o5.IsClosed, o6.IsClosed, false) AND NOT COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'LOST'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sqo_status,
+        -- 7-tier opportunity_id
+        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id) AS opportunity_id,
+        COALESCE(f.OpportunityName, o.OpportunityName, o2.OpportunityName, o3.OpportunityName, o4.OpportunityName, o5.OpportunityName, o6.OpportunityName) AS opportunity_name,
+        COALESCE(o.StageName, o2.StageName, o3.StageName, o4.StageName, o5.StageName, o6.StageName) AS opportunity_stage,
+        COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) AS days_in_stage,
+        'NEW LOGO' AS category,
+        -- Deduplicate by opportunity ID, preferring won deals
+        ROW_NUMBER() OVER (
+          PARTITION BY COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id, COALESCE(f.LeadEmail, f.ContactEmail))
+          ORDER BY
+            CASE WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 0 ELSE 1 END,
+            f.SQO_DT DESC
+        ) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\` f
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
+        ON f.LeadId = l.Id
+      -- Tier 1-2: Direct OpportunityID or ConvertedOpportunityId
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
+      -- Tier 3: Name match (only if tiers 1-2 failed)
+      LEFT JOIN name_matched_opps nmo
+        ON f.OpportunityName = nmo.OpportunityName
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o2
+        ON nmo.opp_id = o2.Id
+      -- Tier 4: ContactId → Account (only if tiers 1-3 failed)
+      LEFT JOIN contact_account_opps cao
+        ON f.ContactId = cao.contact_id
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o3
+        ON cao.opp_id = o3.Id
+      -- Tier 5: Email → Contact → Account (only if tiers 1-4 failed)
+      LEFT JOIN email_matched_opps emo
+        ON LOWER(TRIM(COALESCE(f.LeadEmail, f.ContactEmail))) = emo.email
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o4
+        ON emo.opp_id = o4.Id
+      -- Tier 6: Fuzzy name match (only if all other tiers failed)
+      LEFT JOIN fuzzy_name_matched_opps fnmo
+        ON REGEXP_REPLACE(LOWER(TRIM(f.Company)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') = fnmo.normalized_name
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o5
+        ON fnmo.opp_id = o5.Id
+      -- Tier 7: Account.Name direct match (only if all other tiers failed)
+      LEFT JOIN account_matched_opps amo
+        ON LOWER(TRIM(f.Company)) = amo.account_name
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL AND fnmo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o6
+        ON amo.opp_id = o6.Id
+      WHERE f.Division IN ('US', 'UK', 'AU')
+        AND (f.SpiralyzeTest IS NULL OR f.SpiralyzeTest = false)
+        AND (f.MQL_Reverted IS NULL OR f.MQL_Reverted = false)
+        AND f.SQO_DT IS NOT NULL
+        AND CAST(f.SQO_DT AS DATE) >= '${filters.startDate}'
+        AND CAST(f.SQO_DT AS DATE) <= '${filters.endDate}'
+        ${regionClause}
+    )
+    SELECT * EXCEPT(rn)
+    FROM ranked_sqos
+    WHERE rn = 1
+    ORDER BY sqo_date DESC
+  `;
+
+  const r360RegionClause = filters.regions && filters.regions.length > 0
+    ? `AND f.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+    : '';
+
+  // R360 SQO query - deduplicates, JOINs for details (no SAL stage in R360)
+  // 6-tier enhanced linking: OpportunityID → ConvertedOpportunityId → Name match → ContactId-Account → Email-Account → Fuzzy name
+  const r360Query = `
+    WITH name_matched_opps AS (
+      -- Tier 3: Pre-compute opportunity lookups by exact name
+      SELECT DISTINCT
+        OpportunityName,
+        FIRST_VALUE(Id) OVER (PARTITION BY OpportunityName ORDER BY CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+      WHERE OpportunityName IS NOT NULL AND OpportunityName != ''
+        AND por_record__c = false
+    ),
+    contact_account_opps AS (
+      -- Tier 4: Match via ContactId → Contact.AccountId → Opportunity
+      SELECT DISTINCT
+        c.Id AS contact_id,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY c.Id ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON c.AccountId = o.AccountId
+      WHERE c.AccountId IS NOT NULL AND o.por_record__c = false
+    ),
+    email_matched_opps AS (
+      -- Tier 5: Match via Email → Contact → Account → Opportunity
+      SELECT DISTINCT
+        LOWER(TRIM(c.Email)) AS email,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY LOWER(TRIM(c.Email)) ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON c.AccountId = o.AccountId
+      WHERE c.Email IS NOT NULL AND c.Email != '' AND c.AccountId IS NOT NULL
+        AND o.por_record__c = false
+    ),
+    fuzzy_name_matched_opps AS (
+      -- Tier 6: Fuzzy company name match (remove Inc, LLC, Ltd, etc.)
+      SELECT DISTINCT
+        REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') AS normalized_name,
+        FIRST_VALUE(o.Id) OVER (
+          PARTITION BY REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '')
+          ORDER BY o.CreatedDate DESC
+        ) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+      WHERE o.AccountName IS NOT NULL AND o.AccountName != '' AND o.por_record__c = false
+    ),
+    account_matched_opps AS (
+      -- Tier 7: Direct Account.Name match → find any Opportunity on that Account
+      SELECT DISTINCT
+        LOWER(TRIM(a.Name)) AS account_name,
+        FIRST_VALUE(o.Id) OVER (PARTITION BY a.Id ORDER BY o.CreatedDate DESC) AS opp_id
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a
+      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON a.Id = o.AccountId
+      WHERE a.Name IS NOT NULL AND a.Name != ''
+        AND o.por_record__c = false
+    ),
+    ranked_sqos AS (
+      SELECT
+        'R360' AS product,
+        f.Region AS region,
+        COALESCE(f.OpportunityID, f.LeadId) AS record_id,
+        -- 7-tier URL resolution
+        CASE
+          WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
+          WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
+          WHEN nmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', nmo.opp_id)
+          WHEN cao.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', cao.opp_id)
+          WHEN emo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', emo.opp_id)
+          WHEN fnmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', fnmo.opp_id)
+          WHEN amo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', amo.opp_id)
+          WHEN NULLIF(f.LeadId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
+          ELSE 'https://por.my.salesforce.com/'
+        END AS salesforce_url,
+        COALESCE(f.Company, 'Unknown') AS company_name,
+        COALESCE(f.Email, 'N/A') AS email,
+        COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND') AS source,
+        CAST(f.SQO_DT AS STRING) AS sqo_date,
+        'N/A' AS sal_date,
+        CAST(f.SQL_DT AS STRING) AS sql_date,
+        CAST(f.MQL_DT AS STRING) AS mql_date,
+        0 AS days_sal_to_sqo,
+        DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_total_cycle,
+        -- 7-tier sqo_status check
+        CASE
+          WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'
+          WHEN COALESCE(o.IsClosed, o2.IsClosed, o3.IsClosed, o4.IsClosed, o5.IsClosed, o6.IsClosed, false) AND NOT COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'LOST'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sqo_status,
+        -- 7-tier opportunity_id
+        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id) AS opportunity_id,
+        COALESCE(f.OpportunityName, o.OpportunityName, o2.OpportunityName, o3.OpportunityName, o4.OpportunityName, o5.OpportunityName, o6.OpportunityName) AS opportunity_name,
+        COALESCE(o.StageName, o2.StageName, o3.StageName, o4.StageName, o5.StageName, o6.StageName) AS opportunity_stage,
+        COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) AS days_in_stage,
+        'NEW LOGO' AS category,
+        -- Deduplicate by opportunity ID
+        ROW_NUMBER() OVER (
+          PARTITION BY COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id, f.Email)
+          ORDER BY
+            CASE WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 0 ELSE 1 END,
+            f.SQO_DT DESC
+        ) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\` f
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
+        ON f.LeadId = l.Id
+      -- Tier 1-2: Direct OpportunityID or ConvertedOpportunityId
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
+      -- Tier 3: Name match (only if tiers 1-2 failed)
+      LEFT JOIN name_matched_opps nmo
+        ON f.OpportunityName = nmo.OpportunityName
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o2
+        ON nmo.opp_id = o2.Id
+      -- Tier 4: ContactId → Account (only if tiers 1-3 failed)
+      LEFT JOIN contact_account_opps cao
+        ON f.ContactId = cao.contact_id
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o3
+        ON cao.opp_id = o3.Id
+      -- Tier 5: Email → Contact → Account (only if tiers 1-4 failed)
+      LEFT JOIN email_matched_opps emo
+        ON LOWER(TRIM(f.Email)) = emo.email
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o4
+        ON emo.opp_id = o4.Id
+      -- Tier 6: Fuzzy name match (only if all other tiers failed)
+      LEFT JOIN fuzzy_name_matched_opps fnmo
+        ON REGEXP_REPLACE(LOWER(TRIM(f.Company)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') = fnmo.normalized_name
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o5
+        ON fnmo.opp_id = o5.Id
+      -- Tier 7: Account.Name direct match (only if all other tiers failed)
+      LEFT JOIN account_matched_opps amo
+        ON LOWER(TRIM(f.Company)) = amo.account_name
+        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL AND fnmo.opp_id IS NULL
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o6
+        ON amo.opp_id = o6.Id
+      WHERE f.Region IS NOT NULL
+        AND f.MQL_Reverted = false
+        AND f.SQO_DT IS NOT NULL
+        AND CAST(f.SQO_DT AS DATE) >= '${filters.startDate}'
+        AND CAST(f.SQO_DT AS DATE) <= '${filters.endDate}'
+        ${r360RegionClause}
+    )
+    SELECT * EXCEPT(rn)
+    FROM ranked_sqos
+    WHERE rn = 1
+    ORDER BY sqo_date DESC
+  `;
+
+  try {
+    const [[porRows], [r360Rows]] = await Promise.all([
+      getBigQuery().query({ query: porQuery }),
+      getBigQuery().query({ query: r360Query }),
+    ]);
+    console.log(`SQO query returned ${porRows?.length || 0} POR rows, ${r360Rows?.length || 0} R360 rows`);
+
+    return {
+      POR: porRows as any[],
+      R360: r360Rows as any[],
+    };
+  } catch (error) {
+    console.error('SQO details query failed:', error);
     return { POR: [], R360: [] };
   }
 }
@@ -1533,6 +2321,8 @@ export async function POST(request: Request) {
       lossReasonData,
       mqlDetailsData,
       sqlDetailsData,
+      salDetailsData,
+      sqoDetailsData,
       porFunnelByCategory,
       r360FunnelByCategory,
       renewalUpliftMap,
@@ -1562,6 +2352,8 @@ export async function POST(request: Request) {
       getLossReasonRCA(filters),
       getMQLDetails(filters),
       getSQLDetails(filters),
+      getSALDetails(filters),
+      getSQODetails(filters),
       filters.products.length === 0 || filters.products.includes('POR')
         ? getFunnelByCategory(filters, 'POR')
         : Promise.resolve([]),
@@ -1731,8 +2523,12 @@ export async function POST(request: Request) {
       const fyProgressPct = fyTarget > 0 ? Math.round((qtdAcv / fyTarget) * 1000) / 10 : 0;
 
       // Calculate pipeline coverage (pipeline / remaining gap to Q1)
-      const remainingGap = Math.max(0, q1Target - qtdAcv);
-      const pipelineCoverage = remainingGap > 0 ? pipeline.acv / remainingGap : (pipeline.acv > 0 ? 99 : 0);
+      // For RENEWAL: use wonAcv only (not including uplift) because uplift represents expected
+      // pipeline close - including it would double-count and artificially inflate coverage
+      const remainingGapBase = target.category === 'RENEWAL' ? wonAcv : qtdAcv;
+      const remainingGap = Math.max(0, q1Target - remainingGapBase);
+      // If no remaining gap (target hit or no target), coverage is 0 (not needed)
+      const pipelineCoverage = remainingGap > 0 ? pipeline.acv / remainingGap : 0;
 
       // Calculate win rate (won deals / (won + lost))
       const totalClosed = qtdDeals + lost.count;
@@ -1811,6 +2607,8 @@ export async function POST(request: Request) {
       total_win_rate_pct: (totalWonDeals + totalLostDeals) > 0
         ? Math.round((totalWonDeals / (totalWonDeals + totalLostDeals)) * 1000) / 10
         : 0,
+      total_won_deals: totalWonDeals,
+      total_lost_deals: totalLostDeals,
       risk_profile: 'P75',
     };
 
@@ -1849,6 +2647,7 @@ export async function POST(request: Request) {
           total_win_rate_pct: (prodWonDeals + prodLostDeals) > 0
             ? Math.round((prodWonDeals / (prodWonDeals + prodLostDeals)) * 1000) / 10
             : 0,
+          total_won_deals: prodWonDeals,
           total_lost_deals: prodLostDeals,
           total_lost_acv: prodLostAcv,
           risk_profile: 'P75',
@@ -2148,24 +2947,49 @@ export async function POST(request: Request) {
     // Build funnel by source data
     const funnelBySource: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
 
-    // Funnel by source: targets are at category level, not source level
-    // When target=0, pacing=100% (met zero target)
+    // Note: sourceQtdProrationFactor already defined above for source attainment
+
+    // Funnel by source: now includes source-level targets from plan with QTD proration
     for (const row of porFunnelBySource as any[]) {
+      const q1TargetMql = parseInt(row.target_mql) || 0;
+      const q1TargetSql = parseInt(row.target_sql) || 0;
+      const q1TargetSal = parseInt(row.target_sal) || 0;
+      const q1TargetSqo = parseInt(row.target_sqo) || 0;
+      // Calculate QTD targets by applying proration factor
+      const qtdTargetMql = Math.round(q1TargetMql * sourceQtdProrationFactor);
+      const qtdTargetSql = Math.round(q1TargetSql * sourceQtdProrationFactor);
+      const qtdTargetSal = Math.round(q1TargetSal * sourceQtdProrationFactor);
+      const qtdTargetSqo = Math.round(q1TargetSqo * sourceQtdProrationFactor);
+      const actualMql = parseInt(row.actual_mql) || 0;
+      const actualSql = parseInt(row.actual_sql) || 0;
+      const actualSal = parseInt(row.actual_sal) || 0;
+      const actualSqo = parseInt(row.actual_sqo) || 0;
+
       funnelBySource.POR.push({
         region: row.region,
         source: row.source,
-        actual_mql: parseInt(row.actual_mql) || 0,
-        actual_sql: parseInt(row.actual_sql) || 0,
-        actual_sal: parseInt(row.actual_sal) || 0,
-        actual_sqo: parseInt(row.actual_sqo) || 0,
-        target_mql: 0,
-        target_sql: 0,
-        target_sal: 0,
-        target_sqo: 0,
-        mql_pacing_pct: 100, // No source-level targets = 100%
-        sql_pacing_pct: 100,
-        sal_pacing_pct: 100,
-        sqo_pacing_pct: 100,
+        actual_mql: actualMql,
+        actual_sql: actualSql,
+        actual_sal: actualSal,
+        actual_sqo: actualSqo,
+        q1_target_mql: q1TargetMql,
+        q1_target_sql: q1TargetSql,
+        q1_target_sal: q1TargetSal,
+        q1_target_sqo: q1TargetSqo,
+        qtd_target_mql: qtdTargetMql,
+        qtd_target_sql: qtdTargetSql,
+        qtd_target_sal: qtdTargetSal,
+        qtd_target_sqo: qtdTargetSqo,
+        // Pacing calculated against QTD targets (not Q1)
+        mql_pacing_pct: qtdTargetMql > 0 ? Math.round((actualMql / qtdTargetMql) * 100) : 100,
+        sql_pacing_pct: qtdTargetSql > 0 ? Math.round((actualSql / qtdTargetSql) * 100) : 100,
+        sal_pacing_pct: qtdTargetSal > 0 ? Math.round((actualSal / qtdTargetSal) * 100) : 100,
+        sqo_pacing_pct: qtdTargetSqo > 0 ? Math.round((actualSqo / qtdTargetSqo) * 100) : 100,
+        // Gaps calculated against QTD targets
+        mql_gap: actualMql - qtdTargetMql,
+        sql_gap: actualSql - qtdTargetSql,
+        sal_gap: actualSal - qtdTargetSal,
+        sqo_gap: actualSqo - qtdTargetSqo,
         mql_to_sql_rate: parseFloat(row.mql_to_sql_rate) || 0,
         sql_to_sal_rate: parseFloat(row.sql_to_sal_rate) || 0,
         sal_to_sqo_rate: parseFloat(row.sal_to_sqo_rate) || 0,
@@ -2173,23 +2997,44 @@ export async function POST(request: Request) {
     }
 
     for (const row of r360FunnelBySource as any[]) {
+      const q1TargetMql = parseInt(row.target_mql) || 0;
+      const q1TargetSql = parseInt(row.target_sql) || 0;
+      const q1TargetSqo = parseInt(row.target_sqo) || 0;
+      // Calculate QTD targets by applying proration factor
+      const qtdTargetMql = Math.round(q1TargetMql * sourceQtdProrationFactor);
+      const qtdTargetSql = Math.round(q1TargetSql * sourceQtdProrationFactor);
+      const qtdTargetSqo = Math.round(q1TargetSqo * sourceQtdProrationFactor);
+      const actualMql = parseInt(row.actual_mql) || 0;
+      const actualSql = parseInt(row.actual_sql) || 0;
+      const actualSqo = parseInt(row.actual_sqo) || 0;
+
       funnelBySource.R360.push({
         region: row.region,
         source: row.source,
-        actual_mql: parseInt(row.actual_mql) || 0,
-        actual_sql: parseInt(row.actual_sql) || 0,
-        actual_sal: parseInt(row.actual_sal) || 0,
-        actual_sqo: parseInt(row.actual_sqo) || 0,
-        target_mql: 0,
-        target_sql: 0,
-        target_sal: 0,
-        target_sqo: 0,
-        mql_pacing_pct: 100, // No source-level targets = 100%
-        sql_pacing_pct: 100,
+        actual_mql: actualMql,
+        actual_sql: actualSql,
+        actual_sal: 0,  // R360 has no SAL stage
+        actual_sqo: actualSqo,
+        q1_target_mql: q1TargetMql,
+        q1_target_sql: q1TargetSql,
+        q1_target_sal: 0,
+        q1_target_sqo: q1TargetSqo,
+        qtd_target_mql: qtdTargetMql,
+        qtd_target_sql: qtdTargetSql,
+        qtd_target_sal: 0,
+        qtd_target_sqo: qtdTargetSqo,
+        // Pacing calculated against QTD targets (not Q1)
+        mql_pacing_pct: qtdTargetMql > 0 ? Math.round((actualMql / qtdTargetMql) * 100) : 100,
+        sql_pacing_pct: qtdTargetSql > 0 ? Math.round((actualSql / qtdTargetSql) * 100) : 100,
         sal_pacing_pct: 100,
-        sqo_pacing_pct: 100,
+        sqo_pacing_pct: qtdTargetSqo > 0 ? Math.round((actualSqo / qtdTargetSqo) * 100) : 100,
+        // Gaps calculated against QTD targets
+        mql_gap: actualMql - qtdTargetMql,
+        sql_gap: actualSql - qtdTargetSql,
+        sal_gap: 0,
+        sqo_gap: actualSqo - qtdTargetSqo,
         mql_to_sql_rate: parseFloat(row.mql_to_sql_rate) || 0,
-        sql_to_sal_rate: parseFloat(row.sql_to_sal_rate) || 0,
+        sql_to_sal_rate: 0,
         sal_to_sqo_rate: parseFloat(row.sal_to_sqo_rate) || 0,
       });
     }
@@ -2371,6 +3216,219 @@ export async function POST(request: Request) {
     };
 
     // ========================================================================
+    // WINS & BRIGHT SPOTS
+    // Definition: Areas exceeding targets (GREEN or exceptional performance)
+    // Criteria: >= 100% attainment (exceptional: >= 120%)
+    // ========================================================================
+    const calculateWinsBrightSpots = (
+      attainment: any[],
+      product: 'POR' | 'R360'
+    ) => {
+      const wins: any[] = [];
+
+      for (const row of attainment) {
+        // Only GREEN status qualifies (>= 90% attainment)
+        if (row.rag_status !== 'GREEN') continue;
+
+        // Determine performance tier
+        let performanceTier: 'EXCEPTIONAL' | 'ON_TRACK' | 'NEEDS_ATTENTION';
+        if (row.qtd_attainment_pct >= 120) {
+          performanceTier = 'EXCEPTIONAL';
+        } else if (row.qtd_attainment_pct >= 100) {
+          performanceTier = 'ON_TRACK';
+        } else {
+          performanceTier = 'NEEDS_ATTENTION';
+        }
+
+        // Generate commentary based on performance
+        let commentary = '';
+        if (performanceTier === 'EXCEPTIONAL') {
+          commentary = `${row.region} ${row.category} at ${row.qtd_attainment_pct.toFixed(0)}% - exceptional performance, exceeding targets by ${(row.qtd_attainment_pct - 100).toFixed(0)}%. Strong execution driving results.`;
+        } else if (performanceTier === 'ON_TRACK') {
+          commentary = `${row.region} ${row.category} at ${row.qtd_attainment_pct.toFixed(0)}% - on track, meeting targets. Strong win rate supporting results.`;
+        } else {
+          commentary = `${row.region} ${row.category} at ${row.qtd_attainment_pct.toFixed(0)}% - approaching target with positive trajectory.`;
+        }
+
+        // Determine contributing factor
+        let contributingFactor = 'Solid execution';
+        if (row.win_rate_pct && row.win_rate_pct >= 50) {
+          contributingFactor = 'High win rate';
+        } else if (row.pipeline_coverage_x && row.pipeline_coverage_x >= 2) {
+          contributingFactor = 'Strong pipeline';
+        }
+
+        wins.push({
+          product,
+          region: row.region,
+          category: row.category,
+          qtd_attainment_pct: row.qtd_attainment_pct,
+          qtd_acv: row.qtd_acv,
+          qtd_target: row.qtd_target,
+          performance_tier: performanceTier,
+          success_commentary: commentary,
+          contributing_factor: contributingFactor,
+          pipeline_coverage_x: row.pipeline_coverage_x || 0,
+          win_rate_pct: row.win_rate_pct || 0,
+        });
+      }
+
+      // Sort by attainment (highest first)
+      return wins.sort((a, b) => b.qtd_attainment_pct - a.qtd_attainment_pct);
+    };
+
+    const winsBrightSpots = {
+      POR: calculateWinsBrightSpots(
+        attainmentDetail.filter((a: any) => a.product === 'POR'),
+        'POR'
+      ),
+      R360: calculateWinsBrightSpots(
+        attainmentDetail.filter((a: any) => a.product === 'R360'),
+        'R360'
+      ),
+    };
+
+    // ========================================================================
+    // TOP RISK POCKETS
+    // Definition: Areas significantly underperforming (RED status)
+    // Criteria: < 70% attainment
+    // ========================================================================
+    const calculateTopRiskPockets = (attainment: any[]) => {
+      const riskPockets: any[] = [];
+
+      for (const row of attainment) {
+        // Only RED status qualifies (< 70% attainment)
+        if (row.rag_status !== 'RED') continue;
+
+        riskPockets.push({
+          product: row.product,
+          region: row.region,
+          category: row.category,
+          qtd_target: row.qtd_target,
+          qtd_acv: row.qtd_acv,
+          qtd_gap: row.gap,
+          qtd_attainment_pct: row.qtd_attainment_pct,
+          rag_status: row.rag_status,
+          win_rate_pct: row.win_rate_pct || 0,
+          pipeline_acv: row.pipeline_acv || 0,
+          pipeline_coverage_x: row.pipeline_coverage_x || 0,
+          deals_won: row.qtd_deals || 0,
+          avg_deal_size: row.qtd_deals > 0 ? row.qtd_acv / row.qtd_deals : 0,
+        });
+      }
+
+      // Sort by gap (largest negative gap first)
+      return riskPockets.sort((a, b) => a.qtd_gap - b.qtd_gap);
+    };
+
+    const topRiskPockets = calculateTopRiskPockets(attainmentDetail);
+
+    // ========================================================================
+    // ACTION ITEMS
+    // Definition: Specific recommended actions based on risk analysis
+    // Criteria: RED/YELLOW status areas with actionable recommendations
+    // ========================================================================
+    const calculateActionItems = (attainment: any[], funnel: any[]) => {
+      const immediate: any[] = [];
+      const shortTerm: any[] = [];
+      const strategic: any[] = [];
+
+      for (const row of attainment) {
+        // Only RED and YELLOW status areas need action items
+        if (row.rag_status === 'GREEN') continue;
+
+        const funnelRow = funnel.find((f: any) =>
+          f.product === row.product && f.region === row.region
+        );
+
+        // RED status = IMMEDIATE action needed
+        if (row.rag_status === 'RED') {
+          // Critical: Pipeline gap
+          if (row.pipeline_coverage_x < 2) {
+            immediate.push({
+              urgency: 'IMMEDIATE',
+              category: 'PIPELINE',
+              product: row.product,
+              region: row.region,
+              issue: `${row.region} ${row.category} at ${row.qtd_attainment_pct.toFixed(0)}% with only ${row.pipeline_coverage_x?.toFixed(1)}x pipeline coverage`,
+              reason: 'Insufficient pipeline to close the gap to target',
+              action: 'Prioritize pipeline generation through outbound campaigns and partner sourcing',
+              metric: `Pipeline Coverage: ${row.pipeline_coverage_x?.toFixed(1)}x (need 3x)`,
+              severity: 'CRITICAL',
+            });
+          }
+
+          // Critical: Low win rate
+          if (row.win_rate_pct !== undefined && row.win_rate_pct < 25) {
+            immediate.push({
+              urgency: 'IMMEDIATE',
+              category: 'WIN_RATE',
+              product: row.product,
+              region: row.region,
+              issue: `${row.region} ${row.category} has ${row.win_rate_pct.toFixed(0)}% win rate`,
+              reason: 'Low conversion from pipeline to closed-won deals',
+              action: 'Review loss reasons and implement deal coaching for late-stage opportunities',
+              metric: `Win Rate: ${row.win_rate_pct.toFixed(0)}% (target: 30%+)`,
+              severity: 'CRITICAL',
+            });
+          }
+
+          // High: Funnel leakage
+          if (funnelRow && funnelRow.sqo_pacing_pct < 50) {
+            shortTerm.push({
+              urgency: 'SHORT_TERM',
+              category: 'FUNNEL',
+              product: row.product,
+              region: row.region,
+              issue: `${row.region} SQO pacing at ${funnelRow.sqo_pacing_pct?.toFixed(0)}% of target`,
+              reason: 'Funnel conversion not keeping pace with demand generation',
+              action: 'Audit MQL→SQL→SQO conversion and address stage-specific blockers',
+              metric: `SQO Pacing: ${funnelRow.sqo_pacing_pct?.toFixed(0)}%`,
+              severity: 'HIGH',
+            });
+          }
+        }
+
+        // YELLOW status = SHORT_TERM action needed
+        if (row.rag_status === 'YELLOW') {
+          // Medium: At-risk deals
+          if (row.pipeline_coverage_x && row.pipeline_coverage_x >= 2 && row.pipeline_coverage_x < 3) {
+            shortTerm.push({
+              urgency: 'SHORT_TERM',
+              category: 'EXECUTION',
+              product: row.product,
+              region: row.region,
+              issue: `${row.region} ${row.category} at ${row.qtd_attainment_pct.toFixed(0)}% needs acceleration`,
+              reason: 'Adequate pipeline exists but conversion velocity is slow',
+              action: 'Focus on deal progression and reduce cycle time for late-stage opportunities',
+              metric: `Attainment: ${row.qtd_attainment_pct.toFixed(0)}% (need 90%+)`,
+              severity: 'MEDIUM',
+            });
+          }
+
+          // Strategic: Capacity planning
+          if (funnelRow && funnelRow.mql_pacing_pct < 80) {
+            strategic.push({
+              urgency: 'STRATEGIC',
+              category: 'DEMAND_GEN',
+              product: row.product,
+              region: row.region,
+              issue: `${row.region} MQL generation at ${funnelRow.mql_pacing_pct?.toFixed(0)}% of target`,
+              reason: 'Top-of-funnel not generating enough leads to sustain targets',
+              action: 'Increase marketing investment and expand channel partnerships',
+              metric: `MQL Pacing: ${funnelRow.mql_pacing_pct?.toFixed(0)}%`,
+              severity: 'MEDIUM',
+            });
+          }
+        }
+      }
+
+      return { immediate, short_term: shortTerm, strategic };
+    };
+
+    const actionItems = calculateActionItems(attainmentDetail, funnelPacing);
+
+    // ========================================================================
     // MOMENTUM INDICATORS
     // Definition: YELLOW status areas trending toward GREEN
     // Criteria: 70-89% attainment + strong pipeline coverage OR strong funnel pacing
@@ -2481,14 +3539,19 @@ export async function POST(request: Request) {
       loss_reason_rca: lossReasonRca,
       mql_details: mqlDetailsData,
       sql_details: sqlDetailsData,
+      sal_details: salDetailsData,
+      sqo_details: sqoDetailsData,
       mql_disqualification_summary: mqlDisqualificationSummary,
       sql_disqualification_summary: sqlDisqualificationSummary,
       won_deals: wonDeals,
       lost_deals: lostDeals,
       pipeline_deals: pipelineDeals,
       momentum_indicators: momentumIndicators,
+      wins_bright_spots: winsBrightSpots,
+      top_risk_pockets: topRiskPockets,
+      action_items: actionItems,
       // Version to track deployments and help debug caching issues
-      api_version: '3.1.0-fix-zero-pacing',
+      api_version: '3.3.0-add-insights',
     };
 
     return NextResponse.json(response, {

@@ -67,7 +67,7 @@ function SourceACVTable({ product, rows, period }: { product: Product; rows: Sou
                   <td className="right">{formatCurrency(row.qtd_target)}</td>
                   <td className="right">{formatCurrency(row.qtd_acv)}</td>
                   <td className="right" style={{ color: getAttainmentColor(attPct), fontWeight: 600 }}>{formatPercent(attPct)}</td>
-                  <td className="right" style={{ color: getGapColor(gap) }}>{formatCurrency(gap)}</td>
+                  <td className="right" style={{ color: getGapColor(gap), fontWeight: 600 }}>{formatCurrency(gap)}</td>
                   <td className="center">
                     <span className="rag-tile" style={{ backgroundColor: getRAGBadgeColor(rag) }}>{rag}</span>
                   </td>
@@ -161,7 +161,7 @@ function FunnelByCategoryTable({ product, rows }: { product: Product; rows: Funn
                   <td className="right">{Math.round(stage.qtd || 0)}</td>
                   <td className="right">{Math.round(stage.actual || 0)}</td>
                   <td className="right" style={{ color: getAttainmentColor(stage.pct), fontWeight: 600 }}>{formatPercent(stage.pct)}</td>
-                  <td className="right" style={{ color: getGapColor(stage.gap) }}>
+                  <td className="right" style={{ color: getGapColor(stage.gap), fontWeight: 600 }}>
                     {stage.gap >= 0 ? '+' : ''}{Math.round(stage.gap || 0)}
                   </td>
                 </tr>

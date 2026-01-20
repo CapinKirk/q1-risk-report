@@ -237,16 +237,26 @@ export interface FunnelBySourceActuals {
   actual_sql: number;
   actual_sal: number;
   actual_sqo: number;
-  // Targets (from StrategicOperatingPlan)
-  target_mql: number;
-  target_sql: number;
-  target_sal: number;
-  target_sqo: number;
-  // Pacing percentages (actual vs target)
+  // Q1 targets (full quarter)
+  q1_target_mql: number;
+  q1_target_sql: number;
+  q1_target_sal: number;
+  q1_target_sqo: number;
+  // QTD targets (prorated by quarter % complete)
+  qtd_target_mql: number;
+  qtd_target_sql: number;
+  qtd_target_sal: number;
+  qtd_target_sqo: number;
+  // Pacing percentages (actual vs QTD target)
   mql_pacing_pct: number;
   sql_pacing_pct: number;
   sal_pacing_pct: number;
   sqo_pacing_pct: number;
+  // Gaps (actual - QTD target)
+  mql_gap: number;
+  sql_gap: number;
+  sal_gap: number;
+  sqo_gap: number;
   // Conversion rates
   mql_to_sql_rate: number;
   sql_to_sal_rate: number;
@@ -401,6 +411,16 @@ export interface ReportData {
     POR: SQLDetailRow[];
     R360: SQLDetailRow[];
   };
+  // SAL details for funnel drill-down (POR only)
+  sal_details?: {
+    POR: SALDetailRow[];
+    R360: SALDetailRow[];
+  };
+  // SQO details for funnel drill-down
+  sqo_details?: {
+    POR: SQODetailRow[];
+    R360: SQODetailRow[];
+  };
 }
 
 // Executive Summary Counts
@@ -525,6 +545,57 @@ export interface SQLDetailRow {
   opportunity_acv?: number;
   loss_reason?: string;
   days_in_stage?: number;
+  category: 'NEW LOGO' | 'EXPANSION' | 'MIGRATION';
+}
+
+// SAL Detail row for drill-down
+export interface SALDetailRow {
+  product: Product;
+  region: Region;
+  record_id: string;
+  salesforce_url: string;
+  company_name: string;
+  email: string;
+  source: string;
+  sal_date: string;
+  sql_date: string;
+  mql_date: string;
+  days_sql_to_sal: number;
+  converted_to_sqo: 'Yes' | 'No';
+  has_opportunity: 'Yes' | 'No';
+  sal_status: 'ACTIVE' | 'CONVERTED_SQO' | 'WON' | 'STALLED' | 'LOST';
+  opportunity_id?: string;
+  opportunity_name?: string;
+  opportunity_stage?: string;
+  opportunity_acv?: number;
+  loss_reason?: string;
+  days_in_stage?: number;
+  category: 'NEW LOGO' | 'EXPANSION' | 'MIGRATION';
+}
+
+// SQO Detail row for drill-down
+export interface SQODetailRow {
+  product: Product;
+  region: Region;
+  record_id: string;
+  salesforce_url: string;
+  company_name: string;
+  email: string;
+  source: string;
+  sqo_date: string;
+  sal_date: string;
+  sql_date: string;
+  mql_date: string;
+  days_sal_to_sqo: number;
+  days_total_cycle: number;
+  sqo_status: 'ACTIVE' | 'WON' | 'LOST' | 'STALLED';
+  opportunity_id: string;
+  opportunity_name: string;
+  opportunity_stage: string;
+  opportunity_acv: number;
+  loss_reason?: string;
+  days_in_stage?: number;
+  category: 'NEW LOGO' | 'EXPANSION' | 'MIGRATION';
 }
 
 // Deal Detail for drill-down

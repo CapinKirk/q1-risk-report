@@ -39,7 +39,17 @@ export default function PipelineCoverage({ data }: PipelineCoverageProps) {
       case 'pipeline_acv': return row.pipeline_acv || 0;
       case 'pipeline_coverage_x': return row.pipeline_coverage_x || 0;
       case 'pipeline_avg_age_days': return row.pipeline_avg_age_days || 0;
-      case 'pipeline_health': return row.pipeline_health || 'UNKNOWN';
+      // Sort health by risk level: HEALTHY (1) < ADEQUATE (2) < AT RISK (3) < UNKNOWN (4)
+      case 'pipeline_health': {
+        const healthOrder: Record<string, number> = {
+          'HEALTHY': 1,
+          'ADEQUATE': 2,
+          'AT_RISK': 3,
+          'AT RISK': 3,
+          'UNKNOWN': 4
+        };
+        return healthOrder[row.pipeline_health || 'UNKNOWN'] || 4;
+      }
       default: return null;
     }
   };
@@ -57,10 +67,13 @@ export default function PipelineCoverage({ data }: PipelineCoverageProps) {
     return 'red';
   };
 
-  const getHealthClass = (health: string) => {
-    if (health === 'HEALTHY') return 'green';
-    if (health === 'ADEQUATE') return 'yellow';
-    return 'red';
+  const getHealthStyle = (health: string): { bg: string; color: string } => {
+    switch (health) {
+      case 'HEALTHY': return { bg: '#dcfce7', color: '#166534' };
+      case 'ADEQUATE': return { bg: '#fef3c7', color: '#92400e' };
+      case 'AT RISK': return { bg: '#fee2e2', color: '#991b1b' };
+      default: return { bg: '#f3f4f6', color: '#4b5563' }; // UNKNOWN
+    }
   };
 
   return (
@@ -132,7 +145,19 @@ export default function PipelineCoverage({ data }: PipelineCoverageProps) {
                   <td className="right">{formatCurrency(p.pipeline_acv)}</td>
                   <td className={`${getCoverageClass(coverage)} right`}>{formatCoverage(coverage)}</td>
                   <td className="right">{Math.round(age)} days</td>
-                  <td className={`${getHealthClass(health)} center`}>{health}</td>
+                  <td className="center">
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      backgroundColor: getHealthStyle(health).bg,
+                      color: getHealthStyle(health).color,
+                    }}>
+                      {health}
+                    </span>
+                  </td>
                 </tr>
               );
             })}

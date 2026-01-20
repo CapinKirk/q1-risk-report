@@ -72,8 +72,7 @@ function ProductAttainmentTable({
               <SortableHeader label="FY Tgt" column="fy_target" sortDirection={getSortDirection('fy_target')} onSort={handleSort} className="right" />
               <SortableHeader label="Q1 Tgt" column="q1_target" sortDirection={getSortDirection('q1_target')} onSort={handleSort} className="right" />
               <SortableHeader label="QTD Act" column="qtd_acv" sortDirection={getSortDirection('qtd_acv')} onSort={handleSort} className="right" />
-              <SortableHeader label="Att%" column="qtd_attainment_pct" sortDirection={getSortDirection('qtd_attainment_pct')} onSort={handleSort} className="right" />
-              <SortableHeader label="FY%" column="fy_progress_pct" sortDirection={getSortDirection('fy_progress_pct')} onSort={handleSort} className="right" />
+              <SortableHeader label="QTD Att" column="qtd_attainment_pct" sortDirection={getSortDirection('qtd_attainment_pct')} onSort={handleSort} className="right" />
               <SortableHeader label="QTD Var" column="qtd_gap" sortDirection={getSortDirection('qtd_gap')} onSort={handleSort} className="right" />
               <SortableHeader label="Lost" column="qtd_lost_acv" sortDirection={getSortDirection('qtd_lost_acv')} onSort={handleSort} className="right" />
               <SortableHeader label="Pipe" column="pipeline_acv" sortDirection={getSortDirection('pipeline_acv')} onSort={handleSort} className="right" />
@@ -111,10 +110,7 @@ function ProductAttainmentTable({
                   <td className="right" style={{ color: getAttainmentColor(row.qtd_attainment_pct), fontWeight: 600 }}>
                     {formatPercent(row.qtd_attainment_pct)}
                   </td>
-                  <td className="right" style={{ color: '#6b7280' }}>
-                    {formatPercent(fyProgressPct)}
-                  </td>
-                  <td className="right" style={{ color: getGapColor(gap) }}>{formatCurrency(gap)}</td>
+                  <td className="right" style={{ color: getAttainmentColor(row.qtd_attainment_pct), fontWeight: 600 }}>{formatCurrency(gap)}</td>
                   <td
                     className={`right ${hasDeals && lostAcv > 0 ? 'clickable' : ''}`}
                     onClick={() => hasDeals && lostAcv > 0 && onCellClick('lost', row)}

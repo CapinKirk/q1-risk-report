@@ -131,39 +131,144 @@ function filterReportData(
 
 // Parse markdown-like formatting for display
 function formatAnalysis(text: string) {
-  return text.split('\n').map((line, i) => {
-    if (line.startsWith('## ')) {
-      return <h3 key={i} className="analysis-h3">{line.replace('## ', '')}</h3>;
+  // Helper to parse inline bold text
+  const parseInlineBold = (content: string): React.ReactNode => {
+    if (!content.includes('**')) return content;
+    const parts = content.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, j) =>
+      part.startsWith('**') && part.endsWith('**')
+        ? <strong key={j}>{part.replace(/\*\*/g, '')}</strong>
+        : part
+    );
+  };
+
+  // Pre-process: split inline numbered lists into separate lines
+  // Match patterns like "1. text 2. text 3. text" (numbers followed by periods inline)
+  let preprocessed = text;
+
+  // Split inline numbered lists: look for "1. text 2. text" pattern and put each on new line
+  preprocessed = preprocessed.replace(/(\d+\.)\s+([^.]+?\.?)(?=\s*\d+\.\s|$)/g, (match, num, content) => {
+    // Only split if there's another numbered item after this one (inline pattern)
+    return `\n${num} ${content.trim()}`;
+  });
+
+  // Clean up any double newlines
+  preprocessed = preprocessed.replace(/\n{3,}/g, '\n\n');
+
+  // Track if we're in the "Additional Insights" section (items should be bullets not numbers)
+  let inAdditionalInsights = false;
+
+  const elements: React.ReactNode[] = [];
+  let keyCounter = 0;
+
+  preprocessed.split('\n').forEach((line) => {
+    // Check if entering Additional Insights section
+    if (/Additional\s+(Insights|Focus)/i.test(line)) {
+      inAdditionalInsights = true;
+    }
+    // Reset when hitting a new major section
+    if (/^\d+\.\s+[A-Z]{2,}/.test(line) || line.startsWith('##')) {
+      inAdditionalInsights = false;
+    }
+    const i = keyCounter++;
+
+    // Headers (check longer prefixes first)
+    if (line.startsWith('#### ')) {
+      elements.push(<h5 key={i} className="analysis-h5">{parseInlineBold(line.replace('#### ', ''))}</h5>);
+      return;
     }
     if (line.startsWith('### ')) {
-      return <h4 key={i} className="analysis-h4">{line.replace('### ', '')}</h4>;
+      elements.push(<h4 key={i} className="analysis-h4">{parseInlineBold(line.replace('### ', ''))}</h4>);
+      return;
     }
+    if (line.startsWith('## ')) {
+      elements.push(<h3 key={i} className="analysis-h3">{parseInlineBold(line.replace('## ', ''))}</h3>);
+      return;
+    }
+
+    // Section label lines (Status:, Key Risks:, Action Items:, Root Cause Analysis:, etc.)
+    const labelMatch = line.match(/^(Status|Key Risks?|Action Items?|Root Cause Analysis|Gap to Target|Regional Director Accountability|Likelihood|Top \d+ (?:global )?priorities|Additional (?:Focus Areas|Insights)|Loss Reasons?|MQL Disqualification|Source Channel|Funnel Conversion):?\s*(.*)$/i);
+    if (labelMatch) {
+      const [, label, value] = labelMatch;
+      if (value && value.trim()) {
+        // Check for RAG status in the value and color code it
+        let formattedValue: React.ReactNode = parseInlineBold(value);
+        if (label.toLowerCase() === 'status') {
+          // Color code RED/YELLOW/GREEN in status line
+          if (value.includes('RED')) {
+            formattedValue = <span style={{ color: '#dc2626', fontWeight: 600 }}>{value}</span>;
+          } else if (value.includes('YELLOW')) {
+            formattedValue = <span style={{ color: '#ca8a04', fontWeight: 600 }}>{value}</span>;
+          } else if (value.includes('GREEN')) {
+            formattedValue = <span style={{ color: '#16a34a', fontWeight: 600 }}>{value}</span>;
+          }
+        }
+        // Label with inline value
+        elements.push(
+          <p key={i} className="analysis-label-line">
+            <span className="analysis-label">{label}:</span> {formattedValue}
+          </p>
+        );
+      } else {
+        // Label only (acts as sub-header)
+        elements.push(<p key={i} className="analysis-label-only">{label}</p>);
+      }
+      return;
+    }
+
+    // Fully bold line
     if (line.startsWith('**') && line.endsWith('**')) {
-      return <p key={i} className="analysis-bold">{line.replace(/\*\*/g, '')}</p>;
+      elements.push(<p key={i} className="analysis-bold">{line.replace(/\*\*/g, '')}</p>);
+      return;
     }
-    if (line.includes('**')) {
-      const parts = line.split(/(\*\*[^*]+\*\*)/g);
-      return (
-        <p key={i} className="analysis-p">
-          {parts.map((part, j) =>
-            part.startsWith('**') && part.endsWith('**')
-              ? <strong key={j}>{part.replace(/\*\*/g, '')}</strong>
-              : part
-          )}
-        </p>
-      );
+
+    // Indented bullet points (2+ spaces before -)
+    if (/^\s{2,}[-*]\s/.test(line)) {
+      const content = line.replace(/^\s+[-*]\s/, '');
+      elements.push(<li key={i} className="analysis-li-indent">{parseInlineBold(content)}</li>);
+      return;
     }
+
+    // Regular bullet points
     if (line.startsWith('- ') || line.startsWith('* ')) {
-      return <li key={i} className="analysis-li">{line.replace(/^[-*]\s/, '')}</li>;
+      elements.push(<li key={i} className="analysis-li">{parseInlineBold(line.replace(/^[-*]\s/, ''))}</li>);
+      return;
     }
+
+    // Numbered list items - convert to bullets if in Additional Insights section
     if (/^\d+\.\s/.test(line)) {
-      return <li key={i} className="analysis-li-num">{line.replace(/^\d+\.\s/, '')}</li>;
+      const content = line.replace(/^\d+\.\s/, '');
+      if (inAdditionalInsights) {
+        // Use bullet style for Additional Insights items
+        elements.push(<li key={i} className="analysis-li">{parseInlineBold(content)}</li>);
+      } else {
+        elements.push(<li key={i} className="analysis-li-num">{parseInlineBold(content)}</li>);
+      }
+      return;
     }
+
+    // Empty line
     if (line.trim() === '') {
-      return <br key={i} />;
+      elements.push(<br key={i} />);
+      return;
     }
-    return <p key={i} className="analysis-p">{line}</p>;
+
+    // Horizontal rule
+    if (line.trim() === '---') {
+      elements.push(<hr key={i} className="analysis-hr" />);
+      return;
+    }
+
+    // Regular paragraph with potential inline bold
+    if (line.includes('**')) {
+      elements.push(<p key={i} className="analysis-p">{parseInlineBold(line)}</p>);
+      return;
+    }
+
+    elements.push(<p key={i} className="analysis-p">{line}</p>);
   });
+
+  return elements;
 }
 
 // Get display label for current filter selection
@@ -575,10 +680,36 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
           color: var(--text-primary);
         }
 
+        .analysis-content :global(.analysis-h5) {
+          font-size: 1.05em;
+          font-weight: 600;
+          margin: 18px 0 10px;
+          color: var(--text-secondary);
+        }
+
         .analysis-content :global(.analysis-bold) {
           font-weight: 600;
           margin: 14px 0 8px;
           color: var(--text-primary);
+        }
+
+        .analysis-content :global(.analysis-label-only) {
+          font-weight: 600;
+          font-size: 0.95em;
+          color: var(--accent-blue);
+          margin: 16px 0 6px;
+          padding: 6px 0;
+          border-bottom: 1px solid var(--border-tertiary);
+        }
+
+        .analysis-content :global(.analysis-label-line) {
+          margin: 8px 0;
+          font-size: 0.95em;
+        }
+
+        .analysis-content :global(.analysis-label) {
+          font-weight: 600;
+          color: var(--text-secondary);
         }
 
         .analysis-content :global(.analysis-p) {
@@ -598,6 +729,19 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
 
         .analysis-content :global(.analysis-li-num) {
           list-style-type: decimal;
+        }
+
+        .analysis-content :global(.analysis-li-indent) {
+          margin-left: 48px;
+          margin-bottom: 8px;
+          padding-left: 8px;
+          list-style-type: circle;
+        }
+
+        .analysis-content :global(.analysis-hr) {
+          border: none;
+          border-top: 1px solid var(--border-primary);
+          margin: 24px 0;
         }
 
         /* Responsive */
