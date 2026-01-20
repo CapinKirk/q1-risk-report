@@ -732,210 +732,369 @@ export default function InboundAIAnalysis({ reportData, selectedProducts, select
   };
 
   return (
-    <section className="ai-section" data-testid="inbound-ai-analysis">
+    <section className="ai-analysis-section" data-testid="inbound-ai-analysis">
+      {/* Header */}
       <div className="ai-header">
         <div className="ai-title">
-          <span className="ai-icon">📈</span>
+          <span className="ai-icon">AI</span>
           <h2>Inbound Marketing Deep Dive</h2>
         </div>
         <div className="header-actions">
           <button onClick={generateAnalysis} disabled={state.loading || !reportData} className="btn btn-primary">
-            {state.loading ? 'Analyzing...' : 'Generate'}
+            {state.loading ? (
+              <>
+                <span className="spinner-small" />
+                Analyzing...
+              </>
+            ) : (
+              <>Generate Analysis</>
+            )}
           </button>
-          {state.analysis && <button onClick={clearAnalysis} className="btn btn-secondary">Clear</button>}
+          {state.analysis && <button onClick={clearAnalysis} className="btn btn-ghost">Clear</button>}
         </div>
       </div>
 
-      {state.analysis && (
-        <div className="tabs-bar">
-          <div className="tabs">
-            <button className={`tab ${viewMode === 'display' ? 'active' : ''}`} onClick={() => setViewMode('display')}>Display</button>
-            <button className={`tab ${viewMode === 'slack' ? 'active' : ''}`} onClick={() => setViewMode('slack')}>Slack</button>
-            <button className={`tab ${viewMode === 'html' ? 'active' : ''}`} onClick={() => setViewMode('html')}>HTML</button>
-          </div>
-          {state.generatedAt && <span className="timestamp">{new Date(state.generatedAt).toLocaleTimeString()}</span>}
-        </div>
-      )}
-
-      {!state.analysis && (
-        <div className="scope-bar">
-          <span className="scope-label">Scope:</span>
-          <span className="scope-value">{filterLabel}</span>
-        </div>
-      )}
-
-      <div className="content-area">
-        {state.error && <div className="error-msg">{state.error}</div>}
-
-        {!state.analysis && !state.loading && !state.error && (
-          <div className="placeholder">
-            <div className="placeholder-icon">📈</div>
-            <h3>Inbound Marketing Analysis</h3>
-            <p>Analyze funnel performance, conversion rates, and Google Ads metrics.</p>
-          </div>
-        )}
-
-        {state.loading && (
-          <div className="loading">
-            <div className="spinner" />
-            <p>Analyzing inbound marketing for {filterLabel}...</p>
-          </div>
-        )}
-
-        {state.analysis && viewMode === 'display' && parsedSections && (
-          <div className="analysis-content">{renderContent(parsedSections)}</div>
-        )}
-
-        {state.analysis && viewMode === 'slack' && (
-          <div className="export-view">
-            <div className="export-header">
-              <span>Slack format</span>
-              <button onClick={handleCopySlack} className="btn btn-small">{copySuccess || 'Copy'}</button>
+      {/* Content Panel */}
+      <div className="content-panel">
+        {/* Filter Context */}
+        <div className="filter-context">
+          <span className="filter-label">Analyzing:</span>
+          <span className="filter-value">{filterLabel}</span>
+          {state.generatedAt && (
+            <span className="timestamp">
+              Generated: {new Date(state.generatedAt).toLocaleString()}
+            </span>
+          )}
+          {state.analysis && (
+            <div className="view-tabs">
+              <button className={`tab ${viewMode === 'display' ? 'active' : ''}`} onClick={() => setViewMode('display')}>Display</button>
+              <button className={`tab ${viewMode === 'slack' ? 'active' : ''}`} onClick={() => setViewMode('slack')}>Slack</button>
+              <button className={`tab ${viewMode === 'html' ? 'active' : ''}`} onClick={() => setViewMode('html')}>HTML</button>
             </div>
-            <pre className="export-preview">{toSlackFormat(state.analysis)}</pre>
-          </div>
-        )}
+          )}
+        </div>
 
-        {state.analysis && viewMode === 'html' && (
-          <div className="export-cta">
-            <h3>Export as HTML</h3>
-            <p>Open formatted report in browser for sharing or printing.</p>
-            <button onClick={handleOpenHTML} className="btn btn-primary">Open in Browser</button>
-          </div>
-        )}
+        {/* Content */}
+        <div className="panel-content">
+          {state.error && (
+            <div className="error-message">
+              <span className="error-icon">!</span>
+              {state.error}
+            </div>
+          )}
+
+          {!state.analysis && !state.loading && !state.error && (
+            <div className="placeholder">
+              <div className="placeholder-icon">AI</div>
+              <p className="placeholder-text">
+                Click <strong>Generate Analysis</strong> to get AI-powered insights on funnel performance,
+                conversion rates, and Google Ads metrics.
+              </p>
+              <p className="placeholder-hint">
+                Use the filters above to narrow down to specific products or regions before generating.
+              </p>
+            </div>
+          )}
+
+          {state.loading && (
+            <div className="loading-state">
+              <div className="spinner" />
+              <p>Analyzing inbound marketing for {filterLabel}...</p>
+            </div>
+          )}
+
+          {state.analysis && viewMode === 'display' && parsedSections && (
+            <div className="analysis-content">{renderContent(parsedSections)}</div>
+          )}
+
+          {state.analysis && viewMode === 'slack' && (
+            <div className="export-view">
+              <div className="export-header">
+                <span>Slack format</span>
+                <button onClick={handleCopySlack} className="btn btn-copy">{copySuccess || 'Copy'}</button>
+              </div>
+              <pre className="export-preview">{toSlackFormat(state.analysis)}</pre>
+            </div>
+          )}
+
+          {state.analysis && viewMode === 'html' && (
+            <div className="export-cta">
+              <h3>Export as HTML</h3>
+              <p>Open formatted report in browser for sharing or printing.</p>
+              <button onClick={handleOpenHTML} className="btn btn-primary">Open in Browser</button>
+            </div>
+          )}
+        </div>
       </div>
 
       <style jsx>{`
-        .ai-section { margin: 32px 0; }
+        .ai-analysis-section {
+          margin-top: 32px;
+          margin-bottom: 32px;
+        }
 
         .ai-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-bottom: 12px;
+          margin-bottom: 20px;
           flex-wrap: wrap;
+          gap: 16px;
+        }
+
+        .ai-title {
+          display: flex;
+          align-items: center;
           gap: 12px;
         }
-        .ai-title { display: flex; align-items: center; gap: 10px; }
-        .ai-icon { font-size: 24px; }
+
+        .ai-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 36px;
+          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+          color: white;
+          font-weight: 700;
+          font-size: 0.85em;
+          border-radius: 8px;
+          letter-spacing: -0.5px;
+        }
+
         .ai-header h2 {
           margin: 0;
-          font-size: 1.125rem;
+          font-size: 1.35em;
           font-weight: 600;
           color: var(--text-primary);
         }
 
-        .header-actions { display: flex; gap: 8px; }
+        .header-actions {
+          display: flex;
+          gap: 10px;
+        }
 
         .btn {
-          padding: 8px 16px;
+          padding: 10px 18px;
           border: none;
-          border-radius: 6px;
-          font-size: 0.875rem;
+          border-radius: 8px;
+          font-size: 0.9em;
           font-weight: 500;
           cursor: pointer;
-          transition: all 0.15s;
-        }
-        .btn-primary { background: #10b981; color: white; }
-        .btn-primary:hover:not(:disabled) { background: #059669; }
-        .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
-        .btn-secondary { background: var(--bg-tertiary); color: var(--text-secondary); }
-        .btn-secondary:hover { background: var(--bg-hover); }
-        .btn-small { padding: 4px 12px; font-size: 0.8rem; background: #10b981; color: white; }
-        .btn-small:hover { background: #059669; }
-
-        .tabs-bar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 8px 12px;
-          background: var(--bg-tertiary);
-          border: 1px solid var(--border-primary);
-          border-radius: 8px 8px 0 0;
-          border-bottom: none;
-        }
-        .tabs { display: flex; gap: 4px; }
-        .tab {
-          padding: 6px 14px;
-          border: none;
-          border-radius: 4px;
-          background: transparent;
-          color: var(--text-secondary);
-          font-size: 0.8rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .tab:hover { background: var(--bg-hover); }
-        .tab.active { background: var(--bg-primary); color: var(--text-primary); }
-        .timestamp { font-size: 0.75rem; color: var(--text-muted); }
-
-        .scope-bar {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 10px 16px;
-          background: var(--bg-tertiary);
-          border: 1px solid var(--border-primary);
-          border-radius: 8px 8px 0 0;
-          border-bottom: none;
+          transition: all 0.15s ease;
         }
-        .scope-label { font-size: 0.8rem; color: var(--text-tertiary); }
-        .scope-value {
-          font-size: 0.8rem;
-          font-weight: 600;
-          padding: 2px 10px;
-          background: #10b981;
+
+        .btn-primary {
+          background: #2563eb;
           color: white;
-          border-radius: 4px;
         }
 
-        .content-area {
-          background: var(--bg-secondary);
-          border: 1px solid var(--border-primary);
-          border-radius: 0 0 8px 8px;
-          min-height: 180px;
-          padding: 20px;
+        .btn-primary:hover:not(:disabled) {
+          background: #1d4ed8;
         }
 
-        .error-msg {
-          padding: 12px 16px;
-          background: #fef2f2;
-          border: 1px solid #fecaca;
+        .btn-primary:disabled {
+          background: #9ca3af;
+          cursor: not-allowed;
+        }
+
+        .btn-ghost {
+          background: transparent;
+          color: var(--text-tertiary);
+        }
+
+        .btn-ghost:hover {
+          background: var(--bg-hover);
+          color: var(--text-primary);
+        }
+
+        .btn-copy {
+          padding: 6px 14px;
+          font-size: 0.85em;
+          background: #2563eb;
+          color: white;
           border-radius: 6px;
-          color: #dc2626;
-          font-size: 0.875rem;
         }
 
+        .btn-copy:hover {
+          background: #1d4ed8;
+        }
+
+        /* Content Panel */
+        .content-panel {
+          background: var(--bg-secondary);
+          border: 2px solid var(--border-primary);
+          border-radius: 12px;
+          min-height: 200px;
+        }
+
+        .filter-context {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 16px 24px;
+          border-bottom: 1px solid var(--border-tertiary);
+          background: var(--bg-tertiary);
+          border-radius: 10px 10px 0 0;
+          flex-wrap: wrap;
+        }
+
+        .filter-label {
+          font-size: 0.9em;
+          color: var(--text-tertiary);
+        }
+
+        .filter-value {
+          font-size: 0.95em;
+          font-weight: 600;
+          color: var(--text-primary);
+          padding: 4px 12px;
+          background: var(--accent-blue);
+          color: white;
+          border-radius: 6px;
+        }
+
+        .timestamp {
+          font-size: 0.85em;
+          color: var(--text-muted);
+          margin-left: auto;
+        }
+
+        .view-tabs {
+          display: flex;
+          gap: 4px;
+          margin-left: auto;
+        }
+
+        .tab {
+          padding: 6px 14px;
+          border: none;
+          border-radius: 6px;
+          background: transparent;
+          color: var(--text-secondary);
+          font-size: 0.85em;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .tab:hover {
+          background: var(--bg-hover);
+        }
+
+        .tab.active {
+          background: var(--bg-primary);
+          color: var(--text-primary);
+        }
+
+        .panel-content {
+          padding: 28px 32px;
+        }
+
+        /* Error State */
+        .error-message {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 16px 20px;
+          background: var(--danger-bg);
+          border: 1px solid var(--danger-border);
+          border-radius: 8px;
+          color: var(--danger-text);
+          font-size: 0.95em;
+        }
+
+        .error-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 24px;
+          height: 24px;
+          background: #dc2626;
+          color: white;
+          border-radius: 50%;
+          font-weight: 700;
+          font-size: 0.85em;
+        }
+
+        /* Placeholder State */
         .placeholder {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 40px 20px;
+          padding: 48px 24px;
           text-align: center;
         }
-        .placeholder-icon { font-size: 40px; margin-bottom: 12px; }
-        .placeholder h3 { margin: 0 0 6px; font-size: 1rem; color: var(--text-primary); }
-        .placeholder p { margin: 0; font-size: 0.875rem; color: var(--text-secondary); max-width: 320px; }
 
-        .loading {
+        .placeholder-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 64px;
+          height: 64px;
+          background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+          color: #6366f1;
+          font-weight: 700;
+          font-size: 1.2em;
+          border-radius: 16px;
+          margin-bottom: 20px;
+        }
+
+        .placeholder-text {
+          font-size: 1em;
+          color: var(--text-primary);
+          max-width: 450px;
+          line-height: 1.6;
+          margin-bottom: 8px;
+        }
+
+        .placeholder-hint {
+          font-size: 0.9em;
+          color: var(--text-muted);
+        }
+
+        /* Loading State */
+        .loading-state {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 50px 20px;
+          padding: 48px 24px;
+          color: var(--text-tertiary);
         }
-        .loading p { margin: 14px 0 0; font-size: 0.9rem; color: var(--text-secondary); }
+
+        .loading-state p {
+          font-size: 1em;
+          margin-top: 16px;
+        }
+
         .spinner {
-          width: 36px;
-          height: 36px;
-          border: 3px solid var(--border-primary);
-          border-top-color: #10b981;
+          width: 40px;
+          height: 40px;
+          border: 4px solid var(--border-primary);
+          border-top-color: var(--accent-blue);
           border-radius: 50%;
           animation: spin 1s linear infinite;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .spinner-small {
+          width: 16px;
+          height: 16px;
+          border: 2px solid rgba(255,255,255,0.3);
+          border-top-color: white;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          display: inline-block;
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
 
         /* Analysis Content */
         .analysis-content {
@@ -1065,7 +1224,7 @@ export default function InboundAIAnalysis({ reportData, selectedProducts, select
           line-height: 1.6;
         }
         .analysis-content :global(.numbered-list li::marker) {
-          color: #10b981;
+          color: var(--accent-blue);
           font-weight: 600;
         }
 
@@ -1187,12 +1346,40 @@ export default function InboundAIAnalysis({ reportData, selectedProducts, select
         .export-cta h3 { margin: 0 0 6px; font-size: 1rem; color: var(--text-primary); }
         .export-cta p { margin: 0 0 16px; font-size: 0.875rem; color: var(--text-secondary); }
 
-        @media (max-width: 640px) {
-          .ai-header { flex-direction: column; align-items: stretch; }
-          .header-actions { justify-content: stretch; }
-          .btn { flex: 1; justify-content: center; }
-          .tabs-bar { flex-direction: column; gap: 8px; }
-          .tabs { width: 100%; justify-content: center; }
+        /* Responsive */
+        @media (max-width: 768px) {
+          .ai-header {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .header-actions {
+            width: 100%;
+          }
+
+          .btn {
+            flex: 1;
+            justify-content: center;
+          }
+
+          .filter-context {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+          }
+
+          .timestamp {
+            margin-left: 0;
+          }
+
+          .view-tabs {
+            margin-left: 0;
+            width: 100%;
+          }
+
+          .panel-content {
+            padding: 20px 16px;
+          }
         }
       `}</style>
     </section>
