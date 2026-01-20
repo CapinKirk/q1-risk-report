@@ -217,6 +217,7 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
           >
             <option value="ALL">All Categories</option>
             <option value="NEW LOGO">New Logo</option>
+            <option value="STRATEGIC">Strategic</option>
             <option value="EXPANSION">Expansion</option>
             <option value="MIGRATION">Migration</option>
           </select>

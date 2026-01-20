@@ -1,7 +1,7 @@
 // Region and Product types
 export type Region = 'AMER' | 'EMEA' | 'APAC';
 export type Product = 'POR' | 'R360';
-export type Category = 'NEW LOGO' | 'EXPANSION' | 'MIGRATION' | 'RENEWAL';
+export type Category = 'NEW LOGO' | 'STRATEGIC' | 'EXPANSION' | 'MIGRATION' | 'RENEWAL';
 export type Source = 'INBOUND' | 'OUTBOUND' | 'AE SOURCED' | 'AM SOURCED' | 'TRADESHOW' | 'PARTNERSHIPS';
 export type RAGStatus = 'GREEN' | 'YELLOW' | 'RED';
 
@@ -519,7 +519,7 @@ export interface MQLDetailRow {
   days_in_stage?: number;
   // NEW: Lead type and category for filtering
   lead_type: LeadType;  // MQL for new business, EQL for existing
-  category: 'NEW LOGO' | 'EXPANSION' | 'MIGRATION';
+  category: 'NEW LOGO' | 'STRATEGIC' | 'EXPANSION' | 'MIGRATION';
 }
 
 // SQL Detail row for drill-down
@@ -545,7 +545,7 @@ export interface SQLDetailRow {
   opportunity_acv?: number;
   loss_reason?: string;
   days_in_stage?: number;
-  category: 'NEW LOGO' | 'EXPANSION' | 'MIGRATION';
+  category: 'NEW LOGO' | 'STRATEGIC' | 'EXPANSION' | 'MIGRATION';
 }
 
 // SAL Detail row for drill-down
@@ -570,7 +570,7 @@ export interface SALDetailRow {
   opportunity_acv?: number;
   loss_reason?: string;
   days_in_stage?: number;
-  category: 'NEW LOGO' | 'EXPANSION' | 'MIGRATION';
+  category: 'NEW LOGO' | 'STRATEGIC' | 'EXPANSION' | 'MIGRATION';
 }
 
 // SQO Detail row for drill-down
@@ -595,7 +595,7 @@ export interface SQODetailRow {
   opportunity_acv: number;
   loss_reason?: string;
   days_in_stage?: number;
-  category: 'NEW LOGO' | 'EXPANSION' | 'MIGRATION';
+  category: 'NEW LOGO' | 'STRATEGIC' | 'EXPANSION' | 'MIGRATION';
 }
 
 // Deal Detail for drill-down

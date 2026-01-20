@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { SALDetailRow, Product, Region } from '@/lib/types';
+import { SQODetailRow, Product, Region } from '@/lib/types';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
 import { formatCurrency } from '@/lib/formatters';
@@ -9,16 +9,16 @@ import RegionBadge from './RegionBadge';
 
 const ITEMS_PER_PAGE = 25;
 
-interface SALDetailsProps {
-  salDetails: {
-    POR: SALDetailRow[];
-    R360: SALDetailRow[];
+interface SQODetailsProps {
+  sqoDetails: {
+    POR: SQODetailRow[];
+    R360: SQODetailRow[];
   };
 }
 
 type Category = 'NEW LOGO' | 'STRATEGIC' | 'EXPANSION' | 'MIGRATION';
 
-export default function SALDetails({ salDetails }: SALDetailsProps) {
+export default function SQODetails({ sqoDetails }: SQODetailsProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | 'ALL'>('ALL');
   const [selectedRegion, setSelectedRegion] = useState<Region | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
@@ -26,61 +26,65 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Combine and filter SAL data
-  const filteredSALs = useMemo(() => {
-    let allSALs: SALDetailRow[] = [];
+  // Combine and filter SQO data
+  const filteredSQOs = useMemo(() => {
+    let allSQOs: SQODetailRow[] = [];
 
     if (selectedProduct === 'ALL' || selectedProduct === 'POR') {
-      allSALs = [...allSALs, ...salDetails.POR];
+      allSQOs = [...allSQOs, ...sqoDetails.POR];
     }
     if (selectedProduct === 'ALL' || selectedProduct === 'R360') {
-      allSALs = [...allSALs, ...salDetails.R360];
+      allSQOs = [...allSQOs, ...sqoDetails.R360];
     }
 
     // Apply region filter
     if (selectedRegion !== 'ALL') {
-      allSALs = allSALs.filter(s => s.region === selectedRegion);
+      allSQOs = allSQOs.filter(s => s.region === selectedRegion);
     }
 
     // Apply status filter
     if (selectedStatus !== 'ALL') {
-      allSALs = allSALs.filter(s => s.sal_status === selectedStatus);
+      allSQOs = allSQOs.filter(s => s.sqo_status === selectedStatus);
     }
 
     // Apply category filter (multi-select)
     if (selectedCategories.length > 0) {
-      allSALs = allSALs.filter(s => selectedCategories.includes(s.category as Category));
+      allSQOs = allSQOs.filter(s => selectedCategories.includes(s.category as Category));
     }
 
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      allSALs = allSALs.filter(s =>
+      allSQOs = allSQOs.filter(s =>
         s.company_name.toLowerCase().includes(term) ||
         s.email.toLowerCase().includes(term) ||
         (s.source && s.source.toLowerCase().includes(term)) ||
-        (s.opportunity_name && s.opportunity_name.toLowerCase().includes(term))
+        (s.opportunity_name && s.opportunity_name.toLowerCase().includes(term)) ||
+        (s.opportunity_stage && s.opportunity_stage.toLowerCase().includes(term))
       );
     }
 
-    return allSALs;
-  }, [salDetails, selectedProduct, selectedRegion, selectedStatus, selectedCategories, searchTerm]);
+    return allSQOs;
+  }, [sqoDetails, selectedProduct, selectedRegion, selectedStatus, selectedCategories, searchTerm]);
 
   // Setup sorting
   const { sortedData, handleSort, getSortDirection } = useSortableTable(
-    filteredSALs,
-    filteredSALs,
-    (item: SALDetailRow, column: string) => {
+    filteredSQOs,
+    filteredSQOs,
+    (item: SQODetailRow, column: string) => {
       switch (column) {
         case 'product': return item.product;
         case 'region': return item.region;
         case 'company': return item.company_name;
         case 'source': return item.source || '';
-        case 'sal_date': return item.sal_date || '';
-        case 'days_sql_sal': return item.days_sql_to_sal ?? 0;
-        case 'status': return item.sal_status;
-        case 'opportunity': return item.opportunity_name || '';
+        case 'sqo_date': return item.sqo_date || '';
+        case 'days_sal_sqo': return item.days_sal_to_sqo ?? 0;
+        case 'days_total': return item.days_total_cycle ?? 0;
+        case 'status': return item.sqo_status;
+        case 'stage': return item.opportunity_stage || '';
+        case 'acv': return item.opportunity_acv ?? 0;
         case 'category': return item.category;
+        case 'loss_reason': return item.loss_reason || '';
         default: return '';
       }
     }
@@ -88,21 +92,23 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
 
   // Calculate summary stats
   const stats = useMemo(() => {
-    const total = filteredSALs.length;
-    const active = filteredSALs.filter(s => s.sal_status === 'ACTIVE').length;
-    const convertedSqo = filteredSALs.filter(s => s.sal_status === 'CONVERTED_SQO' || s.converted_to_sqo === 'Yes').length;
-    const won = filteredSALs.filter(s => s.sal_status === 'WON').length;
-    const lost = filteredSALs.filter(s => s.sal_status === 'LOST').length;
-    const stalled = filteredSALs.filter(s => s.sal_status === 'STALLED').length;
-    const withOpportunity = filteredSALs.filter(s => s.has_opportunity === 'Yes').length;
-    const oppRate = total > 0 ? (withOpportunity / total) * 100 : 0;
-    const conversionRate = total > 0 ? (convertedSqo / total) * 100 : 0;
-    return { total, active, convertedSqo, won, lost, stalled, withOpportunity, oppRate, conversionRate };
-  }, [filteredSALs]);
+    const total = filteredSQOs.length;
+    const active = filteredSQOs.filter(s => s.sqo_status === 'ACTIVE').length;
+    const won = filteredSQOs.filter(s => s.sqo_status === 'WON').length;
+    const lost = filteredSQOs.filter(s => s.sqo_status === 'LOST').length;
+    const stalled = filteredSQOs.filter(s => s.sqo_status === 'STALLED').length;
+    const winRate = (won + lost) > 0 ? (won / (won + lost)) * 100 : 0;
+    const totalAcv = filteredSQOs.reduce((sum, s) => sum + (s.opportunity_acv || 0), 0);
+    const wonAcv = filteredSQOs.filter(s => s.sqo_status === 'WON').reduce((sum, s) => sum + (s.opportunity_acv || 0), 0);
+    const avgCycleTime = filteredSQOs.length > 0
+      ? Math.round(filteredSQOs.reduce((sum, s) => sum + (s.days_total_cycle || 0), 0) / filteredSQOs.length)
+      : 0;
+    return { total, active, won, lost, stalled, winRate, totalAcv, wonAcv, avgCycleTime };
+  }, [filteredSQOs]);
 
   // Pagination
   const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
-  const paginatedSALs = sortedData.slice(
+  const paginatedSQOs = sortedData.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
@@ -113,15 +119,14 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
     setCurrentPage(1);
   };
 
-  const hasPOR = salDetails.POR.length > 0;
-  const hasR360 = salDetails.R360.length > 0;
+  const hasPOR = sqoDetails.POR.length > 0;
+  const hasR360 = sqoDetails.R360.length > 0;
   const hasData = hasPOR || hasR360;
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'WON': return { bg: '#dcfce7', color: '#166534' };
-      case 'CONVERTED_SQO': return { bg: '#dbeafe', color: '#1e40af' };
-      case 'ACTIVE': return { bg: '#fef3c7', color: '#92400e' };
+      case 'ACTIVE': return { bg: '#dbeafe', color: '#1e40af' };
       case 'STALLED': return { bg: '#fed7aa', color: '#c2410c' };
       case 'LOST': return { bg: '#fee2e2', color: '#991b1b' };
       default: return { bg: '#f3f4f6', color: '#4b5563' };
@@ -129,19 +134,19 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
   };
 
   return (
-    <section className="sal-details-section">
-      <h2>SAL Details (Sales Accepted Lead)</h2>
+    <section className="sqo-details-section">
+      <h2>SQO Details (Sales Qualified Opportunity)</h2>
       <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-        Sales Accepted Leads - qualified leads accepted by sales for opportunity development (POR only)
+        Sales Qualified Opportunities - qualified opportunities in active sales pipeline
       </p>
 
       {!hasData && (
         <div style={{ padding: '40px', textAlign: 'center', backgroundColor: 'var(--bg-tertiary)', borderRadius: '8px', border: '1px solid var(--border-primary)' }}>
           <p style={{ color: 'var(--text-tertiary)', fontSize: '14px', margin: 0 }}>
-            No SAL data available for the selected date range.
+            No SQO data available for the selected date range.
           </p>
           <p style={{ color: 'var(--text-tertiary)', fontSize: '12px', marginTop: '8px' }}>
-            SAL details require live BigQuery connection. Click "Refresh" to load live data.
+            SQO details require live BigQuery connection. Click "Refresh" to load live data.
           </p>
         </div>
       )}
@@ -149,10 +154,10 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
       {hasData && (
         <>
           {/* Summary Stats */}
-          <div className="sal-stats">
+          <div className="sqo-stats">
             <div className="stat-card">
               <span className="stat-value">{stats.total}</span>
-              <span className="stat-label">Total SALs</span>
+              <span className="stat-label">Total SQOs</span>
             </div>
             <div className="stat-card">
               <span className="stat-value" style={{ color: '#16a34a' }}>{stats.won}</span>
@@ -163,19 +168,29 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
               <span className="stat-label">Lost</span>
             </div>
             <div className="stat-card">
-              <span className="stat-value" style={{ color: '#2563eb' }}>{stats.convertedSqo}</span>
-              <span className="stat-label">Converted SQO</span>
+              <span className="stat-value" style={{ color: '#2563eb' }}>{stats.active}</span>
+              <span className="stat-label">Active</span>
             </div>
             <div className="stat-card">
-              <span className="stat-value" style={{ color: stats.conversionRate >= 50 ? '#16a34a' : stats.conversionRate >= 25 ? '#ca8a04' : '#dc2626' }}>
-                {stats.conversionRate.toFixed(1)}%
+              <span className="stat-value" style={{ color: stats.winRate >= 50 ? '#16a34a' : stats.winRate >= 25 ? '#ca8a04' : '#dc2626' }}>
+                {stats.winRate.toFixed(1)}%
               </span>
-              <span className="stat-label">Conv. to SQO</span>
+              <span className="stat-label">Win Rate</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value" style={{ color: '#16a34a' }}>
+                {formatCurrency(stats.wonAcv)}
+              </span>
+              <span className="stat-label">Won ACV</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value">{stats.avgCycleTime}d</span>
+              <span className="stat-label">Avg Cycle</span>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="sal-filters">
+          <div className="sqo-filters">
             <div className="filter-group">
               <label>Product:</label>
               <select value={selectedProduct} onChange={(e) => handleFilterChange(setSelectedProduct, e.target.value as Product | 'ALL')}>
@@ -198,7 +213,6 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
               <select value={selectedStatus} onChange={(e) => handleFilterChange(setSelectedStatus, e.target.value)}>
                 <option value="ALL">All Statuses</option>
                 <option value="ACTIVE">Active</option>
-                <option value="CONVERTED_SQO">Converted to SQO</option>
                 <option value="WON">Won</option>
                 <option value="LOST">Lost</option>
                 <option value="STALLED">Stalled</option>
@@ -229,19 +243,19 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
               <label>Search:</label>
               <input
                 type="text"
-                placeholder="Company, email, opp name..."
+                placeholder="Company, opp name, stage..."
                 value={searchTerm}
                 onChange={(e) => handleFilterChange(setSearchTerm, e.target.value)}
               />
             </div>
             <div className="filter-group count">
-              <span className="result-count">{filteredSALs.length} records</span>
+              <span className="result-count">{filteredSQOs.length} records</span>
             </div>
           </div>
 
-          {/* SAL Table */}
-          <div className="sal-table-container">
-            <table className="sal-table">
+          {/* SQO Table */}
+          <div className="sqo-table-container">
+            <table className="sqo-table">
               <thead>
                 <tr>
                   <SortableHeader
@@ -275,16 +289,29 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="SAL Date"
-                    column="sal_date"
-                    sortDirection={getSortDirection('sal_date')}
+                    label="SQO Date"
+                    column="sqo_date"
+                    sortDirection={getSortDirection('sqo_date')}
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Days SQL-SAL"
-                    column="days_sql_sal"
-                    sortDirection={getSortDirection('days_sql_sal')}
+                    label="Total Cycle"
+                    column="days_total"
+                    sortDirection={getSortDirection('days_total')}
                     onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Stage"
+                    column="stage"
+                    sortDirection={getSortDirection('stage')}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="ACV"
+                    column="acv"
+                    sortDirection={getSortDirection('acv')}
+                    onSort={handleSort}
+                    className="right"
                   />
                   <SortableHeader
                     label="Status"
@@ -293,74 +320,73 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Opportunity"
-                    column="opportunity"
-                    sortDirection={getSortDirection('opportunity')}
+                    label="Lost Reason"
+                    column="loss_reason"
+                    sortDirection={getSortDirection('loss_reason')}
                     onSort={handleSort}
                   />
                   <th>Salesforce</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedSALs.length === 0 ? (
+                {paginatedSQOs.length === 0 ? (
                   <tr>
-                    <td colSpan={10} style={{ textAlign: 'center', padding: '20px', color: 'var(--text-tertiary)' }}>
-                      No SALs found matching the filters
+                    <td colSpan={12} style={{ textAlign: 'center', padding: '20px', color: 'var(--text-tertiary)' }}>
+                      No SQOs found matching the filters
                     </td>
                   </tr>
                 ) : (
-                  paginatedSALs.map((sal, idx) => {
-                    const statusStyle = getStatusColor(sal.sal_status);
-                    const hasOpp = sal.has_opportunity === 'Yes' || (sal.opportunity_id && sal.opportunity_id !== '');
+                  paginatedSQOs.map((sqo, idx) => {
+                    const statusStyle = getStatusColor(sqo.sqo_status);
                     return (
-                      <tr key={`${sal.record_id}-${idx}`}>
+                      <tr key={`${sqo.record_id}-${idx}`}>
                         <td>
-                          <span className={`product-badge ${sal.product.toLowerCase()}`}>
-                            {sal.product}
+                          <span className={`product-badge ${sqo.product.toLowerCase()}`}>
+                            {sqo.product}
                           </span>
                         </td>
-                        <td><RegionBadge region={sal.region} /></td>
+                        <td><RegionBadge region={sqo.region} /></td>
                         <td>
-                          <span className={`category-badge ${sal.category.toLowerCase().replace(' ', '-')}`}>
-                            {sal.category}
+                          <span className={`category-badge ${sqo.category.toLowerCase().replace(' ', '-')}`}>
+                            {sqo.category}
                           </span>
                         </td>
-                        <td className="company-cell" title={sal.company_name}>
-                          {sal.company_name.length > 25 ? sal.company_name.substring(0, 25) + '...' : sal.company_name}
+                        <td className="company-cell" title={sqo.company_name}>
+                          {sqo.company_name.length > 20 ? sqo.company_name.substring(0, 20) + '...' : sqo.company_name}
                         </td>
                         <td className="source-cell">
-                          {sal.source || 'N/A'}
+                          {sqo.source || 'N/A'}
                         </td>
                         <td className="date-cell">
-                          {sal.sal_date ? new Date(sal.sal_date).toISOString().split('T')[0] : 'N/A'}
+                          {sqo.sqo_date ? new Date(sqo.sqo_date).toISOString().split('T')[0] : 'N/A'}
                         </td>
                         <td className="days-cell">
-                          {sal.days_sql_to_sal ?? 'N/A'}
+                          {(sqo.days_total_cycle && sqo.days_total_cycle > 0) ? sqo.days_total_cycle : 0}d
+                        </td>
+                        <td className="stage-cell" title={sqo.opportunity_stage || ''}>
+                          {sqo.opportunity_stage ? (sqo.opportunity_stage.length > 15 ? sqo.opportunity_stage.substring(0, 15) + '...' : sqo.opportunity_stage) : '-'}
+                        </td>
+                        <td className="acv-cell right">
+                          {formatCurrency(sqo.opportunity_acv)}
                         </td>
                         <td>
                           <span
                             className="status-badge"
                             style={{ backgroundColor: statusStyle.bg, color: statusStyle.color }}
                           >
-                            {sal.sal_status}
+                            {sqo.sqo_status}
                           </span>
                         </td>
-                        <td className="opp-cell">
-                          {hasOpp ? (
-                            <span title={sal.opportunity_name || ''} style={{ color: '#16a34a' }}>
-                              {sal.opportunity_name ? (sal.opportunity_name.length > 18 ? sal.opportunity_name.substring(0, 18) + '...' : sal.opportunity_name) : 'Yes'}
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--text-tertiary)' }}>No Opp</span>
-                          )}
+                        <td className="loss-reason-cell" title={sqo.loss_reason || ''}>
+                          {sqo.sqo_status === 'LOST' ? (sqo.loss_reason && sqo.loss_reason !== 'N/A' ? (sqo.loss_reason.length > 15 ? sqo.loss_reason.substring(0, 15) + '...' : sqo.loss_reason) : '-') : '-'}
                         </td>
                         <td className="center">
                           <a
-                            href={sal.salesforce_url}
+                            href={sqo.salesforce_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="sf-link"
-                            title={hasOpp ? `Open Opportunity: ${sal.opportunity_name || 'View'}` : 'Open Lead in Salesforce'}
+                            title={`Open: ${sqo.opportunity_name || 'View'}`}
                           >
                             🔗
                           </a>
@@ -389,7 +415,7 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
                 ‹ Prev
               </button>
               <span className="page-info">
-                Page {currentPage} of {totalPages} ({filteredSALs.length} total)
+                Page {currentPage} of {totalPages} ({filteredSQOs.length} total)
               </span>
               <button
                 disabled={currentPage === totalPages}
@@ -413,8 +439,8 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
               <div className="loss-reasons-grid">
                 {(() => {
                   const lossReasons: Record<string, { count: number; acv: number }> = {};
-                  filteredSALs
-                    .filter(s => s.sal_status === 'LOST' && s.loss_reason && s.loss_reason !== 'N/A')
+                  filteredSQOs
+                    .filter(s => s.sqo_status === 'LOST' && s.loss_reason && s.loss_reason !== 'N/A')
                     .forEach(s => {
                       const reason = s.loss_reason || 'Unknown';
                       if (!lossReasons[reason]) {
@@ -441,10 +467,10 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
           )}
 
           <style jsx>{`
-            .sal-details-section {
+            .sqo-details-section {
               margin-top: 24px;
             }
-            .sal-stats {
+            .sqo-stats {
               display: flex;
               gap: 12px;
               margin-bottom: 16px;
@@ -470,7 +496,7 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
               color: var(--text-tertiary);
               margin-top: 2px;
             }
-            .sal-filters {
+            .sqo-filters {
               display: flex;
               gap: 12px;
               margin-bottom: 12px;
@@ -521,37 +547,41 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
             }
             .category-pill:hover {
               background: var(--bg-hover);
-              border-color: #10b981;
+              border-color: #f59e0b;
             }
             .category-pill.active {
-              background: #10b981;
+              background: #f59e0b;
               color: white;
-              border-color: #10b981;
+              border-color: #f59e0b;
             }
-            .sal-table-container {
+            .sqo-table-container {
               overflow-x: auto;
             }
-            .sal-table {
+            .sqo-table {
               width: 100%;
               border-collapse: collapse;
               font-size: 0.7rem;
             }
-            .sal-table th,
-            .sal-table td {
+            .sqo-table th,
+            .sqo-table td {
               padding: 6px 5px;
               border: 1px solid var(--border-primary);
               text-align: left;
             }
-            .sal-table th {
+            .sqo-table th {
               background-color: #1a1a2e;
               color: white;
               font-weight: 600;
               font-size: 0.65rem;
             }
-            .sal-table tbody tr:nth-child(even) {
+            .sqo-table th.right,
+            .sqo-table td.right {
+              text-align: right;
+            }
+            .sqo-table tbody tr:nth-child(even) {
               background-color: var(--bg-tertiary);
             }
-            .sal-table tbody tr:hover {
+            .sqo-table tbody tr:hover {
               background-color: var(--bg-hover);
             }
             .product-badge {
@@ -588,13 +618,13 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
               color: #c2410c;
             }
             .company-cell {
-              max-width: 150px;
+              max-width: 130px;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
             }
             .source-cell {
-              max-width: 80px;
+              max-width: 70px;
             }
             .date-cell {
               white-space: nowrap;
@@ -602,11 +632,23 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
             .days-cell {
               text-align: center;
             }
-            .opp-cell {
+            .stage-cell {
+              max-width: 100px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+            .acv-cell {
+              white-space: nowrap;
+              font-weight: 600;
+            }
+            .loss-reason-cell {
               max-width: 120px;
               overflow: hidden;
               text-overflow: ellipsis;
               white-space: nowrap;
+              font-size: 0.65rem;
+              color: var(--text-tertiary);
             }
             .status-badge {
               display: inline-block;

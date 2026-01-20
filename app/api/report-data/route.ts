@@ -96,13 +96,14 @@ async function getSourceMixAllocations(): Promise<Map<string, number>> {
         RecordType,
         Region,
         OpportunityType,
+        Segment,
         Source,
         ROUND(AVG(SourceMix), 4) as avg_source_mix
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.SourceBookingsAllocations\`
       WHERE month_num IN (1, 2, 3)  -- Q1 months
         AND SourceMix > 0
         AND OpportunityType IN ('New Business', 'Existing Business', 'Migration')
-      GROUP BY RecordType, Region, OpportunityType, Source
+      GROUP BY RecordType, Region, OpportunityType, Segment, Source
     `;
 
     const [rows] = await getBigQuery().query({ query });
@@ -115,8 +116,9 @@ async function getSourceMixAllocations(): Promise<Map<string, number>> {
         : source === 'AM_SOURCED' ? 'AM SOURCED'
         : source.replace('_', ' ');
 
-      // Map OpportunityType to Category
-      const category = row.OpportunityType === 'New Business' ? 'NEW LOGO'
+      // Map OpportunityType + Segment to Category
+      const category = row.OpportunityType === 'New Business' && row.Segment === 'Strategic' ? 'STRATEGIC'
+        : row.OpportunityType === 'New Business' ? 'NEW LOGO'
         : row.OpportunityType === 'Existing Business' ? 'EXPANSION'
         : row.OpportunityType === 'Migration' ? 'MIGRATION'
         : row.OpportunityType;
@@ -181,12 +183,13 @@ async function getRevOpsQTDData(filters: ReportFilters) {
     SELECT
       RecordType AS product,
       Region AS region,
-      -- Map OpportunityType to Category
-      CASE OpportunityType
-        WHEN 'New Business' THEN 'NEW LOGO'
-        WHEN 'Existing Business' THEN 'EXPANSION'
-        WHEN 'Migration' THEN 'MIGRATION'
-        WHEN 'Renewal' THEN 'RENEWAL'
+      -- Map OpportunityType + Segment to Category
+      CASE
+        WHEN OpportunityType = 'New Business' AND Segment = 'Strategic' THEN 'STRATEGIC'
+        WHEN OpportunityType = 'New Business' THEN 'NEW LOGO'
+        WHEN OpportunityType = 'Existing Business' THEN 'EXPANSION'
+        WHEN OpportunityType = 'Migration' THEN 'MIGRATION'
+        WHEN OpportunityType = 'Renewal' THEN 'RENEWAL'
         ELSE OpportunityType
       END AS category,
       OpportunityType AS opportunity_type,
@@ -241,11 +244,12 @@ async function getRevOpsQ1Targets(filters: ReportFilters) {
     SELECT
       RecordType AS product,
       Region AS region,
-      CASE OpportunityType
-        WHEN 'New Business' THEN 'NEW LOGO'
-        WHEN 'Existing Business' THEN 'EXPANSION'
-        WHEN 'Migration' THEN 'MIGRATION'
-        WHEN 'Renewal' THEN 'RENEWAL'
+      CASE
+        WHEN OpportunityType = 'New Business' AND Segment = 'Strategic' THEN 'STRATEGIC'
+        WHEN OpportunityType = 'New Business' THEN 'NEW LOGO'
+        WHEN OpportunityType = 'Existing Business' THEN 'EXPANSION'
+        WHEN OpportunityType = 'Migration' THEN 'MIGRATION'
+        WHEN OpportunityType = 'Renewal' THEN 'RENEWAL'
         ELSE OpportunityType
       END AS category,
       ROUND(COALESCE(Target_ACV, 0), 2) AS q1_target
@@ -279,11 +283,12 @@ async function getRevenueActuals(filters: ReportFilters) {
         WHEN 'UK' THEN 'EMEA'
         WHEN 'AU' THEN 'APAC'
       END AS region,
-      CASE Type
-        WHEN 'Existing Business' THEN 'EXPANSION'
-        WHEN 'New Business' THEN 'NEW LOGO'
-        WHEN 'Migration' THEN 'MIGRATION'
-        WHEN 'Renewal' THEN 'RENEWAL'
+      CASE
+        WHEN Type = 'New Business' AND StrategicAccount = true THEN 'STRATEGIC'
+        WHEN Type = 'Existing Business' THEN 'EXPANSION'
+        WHEN Type = 'New Business' THEN 'NEW LOGO'
+        WHEN Type = 'Migration' THEN 'MIGRATION'
+        WHEN Type = 'Renewal' THEN 'RENEWAL'
         ELSE 'OTHER'
       END AS category,
       COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
@@ -816,11 +821,12 @@ async function getWonDeals(filters: ReportFilters) {
         WHEN 'UK' THEN 'EMEA'
         WHEN 'AU' THEN 'APAC'
       END AS region,
-      CASE Type
-        WHEN 'Existing Business' THEN 'EXPANSION'
-        WHEN 'New Business' THEN 'NEW LOGO'
-        WHEN 'Migration' THEN 'MIGRATION'
-        WHEN 'Renewal' THEN 'RENEWAL'
+      CASE
+        WHEN Type = 'New Business' AND StrategicAccount = true THEN 'STRATEGIC'
+        WHEN Type = 'Existing Business' THEN 'EXPANSION'
+        WHEN Type = 'New Business' THEN 'NEW LOGO'
+        WHEN Type = 'Migration' THEN 'MIGRATION'
+        WHEN Type = 'Renewal' THEN 'RENEWAL'
         ELSE 'OTHER'
       END AS category,
       Type AS deal_type,
@@ -861,11 +867,12 @@ async function getLostDeals(filters: ReportFilters) {
         WHEN 'UK' THEN 'EMEA'
         WHEN 'AU' THEN 'APAC'
       END AS region,
-      CASE Type
-        WHEN 'Existing Business' THEN 'EXPANSION'
-        WHEN 'New Business' THEN 'NEW LOGO'
-        WHEN 'Migration' THEN 'MIGRATION'
-        WHEN 'Renewal' THEN 'RENEWAL'
+      CASE
+        WHEN Type = 'New Business' AND StrategicAccount = true THEN 'STRATEGIC'
+        WHEN Type = 'Existing Business' THEN 'EXPANSION'
+        WHEN Type = 'New Business' THEN 'NEW LOGO'
+        WHEN Type = 'Migration' THEN 'MIGRATION'
+        WHEN Type = 'Renewal' THEN 'RENEWAL'
         ELSE 'OTHER'
       END AS category,
       Type AS deal_type,
@@ -920,11 +927,12 @@ async function getPipelineDeals(filters: ReportFilters) {
         WHEN 'UK' THEN 'EMEA'
         WHEN 'AU' THEN 'APAC'
       END AS region,
-      CASE Type
-        WHEN 'Existing Business' THEN 'EXPANSION'
-        WHEN 'New Business' THEN 'NEW LOGO'
-        WHEN 'Migration' THEN 'MIGRATION'
-        WHEN 'Renewal' THEN 'RENEWAL'
+      CASE
+        WHEN Type = 'New Business' AND StrategicAccount = true THEN 'STRATEGIC'
+        WHEN Type = 'Existing Business' THEN 'EXPANSION'
+        WHEN Type = 'New Business' THEN 'NEW LOGO'
+        WHEN Type = 'Migration' THEN 'MIGRATION'
+        WHEN Type = 'Renewal' THEN 'RENEWAL'
         ELSE 'OTHER'
       END AS category,
       Type AS deal_type,
@@ -1022,11 +1030,12 @@ async function getPipelineAge(filters: ReportFilters) {
         WHEN 'UK' THEN 'EMEA'
         WHEN 'AU' THEN 'APAC'
       END AS region,
-      CASE Type
-        WHEN 'Existing Business' THEN 'EXPANSION'
-        WHEN 'New Business' THEN 'NEW LOGO'
-        WHEN 'Migration' THEN 'MIGRATION'
-        WHEN 'Renewal' THEN 'RENEWAL'
+      CASE
+        WHEN Type = 'New Business' AND StrategicAccount = true THEN 'STRATEGIC'
+        WHEN Type = 'Existing Business' THEN 'EXPANSION'
+        WHEN Type = 'New Business' THEN 'NEW LOGO'
+        WHEN Type = 'Migration' THEN 'MIGRATION'
+        WHEN Type = 'Renewal' THEN 'RENEWAL'
         ELSE 'OTHER'
       END AS category,
       ROUND(AVG(DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY)), 0) AS avg_age_days
@@ -2677,7 +2686,7 @@ export async function POST(request: Request) {
 
     for (const row of revOpsData) {
       // Only include categories with funnel data (exclude RENEWAL)
-      if (!['NEW LOGO', 'EXPANSION', 'MIGRATION'].includes(row.category)) continue;
+      if (!['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'].includes(row.category)) continue;
 
       const key = `${row.product}-${row.region}-${row.category}`;
       if (!funnelDataMap.has(key)) {
@@ -2744,8 +2753,8 @@ export async function POST(request: Request) {
         (sqoPacing || 0) * 0.40
       );
 
-      // Label: EQL for EXPANSION/MIGRATION, MQL for NEW LOGO
-      const leadStageLabel = category === 'NEW LOGO' ? 'MQL' : 'EQL';
+      // Label: EQL for EXPANSION/MIGRATION, MQL for NEW LOGO/STRATEGIC
+      const leadStageLabel = (category === 'NEW LOGO' || category === 'STRATEGIC') ? 'MQL' : 'EQL';
 
       funnelPacing.push({
         product,
@@ -2780,7 +2789,7 @@ export async function POST(request: Request) {
     // Sort by product, category, region
     funnelPacing.sort((a, b) => {
       if (a.product !== b.product) return a.product.localeCompare(b.product);
-      const catOrder = ['NEW LOGO', 'EXPANSION', 'MIGRATION'];
+      const catOrder = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
       if (a.category !== b.category) return catOrder.indexOf(a.category) - catOrder.indexOf(b.category);
       return a.region.localeCompare(b.region);
     });
@@ -2872,7 +2881,7 @@ export async function POST(request: Request) {
     // Compute source-level Q1 targets from category targets × source mix
     // Formula: For each source, sum(category_target × source_mix) across all categories
     const sourceTargetsMap = new Map<string, number>();
-    const allCategories = ['NEW LOGO', 'EXPANSION', 'MIGRATION'];
+    const allCategories = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
     const allProducts = ['POR', 'R360'];
     const allRegions = ['AMER', 'EMEA', 'APAC'];
     const allSources = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];

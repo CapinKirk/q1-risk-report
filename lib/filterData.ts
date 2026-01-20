@@ -23,7 +23,7 @@ import type {
 } from './types';
 
 const ALL_PRODUCTS: Product[] = ['POR', 'R360'];
-const ALL_CATEGORIES: Category[] = ['NEW LOGO', 'EXPANSION', 'MIGRATION', 'RENEWAL'];
+const ALL_CATEGORIES: Category[] = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION', 'RENEWAL'];
 const ALL_SOURCES: Source[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];
 
 /**
@@ -46,7 +46,7 @@ function filterByCategory<T extends { category: Category }>(
   items: T[],
   categories: Category[]
 ): T[] {
-  if (categories.length === 0 || categories.length === 4) {
+  if (categories.length === 0 || categories.length === 5) {
     return items; // All categories selected
   }
   return items.filter(item => categories.includes(item.category));

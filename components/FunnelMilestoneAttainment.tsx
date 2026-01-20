@@ -44,7 +44,7 @@ function calculateTOFScore(mql: number, sql: number, sal: number, sqo: number): 
 }
 
 function getLeadStageLabel(category: Category): 'MQL' | 'EQL' {
-  return category === 'NEW LOGO' ? 'MQL' : 'EQL';
+  return (category === 'NEW LOGO' || category === 'STRATEGIC') ? 'MQL' : 'EQL';
 }
 
 // ============================================================================
@@ -263,7 +263,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
   }, [funnelData, funnelBySource]);
 
   const availableRegions: Region[] = ['AMER', 'EMEA', 'APAC'];
-  const availableCategories: Category[] = ['NEW LOGO', 'EXPANSION', 'MIGRATION'];
+  const availableCategories: Category[] = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
 
   const availableSources: string[] = useMemo(() => {
     const sources = new Set<string>();
@@ -336,7 +336,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
   // Build category-based data (separate aggregation)
   const categoryData = useMemo(() => {
     const rows: UnifiedRowData[] = [];
-    const funnelCategories: Category[] = ['NEW LOGO', 'EXPANSION', 'MIGRATION'];
+    const funnelCategories: Category[] = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
 
     const processRows = (catRows: FunnelByCategoryRow[], product: Product) => {
       catRows.forEach(row => {
