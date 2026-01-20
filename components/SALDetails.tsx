@@ -414,9 +414,9 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
                 {(() => {
                   const lossReasons: Record<string, { count: number; acv: number }> = {};
                   filteredSALs
-                    .filter(s => s.sal_status === 'LOST' && s.loss_reason && s.loss_reason !== 'N/A')
+                    .filter(s => s.sal_status === 'LOST')
                     .forEach(s => {
-                      const reason = s.loss_reason || 'Unknown';
+                      const reason = (s.loss_reason && s.loss_reason !== 'N/A') ? s.loss_reason : 'No Reason Provided';
                       if (!lossReasons[reason]) {
                         lossReasons[reason] = { count: 0, acv: 0 };
                       }
