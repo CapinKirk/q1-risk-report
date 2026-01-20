@@ -284,7 +284,7 @@ async function getRevenueActuals(filters: ReportFilters) {
         WHEN 'AU' THEN 'APAC'
       END AS region,
       CASE
-        WHEN Type = 'New Business' AND StrategicAccount = true THEN 'STRATEGIC'
+        WHEN Type = 'New Business' AND ACV > 100000 THEN 'STRATEGIC'
         WHEN Type = 'Existing Business' THEN 'EXPANSION'
         WHEN Type = 'New Business' THEN 'NEW LOGO'
         WHEN Type = 'Migration' THEN 'MIGRATION'
@@ -822,7 +822,7 @@ async function getWonDeals(filters: ReportFilters) {
         WHEN 'AU' THEN 'APAC'
       END AS region,
       CASE
-        WHEN Type = 'New Business' AND StrategicAccount = true THEN 'STRATEGIC'
+        WHEN Type = 'New Business' AND ACV > 100000 THEN 'STRATEGIC'
         WHEN Type = 'Existing Business' THEN 'EXPANSION'
         WHEN Type = 'New Business' THEN 'NEW LOGO'
         WHEN Type = 'Migration' THEN 'MIGRATION'
@@ -868,7 +868,7 @@ async function getLostDeals(filters: ReportFilters) {
         WHEN 'AU' THEN 'APAC'
       END AS region,
       CASE
-        WHEN Type = 'New Business' AND StrategicAccount = true THEN 'STRATEGIC'
+        WHEN Type = 'New Business' AND ACV > 100000 THEN 'STRATEGIC'
         WHEN Type = 'Existing Business' THEN 'EXPANSION'
         WHEN Type = 'New Business' THEN 'NEW LOGO'
         WHEN Type = 'Migration' THEN 'MIGRATION'
@@ -928,7 +928,7 @@ async function getPipelineDeals(filters: ReportFilters) {
         WHEN 'AU' THEN 'APAC'
       END AS region,
       CASE
-        WHEN Type = 'New Business' AND StrategicAccount = true THEN 'STRATEGIC'
+        WHEN Type = 'New Business' AND ACV > 100000 THEN 'STRATEGIC'
         WHEN Type = 'Existing Business' THEN 'EXPANSION'
         WHEN Type = 'New Business' THEN 'NEW LOGO'
         WHEN Type = 'Migration' THEN 'MIGRATION'
@@ -1031,7 +1031,7 @@ async function getPipelineAge(filters: ReportFilters) {
         WHEN 'AU' THEN 'APAC'
       END AS region,
       CASE
-        WHEN Type = 'New Business' AND StrategicAccount = true THEN 'STRATEGIC'
+        WHEN Type = 'New Business' AND ACV > 100000 THEN 'STRATEGIC'
         WHEN Type = 'Existing Business' THEN 'EXPANSION'
         WHEN Type = 'New Business' THEN 'NEW LOGO'
         WHEN Type = 'Migration' THEN 'MIGRATION'
