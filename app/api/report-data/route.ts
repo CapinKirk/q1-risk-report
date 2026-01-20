@@ -946,7 +946,7 @@ async function getLostDeals(filters: ReportFilters) {
       OwnerId AS owner_id,
       CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
-    WHERE StageName = 'Closed Lost'
+    WHERE LOWER(StageName) LIKE '%lost%'
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
       AND Type NOT IN ('Credit Card', 'Consulting')
@@ -1139,7 +1139,7 @@ async function getLossReasonRCA(filters: ReportFilters) {
       COUNT(*) AS deal_count,
       ROUND(SUM(ACV), 2) AS lost_acv
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
-    WHERE StageName = 'Closed Lost'
+    WHERE LOWER(StageName) LIKE '%lost%'
       AND CloseDate >= '${filters.startDate}'
       AND CloseDate <= '${filters.endDate}'
       AND Type NOT IN ('Credit Card', 'Consulting')
