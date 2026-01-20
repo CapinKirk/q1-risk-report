@@ -352,7 +352,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
                       className="sf-link"
                       title="Open in Salesforce"
                     >
-                      View
+                      🔗
                     </a>
                   </td>
                 </tr>

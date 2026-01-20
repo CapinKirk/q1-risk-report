@@ -188,7 +188,7 @@ export default function SourceAttainment({ data }: SourceAttainmentProps) {
       {/* Funnel by Category */}
       <h3>Full Funnel Attainment by Category (EQL/MQL → SQO)</h3>
       <p style={{ fontSize: '10px', color: '#666', margin: '3px 0' }}>
-        EQL for EXPANSION/MIGRATION, MQL for NEW LOGO/STRATEGIC | TOF Score: Weighted attainment (EQL/MQL=10%, SQL=20%, SAL=30%, SQO=40%)
+        EQL for EXPANSION/MIGRATION, MQL for NEW LOGO/STRATEGIC | TOF Score: POR (10% MQL + 20% SQL + 30% SAL + 40% SQO) | R360 (14% MQL + 29% SQL + 57% SQO - no SAL)
       </p>
       <FunnelByCategoryTable product="POR" rows={funnel_by_category.POR} />
       <FunnelByCategoryTable product="R360" rows={funnel_by_category.R360} />

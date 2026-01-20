@@ -2,7 +2,7 @@
 
 import { useMemo, useCallback } from 'react';
 import { ReportData, AttainmentRow } from '@/lib/types';
-import { formatCurrency, formatPercent, formatCoverage } from '@/lib/formatters';
+import { formatCurrency, formatPercent, formatCoverage, getGapColor } from '@/lib/formatters';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
 
@@ -17,7 +17,9 @@ type DetailRow = {
   q1_target: number;
   qtd_target: number;
   qtd_actual: number;
+  qtd_var: number;
   attainment_pct: number;
+  pipeline_acv: number;
   pipeline_coverage: number;
   win_rate_pct: number;
 };
@@ -76,6 +78,10 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
       }, {} as Record<string, any>);
 
       Object.entries(porByRegion).forEach(([region, data]) => {
+        // Calculate remaining Q1 gap - use Q1 target, not QTD target
+        const remainingQ1Gap = Math.max(0, data.q1_target - data.qtd_actual);
+        // Coverage = pipeline / remaining gap. If no gap (target met), coverage = 0
+        const coverage = remainingQ1Gap > 0 ? data.pipeline_acv / remainingQ1Gap : 0;
         rows.push({
           product: 'POR',
           region,
@@ -83,8 +89,10 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
           q1_target: data.q1_target,
           qtd_target: data.qtd_target,
           qtd_actual: data.qtd_actual,
+          qtd_var: data.qtd_actual - data.qtd_target,
           attainment_pct: data.qtd_target > 0 ? (data.qtd_actual / data.qtd_target) * 100 : 0,
-          pipeline_coverage: data.qtd_target > 0 ? data.pipeline_acv / (data.qtd_target - data.qtd_actual) : 0,
+          pipeline_acv: data.pipeline_acv,
+          pipeline_coverage: coverage,
           win_rate_pct: data.count > 0 ? data.win_rate_total / data.count : 0,
         });
       });
@@ -116,6 +124,10 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
       }, {} as Record<string, any>);
 
       Object.entries(r360ByRegion).forEach(([region, data]) => {
+        // Calculate remaining Q1 gap - use Q1 target, not QTD target
+        const remainingQ1Gap = Math.max(0, data.q1_target - data.qtd_actual);
+        // Coverage = pipeline / remaining gap. If no gap (target met), coverage = 0
+        const coverage = remainingQ1Gap > 0 ? data.pipeline_acv / remainingQ1Gap : 0;
         rows.push({
           product: 'R360',
           region,
@@ -123,8 +135,10 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
           q1_target: data.q1_target,
           qtd_target: data.qtd_target,
           qtd_actual: data.qtd_actual,
+          qtd_var: data.qtd_actual - data.qtd_target,
           attainment_pct: data.qtd_target > 0 ? (data.qtd_actual / data.qtd_target) * 100 : 0,
-          pipeline_coverage: data.qtd_target > 0 ? data.pipeline_acv / (data.qtd_target - data.qtd_actual) : 0,
+          pipeline_acv: data.pipeline_acv,
+          pipeline_coverage: coverage,
           win_rate_pct: data.count > 0 ? data.win_rate_total / data.count : 0,
         });
       });
@@ -147,7 +161,9 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
       case 'q1_target': return row.q1_target;
       case 'qtd_target': return row.qtd_target;
       case 'qtd_actual': return row.qtd_actual;
+      case 'qtd_var': return row.qtd_var;
       case 'attainment_pct': return row.attainment_pct;
+      case 'pipeline_acv': return row.pipeline_acv;
       case 'pipeline_coverage': return row.pipeline_coverage;
       case 'win_rate_pct': return row.win_rate_pct;
       default: return null;
@@ -231,9 +247,31 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
           </tr>
           <tr>
             <td>Win Rate</td>
-            <td className="right">{formatPercent(grand_total.total_win_rate_pct)}</td>
-            {hasPOR && <td className="right">{formatPercent(por?.total_win_rate_pct)}</td>}
-            {hasR360 && <td className="right">{formatPercent(r360?.total_win_rate_pct)}</td>}
+            <td className="right">
+              {((grand_total as any).total_won_deals || 0) + ((grand_total as any).total_lost_deals || 0) === 0
+                ? <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8em' }}>N/A (no deals)</span>
+                : ((grand_total as any).total_lost_deals || 0) === 0
+                  ? <span style={{ color: '#16a34a' }}>100% <span style={{ fontSize: '0.75em', color: 'var(--text-tertiary)' }}>(no losses)</span></span>
+                  : formatPercent(grand_total.total_win_rate_pct)}
+            </td>
+            {hasPOR && (
+              <td className="right">
+                {((por as any)?.total_won_deals || 0) + ((por as any)?.total_lost_deals || 0) === 0
+                  ? <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8em' }}>N/A (no deals)</span>
+                  : ((por as any)?.total_lost_deals || 0) === 0
+                    ? <span style={{ color: '#16a34a' }}>100% <span style={{ fontSize: '0.75em', color: 'var(--text-tertiary)' }}>(no losses)</span></span>
+                    : formatPercent(por?.total_win_rate_pct)}
+              </td>
+            )}
+            {hasR360 && (
+              <td className="right">
+                {((r360 as any)?.total_won_deals || 0) + ((r360 as any)?.total_lost_deals || 0) === 0
+                  ? <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8em' }}>N/A (no deals)</span>
+                  : ((r360 as any)?.total_lost_deals || 0) === 0
+                    ? <span style={{ color: '#16a34a' }}>100% <span style={{ fontSize: '0.75em', color: 'var(--text-tertiary)' }}>(no losses)</span></span>
+                    : formatPercent(r360?.total_win_rate_pct)}
+              </td>
+            )}
           </tr>
           <tr>
             <td>Hits / Misses</td>
@@ -292,9 +330,23 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
                     className="right"
                   />
                   <SortableHeader
+                    label="QTD Var"
+                    column="qtd_var"
+                    sortDirection={getSortDirection('qtd_var')}
+                    onSort={handleSort}
+                    className="right"
+                  />
+                  <SortableHeader
                     label="Attainment %"
                     column="attainment_pct"
                     sortDirection={getSortDirection('attainment_pct')}
+                    onSort={handleSort}
+                    className="right"
+                  />
+                  <SortableHeader
+                    label="Pipeline ACV"
+                    column="pipeline_acv"
+                    sortDirection={getSortDirection('pipeline_acv')}
                     onSort={handleSort}
                     className="right"
                   />
@@ -328,9 +380,13 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
                       <td className="right">{formatCurrency(row.q1_target)}</td>
                       <td className="right">{formatCurrency(row.qtd_target)}</td>
                       <td className="right"><strong>{formatCurrency(row.qtd_actual)}</strong></td>
+                      <td className="right" style={{ color: getGapColor(row.qtd_var), fontWeight: 600 }}>
+                        {formatCurrency(row.qtd_var)}
+                      </td>
                       <td className={`right attainment-cell ${attClass}`}>
                         <strong>{formatPercent(row.attainment_pct)}</strong>
                       </td>
+                      <td className="right">{formatCurrency(row.pipeline_acv)}</td>
                       <td className={`right coverage-cell ${covClass}`}>
                         <strong>{formatCoverage(row.pipeline_coverage)}</strong>
                       </td>

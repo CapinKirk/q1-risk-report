@@ -3167,7 +3167,8 @@ export async function POST(request: Request) {
         qtd_target_sqo: qtdTargetSqo,
         sqo_pacing_pct: sqoPacing,
         sqo_gap: (parseInt(row.actual_sqo) || 0) - qtdTargetSqo,
-        weighted_tof_score: Math.round((mqlPacing * 0.1 + sqlPacing * 0.2 + salPacing * 0.3 + sqoPacing * 0.4)),
+        // R360 has no SAL stage - redistribute weights (10:20:40 → 14.3:28.6:57.1)
+        weighted_tof_score: Math.round((mqlPacing * 0.143 + sqlPacing * 0.286 + sqoPacing * 0.571)),
       });
     }
 

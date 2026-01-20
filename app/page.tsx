@@ -9,6 +9,7 @@ import UserMenu from '@/components/UserMenu';
 import ExecutiveKPICards from '@/components/ExecutiveKPICards';
 import ExecutiveSummary from '@/components/ExecutiveSummary';
 import BrightSpots from '@/components/BrightSpots';
+import TopRiskPockets from '@/components/TopRiskPockets';
 import MomentumTracker from '@/components/MomentumTracker';
 import AttainmentTable from '@/components/AttainmentTable';
 import SourceAttainment from '@/components/SourceAttainment';
@@ -17,12 +18,15 @@ import ActionItemsDashboard from '@/components/ActionItemsDashboard';
 import FunnelMilestoneAttainment from '@/components/FunnelMilestoneAttainment';
 import MQLDetails from '@/components/MQLDetails';
 import SQLDetails from '@/components/SQLDetails';
+import SALDetails from '@/components/SALDetails';
+import SQODetails from '@/components/SQODetails';
 import PipelineCoverage from '@/components/PipelineCoverage';
 import LostOpportunities from '@/components/LostOpportunities';
 import GoogleAdsPerf from '@/components/GoogleAdsPerf';
 import OpportunitiesTable from '@/components/OpportunitiesTable';
 import LoadingOverlay from '@/components/LoadingOverlay';
 import AIAnalysis from '@/components/AIAnalysis';
+import InboundAIAnalysis from '@/components/InboundAIAnalysis';
 import RenewalsSection from '@/components/RenewalsSection';
 import ThemeToggle from '@/components/ThemeToggle';
 
@@ -119,8 +123,13 @@ function transformAPIResponse(apiData: any): ReportData {
       const salPct = qtdTargetSal > 0 ? Math.round((actualSal / qtdTargetSal) * 100) : 100;
       const sqoPct = qtdTargetSqo > 0 ? Math.round((actualSqo / qtdTargetSqo) * 100) : 100;
 
-      // Calculate weighted TOF score: MQL=10%, SQL=20%, SAL=30%, SQO=40%
-      const weightedTofScore = (mqlPct * 0.10) + (sqlPct * 0.20) + (salPct * 0.30) + (sqoPct * 0.40);
+      // Calculate weighted TOF score:
+      // POR: MQL=10%, SQL=20%, SAL=30%, SQO=40%
+      // R360: MQL=14.3%, SQL=28.6%, SQO=57.1% (no SAL stage, weights redistributed)
+      const isR360 = row.product === 'R360';
+      const weightedTofScore = isR360
+        ? (mqlPct * 0.143) + (sqlPct * 0.286) + (sqoPct * 0.571)
+        : (mqlPct * 0.10) + (sqlPct * 0.20) + (salPct * 0.30) + (sqoPct * 0.40);
 
       const funnelRow = {
         category: (row.category || 'NEW LOGO') as Category,
@@ -303,6 +312,8 @@ function transformAPIResponse(apiData: any): ReportData {
     pipeline_deals: pipelineDealsByProduct,
     mql_details: apiData.mql_details || { POR: [], R360: [] },
     sql_details: apiData.sql_details || { POR: [], R360: [] },
+    sal_details: apiData.sal_details || { POR: [], R360: [] },
+    sqo_details: apiData.sqo_details || { POR: [], R360: [] },
     // Include executive counts so filterReportData can recalculate them
     executive_counts: executiveCounts,
     // Include momentum indicators (YELLOW status trending toward GREEN)
@@ -534,6 +545,11 @@ function ReportContent() {
         <BrightSpots wins={filteredData.wins_bright_spots} />
       )}
 
+      {/* Top Risk Pockets - Areas at highest risk */}
+      {filteredData.top_risk_pockets && filteredData.top_risk_pockets.length > 0 && (
+        <TopRiskPockets risks={filteredData.top_risk_pockets} />
+      )}
+
       {/* Momentum Tracker - WoW trend indicators */}
       {filteredData.momentum_indicators && (
         <MomentumTracker momentum={filteredData.momentum_indicators} period={period} />
@@ -566,6 +582,16 @@ function ReportContent() {
         <SQLDetails sqlDetails={filteredData.sql_details} />
       )}
 
+      {/* SAL Details (POR only - R360 doesn't have SAL stage) */}
+      {filteredData.sal_details && (
+        <SALDetails salDetails={filteredData.sal_details} />
+      )}
+
+      {/* SQO Details */}
+      {filteredData.sqo_details && (
+        <SQODetails sqoDetails={filteredData.sqo_details} />
+      )}
+
       <HitsMisses data={filteredData} />
 
       {/* Action Items Dashboard */}
@@ -583,6 +609,13 @@ function ReportContent() {
 
       {/* AI-Powered Analysis & Recommendations */}
       <AIAnalysis
+        reportData={filteredData}
+        selectedProducts={selectedProducts}
+        selectedRegions={selectedRegions}
+      />
+
+      {/* Marketing/Inbound Funnel AI Analysis */}
+      <InboundAIAnalysis
         reportData={filteredData}
         selectedProducts={selectedProducts}
         selectedRegions={selectedRegions}

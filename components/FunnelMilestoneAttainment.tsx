@@ -37,9 +37,15 @@ function getRagColor(rag: RAGStatus): string {
 
 /**
  * TOF Score: Weighted attainment across funnel stages
- * EQL/MQL=10%, SQL=20%, SAL=30%, SQO=40%
+ * POR: EQL/MQL=10%, SQL=20%, SAL=30%, SQO=40%
+ * R360: EQL/MQL=14.3%, SQL=28.6%, SQO=57.1% (no SAL stage, weights redistributed)
  */
-function calculateTOFScore(mql: number, sql: number, sal: number, sqo: number): number {
+function calculateTOFScore(mql: number, sql: number, sal: number, sqo: number, product: Product = 'POR'): number {
+  if (product === 'R360') {
+    // R360 has no SAL stage - redistribute weights (10:20:40 → 14.3:28.6:57.1)
+    return Math.round((mql * 0.143) + (sql * 0.286) + (sqo * 0.571));
+  }
+  // POR has all 4 stages
   return Math.round((mql * 0.10) + (sql * 0.20) + (sal * 0.30) + (sqo * 0.40));
 }
 
@@ -321,7 +327,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
             sqoActual: row.actual_sqo,
             sqoTarget: qtdTargetSqo,
             sqoPacingPct,
-            tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
+            tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, product),
           });
         });
       };
@@ -366,7 +372,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           sqoActual: row.actual_sqo || 0,
           sqoTarget: row.qtd_target_sqo || 0,
           sqoPacingPct,
-          tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
+          tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, product),
         });
       });
     };
@@ -429,6 +435,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 100;
       const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 100;
 
+      // Use R360 weights only if R360 is the only selected product
+      const effectiveProduct: Product = selectedProducts.length === 1 && selectedProducts[0] === 'R360' ? 'R360' : 'POR';
       result.push({
         label: category,
         type: 'category',
@@ -439,7 +447,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         sqlPacingPct,
         salPacingPct,
         sqoPacingPct,
-        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
+        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
       });
     });
 
@@ -501,6 +509,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 100;
       const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 100;
 
+      // Use R360 weights only if R360 is the only selected product
+      const effectiveProduct: Product = selectedProducts.length === 1 && selectedProducts[0] === 'R360' ? 'R360' : 'POR';
       result.push({
         label: source,
         type: 'source',
@@ -510,7 +520,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         sqlPacingPct,
         salPacingPct,
         sqoPacingPct,
-        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
+        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
       });
     });
 
@@ -566,6 +576,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 100;
       const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 100;
 
+      // Use R360 weights only if R360 is the only selected product
+      const effectiveProduct: Product = selectedProducts.length === 1 && selectedProducts[0] === 'R360' ? 'R360' : 'POR';
       result.push({
         label: region,
         type: 'region',
@@ -575,7 +587,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         sqlPacingPct,
         salPacingPct,
         sqoPacingPct,
-        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
+        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
       });
     });
 
@@ -603,15 +615,17 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     const salPacingPct = total.salTarget > 0 ? Math.round((total.salActual / total.salTarget) * 100) : 100;
     const sqoPacingPct = total.sqoTarget > 0 ? Math.round((total.sqoActual / total.sqoTarget) * 100) : 100;
 
+    // Use R360 weights only if R360 is the only selected product
+    const effectiveProduct: Product = selectedProducts.length === 1 && selectedProducts[0] === 'R360' ? 'R360' : 'POR';
     return {
       ...total,
       mqlPacingPct,
       sqlPacingPct,
       salPacingPct,
       sqoPacingPct,
-      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
+      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
     };
-  }, [aggregatedData]);
+  }, [aggregatedData, selectedProducts]);
 
   const sourceTotals = useMemo(() => {
     const total = sourceAggregatedData.reduce((acc, row) => ({
@@ -633,15 +647,17 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     const salPacingPct = total.salTarget > 0 ? Math.round((total.salActual / total.salTarget) * 100) : 100;
     const sqoPacingPct = total.sqoTarget > 0 ? Math.round((total.sqoActual / total.sqoTarget) * 100) : 100;
 
+    // Use R360 weights only if R360 is the only selected product
+    const effectiveProduct: Product = selectedProducts.length === 1 && selectedProducts[0] === 'R360' ? 'R360' : 'POR';
     return {
       ...total,
       mqlPacingPct,
       sqlPacingPct,
       salPacingPct,
       sqoPacingPct,
-      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
+      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
     };
-  }, [sourceAggregatedData]);
+  }, [sourceAggregatedData, selectedProducts]);
 
   const regionTotals = useMemo(() => {
     const total = regionAggregatedData.reduce((acc, row) => ({
@@ -663,15 +679,17 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     const salPacingPct = total.salTarget > 0 ? Math.round((total.salActual / total.salTarget) * 100) : 100;
     const sqoPacingPct = total.sqoTarget > 0 ? Math.round((total.sqoActual / total.sqoTarget) * 100) : 100;
 
+    // Use R360 weights only if R360 is the only selected product
+    const effectiveProduct: Product = selectedProducts.length === 1 && selectedProducts[0] === 'R360' ? 'R360' : 'POR';
     return {
       ...total,
       mqlPacingPct,
       sqlPacingPct,
       salPacingPct,
       sqoPacingPct,
-      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct),
+      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
     };
-  }, [regionAggregatedData]);
+  }, [regionAggregatedData, selectedProducts]);
 
   if (categoryData.length === 0 && unifiedData.length === 0) {
     return null;
@@ -834,7 +852,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         <span className="separator">|</span>
         <span className="lead-label eql">EQL</span> Existing Qualified Lead (EXPANSION, MIGRATION)
         <span className="separator">|</span>
-        <span className="tof-label">TOF Score</span> = 10% EQL/MQL + 20% SQL + 30% SAL + 40% SQO
+        <span className="tof-label">TOF Score</span> POR: 10% EQL/MQL + 20% SQL + 30% SAL + 40% SQO | R360: 14% MQL + 29% SQL + 57% SQO (no SAL)
       </p>
 
       {/* Multi-Select Filters */}

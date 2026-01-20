@@ -156,7 +156,7 @@ export default function DealListModal({
                       rel="noopener noreferrer"
                       className="sf-link"
                     >
-                      Open SF
+                      🔗
                     </a>
                   </td>
                 </tr>

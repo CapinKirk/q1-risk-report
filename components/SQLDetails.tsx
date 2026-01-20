@@ -169,12 +169,6 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
           <span className="stat-value" style={{ color: '#ca8a04' }}>{stats.stalled}</span>
           <span className="stat-label">Stalled</span>
         </div>
-        <div className="stat-card">
-          <span className="stat-value" style={{ color: stats.oppRate >= 50 ? '#16a34a' : stats.oppRate >= 25 ? '#ca8a04' : '#dc2626' }}>
-            {stats.oppRate.toFixed(1)}%
-          </span>
-          <span className="stat-label">Opp Rate</span>
-        </div>
       </div>
 
       {/* Filters */}

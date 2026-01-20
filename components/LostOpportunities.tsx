@@ -135,10 +135,13 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
     currentPage * ITEMS_PER_PAGE
   );
 
-  const getSeverityClass = (severity: string) => {
-    if (severity === 'CRITICAL') return 'red';
-    if (severity === 'HIGH') return 'yellow';
-    return '';
+  const getSeverityStyle = (severity: string): { bg: string; color: string } => {
+    switch (severity) {
+      case 'CRITICAL': return { bg: '#fee2e2', color: '#991b1b' };
+      case 'HIGH': return { bg: '#fef3c7', color: '#92400e' };
+      case 'MEDIUM': return { bg: '#e0e7ff', color: '#3730a3' };
+      default: return { bg: '#f3f4f6', color: '#4b5563' }; // LOW
+    }
   };
 
   return (
@@ -323,7 +326,19 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
                   <td title={row.loss_reason || 'Unknown'}>{reason}</td>
                   <td className="right">{Math.round(row.deal_count || 0)}</td>
                   <td className="right red">{formatCurrency(row.lost_acv)}</td>
-                  <td className={`${getSeverityClass(row.severity || 'LOW')} center`}>{row.severity || 'LOW'}</td>
+                  <td className="center">
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      backgroundColor: getSeverityStyle(row.severity || 'LOW').bg,
+                      color: getSeverityStyle(row.severity || 'LOW').color,
+                    }}>
+                      {row.severity || 'LOW'}
+                    </span>
+                  </td>
                 </tr>
               );
             })}

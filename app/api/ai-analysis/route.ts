@@ -77,13 +77,78 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
   // Get MQL disqualification summary
   const dqSummary = mql_disqualification_summary || { POR: {}, R360: {} };
 
-  // Build comprehensive context
-  const prompt = `You are a Revenue Operations analyst reviewing Q1 2026 Bookings performance data. Analyze the following data and provide:
+  // Group attainment data by region for regional breakdowns
+  const amerAttainment = allAttainment.filter((r: any) => r.region === 'AMER');
+  const emeaAttainment = allAttainment.filter((r: any) => r.region === 'EMEA');
+  const apacAttainment = allAttainment.filter((r: any) => r.region === 'APAC');
 
-1. **Executive Summary** (2-3 sentences on overall performance)
-2. **Critical Misses Analysis** - For each underperforming segment, explain WHY it's missing and the root cause
-3. **Recommended Actions** - Specific, actionable recommendations with owner suggestions
-4. **Risk Assessment** - Likelihood of hitting Q1 targets based on current trajectory
+  // Calculate regional totals
+  const calcRegionTotal = (rows: any[]) => {
+    const qtdAcv = rows.reduce((sum, r) => sum + (r.qtd_acv || 0), 0);
+    const qtdTarget = rows.reduce((sum, r) => sum + (r.qtd_target || 0), 0);
+    const gap = rows.reduce((sum, r) => sum + (r.qtd_gap || 0), 0);
+    const attainment = qtdTarget > 0 ? Math.round((qtdAcv / qtdTarget) * 100) : 0;
+    return { qtdAcv, qtdTarget, gap, attainment };
+  };
+
+  const amerTotal = calcRegionTotal(amerAttainment);
+  const emeaTotal = calcRegionTotal(emeaAttainment);
+  const apacTotal = calcRegionTotal(apacAttainment);
+
+  // Build comprehensive context
+  const prompt = `You are a Revenue Operations analyst reviewing Q1 2026 Bookings performance data.
+
+**CRITICAL INSTRUCTION**: Structure your analysis BY REGION (AMER, EMEA, APAC) so that regional directors can see their specific feedback.
+
+## OUTPUT FORMAT (FOLLOW THIS EXACTLY):
+
+### 1. EXECUTIVE SUMMARY
+2-3 sentences on overall global performance.
+
+### 2. REGIONAL ANALYSIS (REQUIRED - one section for each region)
+
+#### 🇺🇸 AMER REGION
+**Regional Director Accountability**
+- **Status**: [GREEN/YELLOW/RED] - [X]% attainment
+- **Gap to Target**: $[amount]
+- **Key Risks**:
+  - [Risk 1 with specific segment and $ impact]
+  - [Risk 2 with specific segment and $ impact]
+- **Root Cause Analysis**:
+  - [Why this region is missing/exceeding - be specific]
+- **Action Items for AMER**:
+  - [Specific action 1] - Owner: [Name/Role]
+  - [Specific action 2] - Owner: [Name/Role]
+
+#### 🇬🇧 EMEA REGION
+**Regional Director Accountability**
+- **Status**: [GREEN/YELLOW/RED] - [X]% attainment
+- **Gap to Target**: $[amount]
+- **Key Risks**:
+  - [Risk 1 with specific segment and $ impact]
+  - [Risk 2 with specific segment and $ impact]
+- **Root Cause Analysis**:
+  - [Why this region is missing/exceeding - be specific]
+- **Action Items for EMEA**:
+  - [Specific action 1] - Owner: [Name/Role]
+  - [Specific action 2] - Owner: [Name/Role]
+
+#### 🇦🇺 APAC REGION
+**Regional Director Accountability**
+- **Status**: [GREEN/YELLOW/RED] - [X]% attainment
+- **Gap to Target**: $[amount]
+- **Key Risks**:
+  - [Risk 1 with specific segment and $ impact]
+  - [Risk 2 with specific segment and $ impact]
+- **Root Cause Analysis**:
+  - [Why this region is missing/exceeding - be specific]
+- **Action Items for APAC**:
+  - [Specific action 1] - Owner: [Name/Role]
+  - [Specific action 2] - Owner: [Name/Role]
+
+### 3. GLOBAL RISK ASSESSMENT
+- Likelihood of hitting Q1 targets
+- Top 3 global priorities
 
 ## Filter Context
 ${filterDescription}
@@ -97,9 +162,25 @@ ${filterDescription}
 - Q1 Target: $${(grand_total?.total_q1_target || 0).toLocaleString()}
 - QTD Target: $${(grand_total?.total_qtd_target || 0).toLocaleString()}
 - QTD Actual: $${(grand_total?.total_qtd_acv || 0).toLocaleString()}
-- QTD Attainment: ${grand_total?.total_qtd_attainment_pct || 0}%
-- Pipeline: $${(grand_total?.total_pipeline_acv || 0).toLocaleString()}
-- Pipeline Coverage: ${grand_total?.total_pipeline_coverage_x || 0}x
+
+## REGIONAL SUMMARY (USE THESE NUMBERS)
+### AMER Region Total
+- QTD Actual: $${amerTotal.qtdAcv.toLocaleString()}
+- QTD Target: $${amerTotal.qtdTarget.toLocaleString()}
+- Attainment: ${amerTotal.attainment}%
+- Gap: $${amerTotal.gap.toLocaleString()}
+
+### EMEA Region Total
+- QTD Actual: $${emeaTotal.qtdAcv.toLocaleString()}
+- QTD Target: $${emeaTotal.qtdTarget.toLocaleString()}
+- Attainment: ${emeaTotal.attainment}%
+- Gap: $${emeaTotal.gap.toLocaleString()}
+
+### APAC Region Total
+- QTD Actual: $${apacTotal.qtdAcv.toLocaleString()}
+- QTD Target: $${apacTotal.qtdTarget.toLocaleString()}
+- Attainment: ${apacTotal.attainment}%
+- Gap: $${apacTotal.gap.toLocaleString()}
 
 ## POR Performance
 - Q1 Target: $${(porTotal.total_q1_target || 0).toLocaleString()}
@@ -115,10 +196,20 @@ ${filterDescription}
 - Pipeline Coverage: ${r360Total.total_pipeline_coverage_x || 0}x
 - Lost Deals: ${r360Total.total_lost_deals || 0} worth $${(r360Total.total_lost_acv || 0).toLocaleString()}
 
-## Segment-Level Attainment (All Segments)
-${allAttainment.map((row: any) =>
-  `- ${row.product} ${row.region} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
-).join('\n')}
+## AMER Segment Detail
+${amerAttainment.map((row: any) =>
+  `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
+).join('\n') || 'No AMER data'}
+
+## EMEA Segment Detail
+${emeaAttainment.map((row: any) =>
+  `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
+).join('\n') || 'No EMEA data'}
+
+## APAC Segment Detail
+${apacAttainment.map((row: any) =>
+  `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
+).join('\n') || 'No APAC data'}
 
 ## Critical Misses (Below 70% Attainment)
 ${criticalMisses.length > 0 ? criticalMisses.map((row: any) =>
