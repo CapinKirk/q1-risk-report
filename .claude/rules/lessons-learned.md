@@ -225,3 +225,88 @@ curl -X POST "URL/api/report-data" \
 | R360 | R360 Inbound | 14 |
 | POR | Migration | 13 |
 | POR | New Logo | 10 |
+
+## Renewal Targets: Use Q1_Plan_2026, Not Prior Year (2026-01-20)
+
+**Problem:** R360 AMER Renewal Q1 target was showing $0.
+
+**Root Cause:** Query used `Q1_Actual_2025` from `RAW_2026_Plan_by_Month` for renewal targets. R360 had no renewal revenue in 2025, so Q1_Actual_2025 = $0.
+
+**Solution:** Use `COALESCE(Q1_Plan_2026, Q1_Actual_2025, 0)` to prefer planned target when prior year is missing:
+
+```sql
+SELECT
+  Division,
+  Booking_Type,
+  ROUND(COALESCE(Q1_Plan_2026, Q1_Actual_2025, 0), 2) AS q1_target
+FROM `Staging.RAW_2026_Plan_by_Month`
+WHERE LOWER(Booking_Type) = 'renewal'
+```
+
+**Key insight:** New products (like R360 renewals) won't have prior year actuals. Always prefer current year plan as primary source.
+
+## Lost Summary Filters: Include N/A Loss Reasons (2026-01-20)
+
+**Problem:** SAL Lost summary showed 0 records despite having 3+ records with status='LOST'.
+
+**Root Cause:** Filter excluded records where `loss_reason === 'N/A'`:
+```typescript
+// BAD: Excludes valid lost records
+.filter(s => s.sal_status === 'LOST' && s.loss_reason && s.loss_reason !== 'N/A')
+```
+
+**Solution:** Include all lost records, display "No Reason Provided" for N/A:
+```typescript
+// GOOD: Includes all lost records
+.filter(s => s.sal_status === 'LOST')
+.forEach(s => {
+  const reason = (s.loss_reason && s.loss_reason !== 'N/A')
+    ? s.loss_reason
+    : 'No Reason Provided';
+  // ...
+});
+```
+
+**Key insight:** Status-based summaries should filter by status alone. Missing metadata (like loss_reason) shouldn't exclude records from the summary.
+
+## Verified Q1 2026 Targets (2026-01-20)
+
+**Source:** `Staging.RevOpsReport` with `RiskProfile='P75'`, `Horizon='QTD'`, `Period_Start_Date='2026-01-01'`
+
+| Product | Q1 Target |
+|---------|-----------|
+| POR | $3,121,250 |
+| R360 | $941,999 |
+| **Total** | **$4,063,249** |
+
+**By Category (R360):**
+| Category | Q1 Target |
+|----------|-----------|
+| EXPANSION | $210,850 |
+| NEW LOGO | $657,760 |
+| RENEWAL | $73,389 |
+
+**By Category (POR):**
+| Category | Q1 Target |
+|----------|-----------|
+| EXPANSION | $1,183,000 |
+| MIGRATION | $596,250 |
+| NEW LOGO | $880,060 |
+| RENEWAL | $461,940 |
+
+## RAW_2026_Plan_by_Month Division Format
+
+Division values include product suffix:
+- `AMER POR`, `EMEA POR`, `APAC POR`
+- `AMER R360`, `EMEA R360`, `APAC R360`
+- `Total` (grand total row)
+
+Parse with:
+```typescript
+const division = row.Division.toUpperCase();
+const region = division.includes('AMER') ? 'AMER'
+  : division.includes('EMEA') ? 'EMEA'
+  : division.includes('APAC') ? 'APAC' : null;
+const product = division.includes('R360') ? 'R360'
+  : division.includes('POR') ? 'POR' : null;
+```

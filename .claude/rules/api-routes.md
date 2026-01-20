@@ -45,8 +45,21 @@ curl ... | jq '.sqo_details.POR | length'
 
 | Function | Line ~Range | Purpose |
 |----------|-------------|---------|
+| `getRenewalTargetsFromRawPlan` | 43-86 | Renewal targets from RAW_2026_Plan_by_Month (uses Q1_Plan_2026) |
+| `getSourceMixAllocations` | 93-137 | Source mix % for target allocation |
 | `getWonDeals` | 786-828 | Won opportunities from OpportunityViewTable |
 | `getLostDeals` | 830-873 | Lost opportunities |
 | `getPipelineDeals` | 875-917 | Open pipeline |
 | `getSALDetails` | 1660-1785 | SAL stage funnel records |
 | `getSQODetails` | 1785-2117 | SQO stage funnel records |
+
+## Target Data Sources
+
+| Target Type | Primary Source | Fallback |
+|-------------|----------------|----------|
+| New Business | RevOpsReport (P75, QTD) | - |
+| Expansion | RevOpsReport (P75, QTD) | - |
+| Migration | RevOpsReport (P75, QTD) | - |
+| **Renewal** | RAW_2026_Plan_by_Month.Q1_Plan_2026 | Q1_Actual_2025 |
+
+**Note:** Renewal targets use `COALESCE(Q1_Plan_2026, Q1_Actual_2025, 0)` because new products like R360 have no prior year renewal history.

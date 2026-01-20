@@ -32,9 +32,36 @@ paths:
 - `SalesCycleLags2026` - Stage duration (P50/P75/P90)
 
 **Raw Data** (Layer 0):
-- `RAW_2026_Plan_by_Month` - CSV import
+- `RAW_2026_Plan_by_Month` - CSV import with Q1 targets
 - `MonthlyRevenueFunnel` - Monthly aggregated funnels
 - `DailyRevenueFunnel` - Daily funnels
+
+### RAW_2026_Plan_by_Month (Critical for Renewals)
+
+**Division format:** `AMER POR`, `EMEA POR`, `APAC POR`, `AMER R360`, `EMEA R360`, `APAC R360`, `Total`
+
+**Key columns:**
+| Column | Purpose |
+|--------|---------|
+| Q1_Plan_2026 | **Primary** Q1 target (use for new products like R360 renewals) |
+| Q1_Actual_2025 | Prior year Q1 actuals (may be $0 for new products) |
+| Booking_Type | `Renewal`, `New`, `Expansion`, `Migration` |
+
+**Renewal target pattern:**
+```sql
+SELECT Division, Booking_Type,
+  ROUND(COALESCE(Q1_Plan_2026, Q1_Actual_2025, 0), 2) AS q1_target
+FROM `Staging.RAW_2026_Plan_by_Month`
+WHERE LOWER(Booking_Type) = 'renewal'
+```
+
+### Source Target Tables
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `Source_2026_POR_Targets` | POR annual targets by funnel/source | Funnel_Type, Region, Annual_Booking_Target |
+| `Source_2026_R360_Targets` | R360 annual targets | Same structure |
+| `Source_2026_Bookings_Targets` | Combined with rates | Target_ADS, Rate_SQO_Won, Rate_SQL_SQO |
 
 ### Standard RevOpsReport Query Pattern
 ```sql
