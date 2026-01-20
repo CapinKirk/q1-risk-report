@@ -107,10 +107,10 @@ function ProductAttainmentTable({
                     {formatCurrency(row.qtd_acv)}
                     {hasDeals && ' 📋'}
                   </td>
-                  <td className="right" style={{ color: getAttainmentColor(row.qtd_attainment_pct), fontWeight: 600 }}>
+                  <td className="right attainment-color" style={{ '--att-color': getAttainmentColor(row.qtd_attainment_pct) } as React.CSSProperties}>
                     {formatPercent(row.qtd_attainment_pct)}
                   </td>
-                  <td className="right" style={{ color: getAttainmentColor(row.qtd_attainment_pct), fontWeight: 600 }}>{formatCurrency(gap)}</td>
+                  <td className="right variance-color" style={{ '--var-color': getAttainmentColor(row.qtd_attainment_pct) } as React.CSSProperties}>{formatCurrency(gap)}</td>
                   <td
                     className={`right ${hasDeals && lostAcv > 0 ? 'clickable' : ''}`}
                     onClick={() => hasDeals && lostAcv > 0 && onCellClick('lost', row)}
@@ -128,7 +128,7 @@ function ProductAttainmentTable({
                     {hasDeals && ' 📋'}
                   </td>
                   <td className="right">{formatCoverage(coverage)}</td>
-                  <td className="right" style={{ color: getAttainmentColor(winRate), fontWeight: 600 }}>
+                  <td className="right attainment-color" style={{ '--att-color': getAttainmentColor(winRate) } as React.CSSProperties}>
                     {formatPercent(winRate)}
                   </td>
                   <td className="center">
@@ -150,6 +150,14 @@ function ProductAttainmentTable({
         }
         .clickable:hover {
           background-color: #eff6ff;
+        }
+        .attainment-color {
+          color: var(--att-color) !important;
+          font-weight: 600;
+        }
+        .variance-color {
+          color: var(--var-color) !important;
+          font-weight: 600;
         }
       `}</style>
     </>

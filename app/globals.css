@@ -694,6 +694,19 @@ td {
   word-wrap: break-word;
 }
 
+/* Color-coded attainment and variance cells */
+td.att-color,
+td.attainment-color {
+  color: var(--att-color) !important;
+  font-weight: 600;
+}
+
+td.var-color,
+td.variance-color {
+  color: var(--var-color) !important;
+  font-weight: 600;
+}
+
 /* Enhanced alternating row colors - more visible */
 tr:nth-child(odd) {
   background: var(--bg-secondary);
