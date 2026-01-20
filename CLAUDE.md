@@ -237,6 +237,41 @@ npx playwright test tests/ui/    # Run frontend tests only
 npx playwright test tests/api/   # Run backend tests only
 ```
 
+### Multi-Agent Testing Framework
+
+**Testing must be verified via Playwright before completion.** Use the multi-agent orchestration pattern:
+
+```
+Phase 1: Implementation (parallel)
+├── backend-dev → API changes
+├── frontend-dev → UI changes
+└── Explore agent → Codebase research
+
+Phase 2: Local Verification
+├── npm run build → Build check
+└── Component comparison (if styling)
+
+Phase 3: Deployment
+└── vercel --prod → Deploy to production
+
+Phase 4: E2E Verification (parallel)
+├── playwright-frontend-tester → UI tests
+└── playwright-backend-tester → API tests
+```
+
+### Test Files
+
+| Test File | Purpose |
+|-----------|---------|
+| `tests/ui/ai-analysis-styling.spec.ts` | AI Analysis section styling consistency |
+| `tests/ui/filters.spec.ts` | Product/Region filter functionality |
+| `tests/ui/dark-mode.spec.ts` | Dark mode styling |
+| `tests/ui/table-sorting.spec.ts` | Table sorting functionality |
+| `tests/api/report-data.spec.ts` | Main API endpoint validation |
+| `tests/smoke.spec.ts` | Authentication and basic page loads |
+| `tests/analysis.spec.ts` | Trend Analysis page |
+| `tests/production.spec.ts` | Production deployment verification |
+
 ### Playwright Testing Agents
 
 | Agent | Focus Area | Test Location |
@@ -252,6 +287,7 @@ npx playwright test tests/api/   # Run backend tests only
 - Responsive design verification
 - Accessibility compliance (WCAG)
 - Visual regression testing
+- **Component styling consistency** (e.g., AI Analysis sections)
 
 ### Backend Testing Agent Responsibilities
 
@@ -268,6 +304,41 @@ For comprehensive testing:
 1. `playwright-backend-tester` - Verify all APIs return correct data
 2. `playwright-frontend-tester` - Test UI interactions and rendering
 3. `test-runner` - Run build to ensure no regressions
+
+### Styling Consistency Testing
+
+When making UI styling changes (especially across multiple similar components):
+
+1. **Use Explore agent** to compare CSS styles between components
+2. **Create Playwright test** to verify computed styles match
+3. **Deploy and wait** for Vercel propagation (~90 seconds)
+4. **Run Playwright tests** against production
+5. **Verify all tests pass** before marking complete
+
+Example test pattern for styling consistency:
+```typescript
+test('AI icons have matching gradient styling', async ({ page }) => {
+  const icon1 = page.locator('[data-testid="section1"] .ai-icon');
+  const icon2 = page.locator('[data-testid="section2"] .ai-icon');
+
+  const style1 = await icon1.evaluate((el) => {
+    const computed = window.getComputedStyle(el);
+    return {
+      background: computed.backgroundImage,
+      width: computed.width,
+      height: computed.height,
+    };
+  });
+
+  const style2 = await icon2.evaluate((el) => {
+    const computed = window.getComputedStyle(el);
+    return { /* same properties */ };
+  });
+
+  expect(style1.background).toBe(style2.background);
+  expect(style1.width).toBe(style2.width);
+});
+```
 
 ## Debugging
 
