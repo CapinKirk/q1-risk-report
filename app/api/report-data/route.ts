@@ -603,12 +603,43 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
       ORDER BY region, category
     `;
 
-    const [[newLogoRows], [expMigRows]] = await Promise.all([
+    // STRATEGIC from OpportunityViewTable - New Business with ACV > $100K
+    // Tracks large new business deals separately from standard NEW LOGO
+    const strategicQuery = `
+      SELECT
+        'POR' AS product,
+        CASE Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        'STRATEGIC' AS category,
+        COUNT(*) AS actual_mql,
+        -- SQL: opportunities that progressed past initial stage
+        COUNT(CASE WHEN StageName NOT IN ('Discovery', 'Qualification') OR Won THEN 1 END) AS actual_sql,
+        -- SAL: opportunities accepted by sales
+        COUNT(CASE WHEN StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') OR Won THEN 1 END) AS actual_sal,
+        -- SQO: opportunities that are Won or in final stages
+        COUNT(CASE WHEN Won OR StageName IN ('Proposal', 'Negotiation', 'Closed Won') THEN 1 END) AS actual_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+      WHERE por_record__c = true
+        AND Division IN ('US', 'UK', 'AU')
+        AND Type = 'New Business'
+        AND ACV > 100000
+        AND CAST(CreatedDate AS DATE) >= '${filters.startDate}'
+        AND CAST(CreatedDate AS DATE) <= '${filters.endDate}'
+        ${divisionClause}
+      GROUP BY product, region
+      ORDER BY region
+    `;
+
+    const [[newLogoRows], [expMigRows], [strategicRows]] = await Promise.all([
       getBigQuery().query({ query: newLogoQuery }),
       getBigQuery().query({ query: expansionMigrationQuery }),
+      getBigQuery().query({ query: strategicQuery }),
     ]);
 
-    results.push(...(newLogoRows as any[]), ...(expMigRows as any[]));
+    results.push(...(newLogoRows as any[]), ...(expMigRows as any[]), ...(strategicRows as any[]));
   } else {
     // R360
     const regionClause = filters.regions && filters.regions.length > 0
@@ -699,12 +730,42 @@ async function getFunnelByCategory(filters: ReportFilters, product: 'POR' | 'R36
       ORDER BY region, category
     `;
 
-    const [[newLogoRows], [expMigRows]] = await Promise.all([
+    // STRATEGIC from OpportunityViewTable - New Business with ACV > $100K
+    // Tracks large new business deals separately from standard NEW LOGO
+    const strategicQuery = `
+      SELECT
+        'R360' AS product,
+        CASE Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        'STRATEGIC' AS category,
+        COUNT(*) AS actual_mql,
+        -- SQL: opportunities that progressed past initial stage
+        COUNT(CASE WHEN StageName NOT IN ('Discovery', 'Qualification') OR Won THEN 1 END) AS actual_sql,
+        0 AS actual_sal,
+        -- SQO: opportunities that are Won or in final stages
+        COUNT(CASE WHEN Won OR StageName IN ('Proposal', 'Negotiation', 'Closed Won') THEN 1 END) AS actual_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+      WHERE r360_record__c = true
+        AND Division IN ('US', 'UK', 'AU')
+        AND Type = 'New Business'
+        AND ACV > 100000
+        AND CAST(CreatedDate AS DATE) >= '${filters.startDate}'
+        AND CAST(CreatedDate AS DATE) <= '${filters.endDate}'
+        ${regionClause.replace(/Region/g, 'Division').replace(/'AMER'/g, "'US'").replace(/'EMEA'/g, "'UK'").replace(/'APAC'/g, "'AU'")}
+      GROUP BY product, region
+      ORDER BY region
+    `;
+
+    const [[newLogoRows], [expMigRows], [strategicRows]] = await Promise.all([
       getBigQuery().query({ query: newLogoQuery }),
       getBigQuery().query({ query: expansionMigrationQuery }),
+      getBigQuery().query({ query: strategicQuery }),
     ]);
 
-    results.push(...(newLogoRows as any[]), ...(expMigRows as any[]));
+    results.push(...(newLogoRows as any[]), ...(expMigRows as any[]), ...(strategicRows as any[]));
   }
 
   return results;
