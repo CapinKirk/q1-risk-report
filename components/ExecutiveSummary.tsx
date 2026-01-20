@@ -2,7 +2,7 @@
 
 import { useMemo, useCallback } from 'react';
 import { ReportData, AttainmentRow } from '@/lib/types';
-import { formatCurrency, formatPercent, formatCoverage, getGapColor } from '@/lib/formatters';
+import { formatCurrency, formatPercent, formatCoverage, getGapColor, getAttainmentColor } from '@/lib/formatters';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
 
@@ -252,7 +252,7 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
                 ? <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8em' }}>N/A (no deals)</span>
                 : ((grand_total as any).total_lost_deals || 0) === 0
                   ? <span style={{ color: '#16a34a' }}>100% <span style={{ fontSize: '0.75em', color: 'var(--text-tertiary)' }}>(no losses)</span></span>
-                  : formatPercent(grand_total.total_win_rate_pct)}
+                  : <span style={{ color: getAttainmentColor(grand_total.total_win_rate_pct), fontWeight: 600 }}>{formatPercent(grand_total.total_win_rate_pct)}</span>}
             </td>
             {hasPOR && (
               <td className="right">
@@ -260,7 +260,7 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
                   ? <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8em' }}>N/A (no deals)</span>
                   : ((por as any)?.total_lost_deals || 0) === 0
                     ? <span style={{ color: '#16a34a' }}>100% <span style={{ fontSize: '0.75em', color: 'var(--text-tertiary)' }}>(no losses)</span></span>
-                    : formatPercent(por?.total_win_rate_pct)}
+                    : <span style={{ color: getAttainmentColor(por?.total_win_rate_pct), fontWeight: 600 }}>{formatPercent(por?.total_win_rate_pct)}</span>}
               </td>
             )}
             {hasR360 && (
@@ -269,7 +269,7 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
                   ? <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8em' }}>N/A (no deals)</span>
                   : ((r360 as any)?.total_lost_deals || 0) === 0
                     ? <span style={{ color: '#16a34a' }}>100% <span style={{ fontSize: '0.75em', color: 'var(--text-tertiary)' }}>(no losses)</span></span>
-                    : formatPercent(r360?.total_win_rate_pct)}
+                    : <span style={{ color: getAttainmentColor(r360?.total_win_rate_pct), fontWeight: 600 }}>{formatPercent(r360?.total_win_rate_pct)}</span>}
               </td>
             )}
           </tr>
