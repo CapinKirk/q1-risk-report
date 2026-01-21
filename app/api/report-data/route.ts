@@ -951,6 +951,7 @@ async function getLostDeals(filters: ReportFilters) {
       AND CloseDate <= '${filters.endDate}'
       AND Type NOT IN ('Credit Card', 'Consulting')
       AND Division IN ('US', 'UK', 'AU')
+      AND ACV >= 0
       ${productClause}
       ${regionClause}
     ORDER BY ACV DESC
