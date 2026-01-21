@@ -156,43 +156,46 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
 ## OUTPUT FORMAT
 
 ### 🚨 INBOUND RISKS TO Q1 PLAN
-List ALL inbound risks with:
-- Specific metric/region at risk
-- Gap to target (numbers)
-- Risk level (HIGH/MEDIUM/LOW)
+- **[Product] [Region] [Metric]**
+  - Gap: X% behind target
+  - Risk Level: HIGH/MEDIUM/LOW
+  - Impact: $X at risk
 
 ### 📊 ROOT CAUSE ANALYSIS
 
 #### Lead Volume Risks
-For each region BELOW target on MQL/SQL/SQO:
 - **[Product] [Region]**: X% behind pacing
-- **Root Cause**: [Why leads are low]
-- **UTM/Source Analysis**: [Which channels are underperforming]
+  - Root Cause: [Why leads are low]
+  - Underperforming Channels: [UTM source/medium analysis]
 
 #### Conversion Rate Risks
-For each conversion stage BELOW threshold:
-- MQL→SQL below 30%: [Product/Region] at X% - [Root cause]
-- SQL→SAL below 50% (POR only): [Product/Region] at X% - [Root cause]
-- SAL→SQO below 60% (POR only): [Product/Region] at X% - [Root cause]
-- SQL→SQO below 50% (R360 only): [Product/Region] at X% - [Root cause]
+- **MQL→SQL** (threshold: 30%)
+  - [Product/Region]: X% → [Root cause]
+- **SQL→SAL** (POR only, threshold: 50%)
+  - [Product/Region]: X% → [Root cause]
+- **SAL→SQO** (POR only, threshold: 60%)
+  - [Product/Region]: X% → [Root cause]
+- **SQL→SQO** (R360 only, threshold: 50%)
+  - [Product/Region]: X% → [Root cause]
 
 #### Google Ads Risks
-For each ad issue:
-- **[Region] CPA**: $X (target <$200) - [Root cause]
-- **[Region] CTR**: X% (target >3%) - [Root cause]
+- **[Region] CPA**: $X (target <$200)
+  - Root Cause: [Why CPA is high]
+- **[Region] CTR**: X% (target >3%)
+  - Root Cause: [Why CTR is low]
 
 ### ✅ ACTION ITEMS
-For each risk:
-- **Action**: Specific fix
-- **Owner**: Marketing/Sales/SDR
-- **Timeline**: Immediate/This Week/This Month
-- **Expected Impact**: Quantified improvement
+- **[Risk Area]**
+  - Action: [Specific fix]
+  - Owner: Marketing/Sales/SDR
+  - Timeline: Immediate/This Week/This Month
+  - Expected Impact: [Quantified improvement]
 
 ### ⚠️ OVERALL RISK ASSESSMENT
 - **Risk Level**: HIGH / MEDIUM / LOW
-- **Key Risk**: Single biggest threat
-- **$ at Risk**: Dollar impact if not addressed
-- **Confidence**: % likelihood of hitting inbound targets
+- **Key Risk**: [Single biggest threat]
+- **$ at Risk**: [Dollar impact if not addressed]
+- **Confidence**: [% likelihood of hitting inbound targets]
 
 ${filterDescription}
 
@@ -331,22 +334,18 @@ ${(google_ads_rca?.POR || []).concat(google_ads_rca?.R360 || []).map((row: any) 
 - Converted to SQO: ${inboundSqlR360.filter((s: any) => s.converted_to_sqo === 'Yes').length}
 - Average Days MQL→SQL: ${Math.round(inboundSqlR360.reduce((sum: number, s: any) => sum + (s.days_mql_to_sql || 0), 0) / (inboundSqlR360.length || 1))}
 
-## CRITICAL OUTPUT RULES
-
-1. **NO POSITIVE INFORMATION** - Do not mention anything working well
-2. **RISKS ONLY** - Every paragraph must describe a problem
-3. **ROOT CAUSE REQUIRED** - Every risk must explain WHY
-4. **ACTION REQUIRED** - Every risk must have a fix
-5. **R360**: Does NOT have SAL stage (SQL→SQO direct)
-6. **Thresholds**:
-   - MQL→SQL: 30% (below = risk)
-   - SQL→SAL: 50% (POR only, below = risk)
-   - SAL→SQO: 60% (POR only, below = risk)
-   - SQL→SQO: 50% (R360 only, below = risk)
-   - CPA: <$200 (above = risk)
-   - CTR: >3% (below = risk)
-
-**This is a RISK REPORT. Zero positive content allowed.**`;
+## CRITICAL RULES
+- **NO POSITIVE INFO** - Only report problems and risks
+- **ROOT CAUSE REQUIRED** - Every risk must explain WHY
+- **ACTION REQUIRED** - Every risk needs a fix
+- **R360 NOTE** - R360 has no SAL stage (SQL→SQO direct)
+- **Thresholds**:
+  - MQL→SQL: 30% (below = risk)
+  - SQL→SAL: 50% (POR only)
+  - SAL→SQO: 60% (POR only)
+  - SQL→SQO: 50% (R360 only)
+  - CPA: <$200 (above = risk)
+  - CTR: >3% (below = risk)`;
 
   return prompt;
 }

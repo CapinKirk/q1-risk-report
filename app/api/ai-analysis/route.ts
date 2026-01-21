@@ -102,53 +102,51 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
 
 ## OUTPUT FORMAT (FOLLOW THIS EXACTLY):
 
-### 1. EXECUTIVE SUMMARY
-2-3 sentences on overall global performance.
+### 📈 EXECUTIVE SUMMARY
+Brief 2-3 sentence overview of global Q1 performance status.
 
-### 2. REGIONAL ANALYSIS (REQUIRED - one section for each region)
+### 🌎 REGIONAL ANALYSIS
 
-#### 🇺🇸 AMER REGION
-**Regional Director Accountability**
-- **Status**: [GREEN/YELLOW/RED] - [X]% attainment
-- **Gap to Target**: $[amount]
-- **Key Risks**:
-  - [Risk 1 with specific segment and $ impact]
-  - [Risk 2 with specific segment and $ impact]
-- **Root Cause Analysis**:
-  - [Why this region is missing/exceeding - be specific]
-- **Action Items for AMER**:
-  - [Specific action 1] - Owner: [Name/Role]
-  - [Specific action 2] - Owner: [Name/Role]
+#### 🇺🇸 AMER
+- **Status**: [GREEN/YELLOW/RED] at [X]% attainment
+- **Gap**: $[amount] to target
+- **Risks**:
+  - [Specific risk with $ impact]
+  - [Second risk if applicable]
+- **Root Cause**: [Why missing/exceeding]
+- **Actions**:
+  - [Action item] → Owner: [Role]
+  - [Action item] → Owner: [Role]
 
-#### 🇬🇧 EMEA REGION
-**Regional Director Accountability**
-- **Status**: [GREEN/YELLOW/RED] - [X]% attainment
-- **Gap to Target**: $[amount]
-- **Key Risks**:
-  - [Risk 1 with specific segment and $ impact]
-  - [Risk 2 with specific segment and $ impact]
-- **Root Cause Analysis**:
-  - [Why this region is missing/exceeding - be specific]
-- **Action Items for EMEA**:
-  - [Specific action 1] - Owner: [Name/Role]
-  - [Specific action 2] - Owner: [Name/Role]
+#### 🇬🇧 EMEA
+- **Status**: [GREEN/YELLOW/RED] at [X]% attainment
+- **Gap**: $[amount] to target
+- **Risks**:
+  - [Specific risk with $ impact]
+  - [Second risk if applicable]
+- **Root Cause**: [Why missing/exceeding]
+- **Actions**:
+  - [Action item] → Owner: [Role]
+  - [Action item] → Owner: [Role]
 
-#### 🇦🇺 APAC REGION
-**Regional Director Accountability**
-- **Status**: [GREEN/YELLOW/RED] - [X]% attainment
-- **Gap to Target**: $[amount]
-- **Key Risks**:
-  - [Risk 1 with specific segment and $ impact]
-  - [Risk 2 with specific segment and $ impact]
-- **Root Cause Analysis**:
-  - [Why this region is missing/exceeding - be specific]
-- **Action Items for APAC**:
-  - [Specific action 1] - Owner: [Name/Role]
-  - [Specific action 2] - Owner: [Name/Role]
+#### 🇦🇺 APAC
+- **Status**: [GREEN/YELLOW/RED] at [X]% attainment
+- **Gap**: $[amount] to target
+- **Risks**:
+  - [Specific risk with $ impact]
+  - [Second risk if applicable]
+- **Root Cause**: [Why missing/exceeding]
+- **Actions**:
+  - [Action item] → Owner: [Role]
+  - [Action item] → Owner: [Role]
 
-### 3. GLOBAL RISK ASSESSMENT
-- Likelihood of hitting Q1 targets
-- Top 3 global priorities
+### ⚠️ GLOBAL RISK ASSESSMENT
+- **Q1 Outlook**: [HIGH/MEDIUM/LOW] risk of missing targets
+- **$ at Risk**: Total dollar amount at risk if issues not addressed
+- **Top Priorities**:
+  - [Priority 1]
+  - [Priority 2]
+  - [Priority 3]
 
 ## Filter Context
 ${filterDescription}
@@ -289,11 +287,13 @@ ${sourceAttainmentData.R360.map((row: any) =>
   `- ${row.source} (${row.region}): ${row.attainment_pct || 0}% attainment, $${(row.gap || 0).toLocaleString()} gap, RAG: ${row.rag_status || 'N/A'}`
 ).join('\n') || 'No R360 source attainment data'}
 
-Provide your analysis in a structured format with clear headers. Be specific about which segments need attention and what actions should be taken. Include realistic assessments - don't sugarcoat underperformance. Pay special attention to:
-1. Loss reasons by product - what patterns emerge?
-2. MQL disqualification rates - are we generating quality leads?
-3. Source channel performance - which channels are working/failing?
-4. Funnel conversion rates - where are we losing deals?`;
+## CRITICAL RULES
+- Be specific about which segments need attention
+- Include realistic assessments - don't sugarcoat underperformance
+- Focus on loss patterns by product
+- Analyze MQL disqualification rates for lead quality
+- Evaluate source channel performance
+- Identify funnel conversion bottlenecks`;
 
   return prompt;
 }
