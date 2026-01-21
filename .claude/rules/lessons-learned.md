@@ -294,6 +294,62 @@ WHERE LOWER(Booking_Type) = 'renewal'
 | NEW LOGO | $880,060 |
 | RENEWAL | $461,940 |
 
+## SAL Details: Multiple Data Sources Required (2026-01-20)
+
+**Problem:** SAL Details "Opp Type" filters showed only NEW LOGO records, even though funnel summary showed EXPANSION (121) and MIGRATION (4) SAL records.
+
+**Root Cause:** SAL Details query only pulled from `InboundFunnel`, which exclusively contains New Logo (inbound) leads. EXPANSION and MIGRATION SAL records come from a different source.
+
+**Data Source Architecture:**
+| Category | SAL Data Source | SAL Criteria |
+|----------|-----------------|--------------|
+| NEW LOGO | `InboundFunnel.SAL_DT` | Has SAL_DT date |
+| EXPANSION | `OpportunityViewTable` where Type='Existing Business' | Stage past Needs Analysis OR Won |
+| MIGRATION | `OpportunityViewTable` where Type='Migration' | Stage past Needs Analysis OR Won |
+
+**Solution:** UNION ALL multiple data sources in SAL Details query:
+```sql
+-- InboundFunnel for NEW LOGO (existing query)
+ranked_sals AS (
+  SELECT ... FROM InboundFunnel f
+  WHERE f.SAL_DT IS NOT NULL
+),
+-- OpportunityViewTable for EXPANSION/MIGRATION
+expansion_migration_sals AS (
+  SELECT
+    'POR' AS product,
+    CASE o.Division WHEN 'US' THEN 'AMER' ... END AS region,
+    o.Id AS record_id,
+    CASE WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+         WHEN o.Type = 'Migration' THEN 'MIGRATION' END AS category,
+    ...
+  FROM OpportunityViewTable o
+  WHERE o.Type IN ('Existing Business', 'Migration')
+    AND o.ACV > 0
+    -- SAL stage = past Needs Analysis OR Won
+    AND (o.StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') OR o.Won)
+)
+SELECT * FROM ranked_sals WHERE rn = 1
+UNION ALL
+SELECT * FROM expansion_migration_sals WHERE rn = 1
+```
+
+**Key Insights:**
+1. **Funnel tables are category-specific**: InboundFunnel = New Logo only
+2. **SAL stage for EXPANSION/MIGRATION**: Determined by stage progression, not a date field
+3. **Category derivation**: Always derive from `Opportunity.Type`, never hardcode
+4. **UNION pattern**: Combine multiple data sources to populate all filter options
+
+**Category Derivation from Opportunity.Type:**
+```sql
+CASE
+  WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+  WHEN o.Type = 'Migration' THEN 'MIGRATION'
+  WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
+  ELSE 'NEW LOGO'
+END AS category
+```
+
 ## RAW_2026_Plan_by_Month Division Format
 
 Division values include product suffix:

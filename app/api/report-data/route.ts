@@ -3691,8 +3691,6 @@ export async function POST(request: Request) {
       wins_bright_spots: winsBrightSpots,
       top_risk_pockets: topRiskPockets,
       action_items: actionItems,
-      // Version to track deployments and help debug caching issues
-      api_version: '3.3.0-add-insights',
     };
 
     return NextResponse.json(response, {

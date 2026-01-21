@@ -63,3 +63,20 @@ curl ... | jq '.sqo_details.POR | length'
 | **Renewal** | RAW_2026_Plan_by_Month.Q1_Plan_2026 | Q1_Actual_2025 |
 
 **Note:** Renewal targets use `COALESCE(Q1_Plan_2026, Q1_Actual_2025, 0)` because new products like R360 have no prior year renewal history.
+
+## Funnel Detail Data Sources
+
+| Detail Type | Category | Data Source | Filter Criteria |
+|-------------|----------|-------------|-----------------|
+| SAL Details | NEW LOGO | `InboundFunnel` | `SAL_DT IS NOT NULL` |
+| SAL Details | EXPANSION | `OpportunityViewTable` | `Type='Existing Business'` + past Needs Analysis stage |
+| SAL Details | MIGRATION | `OpportunityViewTable` | `Type='Migration'` + past Needs Analysis stage |
+| SQO Details | All | `InboundFunnel` + `OpportunityViewTable` | `SQO_DT IS NOT NULL` or Won/Proposal stage |
+| SQL Details | All | `InboundFunnel` | `SQL_DT IS NOT NULL` |
+| MQL Details | NEW LOGO | `InboundFunnel` | `MQL_DT IS NOT NULL` |
+
+**SAL Stage Criteria for EXPANSION/MIGRATION:**
+```sql
+-- Opportunities past Needs Analysis stage (Stage 3) OR Won
+WHERE (StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') OR Won)
+```
