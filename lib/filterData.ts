@@ -403,6 +403,16 @@ export function filterReportData(
       POR: filterProductRegion(data.sql_details.POR || [], includePOR),
       R360: filterProductRegion(data.sql_details.R360 || [], includeR360),
     } : undefined,
+    // SAL details (filter by product and region only)
+    sal_details: data.sal_details ? {
+      POR: filterProductRegion(data.sal_details.POR || [], includePOR),
+      R360: filterProductRegion(data.sal_details.R360 || [], includeR360),
+    } : undefined,
+    // SQO details (filter by product and region only)
+    sqo_details: data.sqo_details ? {
+      POR: filterProductRegion(data.sqo_details.POR || [], includePOR),
+      R360: filterProductRegion(data.sqo_details.R360 || [], includeR360),
+    } : undefined,
     // Filter insight sections
     wins_bright_spots: data.wins_bright_spots ? {
       POR: filterProductRegion(data.wins_bright_spots.POR || [], includePOR),
