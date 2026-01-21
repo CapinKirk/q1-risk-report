@@ -13,7 +13,10 @@ interface AnalysisRequest {
   reportData: any;
   analysisType: 'bookings_miss' | 'pipeline_risk' | 'full_report';
   filterContext?: FilterContext;
+  formats?: ('display' | 'html' | 'slack')[];
 }
+
+import { formatAnalysisMultiple, type OutputFormat } from '@/lib/ai/formatter';
 
 // Normalize attainment_detail to flat array (handles both API and frontend formats)
 function normalizeAttainmentDetail(attainment_detail: any): any[] {
@@ -98,55 +101,23 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
   // Build comprehensive context
   const prompt = `You are a Revenue Operations analyst reviewing Q1 2026 Bookings performance data.
 
-**CRITICAL INSTRUCTION**: Structure your analysis BY REGION (AMER, EMEA, APAC) so that regional directors can see their specific feedback.
+Provide a structured analysis with the following sections. Use plain text with clear section headers.
 
-## OUTPUT FORMAT (FOLLOW THIS EXACTLY):
+EXECUTIVE SUMMARY:
+Write 2-3 sentences on overall global Q1 performance status.
 
-### 📈 EXECUTIVE SUMMARY
-Brief 2-3 sentence overview of global Q1 performance status.
+REGIONAL ANALYSIS:
+For each region (AMER, EMEA, APAC), provide:
+- Status: GREEN/YELLOW/RED and attainment percentage
+- Gap: Dollar amount to target
+- Key Risks: 1-2 specific risks with dollar impact
+- Root Cause: Why the region is missing or exceeding
+- Actions: 1-2 specific action items with owner roles
 
-### 🌎 REGIONAL ANALYSIS
-
-#### 🇺🇸 AMER
-- **Status**: [GREEN/YELLOW/RED] at [X]% attainment
-- **Gap**: $[amount] to target
-- **Risks**:
-  - [Specific risk with $ impact]
-  - [Second risk if applicable]
-- **Root Cause**: [Why missing/exceeding]
-- **Actions**:
-  - [Action item] → Owner: [Role]
-  - [Action item] → Owner: [Role]
-
-#### 🇬🇧 EMEA
-- **Status**: [GREEN/YELLOW/RED] at [X]% attainment
-- **Gap**: $[amount] to target
-- **Risks**:
-  - [Specific risk with $ impact]
-  - [Second risk if applicable]
-- **Root Cause**: [Why missing/exceeding]
-- **Actions**:
-  - [Action item] → Owner: [Role]
-  - [Action item] → Owner: [Role]
-
-#### 🇦🇺 APAC
-- **Status**: [GREEN/YELLOW/RED] at [X]% attainment
-- **Gap**: $[amount] to target
-- **Risks**:
-  - [Specific risk with $ impact]
-  - [Second risk if applicable]
-- **Root Cause**: [Why missing/exceeding]
-- **Actions**:
-  - [Action item] → Owner: [Role]
-  - [Action item] → Owner: [Role]
-
-### ⚠️ GLOBAL RISK ASSESSMENT
-- **Q1 Outlook**: [HIGH/MEDIUM/LOW] risk of missing targets
-- **$ at Risk**: Total dollar amount at risk if issues not addressed
-- **Top Priorities**:
-  - [Priority 1]
-  - [Priority 2]
-  - [Priority 3]
+GLOBAL RISK ASSESSMENT:
+- Q1 Outlook: HIGH/MEDIUM/LOW risk level
+- Dollar amount at risk if issues not addressed
+- Top 3 priorities
 
 ## Filter Context
 ${filterDescription}
@@ -310,7 +281,7 @@ export async function POST(request: Request) {
     }
 
     const body: AnalysisRequest = await request.json();
-    const { reportData, analysisType = 'bookings_miss', filterContext } = body;
+    const { reportData, analysisType = 'bookings_miss', filterContext, formats = ['display'] } = body;
 
     if (!reportData) {
       return NextResponse.json(
@@ -321,19 +292,19 @@ export async function POST(request: Request) {
 
     const prompt = buildAnalysisPrompt(reportData, analysisType, filterContext);
 
-    // Call OpenAI API
-    const response = await fetch(OPENAI_API_URL, {
+    // STAGE 1: Generate raw insights with GPT-4o
+    const insightResponse = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o', // Using GPT-4o (latest available model)
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: 'You are an expert Revenue Operations analyst specializing in B2B SaaS bookings analysis. Provide data-driven insights with specific, actionable recommendations. Be direct and honest about performance issues.'
+            content: 'You are an expert Revenue Operations analyst specializing in B2B SaaS bookings analysis. Provide data-driven insights with specific, actionable recommendations. Be direct and honest about performance issues. Output plain text analysis without markdown formatting - formatting will be applied separately.'
           },
           {
             role: 'user',
@@ -345,23 +316,53 @@ export async function POST(request: Request) {
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('OpenAI API error:', errorData);
+    if (!insightResponse.ok) {
+      const errorData = await insightResponse.json().catch(() => ({}));
+      console.error('OpenAI API error (insights):', errorData);
       return NextResponse.json(
-        { error: 'Failed to get AI analysis', details: errorData },
-        { status: response.status }
+        { error: 'Failed to generate insights', details: errorData },
+        { status: insightResponse.status }
       );
     }
 
-    const data = await response.json();
-    const analysis = data.choices?.[0]?.message?.content || 'No analysis generated';
+    const insightData = await insightResponse.json();
+    const rawAnalysis = insightData.choices?.[0]?.message?.content || 'No analysis generated';
+
+    // STAGE 2: Format with cheap model (GPT-4o-mini)
+    const validFormats = formats.filter((f): f is OutputFormat =>
+      ['display', 'html', 'slack'].includes(f)
+    );
+
+    let formattedOutputs: Record<string, string> = {};
+    let formattingTokens = 0;
+
+    if (validFormats.length > 0) {
+      try {
+        formattedOutputs = await formatAnalysisMultiple(rawAnalysis, validFormats, apiKey);
+        // Note: Token tracking would need to be added to formatAnalysisMultiple if needed
+      } catch (formatError: any) {
+        console.error('Formatting error:', formatError);
+        // Fallback to raw analysis if formatting fails
+        formattedOutputs = { display: rawAnalysis };
+      }
+    } else {
+      formattedOutputs = { display: rawAnalysis };
+    }
+
+    // Return the primary format as 'analysis' for backward compatibility
+    const primaryFormat = validFormats[0] || 'display';
 
     return NextResponse.json({
       success: true,
-      analysis,
-      model: data.model,
-      usage: data.usage,
+      analysis: formattedOutputs[primaryFormat] || rawAnalysis,
+      raw_analysis: rawAnalysis,
+      formatted: formattedOutputs,
+      model: insightData.model,
+      usage: {
+        insight_tokens: insightData.usage?.total_tokens || 0,
+        formatting_tokens: formattingTokens,
+        total_tokens: (insightData.usage?.total_tokens || 0) + formattingTokens,
+      },
       generated_at: new Date().toISOString(),
     });
 
@@ -378,10 +379,16 @@ export async function GET() {
   return NextResponse.json({
     endpoint: '/api/ai-analysis',
     method: 'POST',
-    description: 'Generate AI-powered analysis of bookings performance',
+    description: 'Generate AI-powered analysis of bookings performance (two-stage: insights + formatting)',
     parameters: {
       reportData: 'Full report data object from /api/report-data',
       analysisType: 'bookings_miss | pipeline_risk | full_report (optional)',
+      formats: 'Array of output formats: display | html | slack (default: ["display"])',
+    },
+    response: {
+      analysis: 'Primary formatted output (first format in array)',
+      raw_analysis: 'Raw unformatted insights from GPT-4o',
+      formatted: 'Object with all requested formats { display, html, slack }',
     },
   });
 }

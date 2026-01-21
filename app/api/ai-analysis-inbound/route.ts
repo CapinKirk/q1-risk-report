@@ -12,7 +12,10 @@ interface FilterContext {
 interface InboundAnalysisRequest {
   reportData: any;
   filterContext?: FilterContext;
+  formats?: ('display' | 'html' | 'slack')[];
 }
+
+import { formatAnalysisMultiple, type OutputFormat } from '@/lib/ai/formatter';
 
 // Build the inbound marketing analysis prompt
 function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterContext): string {
@@ -153,49 +156,21 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
 
 **R360 NOTE**: R360 does NOT have a SAL stage. R360 flows directly from SQL to SQO.
 
-## OUTPUT FORMAT
+## OUTPUT FORMAT (plain text, formatting applied separately)
 
-### 🚨 INBOUND RISKS TO Q1 PLAN
-- **[Product] [Region] [Metric]**
-  - Gap: X% behind target
-  - Risk Level: HIGH/MEDIUM/LOW
-  - Impact: $X at risk
+INBOUND RISKS TO Q1 PLAN:
+List all inbound risks with: Product, Region, Metric, Gap percentage, Risk level (HIGH/MEDIUM/LOW), Dollar impact.
 
-### 📊 ROOT CAUSE ANALYSIS
+ROOT CAUSE ANALYSIS:
+For Lead Volume Risks: List each product/region behind pacing with root cause and underperforming channels.
+For Conversion Rate Risks: List each stage below threshold (MQL to SQL below 30%, SQL to SAL below 50%, SAL to SQO below 60%, SQL to SQO below 50% for R360).
+For Google Ads Risks: List CPA above $200 or CTR below 3% with root causes.
 
-#### Lead Volume Risks
-- **[Product] [Region]**: X% behind pacing
-  - Root Cause: [Why leads are low]
-  - Underperforming Channels: [UTM source/medium analysis]
+ACTION ITEMS:
+For each risk, provide: Action, Owner (Marketing/Sales/SDR), Timeline (Immediate/This Week/This Month), Expected Impact.
 
-#### Conversion Rate Risks
-- **MQL→SQL** (threshold: 30%)
-  - [Product/Region]: X% → [Root cause]
-- **SQL→SAL** (POR only, threshold: 50%)
-  - [Product/Region]: X% → [Root cause]
-- **SAL→SQO** (POR only, threshold: 60%)
-  - [Product/Region]: X% → [Root cause]
-- **SQL→SQO** (R360 only, threshold: 50%)
-  - [Product/Region]: X% → [Root cause]
-
-#### Google Ads Risks
-- **[Region] CPA**: $X (target <$200)
-  - Root Cause: [Why CPA is high]
-- **[Region] CTR**: X% (target >3%)
-  - Root Cause: [Why CTR is low]
-
-### ✅ ACTION ITEMS
-- **[Risk Area]**
-  - Action: [Specific fix]
-  - Owner: Marketing/Sales/SDR
-  - Timeline: Immediate/This Week/This Month
-  - Expected Impact: [Quantified improvement]
-
-### ⚠️ OVERALL RISK ASSESSMENT
-- **Risk Level**: HIGH / MEDIUM / LOW
-- **Key Risk**: [Single biggest threat]
-- **$ at Risk**: [Dollar impact if not addressed]
-- **Confidence**: [% likelihood of hitting inbound targets]
+OVERALL RISK ASSESSMENT:
+Risk Level (HIGH/MEDIUM/LOW), Key Risk (single biggest threat), Dollar amount at risk, Confidence percentage of hitting inbound targets.
 
 ${filterDescription}
 
@@ -362,7 +337,7 @@ export async function POST(request: Request) {
     }
 
     const body: InboundAnalysisRequest = await request.json();
-    const { reportData, filterContext } = body;
+    const { reportData, filterContext, formats = ['display'] } = body;
 
     if (!reportData) {
       return NextResponse.json(
@@ -373,8 +348,8 @@ export async function POST(request: Request) {
 
     const prompt = buildInboundAnalysisPrompt(reportData, filterContext);
 
-    // Call OpenAI API
-    const response = await fetch(OPENAI_API_URL, {
+    // STAGE 1: Generate raw insights with GPT-4o
+    const insightResponse = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -385,7 +360,7 @@ export async function POST(request: Request) {
         messages: [
           {
             role: 'system',
-            content: 'You are a Risk Analyst for Inbound Marketing. Your ONLY job is to identify RISKS to inbound targets, provide root cause analysis using UTM/channel/keyword data, and recommend fixes. DO NOT include any positive information, wins, bright spots, or things going well. Analyze UTM sources, channels, campaigns, and keywords to identify underperforming segments. Be direct, specific, and actionable. Every output must focus exclusively on problems and how to fix them.'
+            content: 'You are a Risk Analyst for Inbound Marketing. Your ONLY job is to identify RISKS to inbound targets, provide root cause analysis using UTM/channel/keyword data, and recommend fixes. DO NOT include any positive information. Output plain text analysis without markdown formatting - formatting will be applied separately.'
           },
           {
             role: 'user',
@@ -397,23 +372,48 @@ export async function POST(request: Request) {
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('OpenAI API error:', errorData);
+    if (!insightResponse.ok) {
+      const errorData = await insightResponse.json().catch(() => ({}));
+      console.error('OpenAI API error (insights):', errorData);
       return NextResponse.json(
-        { error: 'Failed to get AI analysis', details: errorData },
-        { status: response.status }
+        { error: 'Failed to generate insights', details: errorData },
+        { status: insightResponse.status }
       );
     }
 
-    const data = await response.json();
-    const analysis = data.choices?.[0]?.message?.content || 'No analysis generated';
+    const insightData = await insightResponse.json();
+    const rawAnalysis = insightData.choices?.[0]?.message?.content || 'No analysis generated';
+
+    // STAGE 2: Format with cheap model (GPT-4o-mini)
+    const validFormats = formats.filter((f): f is OutputFormat =>
+      ['display', 'html', 'slack'].includes(f)
+    );
+
+    let formattedOutputs: Record<string, string> = {};
+
+    if (validFormats.length > 0) {
+      try {
+        formattedOutputs = await formatAnalysisMultiple(rawAnalysis, validFormats, apiKey);
+      } catch (formatError: any) {
+        console.error('Formatting error:', formatError);
+        formattedOutputs = { display: rawAnalysis };
+      }
+    } else {
+      formattedOutputs = { display: rawAnalysis };
+    }
+
+    const primaryFormat = validFormats[0] || 'display';
 
     return NextResponse.json({
       success: true,
-      analysis,
-      model: data.model,
-      usage: data.usage,
+      analysis: formattedOutputs[primaryFormat] || rawAnalysis,
+      raw_analysis: rawAnalysis,
+      formatted: formattedOutputs,
+      model: insightData.model,
+      usage: {
+        insight_tokens: insightData.usage?.total_tokens || 0,
+        total_tokens: insightData.usage?.total_tokens || 0,
+      },
       generated_at: new Date().toISOString(),
     });
 
@@ -430,10 +430,16 @@ export async function GET() {
   return NextResponse.json({
     endpoint: '/api/ai-analysis-inbound',
     method: 'POST',
-    description: 'Generate AI-powered deep dive analysis focused on Inbound Marketing performance',
+    description: 'Generate AI-powered inbound marketing risk analysis (two-stage: insights + formatting)',
     parameters: {
       reportData: 'Full report data object from /api/report-data',
       filterContext: 'Optional filter context for products and regions',
+      formats: 'Array of output formats: display | html | slack (default: ["display"])',
+    },
+    response: {
+      analysis: 'Primary formatted output (first format in array)',
+      raw_analysis: 'Raw unformatted insights from GPT-4o',
+      formatted: 'Object with all requested formats { display, html, slack }',
     },
   });
 }
