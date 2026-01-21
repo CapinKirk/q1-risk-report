@@ -16,45 +16,53 @@ interface FormatResult {
 }
 
 const FORMAT_PROMPTS: Record<OutputFormat, string> = {
-  display: `You are a formatting assistant. Reformat the raw analysis into clean markdown with color-coded indicators.
+  display: `You are a formatting assistant. Reformat the raw analysis into clean markdown with proper hierarchy.
 
-CRITICAL: REMOVE ALL NUMBERED SECTIONS. Convert "1. EXECUTIVE SUMMARY" to "### 📈 EXECUTIVE SUMMARY" (no numbers).
+HEADER HIERARCHY (NO BULLETS ON HEADERS):
+### 📈 EXECUTIVE SUMMARY
+[paragraph text, no bullets]
 
-SECTION TRANSFORMATIONS:
-- "1. EXECUTIVE SUMMARY" → "### 📈 EXECUTIVE SUMMARY"
-- "2. REGIONAL ANALYSIS" → "### 🌎 REGIONAL ANALYSIS"
-- "3. GLOBAL RISK" or "RISK ASSESSMENT" → "### ⚠️ RISK ASSESSMENT"
-- "AMER" sections → "#### 🇺🇸 AMER"
-- "EMEA" sections → "#### 🇬🇧 EMEA"
-- "APAC" sections → "#### 🇦🇺 APAC"
-- "ACTION ITEMS" → "### ✅ ACTION ITEMS"
-- "INBOUND RISKS" → "### 🚨 INBOUND RISKS"
-- "ROOT CAUSE" → "### 📊 ROOT CAUSE ANALYSIS"
+### 🌎 REGIONAL ANALYSIS
 
-COLOR CODING (CRITICAL - add emoji indicators):
-- Attainment >=100%: prefix with 🟢 (e.g., "🟢 105% attainment")
-- Attainment 80-99%: prefix with 🟡 (e.g., "🟡 89% attainment")
-- Attainment <80%: prefix with 🔴 (e.g., "🔴 65% attainment")
-- Risk level HIGH: prefix with 🔴
-- Risk level MEDIUM: prefix with 🟡
-- Risk level LOW: prefix with 🟢
-- Negative gaps/variances: prefix with 🔴 (e.g., "🔴 -$50,000 gap")
-- Positive performance: prefix with 🟢
+#### 🇺🇸 AMER
+- **Status:** 🟡 YELLOW at 89%
+- **Gap:** 🔴 -$97,210
+- **Key Risks:**
+  ◦ First risk item here
+  ◦ Second risk item here
+- **Root Cause:** Description here
+- **Actions:**
+  ◦ First action item
+  ◦ Second action item
 
-STATUS LINE FORMAT:
-- "- **Status**: 🟢 GREEN at 105%" or "- **Status**: 🔴 RED at 65%"
+#### 🇬🇧 EMEA
+[same structure]
 
-BULLET FORMATTING:
-- Convert any "1." "2." "3." numbered items to bullet points "-"
-- Use nested bullets with 2-space indent for sub-items
-- Format: "- **Label**: value" for key-value pairs
-- Format: "  - Sub-item" for nested items
+#### 🇦🇺 APAC
+[same structure]
 
-ABSOLUTE RULES:
-- NO numbers before section headers (remove "1.", "2.", "3." etc)
-- NO numbered lists anywhere - convert ALL to bullets
-- Add color emoji indicators to ALL percentages and risk levels
-- Preserve all data/numbers in the content itself
+### ⚠️ RISK ASSESSMENT
+- **Q1 Outlook:** 🟡 MEDIUM risk
+- **$ at Risk:** 🔴 -$250,000
+- **Top Priorities:**
+  ◦ Priority 1
+  ◦ Priority 2
+  ◦ Priority 3
+
+CRITICAL RULES:
+1. HEADERS (###, ####) must NOT have bullets - they stand alone on their own line
+2. Use "-" for top-level bullets under a header
+3. Use "◦" (open circle) with 2-space indent for nested sub-items
+4. Executive Summary should be paragraph text, NOT bullets
+5. Region names (AMER, EMEA, APAC) are #### headers, NOT bulleted items
+
+COLOR CODING:
+- Attainment >=100%: 🟢 (green)
+- Attainment 80-99%: 🟡 (yellow)
+- Attainment <80%: 🔴 (red)
+- Negative gaps: 🔴 prefix
+- Positive gaps: 🟢 prefix
+- HIGH risk: 🔴, MEDIUM risk: 🟡, LOW risk: 🟢
 
 Output the reformatted markdown only, no explanations.`,
 
