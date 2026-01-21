@@ -1,0 +1,5212 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - heading "Q1 2026 Risk Analysis Report" [level=1] [ref=e6]
+        - generic [ref=e7]:
+          - generic [ref=e8]: "Report Date: 2026-01-21"
+          - generic [ref=e9]: "Q1 Progress: 23.3% (21/90 days)"
+          - generic [ref=e10]: "Version: 3.0.0-live"
+          - generic [ref=e11]: "Live Data (Updated: 12:11:59 PM)"
+      - generic [ref=e13]:
+        - generic "When enabled, filter changes will fetch fresh data from BigQuery" [ref=e14] [cursor=pointer]:
+          - checkbox "Live Mode" [checked] [ref=e15]
+          - generic [ref=e16]: Live Mode
+        - button "↻ Refresh" [ref=e17] [cursor=pointer]:
+          - generic [ref=e18]: ↻
+          - text: Refresh
+        - button "Switch to dark mode" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]: 🌙
+          - generic [ref=e21]: Dark
+    - generic [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]: "Product:"
+        - button "All Products" [ref=e25] [cursor=pointer]
+        - button "Point of Rental" [ref=e26] [cursor=pointer]
+        - button "Record360" [ref=e27] [cursor=pointer]
+      - generic [ref=e28]:
+        - generic [ref=e29]: "Region:"
+        - button "All Regions" [ref=e30] [cursor=pointer]
+        - button "AMER" [ref=e31] [cursor=pointer]
+        - button "EMEA" [ref=e32] [cursor=pointer]
+        - button "APAC" [ref=e33] [cursor=pointer]
+      - generic [ref=e34]:
+        - generic [ref=e35]: "Category:"
+        - button "All Categories" [ref=e36] [cursor=pointer]
+        - button "NEW LOGO" [ref=e37] [cursor=pointer]
+        - button "STRATEGIC" [ref=e38] [cursor=pointer]
+        - button "EXPANSION" [ref=e39] [cursor=pointer]
+        - button "MIGRATION" [ref=e40] [cursor=pointer]
+        - button "RENEWAL" [ref=e41] [cursor=pointer]
+      - generic [ref=e42]:
+        - generic [ref=e43]: "Source:"
+        - button "All Sources" [ref=e44] [cursor=pointer]
+        - button "INBOUND" [ref=e45] [cursor=pointer]
+        - button "OUTBOUND" [ref=e46] [cursor=pointer]
+        - button "AE SOURCED" [ref=e47] [cursor=pointer]
+        - button "AM SOURCED" [ref=e48] [cursor=pointer]
+        - button "TRADESHOW" [ref=e49] [cursor=pointer]
+        - button "PARTNERSHIPS" [ref=e50] [cursor=pointer]
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - generic [ref=e53]: "8"
+        - generic [ref=e54]: Exceeding Target
+      - generic [ref=e55]:
+        - generic [ref=e56]: "11"
+        - generic [ref=e57]: At Risk
+      - generic [ref=e58]:
+        - generic [ref=e59]: "3"
+        - generic [ref=e60]: Needs Attention
+      - generic [ref=e61]:
+        - generic [ref=e62]: "1"
+        - generic [ref=e63]: With Momentum
+    - generic [ref=e64]:
+      - heading "1. Executive Summary" [level=2] [ref=e65]
+      - table [ref=e66]:
+        - rowgroup [ref=e67]:
+          - row "Metric Total POR R360" [ref=e68]:
+            - columnheader "Metric" [ref=e69]
+            - columnheader "Total" [ref=e70]
+            - columnheader "POR" [ref=e71]
+            - columnheader "R360" [ref=e72]
+        - rowgroup [ref=e73]:
+          - row "FY Target $16,252,997 $12,485,001 $3,767,996" [ref=e74]:
+            - cell "FY Target" [ref=e75]
+            - cell "$16,252,997" [ref=e76]
+            - cell "$12,485,001" [ref=e77]
+            - cell "$3,767,996" [ref=e78]
+          - row "Q1 Target $4,063,249 $3,121,250 $941,999" [ref=e79]:
+            - cell "Q1 Target" [ref=e80]
+            - cell "$4,063,249" [ref=e81]
+            - cell "$3,121,250" [ref=e82]
+            - cell "$941,999" [ref=e83]
+          - row "QTD Target $1,357,335 $1,081,559 $275,775" [ref=e84]:
+            - cell "QTD Target" [ref=e85]
+            - cell "$1,357,335" [ref=e86]
+            - cell "$1,081,559" [ref=e87]
+            - cell "$275,775" [ref=e88]
+          - row "QTD Actual $1,286,911 $1,168,678 $118,234" [ref=e89]:
+            - cell "QTD Actual" [ref=e90]
+            - cell "$1,286,911" [ref=e91]:
+              - strong [ref=e92]: $1,286,911
+            - cell "$1,168,678" [ref=e93]:
+              - strong [ref=e94]: $1,168,678
+            - cell "$118,234" [ref=e95]:
+              - strong [ref=e96]: $118,234
+          - row "QTD Attainment 95% 108% 43%" [ref=e97]:
+            - cell "QTD Attainment" [ref=e98]
+            - cell "95%" [ref=e99]:
+              - strong [ref=e100]: 95%
+            - cell "108%" [ref=e101]:
+              - strong [ref=e102]: 108%
+            - cell "43%" [ref=e103]:
+              - strong [ref=e104]: 43%
+          - row "Pipeline Coverage 2.1x 2.3x 1.8x" [ref=e105]:
+            - cell "Pipeline Coverage" [ref=e106]
+            - cell "2.1x" [ref=e107]:
+              - strong [ref=e108]: 2.1x
+            - cell "2.3x" [ref=e109]
+            - cell "1.8x" [ref=e110]
+          - row "Win Rate 55% 55% 54%" [ref=e111]:
+            - cell "Win Rate" [ref=e112]
+            - cell "55%" [ref=e113]
+            - cell "55%" [ref=e114]
+            - cell "54%" [ref=e115]
+          - row "Hits / Misses 9 on track / 14 need attention" [ref=e116]:
+            - cell "Hits / Misses" [ref=e117]
+            - cell "9 on track / 14 need attention" [ref=e118]:
+              - strong [ref=e119]: "9"
+              - text: on track /
+              - strong [ref=e120]: "14"
+              - text: need attention
+      - heading "Regional Breakdown" [level=3] [ref=e121]
+      - table [ref=e123]:
+        - rowgroup [ref=e124]:
+          - row "Product Region FY Target Q1 Target QTD Target QTD Actual QTD Var Attainment % Pipeline ACV Pipeline Coverage Win Rate %" [ref=e125]:
+            - columnheader "Product" [ref=e126] [cursor=pointer]:
+              - generic [ref=e127]: Product
+            - columnheader "Region" [ref=e128] [cursor=pointer]:
+              - generic [ref=e129]: Region
+            - columnheader "FY Target" [ref=e130] [cursor=pointer]:
+              - generic [ref=e131]: FY Target
+            - columnheader "Q1 Target" [ref=e132] [cursor=pointer]:
+              - generic [ref=e133]: Q1 Target
+            - columnheader "QTD Target" [ref=e134] [cursor=pointer]:
+              - generic [ref=e135]: QTD Target
+            - columnheader "QTD Actual" [ref=e136] [cursor=pointer]:
+              - generic [ref=e137]: QTD Actual
+            - columnheader "QTD Var" [ref=e138] [cursor=pointer]:
+              - generic [ref=e139]: QTD Var
+            - columnheader "Attainment %" [ref=e140] [cursor=pointer]:
+              - generic [ref=e141]: Attainment %
+            - columnheader "Pipeline ACV" [ref=e142] [cursor=pointer]:
+              - generic [ref=e143]: Pipeline ACV
+            - columnheader "Pipeline Coverage" [ref=e144] [cursor=pointer]:
+              - generic [ref=e145]: Pipeline Coverage
+            - columnheader "Win Rate %" [ref=e146] [cursor=pointer]:
+              - generic [ref=e147]: Win Rate %
+        - rowgroup [ref=e148]:
+          - row "R360 APAC $85,000 $21,250 $4,951 $0 -$4,951 0% $0 0.0x 0%" [ref=e149]:
+            - cell "R360" [ref=e150]
+            - cell "APAC" [ref=e151]
+            - cell "$85,000" [ref=e152]
+            - cell "$21,250" [ref=e153]
+            - cell "$4,951" [ref=e154]
+            - cell "$0" [ref=e155]:
+              - strong [ref=e156]: $0
+            - cell "-$4,951" [ref=e157]
+            - cell "0%" [ref=e158]:
+              - strong [ref=e159]: 0%
+            - cell "$0" [ref=e160]
+            - cell "0.0x" [ref=e161]:
+              - strong [ref=e162]: 0.0x
+            - cell "0%" [ref=e163]
+          - row "R360 AMER $3,234,196 $808,549 $244,681 $79,500 -$165,182 32% $1,244,349 1.7x 56%" [ref=e164]:
+            - cell "R360" [ref=e165]
+            - cell "AMER" [ref=e166]
+            - cell "$3,234,196" [ref=e167]
+            - cell "$808,549" [ref=e168]
+            - cell "$244,681" [ref=e169]
+            - cell "$79,500" [ref=e170]:
+              - strong [ref=e171]: $79,500
+            - cell "-$165,182" [ref=e172]
+            - cell "32%" [ref=e173]:
+              - strong [ref=e174]: 32%
+            - cell "$1,244,349" [ref=e175]
+            - cell "1.7x" [ref=e176]:
+              - strong [ref=e177]: 1.7x
+            - cell "56%" [ref=e178]
+          - row "POR APAC $930,749 $232,687 $80,169 $61,955 -$18,214 77% $1,430,170 8.4x 58%" [ref=e179]:
+            - cell "POR" [ref=e180]
+            - cell "APAC" [ref=e181]
+            - cell "$930,749" [ref=e182]
+            - cell "$232,687" [ref=e183]
+            - cell "$80,169" [ref=e184]
+            - cell "$61,955" [ref=e185]:
+              - strong [ref=e186]: $61,955
+            - cell "-$18,214" [ref=e187]
+            - cell "77%" [ref=e188]:
+              - strong [ref=e189]: 77%
+            - cell "$1,430,170" [ref=e190]
+            - cell "8.4x" [ref=e191]:
+              - strong [ref=e192]: 8.4x
+            - cell "58%" [ref=e193]
+          - row "POR EMEA $4,056,008 $1,014,002 $369,569 $387,035 $17,466 105% $1,532,879 2.4x 57%" [ref=e194]:
+            - cell "POR" [ref=e195]
+            - cell "EMEA" [ref=e196]
+            - cell "$4,056,008" [ref=e197]
+            - cell "$1,014,002" [ref=e198]
+            - cell "$369,569" [ref=e199]
+            - cell "$387,035" [ref=e200]:
+              - strong [ref=e201]: $387,035
+            - cell "$17,466" [ref=e202]
+            - cell "105%" [ref=e203]:
+              - strong [ref=e204]: 105%
+            - cell "$1,532,879" [ref=e205]
+            - cell "2.4x" [ref=e206]:
+              - strong [ref=e207]: 2.4x
+            - cell "57%" [ref=e208]
+          - row "POR AMER $7,498,243 $1,874,561 $631,821 $719,688 $87,866 114% $1,539,575 1.3x 38%" [ref=e209]:
+            - cell "POR" [ref=e210]
+            - cell "AMER" [ref=e211]
+            - cell "$7,498,243" [ref=e212]
+            - cell "$1,874,561" [ref=e213]
+            - cell "$631,821" [ref=e214]
+            - cell "$719,688" [ref=e215]:
+              - strong [ref=e216]: $719,688
+            - cell "$87,866" [ref=e217]
+            - cell "114%" [ref=e218]:
+              - strong [ref=e219]: 114%
+            - cell "$1,539,575" [ref=e220]
+            - cell "1.3x" [ref=e221]:
+              - strong [ref=e222]: 1.3x
+            - cell "38%" [ref=e223]
+          - row "R360 EMEA $448,800 $112,200 $26,143 $38,734 $12,592 148% $212,395 2.9x 9%" [ref=e224]:
+            - cell "R360" [ref=e225]
+            - cell "EMEA" [ref=e226]
+            - cell "$448,800" [ref=e227]
+            - cell "$112,200" [ref=e228]
+            - cell "$26,143" [ref=e229]
+            - cell "$38,734" [ref=e230]:
+              - strong [ref=e231]: $38,734
+            - cell "$12,592" [ref=e232]
+            - cell "148%" [ref=e233]:
+              - strong [ref=e234]: 148%
+            - cell "$212,395" [ref=e235]
+            - cell "2.9x" [ref=e236]:
+              - strong [ref=e237]: 2.9x
+            - cell "9%" [ref=e238]
+    - generic [ref=e239]:
+      - heading "Areas with Momentum" [level=2] [ref=e240]
+      - paragraph [ref=e241]: YELLOW status areas (70-89%) trending toward GREEN based on strong pipeline (≥2x) or funnel pacing (≥90%)
+      - paragraph [ref=e242]: Limited data (23% of quarter) - trends may not be statistically significant
+      - generic [ref=e244]:
+        - generic [ref=e245]:
+          - generic [ref=e246]: POR EMEA
+          - generic [ref=e247]: 📈 MODERATE
+        - generic [ref=e248]: MIGRATION
+        - generic [ref=e249]:
+          - generic [ref=e250]:
+            - generic [ref=e251]: 77%
+            - generic [ref=e252]: Attainment
+          - generic [ref=e253]:
+            - generic [ref=e254]: 13%
+            - generic [ref=e255]: Gap to GREEN
+          - generic [ref=e256]:
+            - generic [ref=e257]: 3.2x
+            - generic [ref=e258]: Pipeline
+        - generic [ref=e259]:
+          - generic [ref=e260]:
+            - generic [ref=e261]: MQL/EQL
+            - generic [ref=e262]: → -12%
+          - generic [ref=e263]:
+            - generic [ref=e264]: SQL
+            - generic [ref=e265]: ↓ -83%
+        - paragraph [ref=e266]: "EMEA MIGRATION at 77% (YELLOW) showing positive momentum: 3.2x pipeline coverage. (early quarter - monitor trends)"
+    - generic [ref=e267]:
+      - heading "2. Attainment by Region & Product" [level=2] [ref=e268]
+      - paragraph [ref=e269]: Click on QTD Actual, Lost, or Pipeline values to view deal details
+      - heading "POR - Point of Rental" [level=3] [ref=e270]
+      - table [ref=e272]:
+        - rowgroup [ref=e273]:
+          - row "Region Cat FY Tgt Q1 Tgt QTD Act QTD Att QTD Var Lost Pipe Cov Win% RAG" [ref=e274]:
+            - columnheader "Region" [ref=e275] [cursor=pointer]:
+              - generic [ref=e276]: Region
+            - columnheader "Cat" [ref=e277] [cursor=pointer]:
+              - generic [ref=e278]: Cat
+            - columnheader "FY Tgt" [ref=e279] [cursor=pointer]:
+              - generic [ref=e280]: FY Tgt
+            - columnheader "Q1 Tgt" [ref=e281] [cursor=pointer]:
+              - generic [ref=e282]: Q1 Tgt
+            - columnheader "QTD Act" [ref=e283] [cursor=pointer]:
+              - generic [ref=e284]: QTD Act
+            - columnheader "QTD Att" [ref=e285] [cursor=pointer]:
+              - generic [ref=e286]: QTD Att
+            - columnheader "QTD Var" [ref=e287] [cursor=pointer]:
+              - generic [ref=e288]: QTD Var
+            - columnheader "Lost" [ref=e289] [cursor=pointer]:
+              - generic [ref=e290]: Lost
+            - columnheader "Pipe" [ref=e291] [cursor=pointer]:
+              - generic [ref=e292]: Pipe
+            - columnheader "Cov" [ref=e293] [cursor=pointer]:
+              - generic [ref=e294]: Cov
+            - columnheader "Win%" [ref=e295] [cursor=pointer]:
+              - generic [ref=e296]: Win%
+            - columnheader "RAG" [ref=e297] [cursor=pointer]:
+              - generic [ref=e298]: RAG
+        - rowgroup [ref=e299]:
+          - row "AMER STRATEGIC $664,400 $166,100 $0 📋 0% -$38,701 $0 $121,874 📋 0.7x 0% RED" [ref=e300]:
+            - cell "AMER" [ref=e301]
+            - cell "STRATEGIC" [ref=e302]
+            - cell "$664,400" [ref=e303]
+            - cell "$166,100" [ref=e304]
+            - cell "$0 📋" [ref=e305] [cursor=pointer]
+            - cell "0%" [ref=e306]
+            - cell "-$38,701" [ref=e307]
+            - cell "$0" [ref=e308]
+            - cell "$121,874 📋" [ref=e309] [cursor=pointer]
+            - cell "0.7x" [ref=e310]
+            - cell "0%" [ref=e311]
+            - cell "RED" [ref=e312]:
+              - generic [ref=e313]: RED
+          - row "APAC MIGRATION $234,600 $58,650 $0 📋 0% -$13,665 $0 $102,945 📋 1.8x 0% RED" [ref=e314]:
+            - cell "APAC" [ref=e315]
+            - cell "MIGRATION" [ref=e316]
+            - cell "$234,600" [ref=e317]
+            - cell "$58,650" [ref=e318]
+            - cell "$0 📋" [ref=e319] [cursor=pointer]
+            - cell "0%" [ref=e320]
+            - cell "-$13,665" [ref=e321]
+            - cell "$0" [ref=e322]
+            - cell "$102,945 📋" [ref=e323] [cursor=pointer]
+            - cell "1.8x" [ref=e324]
+            - cell "0%" [ref=e325]
+            - cell "RED" [ref=e326]:
+              - generic [ref=e327]: RED
+          - row "EMEA STRATEGIC $334,400 $83,600 $0 📋 0% -$19,479 $0 $114,055 📋 1.4x 0% RED" [ref=e328]:
+            - cell "EMEA" [ref=e329]
+            - cell "STRATEGIC" [ref=e330]
+            - cell "$334,400" [ref=e331]
+            - cell "$83,600" [ref=e332]
+            - cell "$0 📋" [ref=e333] [cursor=pointer]
+            - cell "0%" [ref=e334]
+            - cell "-$19,479" [ref=e335]
+            - cell "$0" [ref=e336]
+            - cell "$114,055 📋" [ref=e337] [cursor=pointer]
+            - cell "1.4x" [ref=e338]
+            - cell "0%" [ref=e339]
+            - cell "RED" [ref=e340]:
+              - generic [ref=e341]: RED
+          - row "AMER MIGRATION $1,056,000 $264,000 $24,749 📋 40% -$36,763 $30,867 📋 $357,745 📋 1.5x 25% RED" [ref=e342]:
+            - cell "AMER" [ref=e343]
+            - cell "MIGRATION" [ref=e344]
+            - cell "$1,056,000" [ref=e345]
+            - cell "$264,000" [ref=e346]
+            - cell "$24,749 📋" [ref=e347] [cursor=pointer]
+            - cell "40%" [ref=e348]
+            - cell "-$36,763" [ref=e349]
+            - cell "$30,867 📋" [ref=e350] [cursor=pointer]
+            - cell "$357,745 📋" [ref=e351] [cursor=pointer]
+            - cell "1.5x" [ref=e352]
+            - cell "25%" [ref=e353]
+            - cell "RED" [ref=e354]:
+              - generic [ref=e355]: RED
+          - row "APAC NEW LOGO $376,000 $94,000 $8,679 📋 40% -$13,223 $0 $233,534 📋 2.7x 100% RED" [ref=e356]:
+            - cell "APAC" [ref=e357]
+            - cell "NEW LOGO" [ref=e358]
+            - cell "$376,000" [ref=e359]
+            - cell "$94,000" [ref=e360]
+            - cell "$8,679 📋" [ref=e361] [cursor=pointer]
+            - cell "40%" [ref=e362]
+            - cell "-$13,223" [ref=e363]
+            - cell "$0" [ref=e364]
+            - cell "$233,534 📋" [ref=e365] [cursor=pointer]
+            - cell "2.7x" [ref=e366]
+            - cell "100%" [ref=e367]
+            - cell "RED" [ref=e368]:
+              - generic [ref=e369]: RED
+          - row "EMEA RENEWAL $695,208 $173,802 $84,891 📋 49% -$88,911 $0 $133,303 📋 0.8x 100% RED" [ref=e370]:
+            - cell "EMEA" [ref=e371]
+            - cell "RENEWAL" [ref=e372]
+            - cell "$695,208" [ref=e373]
+            - cell "$173,802" [ref=e374]
+            - cell "$84,891 📋" [ref=e375] [cursor=pointer]
+            - cell "49%" [ref=e376]
+            - cell "-$88,911" [ref=e377]
+            - cell "$0" [ref=e378]
+            - cell "$133,303 📋" [ref=e379] [cursor=pointer]
+            - cell "0.8x" [ref=e380]
+            - cell "100%" [ref=e381]
+            - cell "RED" [ref=e382]:
+              - generic [ref=e383]: RED
+          - row "EMEA MIGRATION $1,094,400 $273,600 $49,083 📋 77% -$14,666 $49,106 📋 $710,866 📋 3.2x 43% YELLOW" [ref=e384]:
+            - cell "EMEA" [ref=e385]
+            - cell "MIGRATION" [ref=e386]
+            - cell "$1,094,400" [ref=e387]
+            - cell "$273,600" [ref=e388]
+            - cell "$49,083 📋" [ref=e389] [cursor=pointer]
+            - cell "77%" [ref=e390]
+            - cell "-$14,666" [ref=e391]
+            - cell "$49,106 📋" [ref=e392] [cursor=pointer]
+            - cell "$710,866 📋" [ref=e393] [cursor=pointer]
+            - cell "3.2x" [ref=e394]
+            - cell "43%" [ref=e395]
+            - cell "YELLOW" [ref=e396]:
+              - generic [ref=e397]: YELLOW
+          - row "APAC RENEWAL $135,349 $33,837 $28,792 📋 85% -$5,046 $0 $33,663 📋 1.1x 100% YELLOW" [ref=e398]:
+            - cell "APAC" [ref=e399]
+            - cell "RENEWAL" [ref=e400]
+            - cell "$135,349" [ref=e401]
+            - cell "$33,837" [ref=e402]
+            - cell "$28,792 📋" [ref=e403] [cursor=pointer]
+            - cell "85%" [ref=e404]
+            - cell "-$5,046" [ref=e405]
+            - cell "$0" [ref=e406]
+            - cell "$33,663 📋" [ref=e407] [cursor=pointer]
+            - cell "1.1x" [ref=e408]
+            - cell "100%" [ref=e409]
+            - cell "YELLOW" [ref=e410]:
+              - generic [ref=e411]: YELLOW
+          - row "AMER NEW LOGO $1,432,640 $358,160 $77,927 📋 93% -$5,524 $69,064 📋 $312,816 📋 1.1x 17% GREEN" [ref=e412]:
+            - cell "AMER" [ref=e413]
+            - cell "NEW LOGO" [ref=e414]
+            - cell "$1,432,640" [ref=e415]
+            - cell "$358,160" [ref=e416]
+            - cell "$77,927 📋" [ref=e417] [cursor=pointer]
+            - cell "93%" [ref=e418]
+            - cell "-$5,524" [ref=e419]
+            - cell "$69,064 📋" [ref=e420] [cursor=pointer]
+            - cell "$312,816 📋" [ref=e421] [cursor=pointer]
+            - cell "1.1x" [ref=e422]
+            - cell "17%" [ref=e423]
+            - cell "GREEN" [ref=e424]:
+              - generic [ref=e425]: GREEN
+          - row "APAC STRATEGIC $0 $0 $0 📋 100% $0 $0 $1,053,859 📋 0.0x 0% GREEN" [ref=e426]:
+            - cell "APAC" [ref=e427]
+            - cell "STRATEGIC" [ref=e428]
+            - cell "$0" [ref=e429]
+            - cell "$0" [ref=e430]
+            - cell "$0 📋" [ref=e431] [cursor=pointer]
+            - cell "100%" [ref=e432]
+            - cell "$0" [ref=e433]
+            - cell "$0" [ref=e434]
+            - cell "$1,053,859 📋" [ref=e435] [cursor=pointer]
+            - cell "0.0x" [ref=e436]
+            - cell "0%" [ref=e437]
+            - cell "GREEN" [ref=e438]:
+              - generic [ref=e439]: GREEN
+          - row "AMER RENEWAL $1,017,203 $254,301 $332,899 📋 131% $78,598 $0 $428,494 📋 1.9x 100% GREEN" [ref=e440]:
+            - cell "AMER" [ref=e441]
+            - cell "RENEWAL" [ref=e442]
+            - cell "$1,017,203" [ref=e443]
+            - cell "$254,301" [ref=e444]
+            - cell "$332,899 📋" [ref=e445] [cursor=pointer]
+            - cell "131%" [ref=e446]
+            - cell "$78,598" [ref=e447]
+            - cell "$0" [ref=e448]
+            - cell "$428,494 📋" [ref=e449] [cursor=pointer]
+            - cell "1.9x" [ref=e450]
+            - cell "100%" [ref=e451]
+            - cell "GREEN" [ref=e452]:
+              - generic [ref=e453]: GREEN
+          - row "AMER EXPANSION $3,328,000 $832,000 $284,113 📋 147% $90,257 $209,925 📋 $318,646 📋 0.6x 47% GREEN" [ref=e454]:
+            - cell "AMER" [ref=e455]
+            - cell "EXPANSION" [ref=e456]
+            - cell "$3,328,000" [ref=e457]
+            - cell "$832,000" [ref=e458]
+            - cell "$284,113 📋" [ref=e459] [cursor=pointer]
+            - cell "147%" [ref=e460]
+            - cell "$90,257" [ref=e461]
+            - cell "$209,925 📋" [ref=e462] [cursor=pointer]
+            - cell "$318,646 📋" [ref=e463] [cursor=pointer]
+            - cell "0.6x" [ref=e464]
+            - cell "47%" [ref=e465]
+            - cell "GREEN" [ref=e466]:
+              - generic [ref=e467]: GREEN
+          - row "EMEA NEW LOGO $712,800 $178,200 $68,361 📋 165% $26,840 $4,940 📋 $234,121 📋 2.1x 63% GREEN" [ref=e468]:
+            - cell "EMEA" [ref=e469]
+            - cell "NEW LOGO" [ref=e470]
+            - cell "$712,800" [ref=e471]
+            - cell "$178,200" [ref=e472]
+            - cell "$68,361 📋" [ref=e473] [cursor=pointer]
+            - cell "165%" [ref=e474]
+            - cell "$26,840" [ref=e475]
+            - cell "$4,940 📋" [ref=e476] [cursor=pointer]
+            - cell "$234,121 📋" [ref=e477] [cursor=pointer]
+            - cell "2.1x" [ref=e478]
+            - cell "63%" [ref=e479]
+            - cell "GREEN" [ref=e480]:
+              - generic [ref=e481]: GREEN
+          - row "APAC EXPANSION $184,800 $46,200 $24,484 📋 227% $13,720 $4,390 📋 $6,168 📋 0.3x 89% GREEN" [ref=e482]:
+            - cell "APAC" [ref=e483]
+            - cell "EXPANSION" [ref=e484]
+            - cell "$184,800" [ref=e485]
+            - cell "$46,200" [ref=e486]
+            - cell "$24,484 📋" [ref=e487] [cursor=pointer]
+            - cell "227%" [ref=e488]
+            - cell "$13,720" [ref=e489]
+            - cell "$4,390 📋" [ref=e490] [cursor=pointer]
+            - cell "$6,168 📋" [ref=e491] [cursor=pointer]
+            - cell "0.3x" [ref=e492]
+            - cell "89%" [ref=e493]
+            - cell "GREEN" [ref=e494]:
+              - generic [ref=e495]: GREEN
+          - row "EMEA EXPANSION $1,219,200 $304,800 $184,701 📋 260% $113,682 $7,336 📋 $340,534 📋 2.8x 79% GREEN" [ref=e496]:
+            - cell "EMEA" [ref=e497]
+            - cell "EXPANSION" [ref=e498]
+            - cell "$1,219,200" [ref=e499]
+            - cell "$304,800" [ref=e500]
+            - cell "$184,701 📋" [ref=e501] [cursor=pointer]
+            - cell "260%" [ref=e502]
+            - cell "$113,682" [ref=e503]
+            - cell "$7,336 📋" [ref=e504] [cursor=pointer]
+            - cell "$340,534 📋" [ref=e505] [cursor=pointer]
+            - cell "2.8x" [ref=e506]
+            - cell "79%" [ref=e507]
+            - cell "GREEN" [ref=e508]:
+              - generic [ref=e509]: GREEN
+      - heading "R360 - Record360" [level=3] [ref=e510]
+      - table [ref=e512]:
+        - rowgroup [ref=e513]:
+          - row "Region Cat FY Tgt Q1 Tgt QTD Act QTD Att QTD Var Lost Pipe Cov Win% RAG" [ref=e514]:
+            - columnheader "Region" [ref=e515] [cursor=pointer]:
+              - generic [ref=e516]: Region
+            - columnheader "Cat" [ref=e517] [cursor=pointer]:
+              - generic [ref=e518]: Cat
+            - columnheader "FY Tgt" [ref=e519] [cursor=pointer]:
+              - generic [ref=e520]: FY Tgt
+            - columnheader "Q1 Tgt" [ref=e521] [cursor=pointer]:
+              - generic [ref=e522]: Q1 Tgt
+            - columnheader "QTD Act" [ref=e523] [cursor=pointer]:
+              - generic [ref=e524]: QTD Act
+            - columnheader "QTD Att" [ref=e525] [cursor=pointer]:
+              - generic [ref=e526]: QTD Att
+            - columnheader "QTD Var" [ref=e527] [cursor=pointer]:
+              - generic [ref=e528]: QTD Var
+            - columnheader "Lost" [ref=e529] [cursor=pointer]:
+              - generic [ref=e530]: Lost
+            - columnheader "Pipe" [ref=e531] [cursor=pointer]:
+              - generic [ref=e532]: Pipe
+            - columnheader "Cov" [ref=e533] [cursor=pointer]:
+              - generic [ref=e534]: Cov
+            - columnheader "Win%" [ref=e535] [cursor=pointer]:
+              - generic [ref=e536]: Win%
+            - columnheader "RAG" [ref=e537] [cursor=pointer]:
+              - generic [ref=e538]: RAG
+        - rowgroup [ref=e539]:
+          - row "AMER STRATEGIC $486,400 $121,600 $0 📋 0% -$28,333 $0 $112,320 📋 0.9x 0% RED" [ref=e540]:
+            - cell "AMER" [ref=e541]
+            - cell "STRATEGIC" [ref=e542]
+            - cell "$486,400" [ref=e543]
+            - cell "$121,600" [ref=e544]
+            - cell "$0 📋" [ref=e545] [cursor=pointer]
+            - cell "0%" [ref=e546]
+            - cell "-$28,333" [ref=e547]
+            - cell "$0" [ref=e548]
+            - cell "$112,320 📋" [ref=e549] [cursor=pointer]
+            - cell "0.9x" [ref=e550]
+            - cell "0%" [ref=e551]
+            - cell "RED" [ref=e552]:
+              - generic [ref=e553]: RED
+          - row "APAC EXPANSION $3,400 $850 $0 📋 0% -$198 $0 $0 📋 0.0x 0% RED" [ref=e554]:
+            - cell "APAC" [ref=e555]
+            - cell "EXPANSION" [ref=e556]
+            - cell "$3,400" [ref=e557]
+            - cell "$850" [ref=e558]
+            - cell "$0 📋" [ref=e559] [cursor=pointer]
+            - cell "0%" [ref=e560]
+            - cell "-$198" [ref=e561]
+            - cell "$0" [ref=e562]
+            - cell "$0 📋" [ref=e563] [cursor=pointer]
+            - cell "0.0x" [ref=e564]
+            - cell "0%" [ref=e565]
+            - cell "RED" [ref=e566]:
+              - generic [ref=e567]: RED
+          - row "APAC NEW LOGO $81,600 $20,400 $0 📋 0% -$4,753 $11,040 📋 $0 📋 0.0x 0% RED" [ref=e568]:
+            - cell "APAC" [ref=e569]
+            - cell "NEW LOGO" [ref=e570]
+            - cell "$81,600" [ref=e571]
+            - cell "$20,400" [ref=e572]
+            - cell "$0 📋" [ref=e573] [cursor=pointer]
+            - cell "0%" [ref=e574]
+            - cell "-$4,753" [ref=e575]
+            - cell "$11,040 📋" [ref=e576] [cursor=pointer]
+            - cell "$0 📋" [ref=e577] [cursor=pointer]
+            - cell "0.0x" [ref=e578]
+            - cell "0%" [ref=e579]
+            - cell "RED" [ref=e580]:
+              - generic [ref=e581]: RED
+          - row "AMER RENEWAL $293,556 $73,389 $7,704 📋 10% -$65,685 $0 $0 📋 0.0x 100% RED" [ref=e582]:
+            - cell "AMER" [ref=e583]
+            - cell "RENEWAL" [ref=e584]
+            - cell "$293,556" [ref=e585]
+            - cell "$73,389" [ref=e586]
+            - cell "$7,704 📋" [ref=e587] [cursor=pointer]
+            - cell "10%" [ref=e588]
+            - cell "-$65,685" [ref=e589]
+            - cell "$0" [ref=e590]
+            - cell "$0 📋" [ref=e591] [cursor=pointer]
+            - cell "0.0x" [ref=e592]
+            - cell "100%" [ref=e593]
+            - cell "RED" [ref=e594]:
+              - generic [ref=e595]: RED
+          - row "AMER NEW LOGO $1,614,240 $403,560 $34,620 📋 37% -$59,410 $137,937 📋 $922,029 📋 2.5x 23% RED" [ref=e596]:
+            - cell "AMER" [ref=e597]
+            - cell "NEW LOGO" [ref=e598]
+            - cell "$1,614,240" [ref=e599]
+            - cell "$403,560" [ref=e600]
+            - cell "$34,620 📋" [ref=e601] [cursor=pointer]
+            - cell "37%" [ref=e602]
+            - cell "-$59,410" [ref=e603]
+            - cell "$137,937 📋" [ref=e604] [cursor=pointer]
+            - cell "$922,029 📋" [ref=e605] [cursor=pointer]
+            - cell "2.5x" [ref=e606]
+            - cell "23%" [ref=e607]
+            - cell "RED" [ref=e608]:
+              - generic [ref=e609]: RED
+          - row "AMER EXPANSION $840,000 $210,000 $37,176 📋 76% -$11,754 $0 $210,000 📋 1.2x 100% YELLOW" [ref=e610]:
+            - cell "AMER" [ref=e611]
+            - cell "EXPANSION" [ref=e612]
+            - cell "$840,000" [ref=e613]
+            - cell "$210,000" [ref=e614]
+            - cell "$37,176 📋" [ref=e615] [cursor=pointer]
+            - cell "76%" [ref=e616]
+            - cell "-$11,754" [ref=e617]
+            - cell "$0" [ref=e618]
+            - cell "$210,000 📋" [ref=e619] [cursor=pointer]
+            - cell "1.2x" [ref=e620]
+            - cell "100%" [ref=e621]
+            - cell "YELLOW" [ref=e622]:
+              - generic [ref=e623]: YELLOW
+          - row "EMEA EXPANSION $0 $0 $0 📋 100% $0 $7,519 📋 $19,435 📋 0.0x 0% GREEN" [ref=e624]:
+            - cell "EMEA" [ref=e625]
+            - cell "EXPANSION" [ref=e626]
+            - cell "$0" [ref=e627]
+            - cell "$0" [ref=e628]
+            - cell "$0 📋" [ref=e629] [cursor=pointer]
+            - cell "100%" [ref=e630]
+            - cell "$0" [ref=e631]
+            - cell "$7,519 📋" [ref=e632] [cursor=pointer]
+            - cell "$19,435 📋" [ref=e633] [cursor=pointer]
+            - cell "0.0x" [ref=e634]
+            - cell "0%" [ref=e635]
+            - cell "GREEN" [ref=e636]:
+              - generic [ref=e637]: GREEN
+          - row "EMEA NEW LOGO $448,800 $112,200 $38,734 📋 148% $12,592 $90,532 📋 $192,959 📋 2.6x 18% GREEN" [ref=e638]:
+            - cell "EMEA" [ref=e639]
+            - cell "NEW LOGO" [ref=e640]
+            - cell "$448,800" [ref=e641]
+            - cell "$112,200" [ref=e642]
+            - cell "$38,734 📋" [ref=e643] [cursor=pointer]
+            - cell "148%" [ref=e644]
+            - cell "$12,592" [ref=e645]
+            - cell "$90,532 📋" [ref=e646] [cursor=pointer]
+            - cell "$192,959 📋" [ref=e647] [cursor=pointer]
+            - cell "2.6x" [ref=e648]
+            - cell "18%" [ref=e649]
+            - cell "GREEN" [ref=e650]:
+              - generic [ref=e651]: GREEN
+    - generic [ref=e652]:
+      - heading "3. Source Attainment by Channel" [level=2] [ref=e653]
+      - heading "POR ACV by Source" [level=3] [ref=e654]
+      - paragraph [ref=e655]: As of 2026-01-21 (23.3% Q1 - Day 21/90)
+      - table [ref=e657]:
+        - rowgroup [ref=e658]:
+          - row "Region Source Q1 Tgt QTD Tgt QTD Act Att% QTD Var RAG" [ref=e659]:
+            - columnheader "Region" [ref=e660] [cursor=pointer]:
+              - generic [ref=e661]: Region
+            - columnheader "Source" [ref=e662] [cursor=pointer]:
+              - generic [ref=e663]: Source
+            - columnheader "Q1 Tgt" [ref=e664] [cursor=pointer]:
+              - generic [ref=e665]: Q1 Tgt
+            - columnheader "QTD Tgt" [ref=e666] [cursor=pointer]:
+              - generic [ref=e667]: QTD Tgt
+            - columnheader "QTD Act" [ref=e668] [cursor=pointer]:
+              - generic [ref=e669]: QTD Act
+            - columnheader "Att%" [ref=e670] [cursor=pointer]:
+              - generic [ref=e671]: Att%
+            - columnheader "QTD Var" [ref=e672] [cursor=pointer]:
+              - generic [ref=e673]: QTD Var
+            - columnheader "RAG" [ref=e674] [cursor=pointer]:
+              - generic [ref=e675]: RAG
+        - rowgroup [ref=e676]:
+          - row "AMER TRADESHOW $89,330 $20,814 $0 0% -$20,814 RED" [ref=e677]:
+            - cell "AMER" [ref=e678]
+            - cell "TRADESHOW" [ref=e679]
+            - cell "$89,330" [ref=e680]
+            - cell "$20,814" [ref=e681]
+            - cell "$0" [ref=e682]
+            - cell "0%" [ref=e683]
+            - cell "-$20,814" [ref=e684]
+            - cell "RED" [ref=e685]:
+              - generic [ref=e686]: RED
+          - row "APAC AE SOURCED $19,091 $4,448 $0 0% -$4,448 RED" [ref=e687]:
+            - cell "APAC" [ref=e688]
+            - cell "AE SOURCED" [ref=e689]
+            - cell "$19,091" [ref=e690]
+            - cell "$4,448" [ref=e691]
+            - cell "$0" [ref=e692]
+            - cell "0%" [ref=e693]
+            - cell "-$4,448" [ref=e694]
+            - cell "RED" [ref=e695]:
+              - generic [ref=e696]: RED
+          - row "APAC OUTBOUND $15,595 $3,634 $0 0% -$3,634 RED" [ref=e697]:
+            - cell "APAC" [ref=e698]
+            - cell "OUTBOUND" [ref=e699]
+            - cell "$15,595" [ref=e700]
+            - cell "$3,634" [ref=e701]
+            - cell "$0" [ref=e702]
+            - cell "0%" [ref=e703]
+            - cell "-$3,634" [ref=e704]
+            - cell "RED" [ref=e705]:
+              - generic [ref=e706]: RED
+          - row "APAC TRADESHOW $5,847 $1,362 $0 0% -$1,362 RED" [ref=e707]:
+            - cell "APAC" [ref=e708]
+            - cell "TRADESHOW" [ref=e709]
+            - cell "$5,847" [ref=e710]
+            - cell "$1,362" [ref=e711]
+            - cell "$0" [ref=e712]
+            - cell "0%" [ref=e713]
+            - cell "-$1,362" [ref=e714]
+            - cell "RED" [ref=e715]:
+              - generic [ref=e716]: RED
+          - row "EMEA TRADESHOW $16,989 $3,958 $0 0% -$3,958 RED" [ref=e717]:
+            - cell "EMEA" [ref=e718]
+            - cell "TRADESHOW" [ref=e719]
+            - cell "$16,989" [ref=e720]
+            - cell "$3,958" [ref=e721]
+            - cell "$0" [ref=e722]
+            - cell "0%" [ref=e723]
+            - cell "-$3,958" [ref=e724]
+            - cell "RED" [ref=e725]:
+              - generic [ref=e726]: RED
+          - row "AMER AE SOURCED $53,888 $12,556 $420 3% -$12,136 RED" [ref=e727]:
+            - cell "AMER" [ref=e728]
+            - cell "AE SOURCED" [ref=e729]
+            - cell "$53,888" [ref=e730]
+            - cell "$12,556" [ref=e731]
+            - cell "$420" [ref=e732]
+            - cell "3%" [ref=e733]
+            - cell "-$12,136" [ref=e734]
+            - cell "RED" [ref=e735]:
+              - generic [ref=e736]: RED
+          - row "AMER OUTBOUND $138,796 $32,339 $8,589 27% -$23,750 RED" [ref=e737]:
+            - cell "AMER" [ref=e738]
+            - cell "OUTBOUND" [ref=e739]
+            - cell "$138,796" [ref=e740]
+            - cell "$32,339" [ref=e741]
+            - cell "$8,589" [ref=e742]
+            - cell "27%" [ref=e743]
+            - cell "-$23,750" [ref=e744]
+            - cell "RED" [ref=e745]:
+              - generic [ref=e746]: RED
+          - row "EMEA OUTBOUND $110,450 $25,735 $14,199 55% -$11,536 RED" [ref=e747]:
+            - cell "EMEA" [ref=e748]
+            - cell "OUTBOUND" [ref=e749]
+            - cell "$110,450" [ref=e750]
+            - cell "$25,735" [ref=e751]
+            - cell "$14,199" [ref=e752]
+            - cell "55%" [ref=e753]
+            - cell "-$11,536" [ref=e754]
+            - cell "RED" [ref=e755]:
+              - generic [ref=e756]: RED
+          - row "APAC INBOUND $72,524 $16,898 $11,206 66% -$5,692 RED" [ref=e757]:
+            - cell "APAC" [ref=e758]
+            - cell "INBOUND" [ref=e759]
+            - cell "$72,524" [ref=e760]
+            - cell "$16,898" [ref=e761]
+            - cell "$11,206" [ref=e762]
+            - cell "66%" [ref=e763]
+            - cell "-$5,692" [ref=e764]
+            - cell "RED" [ref=e765]:
+              - generic [ref=e766]: RED
+          - row "EMEA INBOUND $236,070 $55,004 $45,231 82% -$9,773 YELLOW" [ref=e767]:
+            - cell "EMEA" [ref=e768]
+            - cell "INBOUND" [ref=e769]
+            - cell "$236,070" [ref=e770]
+            - cell "$55,004" [ref=e771]
+            - cell "$45,231" [ref=e772]
+            - cell "82%" [ref=e773]
+            - cell "-$9,773" [ref=e774]
+            - cell "YELLOW" [ref=e775]:
+              - generic [ref=e776]: YELLOW
+          - row "AMER AM SOURCED $745,757 $173,761 $191,092 110% $17,331 GREEN" [ref=e777]:
+            - cell "AMER" [ref=e778]
+            - cell "AM SOURCED" [ref=e779]
+            - cell "$745,757" [ref=e780]
+            - cell "$173,761" [ref=e781]
+            - cell "$191,092" [ref=e782]
+            - cell "110%" [ref=e783]
+            - cell "$17,331" [ref=e784]
+            - cell "GREEN" [ref=e785]:
+              - generic [ref=e786]: GREEN
+          - row "APAC AM SOURCED $85,793 $19,990 $24,484 122% $4,494 GREEN" [ref=e787]:
+            - cell "APAC" [ref=e788]
+            - cell "AM SOURCED" [ref=e789]
+            - cell "$85,793" [ref=e790]
+            - cell "$19,990" [ref=e791]
+            - cell "$24,484" [ref=e792]
+            - cell "122%" [ref=e793]
+            - cell "$4,494" [ref=e794]
+            - cell "GREEN" [ref=e795]:
+              - generic [ref=e796]: GREEN
+          - row "AMER INBOUND $592,536 $138,061 $209,514 152% $71,453 GREEN" [ref=e797]:
+            - cell "AMER" [ref=e798]
+            - cell "INBOUND" [ref=e799]
+            - cell "$592,536" [ref=e800]
+            - cell "$138,061" [ref=e801]
+            - cell "$209,514" [ref=e802]
+            - cell "152%" [ref=e803]
+            - cell "$71,453" [ref=e804]
+            - cell "GREEN" [ref=e805]:
+              - generic [ref=e806]: GREEN
+          - row "EMEA AM SOURCED $506,262 $117,959 $184,701 157% $66,742 GREEN" [ref=e807]:
+            - cell "EMEA" [ref=e808]
+            - cell "AM SOURCED" [ref=e809]
+            - cell "$506,262" [ref=e810]
+            - cell "$117,959" [ref=e811]
+            - cell "$184,701" [ref=e812]
+            - cell "157%" [ref=e813]
+            - cell "$66,742" [ref=e814]
+            - cell "GREEN" [ref=e815]:
+              - generic [ref=e816]: GREEN
+          - row "EMEA AE SOURCED $70,967 $16,535 $60,329 365% $43,794 GREEN" [ref=e817]:
+            - cell "EMEA" [ref=e818]
+            - cell "AE SOURCED" [ref=e819]
+            - cell "$70,967" [ref=e820]
+            - cell "$16,535" [ref=e821]
+            - cell "$60,329" [ref=e822]
+            - cell "365%" [ref=e823]
+            - cell "$43,794" [ref=e824]
+            - cell "GREEN" [ref=e825]:
+              - generic [ref=e826]: GREEN
+      - heading "R360 ACV by Source" [level=3] [ref=e827]
+      - paragraph [ref=e828]: As of 2026-01-21 (23.3% Q1 - Day 21/90)
+      - table [ref=e830]:
+        - rowgroup [ref=e831]:
+          - row "Region Source Q1 Tgt QTD Tgt QTD Act Att% QTD Var RAG" [ref=e832]:
+            - columnheader "Region" [ref=e833] [cursor=pointer]:
+              - generic [ref=e834]: Region
+            - columnheader "Source" [ref=e835] [cursor=pointer]:
+              - generic [ref=e836]: Source
+            - columnheader "Q1 Tgt" [ref=e837] [cursor=pointer]:
+              - generic [ref=e838]: Q1 Tgt
+            - columnheader "QTD Tgt" [ref=e839] [cursor=pointer]:
+              - generic [ref=e840]: QTD Tgt
+            - columnheader "QTD Act" [ref=e841] [cursor=pointer]:
+              - generic [ref=e842]: QTD Act
+            - columnheader "Att%" [ref=e843] [cursor=pointer]:
+              - generic [ref=e844]: Att%
+            - columnheader "QTD Var" [ref=e845] [cursor=pointer]:
+              - generic [ref=e846]: QTD Var
+            - columnheader "RAG" [ref=e847] [cursor=pointer]:
+              - generic [ref=e848]: RAG
+        - rowgroup [ref=e849]:
+          - row "AMER OUTBOUND $117,550 $27,389 $0 0% -$27,389 RED" [ref=e850]:
+            - cell "AMER" [ref=e851]
+            - cell "OUTBOUND" [ref=e852]
+            - cell "$117,550" [ref=e853]
+            - cell "$27,389" [ref=e854]
+            - cell "$0" [ref=e855]
+            - cell "0%" [ref=e856]
+            - cell "-$27,389" [ref=e857]
+            - cell "RED" [ref=e858]:
+              - generic [ref=e859]: RED
+          - row "AMER PARTNERSHIPS $15,049 $3,506 $0 0% -$3,506 RED" [ref=e860]:
+            - cell "AMER" [ref=e861]
+            - cell "PARTNERSHIPS" [ref=e862]
+            - cell "$15,049" [ref=e863]
+            - cell "$3,506" [ref=e864]
+            - cell "$0" [ref=e865]
+            - cell "0%" [ref=e866]
+            - cell "-$3,506" [ref=e867]
+            - cell "RED" [ref=e868]:
+              - generic [ref=e869]: RED
+          - row "AMER TRADESHOW $33,837 $7,884 $0 0% -$7,884 RED" [ref=e870]:
+            - cell "AMER" [ref=e871]
+            - cell "TRADESHOW" [ref=e872]
+            - cell "$33,837" [ref=e873]
+            - cell "$7,884" [ref=e874]
+            - cell "$0" [ref=e875]
+            - cell "0%" [ref=e876]
+            - cell "-$7,884" [ref=e877]
+            - cell "RED" [ref=e878]:
+              - generic [ref=e879]: RED
+          - row "APAC AE SOURCED $8,919 $2,078 $0 0% -$2,078 RED" [ref=e880]:
+            - cell "APAC" [ref=e881]
+            - cell "AE SOURCED" [ref=e882]
+            - cell "$8,919" [ref=e883]
+            - cell "$2,078" [ref=e884]
+            - cell "$0" [ref=e885]
+            - cell "0%" [ref=e886]
+            - cell "-$2,078" [ref=e887]
+            - cell "RED" [ref=e888]:
+              - generic [ref=e889]: RED
+          - row "APAC AM SOURCED $27 $6 $0 0% -$6 RED" [ref=e890]:
+            - cell "APAC" [ref=e891]
+            - cell "AM SOURCED" [ref=e892]
+            - cell "$27" [ref=e893]
+            - cell "$6" [ref=e894]
+            - cell "$0" [ref=e895]
+            - cell "0%" [ref=e896]
+            - cell "-$6" [ref=e897]
+            - cell "RED" [ref=e898]:
+              - generic [ref=e899]: RED
+          - row "APAC INBOUND $10,299 $2,400 $0 0% -$2,400 RED" [ref=e900]:
+            - cell "APAC" [ref=e901]
+            - cell "INBOUND" [ref=e902]
+            - cell "$10,299" [ref=e903]
+            - cell "$2,400" [ref=e904]
+            - cell "$0" [ref=e905]
+            - cell "0%" [ref=e906]
+            - cell "-$2,400" [ref=e907]
+            - cell "RED" [ref=e908]:
+              - generic [ref=e909]: RED
+          - row "APAC TRADESHOW $2,007 $468 $0 0% -$468 RED" [ref=e910]:
+            - cell "APAC" [ref=e911]
+            - cell "TRADESHOW" [ref=e912]
+            - cell "$2,007" [ref=e913]
+            - cell "$468" [ref=e914]
+            - cell "$0" [ref=e915]
+            - cell "0%" [ref=e916]
+            - cell "-$468" [ref=e917]
+            - cell "RED" [ref=e918]:
+              - generic [ref=e919]: RED
+          - row "EMEA OUTBOUND $12,252 $2,855 $0 0% -$2,855 RED" [ref=e920]:
+            - cell "EMEA" [ref=e921]
+            - cell "OUTBOUND" [ref=e922]
+            - cell "$12,252" [ref=e923]
+            - cell "$2,855" [ref=e924]
+            - cell "$0" [ref=e925]
+            - cell "0%" [ref=e926]
+            - cell "-$2,855" [ref=e927]
+            - cell "RED" [ref=e928]:
+              - generic [ref=e929]: RED
+          - row "EMEA INBOUND $79,471 $18,517 $2,430 13% -$16,087 RED" [ref=e930]:
+            - cell "EMEA" [ref=e931]
+            - cell "INBOUND" [ref=e932]
+            - cell "$79,471" [ref=e933]
+            - cell "$18,517" [ref=e934]
+            - cell "$2,430" [ref=e935]
+            - cell "13%" [ref=e936]
+            - cell "-$16,087" [ref=e937]
+            - cell "RED" [ref=e938]:
+              - generic [ref=e939]: RED
+          - row "AMER AE SOURCED $291,931 $68,020 $22,932 34% -$45,088 RED" [ref=e940]:
+            - cell "AMER" [ref=e941]
+            - cell "AE SOURCED" [ref=e942]
+            - cell "$291,931" [ref=e943]
+            - cell "$68,020" [ref=e944]
+            - cell "$22,932" [ref=e945]
+            - cell "34%" [ref=e946]
+            - cell "-$45,088" [ref=e947]
+            - cell "RED" [ref=e948]:
+              - generic [ref=e949]: RED
+          - row "EMEA AE SOURCED $44,005 $10,253 $4,405 43% -$5,848 RED" [ref=e950]:
+            - cell "EMEA" [ref=e951]
+            - cell "AE SOURCED" [ref=e952]
+            - cell "$44,005" [ref=e953]
+            - cell "$10,253" [ref=e954]
+            - cell "$4,405" [ref=e955]
+            - cell "43%" [ref=e956]
+            - cell "-$5,848" [ref=e957]
+            - cell "RED" [ref=e958]:
+              - generic [ref=e959]: RED
+          - row "AMER INBOUND $272,616 $63,520 $44,904 71% -$18,616 YELLOW" [ref=e960]:
+            - cell "AMER" [ref=e961]
+            - cell "INBOUND" [ref=e962]
+            - cell "$272,616" [ref=e963]
+            - cell "$63,520" [ref=e964]
+            - cell "$44,904" [ref=e965]
+            - cell "71%" [ref=e966]
+            - cell "-$18,616" [ref=e967]
+            - cell "YELLOW" [ref=e968]:
+              - generic [ref=e969]: YELLOW
+          - row "AMER AM SOURCED $4,158 $969 $11,664 1204% $10,695 GREEN" [ref=e970]:
+            - cell "AMER" [ref=e971]
+            - cell "AM SOURCED" [ref=e972]
+            - cell "$4,158" [ref=e973]
+            - cell "$969" [ref=e974]
+            - cell "$11,664" [ref=e975]
+            - cell "1204%" [ref=e976]
+            - cell "$10,695" [ref=e977]
+            - cell "GREEN" [ref=e978]:
+              - generic [ref=e979]: GREEN
+          - row "EMEA TRADESHOW $9,189 $2,141 $31,899 1490% $29,758 GREEN" [ref=e980]:
+            - cell "EMEA" [ref=e981]
+            - cell "TRADESHOW" [ref=e982]
+            - cell "$9,189" [ref=e983]
+            - cell "$2,141" [ref=e984]
+            - cell "$31,899" [ref=e985]
+            - cell "1490%" [ref=e986]
+            - cell "$29,758" [ref=e987]
+            - cell "GREEN" [ref=e988]:
+              - generic [ref=e989]: GREEN
+      - heading "Full Funnel Attainment by Category (EQL/MQL → SQO)" [level=3] [ref=e990]
+      - paragraph [ref=e991]: "EQL for EXPANSION/MIGRATION, MQL for NEW LOGO/STRATEGIC | TOF Score: POR (10% MQL + 20% SQL + 30% SAL + 40% SQO) | R360 (14% MQL + 29% SQL + 57% SQO - no SAL)"
+      - heading "POR" [level=4] [ref=e992]
+      - table [ref=e994]:
+        - rowgroup [ref=e995]:
+          - row "Cat Region TOF Score Stage Q1 Tgt QTD Tgt Actual Att% QTD Var" [ref=e996]:
+            - columnheader "Cat" [ref=e997] [cursor=pointer]:
+              - generic [ref=e998]: Cat
+            - columnheader "Region" [ref=e999] [cursor=pointer]:
+              - generic [ref=e1000]: Region
+            - columnheader "TOF Score" [ref=e1001] [cursor=pointer]:
+              - generic [ref=e1002]: TOF Score
+            - columnheader "Stage" [ref=e1003]
+            - columnheader "Q1 Tgt" [ref=e1004]
+            - columnheader "QTD Tgt" [ref=e1005]
+            - columnheader "Actual" [ref=e1006]
+            - columnheader "Att%" [ref=e1007]
+            - columnheader "QTD Var" [ref=e1008]
+        - rowgroup [ref=e1009]:
+          - row "MIGRATION AMER 26% EQL 214 50 4 8% -46" [ref=e1010]:
+            - cell "MIGRATION" [ref=e1011]:
+              - strong [ref=e1012]: MIGRATION
+            - cell "AMER" [ref=e1013]
+            - cell "26%" [ref=e1014]:
+              - generic [ref=e1015]: 26%
+            - cell "EQL" [ref=e1016]
+            - cell "214" [ref=e1017]
+            - cell "50" [ref=e1018]
+            - cell "4" [ref=e1019]
+            - cell "8%" [ref=e1020]
+            - cell "-46" [ref=e1021]
+          - row "SQL 99 23 4 17% -19" [ref=e1022]:
+            - cell "SQL" [ref=e1023]
+            - cell "99" [ref=e1024]
+            - cell "23" [ref=e1025]
+            - cell "4" [ref=e1026]
+            - cell "17%" [ref=e1027]
+            - cell "-19" [ref=e1028]
+          - row "SAL 44 10 4 40% -6" [ref=e1029]:
+            - cell "SAL" [ref=e1030]
+            - cell "44" [ref=e1031]
+            - cell "10" [ref=e1032]
+            - cell "4" [ref=e1033]
+            - cell "40%" [ref=e1034]
+            - cell "-6" [ref=e1035]
+          - row "SQO 36 8 2 25% -6" [ref=e1036]:
+            - cell "SQO" [ref=e1037]
+            - cell "36" [ref=e1038]
+            - cell "8" [ref=e1039]
+            - cell "2" [ref=e1040]
+            - cell "25%" [ref=e1041]
+            - cell "-6" [ref=e1042]
+          - row "MIGRATION EMEA 38% EQL 271 63 7 11% -56" [ref=e1043]:
+            - cell "MIGRATION" [ref=e1044]:
+              - strong [ref=e1045]: MIGRATION
+            - cell "EMEA" [ref=e1046]
+            - cell "38%" [ref=e1047]:
+              - generic [ref=e1048]: 38%
+            - cell "EQL" [ref=e1049]
+            - cell "271" [ref=e1050]
+            - cell "63" [ref=e1051]
+            - cell "7" [ref=e1052]
+            - cell "11%" [ref=e1053]
+            - cell "-56" [ref=e1054]
+          - row "SQL 84 20 7 35% -13" [ref=e1055]:
+            - cell "SQL" [ref=e1056]
+            - cell "84" [ref=e1057]
+            - cell "20" [ref=e1058]
+            - cell "7" [ref=e1059]
+            - cell "35%" [ref=e1060]
+            - cell "-13" [ref=e1061]
+          - row "SAL 71 17 7 41% -10" [ref=e1062]:
+            - cell "SAL" [ref=e1063]
+            - cell "71" [ref=e1064]
+            - cell "17" [ref=e1065]
+            - cell "7" [ref=e1066]
+            - cell "41%" [ref=e1067]
+            - cell "-10" [ref=e1068]
+          - row "SQO 67 16 7 44% -9" [ref=e1069]:
+            - cell "SQO" [ref=e1070]
+            - cell "67" [ref=e1071]
+            - cell "16" [ref=e1072]
+            - cell "7" [ref=e1073]
+            - cell "44%" [ref=e1074]
+            - cell "-9" [ref=e1075]
+          - row "NEW LOGO APAC 32% MQL 107 25 14 56% -11" [ref=e1076]:
+            - cell "NEW LOGO" [ref=e1077]:
+              - strong [ref=e1078]: NEW LOGO
+            - cell "APAC" [ref=e1079]
+            - cell "32%" [ref=e1080]:
+              - generic [ref=e1081]: 32%
+            - cell "MQL" [ref=e1082]
+            - cell "107" [ref=e1083]
+            - cell "25" [ref=e1084]
+            - cell "14" [ref=e1085]
+            - cell "56%" [ref=e1086]
+            - cell "-11" [ref=e1087]
+          - row "SQL 65 15 3 20% -12" [ref=e1088]:
+            - cell "SQL" [ref=e1089]
+            - cell "65" [ref=e1090]
+            - cell "15" [ref=e1091]
+            - cell "3" [ref=e1092]
+            - cell "20%" [ref=e1093]
+            - cell "-12" [ref=e1094]
+          - row "SAL 45 10 3 30% -7" [ref=e1095]:
+            - cell "SAL" [ref=e1096]
+            - cell "45" [ref=e1097]
+            - cell "10" [ref=e1098]
+            - cell "3" [ref=e1099]
+            - cell "30%" [ref=e1100]
+            - cell "-7" [ref=e1101]
+          - row "SQO 37 9 3 33% -6" [ref=e1102]:
+            - cell "SQO" [ref=e1103]
+            - cell "37" [ref=e1104]
+            - cell "9" [ref=e1105]
+            - cell "3" [ref=e1106]
+            - cell "33%" [ref=e1107]
+            - cell "-6" [ref=e1108]
+          - row "EXPANSION EMEA 46% EQL 2166 505 60 12% -445" [ref=e1109]:
+            - cell "EXPANSION" [ref=e1110]:
+              - strong [ref=e1111]: EXPANSION
+            - cell "EMEA" [ref=e1112]
+            - cell "46%" [ref=e1113]:
+              - generic [ref=e1114]: 46%
+            - cell "EQL" [ref=e1115]
+            - cell "2166" [ref=e1116]
+            - cell "505" [ref=e1117]
+            - cell "60" [ref=e1118]
+            - cell "12%" [ref=e1119]
+            - cell "-445" [ref=e1120]
+          - row "SQL 1027 239 58 24% -181" [ref=e1121]:
+            - cell "SQL" [ref=e1122]
+            - cell "1027" [ref=e1123]
+            - cell "239" [ref=e1124]
+            - cell "58" [ref=e1125]
+            - cell "24%" [ref=e1126]
+            - cell "-181" [ref=e1127]
+          - row "SQO 988 230 56 24% -174" [ref=e1128]:
+            - cell "SQO" [ref=e1129]
+            - cell "988" [ref=e1130]
+            - cell "230" [ref=e1131]
+            - cell "56" [ref=e1132]
+            - cell "24%" [ref=e1133]
+            - cell "-174" [ref=e1134]
+          - row "EXPANSION APAC 51% EQL 236 55 7 13% -48" [ref=e1135]:
+            - cell "EXPANSION" [ref=e1136]:
+              - strong [ref=e1137]: EXPANSION
+            - cell "APAC" [ref=e1138]
+            - cell "51%" [ref=e1139]:
+              - generic [ref=e1140]: 51%
+            - cell "EQL" [ref=e1141]
+            - cell "236" [ref=e1142]
+            - cell "55" [ref=e1143]
+            - cell "7" [ref=e1144]
+            - cell "13%" [ref=e1145]
+            - cell "-48" [ref=e1146]
+          - row "SQL 115 27 7 26% -20" [ref=e1147]:
+            - cell "SQL" [ref=e1148]
+            - cell "115" [ref=e1149]
+            - cell "27" [ref=e1150]
+            - cell "7" [ref=e1151]
+            - cell "26%" [ref=e1152]
+            - cell "-20" [ref=e1153]
+          - row "SQO 87 20 7 35% -13" [ref=e1154]:
+            - cell "SQO" [ref=e1155]
+            - cell "87" [ref=e1156]
+            - cell "20" [ref=e1157]
+            - cell "7" [ref=e1158]
+            - cell "35%" [ref=e1159]
+            - cell "-13" [ref=e1160]
+          - row "NEW LOGO EMEA 35% MQL 111 26 28 108% +2" [ref=e1161]:
+            - cell "NEW LOGO" [ref=e1162]:
+              - strong [ref=e1163]: NEW LOGO
+            - cell "EMEA" [ref=e1164]
+            - cell "35%" [ref=e1165]:
+              - generic [ref=e1166]: 35%
+            - cell "MQL" [ref=e1167]
+            - cell "111" [ref=e1168]
+            - cell "26" [ref=e1169]
+            - cell "28" [ref=e1170]
+            - cell "108%" [ref=e1171]
+            - cell "+2" [ref=e1172]
+          - row "SQL 99 23 8 35% -15" [ref=e1173]:
+            - cell "SQL" [ref=e1174]
+            - cell "99" [ref=e1175]
+            - cell "23" [ref=e1176]
+            - cell "8" [ref=e1177]
+            - cell "35%" [ref=e1178]
+            - cell "-15" [ref=e1179]
+          - row "SAL 74 17 5 29% -12" [ref=e1180]:
+            - cell "SAL" [ref=e1181]
+            - cell "74" [ref=e1182]
+            - cell "17" [ref=e1183]
+            - cell "5" [ref=e1184]
+            - cell "29%" [ref=e1185]
+            - cell "-12" [ref=e1186]
+          - row "SQO 40 9 2 22% -7" [ref=e1187]:
+            - cell "SQO" [ref=e1188]
+            - cell "40" [ref=e1189]
+            - cell "9" [ref=e1190]
+            - cell "2" [ref=e1191]
+            - cell "22%" [ref=e1192]
+            - cell "-7" [ref=e1193]
+          - row "EXPANSION AMER 67% EQL 1318 307 82 27% -225" [ref=e1194]:
+            - cell "EXPANSION" [ref=e1195]:
+              - strong [ref=e1196]: EXPANSION
+            - cell "AMER" [ref=e1197]
+            - cell "67%" [ref=e1198]:
+              - generic [ref=e1199]: 67%
+            - cell "EQL" [ref=e1200]
+            - cell "1318" [ref=e1201]
+            - cell "307" [ref=e1202]
+            - cell "82" [ref=e1203]
+            - cell "27%" [ref=e1204]
+            - cell "-225" [ref=e1205]
+          - row "SQL 770 179 69 39% -110" [ref=e1206]:
+            - cell "SQL" [ref=e1207]
+            - cell "770" [ref=e1208]
+            - cell "179" [ref=e1209]
+            - cell "69" [ref=e1210]
+            - cell "39%" [ref=e1211]
+            - cell "-110" [ref=e1212]
+          - row "SQO 395 92 61 66% -31" [ref=e1213]:
+            - cell "SQO" [ref=e1214]
+            - cell "395" [ref=e1215]
+            - cell "92" [ref=e1216]
+            - cell "61" [ref=e1217]
+            - cell "66%" [ref=e1218]
+            - cell "-31" [ref=e1219]
+          - row "NEW LOGO AMER 68% MQL 366 85 115 135% +30" [ref=e1220]:
+            - cell "NEW LOGO" [ref=e1221]:
+              - strong [ref=e1222]: NEW LOGO
+            - cell "AMER" [ref=e1223]
+            - cell "68%" [ref=e1224]:
+              - generic [ref=e1225]: 68%
+            - cell "MQL" [ref=e1226]
+            - cell "366" [ref=e1227]
+            - cell "85" [ref=e1228]
+            - cell "115" [ref=e1229]
+            - cell "135%" [ref=e1230]
+            - cell "+30" [ref=e1231]
+          - row "SQL 326 76 72 95% -4" [ref=e1232]:
+            - cell "SQL" [ref=e1233]
+            - cell "326" [ref=e1234]
+            - cell "76" [ref=e1235]
+            - cell "72" [ref=e1236]
+            - cell "95%" [ref=e1237]
+            - cell "-4" [ref=e1238]
+          - row "SAL 237 55 43 78% -12" [ref=e1239]:
+            - cell "SAL" [ref=e1240]
+            - cell "237" [ref=e1241]
+            - cell "55" [ref=e1242]
+            - cell "43" [ref=e1243]
+            - cell "78%" [ref=e1244]
+            - cell "-12" [ref=e1245]
+          - row "SQO 134 31 9 29% -22" [ref=e1246]:
+            - cell "SQO" [ref=e1247]
+            - cell "134" [ref=e1248]
+            - cell "31" [ref=e1249]
+            - cell "9" [ref=e1250]
+            - cell "29%" [ref=e1251]
+            - cell "-22" [ref=e1252]
+      - heading "R360" [level=4] [ref=e1253]
+      - table [ref=e1255]:
+        - rowgroup [ref=e1256]:
+          - row "Cat Region TOF Score Stage Q1 Tgt QTD Tgt Actual Att% QTD Var" [ref=e1257]:
+            - columnheader "Cat" [ref=e1258] [cursor=pointer]:
+              - generic [ref=e1259]: Cat
+            - columnheader "Region" [ref=e1260] [cursor=pointer]:
+              - generic [ref=e1261]: Region
+            - columnheader "TOF Score" [ref=e1262] [cursor=pointer]:
+              - generic [ref=e1263]: TOF Score
+            - columnheader "Stage" [ref=e1264]
+            - columnheader "Q1 Tgt" [ref=e1265]
+            - columnheader "QTD Tgt" [ref=e1266]
+            - columnheader "Actual" [ref=e1267]
+            - columnheader "Att%" [ref=e1268]
+            - columnheader "QTD Var" [ref=e1269]
+        - rowgroup [ref=e1270]:
+          - row "NEW LOGO APAC 14% MQL 158 37 1 3% -36" [ref=e1271]:
+            - cell "NEW LOGO" [ref=e1272]:
+              - strong [ref=e1273]: NEW LOGO
+            - cell "APAC" [ref=e1274]
+            - cell "14%" [ref=e1275]:
+              - generic [ref=e1276]: 14%
+            - cell "MQL" [ref=e1277]
+            - cell "158" [ref=e1278]
+            - cell "37" [ref=e1279]
+            - cell "1" [ref=e1280]
+            - cell "3%" [ref=e1281]
+            - cell "-36" [ref=e1282]
+          - row "SQL 34 8 1 13% -7" [ref=e1283]:
+            - cell "SQL" [ref=e1284]
+            - cell "34" [ref=e1285]
+            - cell "8" [ref=e1286]
+            - cell "1" [ref=e1287]
+            - cell "13%" [ref=e1288]
+            - cell "-7" [ref=e1289]
+          - row "SQO 26 6 1 17% -5" [ref=e1290]:
+            - cell "SQO" [ref=e1291]
+            - cell "26" [ref=e1292]
+            - cell "6" [ref=e1293]
+            - cell "1" [ref=e1294]
+            - cell "17%" [ref=e1295]
+            - cell "-5" [ref=e1296]
+          - row "NEW LOGO EMEA 19% MQL 139 32 12 38% -20" [ref=e1297]:
+            - cell "NEW LOGO" [ref=e1298]:
+              - strong [ref=e1299]: NEW LOGO
+            - cell "EMEA" [ref=e1300]
+            - cell "19%" [ref=e1301]:
+              - generic [ref=e1302]: 19%
+            - cell "MQL" [ref=e1303]
+            - cell "139" [ref=e1304]
+            - cell "32" [ref=e1305]
+            - cell "12" [ref=e1306]
+            - cell "38%" [ref=e1307]
+            - cell "-20" [ref=e1308]
+          - row "SQL 154 36 5 14% -31" [ref=e1309]:
+            - cell "SQL" [ref=e1310]
+            - cell "154" [ref=e1311]
+            - cell "36" [ref=e1312]
+            - cell "5" [ref=e1313]
+            - cell "14%" [ref=e1314]
+            - cell "-31" [ref=e1315]
+          - row "SQO 123 29 5 17% -24" [ref=e1316]:
+            - cell "SQO" [ref=e1317]
+            - cell "123" [ref=e1318]
+            - cell "29" [ref=e1319]
+            - cell "5" [ref=e1320]
+            - cell "17%" [ref=e1321]
+            - cell "-24" [ref=e1322]
+          - row "NEW LOGO AMER 31% MQL 299 70 32 46% -38" [ref=e1323]:
+            - cell "NEW LOGO" [ref=e1324]:
+              - strong [ref=e1325]: NEW LOGO
+            - cell "AMER" [ref=e1326]
+            - cell "31%" [ref=e1327]:
+              - generic [ref=e1328]: 31%
+            - cell "MQL" [ref=e1329]
+            - cell "299" [ref=e1330]
+            - cell "70" [ref=e1331]
+            - cell "32" [ref=e1332]
+            - cell "46%" [ref=e1333]
+            - cell "-38" [ref=e1334]
+          - row "SQL 374 87 17 20% -70" [ref=e1335]:
+            - cell "SQL" [ref=e1336]
+            - cell "374" [ref=e1337]
+            - cell "87" [ref=e1338]
+            - cell "17" [ref=e1339]
+            - cell "20%" [ref=e1340]
+            - cell "-70" [ref=e1341]
+          - row "SQO 258 60 19 32% -41" [ref=e1342]:
+            - cell "SQO" [ref=e1343]
+            - cell "258" [ref=e1344]
+            - cell "60" [ref=e1345]
+            - cell "19" [ref=e1346]
+            - cell "32%" [ref=e1347]
+            - cell "-41" [ref=e1348]
+          - row "EXPANSION AMER 60% EQL 465 108 28 26% -80" [ref=e1349]:
+            - cell "EXPANSION" [ref=e1350]:
+              - strong [ref=e1351]: EXPANSION
+            - cell "AMER" [ref=e1352]
+            - cell "60%" [ref=e1353]:
+              - generic [ref=e1354]: 60%
+            - cell "EQL" [ref=e1355]
+            - cell "465" [ref=e1356]
+            - cell "108" [ref=e1357]
+            - cell "28" [ref=e1358]
+            - cell "26%" [ref=e1359]
+            - cell "-80" [ref=e1360]
+          - row "SQL 191 45 27 60% -18" [ref=e1361]:
+            - cell "SQL" [ref=e1362]
+            - cell "191" [ref=e1363]
+            - cell "45" [ref=e1364]
+            - cell "27" [ref=e1365]
+            - cell "60%" [ref=e1366]
+            - cell "-18" [ref=e1367]
+          - row "SQO 156 36 25 69% -11" [ref=e1368]:
+            - cell "SQO" [ref=e1369]
+            - cell "156" [ref=e1370]
+            - cell "36" [ref=e1371]
+            - cell "25" [ref=e1372]
+            - cell "69%" [ref=e1373]
+            - cell "-11" [ref=e1374]
+          - row "STRATEGIC AMER 43% MQL 1 0 1 100% +1" [ref=e1375]:
+            - cell "STRATEGIC" [ref=e1376]:
+              - strong [ref=e1377]: STRATEGIC
+            - cell "AMER" [ref=e1378]
+            - cell "43%" [ref=e1379]:
+              - generic [ref=e1380]: 43%
+            - cell "MQL" [ref=e1381]
+            - cell "1" [ref=e1382]
+            - cell "0" [ref=e1383]
+            - cell "1" [ref=e1384]
+            - cell "100%" [ref=e1385]
+            - cell "+1" [ref=e1386]
+          - row "SQL 4 1 1 100% +0" [ref=e1387]:
+            - cell "SQL" [ref=e1388]
+            - cell "4" [ref=e1389]
+            - cell "1" [ref=e1390]
+            - cell "1" [ref=e1391]
+            - cell "100%" [ref=e1392]
+            - cell "+0" [ref=e1393]
+          - row "SQO 4 1 0 0% -1" [ref=e1394]:
+            - cell "SQO" [ref=e1395]
+            - cell "4" [ref=e1396]
+            - cell "1" [ref=e1397]
+            - cell "0" [ref=e1398]
+            - cell "0%" [ref=e1399]
+            - cell "-1" [ref=e1400]
+    - generic [ref=e1401]:
+      - generic [ref=e1402]:
+        - heading "🔄 Renewals Overview" [level=2] [ref=e1403]:
+          - generic [ref=e1404]: 🔄
+          - text: Renewals Overview
+        - generic [ref=e1405]: Live SF Data
+      - generic [ref=e1406]:
+        - generic [ref=e1407]:
+          - heading "Q1 Renewal Bookings Forecast" [level=3] [ref=e1408]
+          - generic [ref=e1409]: GREEN
+        - generic [ref=e1410]:
+          - generic [ref=e1411]:
+            - generic [ref=e1412]: Q1 Forecast
+            - generic [ref=e1413]: $8,202
+            - generic [ref=e1414]: Won ($7,704) + Q1 Uplift ($498)
+          - generic [ref=e1415]:
+            - generic [ref=e1416]: Q1 Target
+            - generic [ref=e1417]: $0
+            - generic [ref=e1418]: Full quarter target
+          - generic [ref=e1419]:
+            - generic [ref=e1420]: Projected Q1 Attainment
+            - generic [ref=e1421]: 100.0%
+            - generic [ref=e1422]: "Surplus: $8,202"
+          - generic [ref=e1423]:
+            - generic [ref=e1424]: Q1 Contracts
+            - generic [ref=e1425]: "3"
+            - generic [ref=e1426]: $498 uplift (thru Mar 31)
+      - generic [ref=e1427]:
+        - generic [ref=e1428]:
+          - generic [ref=e1429]: Won Renewals (QTD)
+          - generic [ref=e1430]: $7,704
+          - generic [ref=e1431]: 6 deals
+        - generic [ref=e1432]:
+          - generic [ref=e1433]: Pipeline Renewals
+          - generic [ref=e1434]: $0
+          - generic [ref=e1435]: 0 deals
+        - generic [ref=e1436]:
+          - generic [ref=e1437]: Avg Uplift
+          - generic [ref=e1438]: 5%
+          - generic [ref=e1439]: $498 total
+        - generic [ref=e1440]:
+          - generic [ref=e1441]: Upcoming (30d)
+          - generic [ref=e1442]: "1"
+          - generic [ref=e1443]: $1,676 ACV
+        - generic [ref=e1444]:
+          - generic [ref=e1445]: At-Risk Contracts
+          - generic [ref=e1446]: "0"
+          - generic [ref=e1447]: $0 at risk
+        - generic [ref=e1448]:
+          - generic [ref=e1449]: Lost Renewals
+          - generic [ref=e1450]: $0
+          - generic [ref=e1451]: 0 deals
+      - generic [ref=e1452]:
+        - button "Won (6)" [ref=e1453] [cursor=pointer]
+        - button "Pipeline (0)" [ref=e1454] [cursor=pointer]
+        - button "Upcoming (3)" [ref=e1455] [cursor=pointer]
+        - button "At Risk (0)" [ref=e1456] [cursor=pointer]
+      - table [ref=e1458]:
+        - rowgroup [ref=e1459]:
+          - row "Account Product Region ACV Uplift Close Date Owner" [ref=e1460]:
+            - columnheader "Account" [ref=e1461] [cursor=pointer]:
+              - generic [ref=e1462]: Account
+            - columnheader "Product" [ref=e1463] [cursor=pointer]:
+              - generic [ref=e1464]: Product
+            - columnheader "Region" [ref=e1465] [cursor=pointer]:
+              - generic [ref=e1466]: Region
+            - columnheader "ACV" [ref=e1467] [cursor=pointer]:
+              - generic [ref=e1468]: ACV
+            - columnheader "Uplift" [ref=e1469] [cursor=pointer]:
+              - generic [ref=e1470]: Uplift
+            - columnheader "Close Date" [ref=e1471] [cursor=pointer]:
+              - generic [ref=e1472]: Close Date
+            - columnheader "Owner" [ref=e1473] [cursor=pointer]:
+              - generic [ref=e1474]: Owner
+        - rowgroup [ref=e1475]:
+          - row "Underground Pipeline Services R360 AMER $240 $0 1/6/2026 Kayla Winfree" [ref=e1476]:
+            - cell "Underground Pipeline Services" [ref=e1477]:
+              - link "Underground Pipeline Services" [ref=e1478] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RN7m5AAD
+            - cell "R360" [ref=e1479]:
+              - generic [ref=e1480]: R360
+            - cell "AMER" [ref=e1481]
+            - cell "$240" [ref=e1482]
+            - cell "$0" [ref=e1483]
+            - cell "1/6/2026" [ref=e1484]
+            - cell "Kayla Winfree" [ref=e1485]
+          - row "Sewer Equipment R360 AMER $852 $0 1/6/2026 Kayla Winfree" [ref=e1486]:
+            - cell "Sewer Equipment" [ref=e1487]:
+              - link "Sewer Equipment" [ref=e1488] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RN0e9AAD
+            - cell "R360" [ref=e1489]:
+              - generic [ref=e1490]: R360
+            - cell "AMER" [ref=e1491]
+            - cell "$852" [ref=e1492]
+            - cell "$0" [ref=e1493]
+            - cell "1/6/2026" [ref=e1494]
+            - cell "Kayla Winfree" [ref=e1495]
+          - row "King Kong Production Vehicles, Inc. R360 AMER $564 $0 1/6/2026 Kayla Winfree" [ref=e1496]:
+            - cell "King Kong Production Vehicles, Inc." [ref=e1497]:
+              - link "King Kong Production Vehicles, Inc." [ref=e1498] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RMcC6AAL
+            - cell "R360" [ref=e1499]:
+              - generic [ref=e1500]: R360
+            - cell "AMER" [ref=e1501]
+            - cell "$564" [ref=e1502]
+            - cell "$0" [ref=e1503]
+            - cell "1/6/2026" [ref=e1504]
+            - cell "Kayla Winfree" [ref=e1505]
+          - row "F&W Equipment R360 AMER $600 $0 1/6/2026 Kayla Winfree" [ref=e1506]:
+            - cell "F&W Equipment" [ref=e1507]:
+              - link "F&W Equipment" [ref=e1508] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RNICtAAP
+            - cell "R360" [ref=e1509]:
+              - generic [ref=e1510]: R360
+            - cell "AMER" [ref=e1511]
+            - cell "$600" [ref=e1512]
+            - cell "$0" [ref=e1513]
+            - cell "1/6/2026" [ref=e1514]
+            - cell "Kayla Winfree" [ref=e1515]
+          - row "Airport Equipment Rentals R360 AMER $4,860 $0 1/6/2026 Kayla Winfree" [ref=e1516]:
+            - cell "Airport Equipment Rentals" [ref=e1517]:
+              - link "Airport Equipment Rentals" [ref=e1518] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RNKbDAAX
+            - cell "R360" [ref=e1519]:
+              - generic [ref=e1520]: R360
+            - cell "AMER" [ref=e1521]
+            - cell "$4,860" [ref=e1522]
+            - cell "$0" [ref=e1523]
+            - cell "1/6/2026" [ref=e1524]
+            - cell "Kayla Winfree" [ref=e1525]
+          - row "Top Loc Rentals R360 AMER $588 $0 1/6/2026 Kayla Winfree" [ref=e1526]:
+            - cell "Top Loc Rentals" [ref=e1527]:
+              - link "Top Loc Rentals" [ref=e1528] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RNcD7AAL
+            - cell "R360" [ref=e1529]:
+              - generic [ref=e1530]: R360
+            - cell "AMER" [ref=e1531]
+            - cell "$588" [ref=e1532]
+            - cell "$0" [ref=e1533]
+            - cell "1/6/2026" [ref=e1534]
+            - cell "Kayla Winfree" [ref=e1535]
+    - generic [ref=e1536]:
+      - heading "Full Funnel Pacing (EQL/MQL → SQO)" [level=2] [ref=e1537]
+      - paragraph [ref=e1538]:
+        - generic [ref=e1539]: MQL
+        - text: Marketing Qualified Lead (NEW LOGO)
+        - generic [ref=e1540]: "|"
+        - generic [ref=e1541]: EQL
+        - text: Existing Qualified Lead (EXPANSION, MIGRATION)
+        - generic [ref=e1542]: "|"
+        - generic [ref=e1543]: TOF Score
+        - text: "POR: 10% EQL/MQL + 20% SQL + 30% SAL + 40% SQO | R360: 14% MQL + 29% SQL + 57% SQO (no SAL)"
+      - generic [ref=e1544]:
+        - generic [ref=e1545]:
+          - generic [ref=e1546]: "Product:"
+          - button "✓ All" [ref=e1547] [cursor=pointer]:
+            - generic [ref=e1548]: ✓
+            - text: All
+          - button "POR" [ref=e1549] [cursor=pointer]
+          - button "R360" [ref=e1550] [cursor=pointer]
+        - generic [ref=e1551]:
+          - generic [ref=e1552]: "Region:"
+          - button "✓ All" [ref=e1553] [cursor=pointer]:
+            - generic [ref=e1554]: ✓
+            - text: All
+          - button "AMER" [ref=e1555] [cursor=pointer]
+          - button "EMEA" [ref=e1556] [cursor=pointer]
+          - button "APAC" [ref=e1557] [cursor=pointer]
+      - generic [ref=e1558]:
+        - generic [ref=e1559]:
+          - heading "By Category" [level=3] [ref=e1560]
+          - generic [ref=e1561]:
+            - generic [ref=e1562]: "Filter:"
+            - button "✓ All" [ref=e1563] [cursor=pointer]:
+              - generic [ref=e1564]: ✓
+              - text: All
+            - button "NEW LOGO" [ref=e1565] [cursor=pointer]
+            - button "STRATEGIC" [ref=e1566] [cursor=pointer]
+            - button "EXPANSION" [ref=e1567] [cursor=pointer]
+            - button "MIGRATION" [ref=e1568] [cursor=pointer]
+          - table [ref=e1570]:
+            - rowgroup [ref=e1571]:
+              - row "Category EQL/MQL SQL SAL SQO TOF Score" [ref=e1572]:
+                - columnheader "Category" [ref=e1573]
+                - columnheader "EQL/MQL" [ref=e1574]
+                - columnheader "SQL" [ref=e1575]
+                - columnheader "SAL" [ref=e1576]
+                - columnheader "SQO" [ref=e1577]
+                - columnheader "TOF Score" [ref=e1578]
+              - row "Act Tgt Pace Act Tgt Pace Act Tgt Pace Act Tgt Pace" [ref=e1579]:
+                - columnheader "Act" [ref=e1580]
+                - columnheader "Tgt" [ref=e1581]
+                - columnheader "Pace" [ref=e1582]
+                - columnheader "Act" [ref=e1583]
+                - columnheader "Tgt" [ref=e1584]
+                - columnheader "Pace" [ref=e1585]
+                - columnheader "Act" [ref=e1586]
+                - columnheader "Tgt" [ref=e1587]
+                - columnheader "Pace" [ref=e1588]
+                - columnheader "Act" [ref=e1589]
+                - columnheader "Tgt" [ref=e1590]
+                - columnheader "Pace" [ref=e1591]
+            - rowgroup [ref=e1592]:
+              - row "MIGRATIONEQL 11 113 10% 11 43 26% 11 27 41% 9 24 38% 34%" [ref=e1593]:
+                - cell "MIGRATIONEQL" [ref=e1594]
+                - cell "11" [ref=e1595]
+                - cell "113" [ref=e1596]
+                - cell "10%" [ref=e1597]:
+                  - generic [ref=e1598]: 10%
+                - cell "11" [ref=e1599]
+                - cell "43" [ref=e1600]
+                - cell "26%" [ref=e1601]:
+                  - generic [ref=e1602]: 26%
+                - cell "11" [ref=e1603]
+                - cell "27" [ref=e1604]
+                - cell "41%" [ref=e1605]:
+                  - generic [ref=e1606]: 41%
+                - cell "9" [ref=e1607]
+                - cell "24" [ref=e1608]
+                - cell "38%" [ref=e1609]:
+                  - generic [ref=e1610]: 38%
+                - cell "34%" [ref=e1611]:
+                  - generic [ref=e1612]: 34%
+              - row "NEW LOGOMQL 202 275 73% 106 245 43% 51 82 62% 39 144 27% 45%" [ref=e1613]:
+                - cell "NEW LOGOMQL" [ref=e1614]
+                - cell "202" [ref=e1615]
+                - cell "275" [ref=e1616]
+                - cell "73%" [ref=e1617]:
+                  - generic [ref=e1618]: 73%
+                - cell "106" [ref=e1619]
+                - cell "245" [ref=e1620]
+                - cell "43%" [ref=e1621]:
+                  - generic [ref=e1622]: 43%
+                - cell "51" [ref=e1623]
+                - cell "82" [ref=e1624]
+                - cell "62%" [ref=e1625]:
+                  - generic [ref=e1626]: 62%
+                - cell "39" [ref=e1627]
+                - cell "144" [ref=e1628]
+                - cell "27%" [ref=e1629]:
+                  - generic [ref=e1630]: 27%
+                - cell "45%" [ref=e1631]:
+                  - generic [ref=e1632]: 45%
+              - row "EXPANSIONEQL 177 975 18% 161 490 33% 134 0 100% 149 378 39% 54%" [ref=e1633]:
+                - cell "EXPANSIONEQL" [ref=e1634]
+                - cell "177" [ref=e1635]
+                - cell "975" [ref=e1636]
+                - cell "18%" [ref=e1637]:
+                  - generic [ref=e1638]: 18%
+                - cell "161" [ref=e1639]
+                - cell "490" [ref=e1640]
+                - cell "33%" [ref=e1641]:
+                  - generic [ref=e1642]: 33%
+                - cell "134" [ref=e1643]
+                - cell "0" [ref=e1644]
+                - cell "100%" [ref=e1645]:
+                  - generic [ref=e1646]: 100%
+                - cell "149" [ref=e1647]
+                - cell "378" [ref=e1648]
+                - cell "39%" [ref=e1649]:
+                  - generic [ref=e1650]: 39%
+                - cell "54%" [ref=e1651]:
+                  - generic [ref=e1652]: 54%
+              - row "STRATEGICMQL 1 0 100% 1 1 100% 0 0 100% 0 1 0% 60%" [ref=e1653]:
+                - cell "STRATEGICMQL" [ref=e1654]
+                - cell "1" [ref=e1655]
+                - cell "0" [ref=e1656]
+                - cell "100%" [ref=e1657]:
+                  - generic [ref=e1658]: 100%
+                - cell "1" [ref=e1659]
+                - cell "1" [ref=e1660]
+                - cell "100%" [ref=e1661]:
+                  - generic [ref=e1662]: 100%
+                - cell "0" [ref=e1663]
+                - cell "0" [ref=e1664]
+                - cell "100%" [ref=e1665]:
+                  - generic [ref=e1666]: 100%
+                - cell "0" [ref=e1667]
+                - cell "1" [ref=e1668]
+                - cell "0%" [ref=e1669]:
+                  - generic [ref=e1670]: 0%
+                - cell "60%" [ref=e1671]:
+                  - generic [ref=e1672]: 60%
+            - rowgroup [ref=e1673]:
+              - row "TOTAL 391 1,363 29% 279 779 36% 196 109 180% 197 547 36% 79%" [ref=e1674]:
+                - cell "TOTAL" [ref=e1675]:
+                  - strong [ref=e1676]: TOTAL
+                - cell "391" [ref=e1677]:
+                  - strong [ref=e1678]: "391"
+                - cell "1,363" [ref=e1679]:
+                  - strong [ref=e1680]: 1,363
+                - cell "29%" [ref=e1681]:
+                  - strong [ref=e1683]: 29%
+                - cell "279" [ref=e1684]:
+                  - strong [ref=e1685]: "279"
+                - cell "779" [ref=e1686]:
+                  - strong [ref=e1687]: "779"
+                - cell "36%" [ref=e1688]:
+                  - strong [ref=e1690]: 36%
+                - cell "196" [ref=e1691]:
+                  - strong [ref=e1692]: "196"
+                - cell "109" [ref=e1693]:
+                  - strong [ref=e1694]: "109"
+                - cell "180%" [ref=e1695]:
+                  - strong [ref=e1697]: 180%
+                - cell "197" [ref=e1698]:
+                  - strong [ref=e1699]: "197"
+                - cell "547" [ref=e1700]:
+                  - strong [ref=e1701]: "547"
+                - cell "36%" [ref=e1702]:
+                  - strong [ref=e1704]: 36%
+                - cell "79%" [ref=e1705]:
+                  - strong [ref=e1707]: 79%
+        - generic [ref=e1708]:
+          - heading "By Source" [level=3] [ref=e1709]
+          - generic [ref=e1710]:
+            - generic [ref=e1711]: "Filter:"
+            - button "All" [ref=e1712] [cursor=pointer]
+            - button "AE SOURCED" [ref=e1713] [cursor=pointer]
+            - button "AM SOURCED" [ref=e1714] [cursor=pointer]
+            - button "INBOUND" [ref=e1715] [cursor=pointer]
+            - button "OUTBOUND" [ref=e1716] [cursor=pointer]
+            - button "PARTNERSHIPS" [ref=e1717] [cursor=pointer]
+            - button "TRADESHOW" [ref=e1718] [cursor=pointer]
+          - table [ref=e1720]:
+            - rowgroup [ref=e1721]:
+              - row "Source EQL/MQL SQL SAL SQO TOF Score" [ref=e1722]:
+                - columnheader "Source" [ref=e1723]
+                - columnheader "EQL/MQL" [ref=e1724]
+                - columnheader "SQL" [ref=e1725]
+                - columnheader "SAL" [ref=e1726]
+                - columnheader "SQO" [ref=e1727]
+                - columnheader "TOF Score" [ref=e1728]
+              - row "Act Tgt Pace Act Tgt Pace Act Tgt Pace Act Tgt Pace" [ref=e1729]:
+                - columnheader "Act" [ref=e1730]
+                - columnheader "Tgt" [ref=e1731]
+                - columnheader "Pace" [ref=e1732]
+                - columnheader "Act" [ref=e1733]
+                - columnheader "Tgt" [ref=e1734]
+                - columnheader "Pace" [ref=e1735]
+                - columnheader "Act" [ref=e1736]
+                - columnheader "Tgt" [ref=e1737]
+                - columnheader "Pace" [ref=e1738]
+                - columnheader "Act" [ref=e1739]
+                - columnheader "Tgt" [ref=e1740]
+                - columnheader "Pace" [ref=e1741]
+            - rowgroup
+            - rowgroup [ref=e1742]:
+              - row "TOTAL 0 0 100% 0 0 100% 0 0 100% 0 0 100% 100%" [ref=e1743]:
+                - cell "TOTAL" [ref=e1744]:
+                  - strong [ref=e1745]: TOTAL
+                - cell "0" [ref=e1746]:
+                  - strong [ref=e1747]: "0"
+                - cell "0" [ref=e1748]:
+                  - strong [ref=e1749]: "0"
+                - cell "100%" [ref=e1750]:
+                  - strong [ref=e1752]: 100%
+                - cell "0" [ref=e1753]:
+                  - strong [ref=e1754]: "0"
+                - cell "0" [ref=e1755]:
+                  - strong [ref=e1756]: "0"
+                - cell "100%" [ref=e1757]:
+                  - strong [ref=e1759]: 100%
+                - cell "0" [ref=e1760]:
+                  - strong [ref=e1761]: "0"
+                - cell "0" [ref=e1762]:
+                  - strong [ref=e1763]: "0"
+                - cell "100%" [ref=e1764]:
+                  - strong [ref=e1766]: 100%
+                - cell "0" [ref=e1767]:
+                  - strong [ref=e1768]: "0"
+                - cell "0" [ref=e1769]:
+                  - strong [ref=e1770]: "0"
+                - cell "100%" [ref=e1771]:
+                  - strong [ref=e1773]: 100%
+                - cell "100%" [ref=e1774]:
+                  - strong [ref=e1776]: 100%
+        - generic [ref=e1777]:
+          - heading "By Region" [level=3] [ref=e1778]
+          - table [ref=e1780]:
+            - rowgroup [ref=e1781]:
+              - row "Region EQL/MQL SQL SAL SQO TOF Score" [ref=e1782]:
+                - columnheader "Region" [ref=e1783]
+                - columnheader "EQL/MQL" [ref=e1784]
+                - columnheader "SQL" [ref=e1785]
+                - columnheader "SAL" [ref=e1786]
+                - columnheader "SQO" [ref=e1787]
+                - columnheader "TOF Score" [ref=e1788]
+              - row "Act Tgt Pace Act Tgt Pace Act Tgt Pace Act Tgt Pace" [ref=e1789]:
+                - columnheader "Act" [ref=e1790]
+                - columnheader "Tgt" [ref=e1791]
+                - columnheader "Pace" [ref=e1792]
+                - columnheader "Act" [ref=e1793]
+                - columnheader "Tgt" [ref=e1794]
+                - columnheader "Pace" [ref=e1795]
+                - columnheader "Act" [ref=e1796]
+                - columnheader "Tgt" [ref=e1797]
+                - columnheader "Pace" [ref=e1798]
+                - columnheader "Act" [ref=e1799]
+                - columnheader "Tgt" [ref=e1800]
+                - columnheader "Pace" [ref=e1801]
+            - rowgroup [ref=e1802]:
+              - row "APAC 22 117 19% 11 50 22% 10 10 100% 11 35 31% 49%" [ref=e1803]:
+                - cell "APAC" [ref=e1804]
+                - cell "22" [ref=e1805]
+                - cell "117" [ref=e1806]
+                - cell "19%" [ref=e1807]:
+                  - generic [ref=e1808]: 19%
+                - cell "11" [ref=e1809]
+                - cell "50" [ref=e1810]
+                - cell "22%" [ref=e1811]:
+                  - generic [ref=e1812]: 22%
+                - cell "10" [ref=e1813]
+                - cell "10" [ref=e1814]
+                - cell "100%" [ref=e1815]:
+                  - generic [ref=e1816]: 100%
+                - cell "11" [ref=e1817]
+                - cell "35" [ref=e1818]
+                - cell "31%" [ref=e1819]:
+                  - generic [ref=e1820]: 31%
+                - cell "49%" [ref=e1821]:
+                  - generic [ref=e1822]: 49%
+              - row "EMEA 107 626 17% 78 318 25% 70 34 206% 70 284 25% 79%" [ref=e1823]:
+                - cell "EMEA" [ref=e1824]
+                - cell "107" [ref=e1825]
+                - cell "626" [ref=e1826]
+                - cell "17%" [ref=e1827]:
+                  - generic [ref=e1828]: 17%
+                - cell "78" [ref=e1829]
+                - cell "318" [ref=e1830]
+                - cell "25%" [ref=e1831]:
+                  - generic [ref=e1832]: 25%
+                - cell "70" [ref=e1833]
+                - cell "34" [ref=e1834]
+                - cell "206%" [ref=e1835]:
+                  - generic [ref=e1836]: 206%
+                - cell "70" [ref=e1837]
+                - cell "284" [ref=e1838]
+                - cell "25%" [ref=e1839]:
+                  - generic [ref=e1840]: 25%
+                - cell "79%" [ref=e1841]:
+                  - generic [ref=e1842]: 79%
+              - row "AMER 262 620 42% 190 411 46% 116 65 178% 116 228 51% 87%" [ref=e1843]:
+                - cell "AMER" [ref=e1844]
+                - cell "262" [ref=e1845]
+                - cell "620" [ref=e1846]
+                - cell "42%" [ref=e1847]:
+                  - generic [ref=e1848]: 42%
+                - cell "190" [ref=e1849]
+                - cell "411" [ref=e1850]
+                - cell "46%" [ref=e1851]:
+                  - generic [ref=e1852]: 46%
+                - cell "116" [ref=e1853]
+                - cell "65" [ref=e1854]
+                - cell "178%" [ref=e1855]:
+                  - generic [ref=e1856]: 178%
+                - cell "116" [ref=e1857]
+                - cell "228" [ref=e1858]
+                - cell "51%" [ref=e1859]:
+                  - generic [ref=e1860]: 51%
+                - cell "87%" [ref=e1861]:
+                  - generic [ref=e1862]: 87%
+            - rowgroup [ref=e1863]:
+              - row "TOTAL 391 1,363 29% 279 779 36% 196 109 180% 197 547 36% 79%" [ref=e1864]:
+                - cell "TOTAL" [ref=e1865]:
+                  - strong [ref=e1866]: TOTAL
+                - cell "391" [ref=e1867]:
+                  - strong [ref=e1868]: "391"
+                - cell "1,363" [ref=e1869]:
+                  - strong [ref=e1870]: 1,363
+                - cell "29%" [ref=e1871]:
+                  - strong [ref=e1873]: 29%
+                - cell "279" [ref=e1874]:
+                  - strong [ref=e1875]: "279"
+                - cell "779" [ref=e1876]:
+                  - strong [ref=e1877]: "779"
+                - cell "36%" [ref=e1878]:
+                  - strong [ref=e1880]: 36%
+                - cell "196" [ref=e1881]:
+                  - strong [ref=e1882]: "196"
+                - cell "109" [ref=e1883]:
+                  - strong [ref=e1884]: "109"
+                - cell "180%" [ref=e1885]:
+                  - strong [ref=e1887]: 180%
+                - cell "197" [ref=e1888]:
+                  - strong [ref=e1889]: "197"
+                - cell "547" [ref=e1890]:
+                  - strong [ref=e1891]: "547"
+                - cell "36%" [ref=e1892]:
+                  - strong [ref=e1894]: 36%
+                - cell "79%" [ref=e1895]:
+                  - strong [ref=e1897]: 79%
+    - generic [ref=e1898]:
+      - heading "Lead Details (MQL + EQL)" [level=2] [ref=e1899]
+      - paragraph [ref=e1900]: MQL = Marketing Qualified Leads (New Business) | EQL = Existing Qualified Leads (Expansion/Migration)
+      - generic [ref=e1901]:
+        - generic [ref=e1902]: "Lead Type:"
+        - button "MQL (217)" [ref=e1903] [cursor=pointer]
+        - button "EQL (188)" [ref=e1904] [cursor=pointer]
+      - generic [ref=e1905]:
+        - generic [ref=e1906]:
+          - generic [ref=e1907]: "405"
+          - generic [ref=e1908]: Total Leads
+        - generic [ref=e1909]:
+          - generic [ref=e1910]: "217"
+          - generic [ref=e1911]: New Logo
+        - generic [ref=e1912]:
+          - generic [ref=e1913]: "177"
+          - generic [ref=e1914]: Expansion
+        - generic [ref=e1915]:
+          - generic [ref=e1916]: "11"
+          - generic [ref=e1917]: Migration
+        - generic [ref=e1918]:
+          - generic [ref=e1919]: "207"
+          - generic [ref=e1920]: Converted
+        - generic [ref=e1921]:
+          - generic [ref=e1922]: 51.1%
+          - generic [ref=e1923]: Conv. Rate
+      - generic [ref=e1924]:
+        - generic [ref=e1925]:
+          - generic [ref=e1926]: "Product:"
+          - combobox [ref=e1927]:
+            - option "All Products" [selected]
+            - option "POR"
+            - option "R360"
+        - generic [ref=e1928]:
+          - generic [ref=e1929]: "Region:"
+          - combobox [ref=e1930]:
+            - option "All Regions" [selected]
+            - option "AMER"
+            - option "EMEA"
+            - option "APAC"
+        - generic [ref=e1931]:
+          - generic [ref=e1932]: "Status:"
+          - combobox [ref=e1933]:
+            - option "All Statuses" [selected]
+            - option "Active"
+            - option "Converted to SQL"
+            - option "Reverted/DQ"
+            - option "Stalled (30d+)"
+        - generic [ref=e1934]:
+          - generic [ref=e1935]: "Search:"
+          - textbox "Company, email, or source..." [ref=e1936]
+        - generic [ref=e1938]: 405 records
+      - table [ref=e1940]:
+        - rowgroup [ref=e1941]:
+          - row "Type Category Product Region Company Source Date Status Days SF" [ref=e1942]:
+            - columnheader "Type" [ref=e1943] [cursor=pointer]:
+              - generic [ref=e1944]: Type
+            - columnheader "Category" [ref=e1945] [cursor=pointer]:
+              - generic [ref=e1946]: Category
+            - columnheader "Product" [ref=e1947] [cursor=pointer]:
+              - generic [ref=e1948]: Product
+            - columnheader "Region" [ref=e1949] [cursor=pointer]:
+              - generic [ref=e1950]: Region
+            - columnheader "Company" [ref=e1951] [cursor=pointer]:
+              - generic [ref=e1952]: Company
+            - columnheader "Source" [ref=e1953] [cursor=pointer]:
+              - generic [ref=e1954]: Source
+            - columnheader "Date" [ref=e1955] [cursor=pointer]:
+              - generic [ref=e1956]: Date
+            - columnheader "Status" [ref=e1957] [cursor=pointer]:
+              - generic [ref=e1958]: Status
+            - columnheader "Days" [ref=e1959] [cursor=pointer]:
+              - generic [ref=e1960]: Days
+            - columnheader "SF" [ref=e1961]
+        - rowgroup [ref=e1962]:
+          - row "MQL NEW LOGO POR AMER Majestic Equipment Rental... Inbound 1/21/2026 CONVERTED 0 🔗" [ref=e1963]:
+            - cell "MQL" [ref=e1964]:
+              - generic [ref=e1965]: MQL
+            - cell "NEW LOGO" [ref=e1966]:
+              - generic [ref=e1967]: NEW LOGO
+            - cell "POR" [ref=e1968]:
+              - generic [ref=e1969]: POR
+            - cell "AMER" [ref=e1970]
+            - cell "Majestic Equipment Rental..." [ref=e1971]
+            - cell "Inbound" [ref=e1972]
+            - cell "1/21/2026" [ref=e1973]
+            - cell "CONVERTED" [ref=e1974]:
+              - generic [ref=e1975]: CONVERTED
+            - cell "0" [ref=e1976]
+            - cell "🔗" [ref=e1977]:
+              - link "🔗" [ref=e1978] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/
+          - row "MQL NEW LOGO POR AMER Enterprise Electric And R... Inbound 1/20/2026 CONVERTED 1 🔗" [ref=e1979]:
+            - cell "MQL" [ref=e1980]:
+              - generic [ref=e1981]: MQL
+            - cell "NEW LOGO" [ref=e1982]:
+              - generic [ref=e1983]: NEW LOGO
+            - cell "POR" [ref=e1984]:
+              - generic [ref=e1985]: POR
+            - cell "AMER" [ref=e1986]
+            - cell "Enterprise Electric And R..." [ref=e1987]
+            - cell "Inbound" [ref=e1988]
+            - cell "1/20/2026" [ref=e1989]
+            - cell "CONVERTED" [ref=e1990]:
+              - generic [ref=e1991]: CONVERTED
+            - cell "1" [ref=e1992]
+            - cell "🔗" [ref=e1993]:
+              - link "🔗" [ref=e1994] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/
+          - row "MQL NEW LOGO POR AMER Show Me Wash Dry Inbound 1/20/2026 CONVERTED 1 🔗" [ref=e1995]:
+            - cell "MQL" [ref=e1996]:
+              - generic [ref=e1997]: MQL
+            - cell "NEW LOGO" [ref=e1998]:
+              - generic [ref=e1999]: NEW LOGO
+            - cell "POR" [ref=e2000]:
+              - generic [ref=e2001]: POR
+            - cell "AMER" [ref=e2002]
+            - cell "Show Me Wash Dry" [ref=e2003]
+            - cell "Inbound" [ref=e2004]
+            - cell "1/20/2026" [ref=e2005]
+            - cell "CONVERTED" [ref=e2006]:
+              - generic [ref=e2007]: CONVERTED
+            - cell "1" [ref=e2008]
+            - cell "🔗" [ref=e2009]:
+              - link "🔗" [ref=e2010] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/
+          - row "MQL NEW LOGO POR AMER rent-rv.co llc Inbound 1/20/2026 CONVERTED 1 🔗" [ref=e2011]:
+            - cell "MQL" [ref=e2012]:
+              - generic [ref=e2013]: MQL
+            - cell "NEW LOGO" [ref=e2014]:
+              - generic [ref=e2015]: NEW LOGO
+            - cell "POR" [ref=e2016]:
+              - generic [ref=e2017]: POR
+            - cell "AMER" [ref=e2018]
+            - cell "rent-rv.co llc" [ref=e2019]
+            - cell "Inbound" [ref=e2020]
+            - cell "1/20/2026" [ref=e2021]
+            - cell "CONVERTED" [ref=e2022]:
+              - generic [ref=e2023]: CONVERTED
+            - cell "1" [ref=e2024]
+            - cell "🔗" [ref=e2025]:
+              - link "🔗" [ref=e2026] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/
+          - row "MQL NEW LOGO POR AMER LETS SHELLEBRATE Inbound 1/20/2026 CONVERTED 1 🔗" [ref=e2027]:
+            - cell "MQL" [ref=e2028]:
+              - generic [ref=e2029]: MQL
+            - cell "NEW LOGO" [ref=e2030]:
+              - generic [ref=e2031]: NEW LOGO
+            - cell "POR" [ref=e2032]:
+              - generic [ref=e2033]: POR
+            - cell "AMER" [ref=e2034]
+            - cell "LETS SHELLEBRATE" [ref=e2035]
+            - cell "Inbound" [ref=e2036]
+            - cell "1/20/2026" [ref=e2037]
+            - cell "CONVERTED" [ref=e2038]:
+              - generic [ref=e2039]: CONVERTED
+            - cell "1" [ref=e2040]
+            - cell "🔗" [ref=e2041]:
+              - link "🔗" [ref=e2042] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/
+          - row "MQL NEW LOGO POR AMER J.E.H Equipment Rentals C... Inbound 1/20/2026 CONVERTED 1 🔗" [ref=e2043]:
+            - cell "MQL" [ref=e2044]:
+              - generic [ref=e2045]: MQL
+            - cell "NEW LOGO" [ref=e2046]:
+              - generic [ref=e2047]: NEW LOGO
+            - cell "POR" [ref=e2048]:
+              - generic [ref=e2049]: POR
+            - cell "AMER" [ref=e2050]
+            - cell "J.E.H Equipment Rentals C..." [ref=e2051]
+            - cell "Inbound" [ref=e2052]
+            - cell "1/20/2026" [ref=e2053]
+            - cell "CONVERTED" [ref=e2054]:
+              - generic [ref=e2055]: CONVERTED
+            - cell "1" [ref=e2056]
+            - cell "🔗" [ref=e2057]:
+              - link "🔗" [ref=e2058] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/
+          - row "MQL NEW LOGO POR AMER SWS INBOUND 1/19/2026 CONVERTED 2 🔗" [ref=e2059]:
+            - cell "MQL" [ref=e2060]:
+              - generic [ref=e2061]: MQL
+            - cell "NEW LOGO" [ref=e2062]:
+              - generic [ref=e2063]: NEW LOGO
+            - cell "POR" [ref=e2064]:
+              - generic [ref=e2065]: POR
+            - cell "AMER" [ref=e2066]
+            - cell "SWS" [ref=e2067]
+            - cell "INBOUND" [ref=e2068]
+            - cell "1/19/2026" [ref=e2069]
+            - cell "CONVERTED" [ref=e2070]:
+              - generic [ref=e2071]: CONVERTED
+            - cell "2" [ref=e2072]
+            - cell "🔗" [ref=e2073]:
+              - link "🔗" [ref=e2074] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000YFroPEAT
+          - row "MQL NEW LOGO POR AMER Amazing Adventure Rentals Inbound 1/19/2026 CONVERTED 2 🔗" [ref=e2075]:
+            - cell "MQL" [ref=e2076]:
+              - generic [ref=e2077]: MQL
+            - cell "NEW LOGO" [ref=e2078]:
+              - generic [ref=e2079]: NEW LOGO
+            - cell "POR" [ref=e2080]:
+              - generic [ref=e2081]: POR
+            - cell "AMER" [ref=e2082]
+            - cell "Amazing Adventure Rentals" [ref=e2083]
+            - cell "Inbound" [ref=e2084]
+            - cell "1/19/2026" [ref=e2085]
+            - cell "CONVERTED" [ref=e2086]:
+              - generic [ref=e2087]: CONVERTED
+            - cell "2" [ref=e2088]
+            - cell "🔗" [ref=e2089]:
+              - link "🔗" [ref=e2090] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/
+          - row "MQL NEW LOGO POR EMEA Somerset toilet hire ltd INBOUND 1/19/2026 ACTIVE 2 🔗" [ref=e2091]:
+            - cell "MQL" [ref=e2092]:
+              - generic [ref=e2093]: MQL
+            - cell "NEW LOGO" [ref=e2094]:
+              - generic [ref=e2095]: NEW LOGO
+            - cell "POR" [ref=e2096]:
+              - generic [ref=e2097]: POR
+            - cell "EMEA" [ref=e2098]
+            - cell "Somerset toilet hire ltd" [ref=e2099]
+            - cell "INBOUND" [ref=e2100]
+            - cell "1/19/2026" [ref=e2101]
+            - cell "ACTIVE" [ref=e2102]:
+              - generic [ref=e2103]: ACTIVE
+            - cell "2" [ref=e2104]
+            - cell "🔗" [ref=e2105]:
+              - link "🔗" [ref=e2106] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000YCJeQEAX
+          - row "MQL NEW LOGO POR AMER Majestic Equipment Rental... INBOUND 1/19/2026 CONVERTED 2 🔗" [ref=e2107]:
+            - cell "MQL" [ref=e2108]:
+              - generic [ref=e2109]: MQL
+            - cell "NEW LOGO" [ref=e2110]:
+              - generic [ref=e2111]: NEW LOGO
+            - cell "POR" [ref=e2112]:
+              - generic [ref=e2113]: POR
+            - cell "AMER" [ref=e2114]
+            - cell "Majestic Equipment Rental..." [ref=e2115]
+            - cell "INBOUND" [ref=e2116]
+            - cell "1/19/2026" [ref=e2117]
+            - cell "CONVERTED" [ref=e2118]:
+              - generic [ref=e2119]: CONVERTED
+            - cell "2" [ref=e2120]
+            - cell "🔗" [ref=e2121]:
+              - link "🔗" [ref=e2122] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000Y7CnVEAV
+          - row "MQL NEW LOGO POR APAC Christchurch Instrument H... INBOUND 1/19/2026 ACTIVE 2 🔗" [ref=e2123]:
+            - cell "MQL" [ref=e2124]:
+              - generic [ref=e2125]: MQL
+            - cell "NEW LOGO" [ref=e2126]:
+              - generic [ref=e2127]: NEW LOGO
+            - cell "POR" [ref=e2128]:
+              - generic [ref=e2129]: POR
+            - cell "APAC" [ref=e2130]
+            - cell "Christchurch Instrument H..." [ref=e2131]
+            - cell "INBOUND" [ref=e2132]
+            - cell "1/19/2026" [ref=e2133]
+            - cell "ACTIVE" [ref=e2134]:
+              - generic [ref=e2135]: ACTIVE
+            - cell "2" [ref=e2136]
+            - cell "🔗" [ref=e2137]:
+              - link "🔗" [ref=e2138] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000YC4lpEAD
+          - row "MQL NEW LOGO POR APAC GUSH GLOBAL INBOUND 1/19/2026 ACTIVE 2 🔗" [ref=e2139]:
+            - cell "MQL" [ref=e2140]:
+              - generic [ref=e2141]: MQL
+            - cell "NEW LOGO" [ref=e2142]:
+              - generic [ref=e2143]: NEW LOGO
+            - cell "POR" [ref=e2144]:
+              - generic [ref=e2145]: POR
+            - cell "APAC" [ref=e2146]
+            - cell "GUSH GLOBAL" [ref=e2147]
+            - cell "INBOUND" [ref=e2148]
+            - cell "1/19/2026" [ref=e2149]
+            - cell "ACTIVE" [ref=e2150]:
+              - generic [ref=e2151]: ACTIVE
+            - cell "2" [ref=e2152]
+            - cell "🔗" [ref=e2153]:
+              - link "🔗" [ref=e2154] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000YBpWfEAL
+          - row "MQL NEW LOGO POR AMER Sexton Bull Rental INBOUND 1/18/2026 ACTIVE 3 🔗" [ref=e2155]:
+            - cell "MQL" [ref=e2156]:
+              - generic [ref=e2157]: MQL
+            - cell "NEW LOGO" [ref=e2158]:
+              - generic [ref=e2159]: NEW LOGO
+            - cell "POR" [ref=e2160]:
+              - generic [ref=e2161]: POR
+            - cell "AMER" [ref=e2162]
+            - cell "Sexton Bull Rental" [ref=e2163]
+            - cell "INBOUND" [ref=e2164]
+            - cell "1/18/2026" [ref=e2165]
+            - cell "ACTIVE" [ref=e2166]:
+              - generic [ref=e2167]: ACTIVE
+            - cell "3" [ref=e2168]
+            - cell "🔗" [ref=e2169]:
+              - link "🔗" [ref=e2170] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000YBMJNEA5
+          - row "MQL NEW LOGO POR AMER Mj INBOUND 1/18/2026 ACTIVE 3 🔗" [ref=e2171]:
+            - cell "MQL" [ref=e2172]:
+              - generic [ref=e2173]: MQL
+            - cell "NEW LOGO" [ref=e2174]:
+              - generic [ref=e2175]: NEW LOGO
+            - cell "POR" [ref=e2176]:
+              - generic [ref=e2177]: POR
+            - cell "AMER" [ref=e2178]
+            - cell "Mj" [ref=e2179]
+            - cell "INBOUND" [ref=e2180]
+            - cell "1/18/2026" [ref=e2181]
+            - cell "ACTIVE" [ref=e2182]:
+              - generic [ref=e2183]: ACTIVE
+            - cell "3" [ref=e2184]
+            - cell "🔗" [ref=e2185]:
+              - link "🔗" [ref=e2186] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000YBDG5EAP
+          - row "MQL NEW LOGO POR AMER Iron mountain tool and eq... INBOUND 1/18/2026 ACTIVE 3 🔗" [ref=e2187]:
+            - cell "MQL" [ref=e2188]:
+              - generic [ref=e2189]: MQL
+            - cell "NEW LOGO" [ref=e2190]:
+              - generic [ref=e2191]: NEW LOGO
+            - cell "POR" [ref=e2192]:
+              - generic [ref=e2193]: POR
+            - cell "AMER" [ref=e2194]
+            - cell "Iron mountain tool and eq..." [ref=e2195]
+            - cell "INBOUND" [ref=e2196]
+            - cell "1/18/2026" [ref=e2197]
+            - cell "ACTIVE" [ref=e2198]:
+              - generic [ref=e2199]: ACTIVE
+            - cell "3" [ref=e2200]
+            - cell "🔗" [ref=e2201]:
+              - link "🔗" [ref=e2202] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000YB2J3EAL
+          - row "MQL NEW LOGO POR AMER LBI LINENS INBOUND 1/18/2026 CONVERTED 3 🔗" [ref=e2203]:
+            - cell "MQL" [ref=e2204]:
+              - generic [ref=e2205]: MQL
+            - cell "NEW LOGO" [ref=e2206]:
+              - generic [ref=e2207]: NEW LOGO
+            - cell "POR" [ref=e2208]:
+              - generic [ref=e2209]: POR
+            - cell "AMER" [ref=e2210]
+            - cell "LBI LINENS" [ref=e2211]
+            - cell "INBOUND" [ref=e2212]
+            - cell "1/18/2026" [ref=e2213]
+            - cell "CONVERTED" [ref=e2214]:
+              - generic [ref=e2215]: CONVERTED
+            - cell "3" [ref=e2216]
+            - cell "🔗" [ref=e2217]:
+              - link "🔗" [ref=e2218] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000YAMrhEAH
+          - row "MQL NEW LOGO POR AMER Aldy express INBOUND 1/18/2026 ACTIVE 3 🔗" [ref=e2219]:
+            - cell "MQL" [ref=e2220]:
+              - generic [ref=e2221]: MQL
+            - cell "NEW LOGO" [ref=e2222]:
+              - generic [ref=e2223]: NEW LOGO
+            - cell "POR" [ref=e2224]:
+              - generic [ref=e2225]: POR
+            - cell "AMER" [ref=e2226]
+            - cell "Aldy express" [ref=e2227]
+            - cell "INBOUND" [ref=e2228]
+            - cell "1/18/2026" [ref=e2229]
+            - cell "ACTIVE" [ref=e2230]:
+              - generic [ref=e2231]: ACTIVE
+            - cell "3" [ref=e2232]
+            - cell "🔗" [ref=e2233]:
+              - link "🔗" [ref=e2234] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000YAKWXEA5
+          - row "MQL NEW LOGO POR AMER PromosSearch LLC INBOUND 1/17/2026 ACTIVE 4 🔗" [ref=e2235]:
+            - cell "MQL" [ref=e2236]:
+              - generic [ref=e2237]: MQL
+            - cell "NEW LOGO" [ref=e2238]:
+              - generic [ref=e2239]: NEW LOGO
+            - cell "POR" [ref=e2240]:
+              - generic [ref=e2241]: POR
+            - cell "AMER" [ref=e2242]
+            - cell "PromosSearch LLC" [ref=e2243]
+            - cell "INBOUND" [ref=e2244]
+            - cell "1/17/2026" [ref=e2245]
+            - cell "ACTIVE" [ref=e2246]:
+              - generic [ref=e2247]: ACTIVE
+            - cell "4" [ref=e2248]
+            - cell "🔗" [ref=e2249]:
+              - link "🔗" [ref=e2250] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000Y9UYKEA3
+          - row "MQL NEW LOGO POR AMER TBD INBOUND 1/17/2026 ACTIVE 4 🔗" [ref=e2251]:
+            - cell "MQL" [ref=e2252]:
+              - generic [ref=e2253]: MQL
+            - cell "NEW LOGO" [ref=e2254]:
+              - generic [ref=e2255]: NEW LOGO
+            - cell "POR" [ref=e2256]:
+              - generic [ref=e2257]: POR
+            - cell "AMER" [ref=e2258]
+            - cell "TBD" [ref=e2259]
+            - cell "INBOUND" [ref=e2260]
+            - cell "1/17/2026" [ref=e2261]
+            - cell "ACTIVE" [ref=e2262]:
+              - generic [ref=e2263]: ACTIVE
+            - cell "4" [ref=e2264]
+            - cell "🔗" [ref=e2265]:
+              - link "🔗" [ref=e2266] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000Y98SiEAJ
+          - row "MQL NEW LOGO POR AMER Majestic finishing INBOUND 1/17/2026 ACTIVE 4 🔗" [ref=e2267]:
+            - cell "MQL" [ref=e2268]:
+              - generic [ref=e2269]: MQL
+            - cell "NEW LOGO" [ref=e2270]:
+              - generic [ref=e2271]: NEW LOGO
+            - cell "POR" [ref=e2272]:
+              - generic [ref=e2273]: POR
+            - cell "AMER" [ref=e2274]
+            - cell "Majestic finishing" [ref=e2275]
+            - cell "INBOUND" [ref=e2276]
+            - cell "1/17/2026" [ref=e2277]
+            - cell "ACTIVE" [ref=e2278]:
+              - generic [ref=e2279]: ACTIVE
+            - cell "4" [ref=e2280]
+            - cell "🔗" [ref=e2281]:
+              - link "🔗" [ref=e2282] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000Y70SoEAJ
+          - row "MQL NEW LOGO POR AMER Allied Storage Containers Inbound 1/16/2026 CONVERTED 5 🔗" [ref=e2283]:
+            - cell "MQL" [ref=e2284]:
+              - generic [ref=e2285]: MQL
+            - cell "NEW LOGO" [ref=e2286]:
+              - generic [ref=e2287]: NEW LOGO
+            - cell "POR" [ref=e2288]:
+              - generic [ref=e2289]: POR
+            - cell "AMER" [ref=e2290]
+            - cell "Allied Storage Containers" [ref=e2291]
+            - cell "Inbound" [ref=e2292]
+            - cell "1/16/2026" [ref=e2293]
+            - cell "CONVERTED" [ref=e2294]:
+              - generic [ref=e2295]: CONVERTED
+            - cell "5" [ref=e2296]
+            - cell "🔗" [ref=e2297]:
+              - link "🔗" [ref=e2298] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/
+          - row "MQL NEW LOGO POR AMER Florida Party Works Inbound 1/16/2026 CONVERTED 5 🔗" [ref=e2299]:
+            - cell "MQL" [ref=e2300]:
+              - generic [ref=e2301]: MQL
+            - cell "NEW LOGO" [ref=e2302]:
+              - generic [ref=e2303]: NEW LOGO
+            - cell "POR" [ref=e2304]:
+              - generic [ref=e2305]: POR
+            - cell "AMER" [ref=e2306]
+            - cell "Florida Party Works" [ref=e2307]
+            - cell "Inbound" [ref=e2308]
+            - cell "1/16/2026" [ref=e2309]
+            - cell "CONVERTED" [ref=e2310]:
+              - generic [ref=e2311]: CONVERTED
+            - cell "5" [ref=e2312]
+            - cell "🔗" [ref=e2313]:
+              - link "🔗" [ref=e2314] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/
+          - row "MQL NEW LOGO POR AMER Liberty Lift Solutions Inbound 1/16/2026 CONVERTED 5 🔗" [ref=e2315]:
+            - cell "MQL" [ref=e2316]:
+              - generic [ref=e2317]: MQL
+            - cell "NEW LOGO" [ref=e2318]:
+              - generic [ref=e2319]: NEW LOGO
+            - cell "POR" [ref=e2320]:
+              - generic [ref=e2321]: POR
+            - cell "AMER" [ref=e2322]
+            - cell "Liberty Lift Solutions" [ref=e2323]
+            - cell "Inbound" [ref=e2324]
+            - cell "1/16/2026" [ref=e2325]
+            - cell "CONVERTED" [ref=e2326]:
+              - generic [ref=e2327]: CONVERTED
+            - cell "5" [ref=e2328]
+            - cell "🔗" [ref=e2329]:
+              - link "🔗" [ref=e2330] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/
+          - row "MQL NEW LOGO POR AMER Rogue Industrial LLC INBOUND 1/16/2026 ACTIVE 5 🔗" [ref=e2331]:
+            - cell "MQL" [ref=e2332]:
+              - generic [ref=e2333]: MQL
+            - cell "NEW LOGO" [ref=e2334]:
+              - generic [ref=e2335]: NEW LOGO
+            - cell "POR" [ref=e2336]:
+              - generic [ref=e2337]: POR
+            - cell "AMER" [ref=e2338]
+            - cell "Rogue Industrial LLC" [ref=e2339]
+            - cell "INBOUND" [ref=e2340]
+            - cell "1/16/2026" [ref=e2341]
+            - cell "ACTIVE" [ref=e2342]:
+              - generic [ref=e2343]: ACTIVE
+            - cell "5" [ref=e2344]
+            - cell "🔗" [ref=e2345]:
+              - link "🔗" [ref=e2346] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/00Qan00000Y42XbEAJ
+          - row "MQL NEW LOGO POR AMER RENTRESS Inbound 1/16/2026 CONVERTED 5 🔗" [ref=e2347]:
+            - cell "MQL" [ref=e2348]:
+              - generic [ref=e2349]: MQL
+            - cell "NEW LOGO" [ref=e2350]:
+              - generic [ref=e2351]: NEW LOGO
+            - cell "POR" [ref=e2352]:
+              - generic [ref=e2353]: POR
+            - cell "AMER" [ref=e2354]
+            - cell "RENTRESS" [ref=e2355]
+            - cell "Inbound" [ref=e2356]
+            - cell "1/16/2026" [ref=e2357]
+            - cell "CONVERTED" [ref=e2358]:
+              - generic [ref=e2359]: CONVERTED
+            - cell "5" [ref=e2360]
+            - cell "🔗" [ref=e2361]:
+              - link "🔗" [ref=e2362] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/
+      - generic [ref=e2363]:
+        - button "« First" [disabled] [ref=e2364]
+        - button "‹ Prev" [disabled] [ref=e2365]
+        - generic [ref=e2366]: Page 1 of 17 (405 total)
+        - button "Next ›" [ref=e2367] [cursor=pointer]
+        - button "Last »" [ref=e2368] [cursor=pointer]
+    - generic [ref=e2369]:
+      - heading "SQL Details" [level=2] [ref=e2370]
+      - paragraph [ref=e2371]: Sales Qualified Leads with opportunity tracking and loss reasons
+      - generic [ref=e2372]:
+        - generic [ref=e2373]:
+          - generic [ref=e2374]: "56"
+          - generic [ref=e2375]: Total SQLs
+        - generic [ref=e2376]:
+          - generic [ref=e2377]: "9"
+          - generic [ref=e2378]: Won
+        - generic [ref=e2379]:
+          - generic [ref=e2380]: "3"
+          - generic [ref=e2381]: Lost
+        - generic [ref=e2382]:
+          - generic [ref=e2383]: "30"
+          - generic [ref=e2384]: Converted SQO
+        - generic [ref=e2385]:
+          - generic [ref=e2386]: "0"
+          - generic [ref=e2387]: Stalled
+      - generic [ref=e2388]:
+        - generic [ref=e2389]:
+          - generic [ref=e2390]: "Product:"
+          - combobox [ref=e2391]:
+            - option "All Products" [selected]
+            - option "POR"
+            - option "R360"
+        - generic [ref=e2392]:
+          - generic [ref=e2393]: "Region:"
+          - combobox [ref=e2394]:
+            - option "All Regions" [selected]
+            - option "AMER"
+            - option "EMEA"
+            - option "APAC"
+        - generic [ref=e2395]:
+          - generic [ref=e2396]: "Status:"
+          - combobox [ref=e2397]:
+            - option "All Statuses" [selected]
+            - option "Active"
+            - option "Converted to SAL"
+            - option "Converted to SQO"
+            - option "Won"
+            - option "Lost"
+            - option "Stalled"
+        - generic [ref=e2398]:
+          - generic [ref=e2399]: "Search:"
+          - textbox "Company, email, opp name, or loss reason..." [ref=e2400]
+        - generic [ref=e2402]: 56 records
+      - table [ref=e2404]:
+        - rowgroup [ref=e2405]:
+          - row "Product Region Company Source SQL Date Days MQL-SQL Status Opportunity Loss Reason Salesforce" [ref=e2406]:
+            - columnheader "Product" [ref=e2407] [cursor=pointer]:
+              - generic [ref=e2408]: Product
+            - columnheader "Region" [ref=e2409] [cursor=pointer]:
+              - generic [ref=e2410]: Region
+            - columnheader "Company" [ref=e2411] [cursor=pointer]:
+              - generic [ref=e2412]: Company
+            - columnheader "Source" [ref=e2413] [cursor=pointer]:
+              - generic [ref=e2414]: Source
+            - columnheader "SQL Date" [ref=e2415] [cursor=pointer]:
+              - generic [ref=e2416]: SQL Date
+            - columnheader "Days MQL-SQL" [ref=e2417] [cursor=pointer]:
+              - generic [ref=e2418]: Days MQL-SQL
+            - columnheader "Status" [ref=e2419] [cursor=pointer]:
+              - generic [ref=e2420]: Status
+            - columnheader "Opportunity" [ref=e2421] [cursor=pointer]:
+              - generic [ref=e2422]: Opportunity
+            - columnheader "Loss Reason" [ref=e2423] [cursor=pointer]:
+              - generic [ref=e2424]: Loss Reason
+            - columnheader "Salesforce" [ref=e2425]
+        - rowgroup [ref=e2426]:
+          - row "POR AMER SWS INBOUND 1/20/2026 1 CONVERTED_SAL SWS- - Opp" [ref=e2427]:
+            - cell "POR" [ref=e2428]:
+              - generic [ref=e2429]: POR
+            - cell "AMER" [ref=e2430]
+            - cell "SWS" [ref=e2431]
+            - cell "INBOUND" [ref=e2432]
+            - cell "1/20/2026" [ref=e2433]
+            - cell "1" [ref=e2434]
+            - cell "CONVERTED_SAL" [ref=e2435]:
+              - generic [ref=e2436]: CONVERTED_SAL
+            - cell "SWS-" [ref=e2437]
+            - cell "-" [ref=e2438]
+            - cell "Opp" [ref=e2439]:
+              - link "Opp" [ref=e2440] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SViMPAA1
+          - row "POR AMER Majestic Equipment Rental... INBOUND 1/19/2026 0 ACTIVE Majestic Equipment... - Opp" [ref=e2441]:
+            - cell "POR" [ref=e2442]:
+              - generic [ref=e2443]: POR
+            - cell "AMER" [ref=e2444]
+            - cell "Majestic Equipment Rental..." [ref=e2445]
+            - cell "INBOUND" [ref=e2446]
+            - cell "1/19/2026" [ref=e2447]
+            - cell "0" [ref=e2448]
+            - cell "ACTIVE" [ref=e2449]:
+              - generic [ref=e2450]: ACTIVE
+            - cell "Majestic Equipment..." [ref=e2451]
+            - cell "-" [ref=e2452]
+            - cell "Opp" [ref=e2453]:
+              - link "Opp" [ref=e2454] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SQam7AAD
+          - row "POR AMER LBI LINENS INBOUND 1/19/2026 1 ACTIVE LBI LINENS- - Opp" [ref=e2455]:
+            - cell "POR" [ref=e2456]:
+              - generic [ref=e2457]: POR
+            - cell "AMER" [ref=e2458]
+            - cell "LBI LINENS" [ref=e2459]
+            - cell "INBOUND" [ref=e2460]
+            - cell "1/19/2026" [ref=e2461]
+            - cell "1" [ref=e2462]
+            - cell "ACTIVE" [ref=e2463]:
+              - generic [ref=e2464]: ACTIVE
+            - cell "LBI LINENS-" [ref=e2465]
+            - cell "-" [ref=e2466]
+            - cell "Opp" [ref=e2467]:
+              - link "Opp" [ref=e2468] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SPfZUAA1
+          - row "POR AMER KSF Equipment INBOUND 1/18/2026 412 WON KSF Equipment- - Opp" [ref=e2469]:
+            - cell "POR" [ref=e2470]:
+              - generic [ref=e2471]: POR
+            - cell "AMER" [ref=e2472]
+            - cell "KSF Equipment" [ref=e2473]
+            - cell "INBOUND" [ref=e2474]
+            - cell "1/18/2026" [ref=e2475]
+            - cell "412" [ref=e2476]
+            - cell "WON" [ref=e2477]:
+              - generic [ref=e2478]: WON
+            - cell "KSF Equipment-" [ref=e2479]
+            - cell "-" [ref=e2480]
+            - cell "Opp" [ref=e2481]:
+              - link "Opp" [ref=e2482] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/0064u00001L6zFSAAZ
+          - row "POR AMER DETRIBEC INBOUND 1/16/2026 7 CONVERTED_SAL DETRIBEC- - Opp" [ref=e2483]:
+            - cell "POR" [ref=e2484]:
+              - generic [ref=e2485]: POR
+            - cell "AMER" [ref=e2486]
+            - cell "DETRIBEC" [ref=e2487]
+            - cell "INBOUND" [ref=e2488]
+            - cell "1/16/2026" [ref=e2489]
+            - cell "7" [ref=e2490]
+            - cell "CONVERTED_SAL" [ref=e2491]:
+              - generic [ref=e2492]: CONVERTED_SAL
+            - cell "DETRIBEC-" [ref=e2493]
+            - cell "-" [ref=e2494]
+            - cell "Opp" [ref=e2495]:
+              - link "Opp" [ref=e2496] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SHq29AAD
+          - row "POR AMER Atlas Cedar Rentals INBOUND 1/16/2026 1 ACTIVE Atlas Cedar Rental... - Opp" [ref=e2497]:
+            - cell "POR" [ref=e2498]:
+              - generic [ref=e2499]: POR
+            - cell "AMER" [ref=e2500]
+            - cell "Atlas Cedar Rentals" [ref=e2501]
+            - cell "INBOUND" [ref=e2502]
+            - cell "1/16/2026" [ref=e2503]
+            - cell "1" [ref=e2504]
+            - cell "ACTIVE" [ref=e2505]:
+              - generic [ref=e2506]: ACTIVE
+            - cell "Atlas Cedar Rental..." [ref=e2507]
+            - cell "-" [ref=e2508]
+            - cell "Opp" [ref=e2509]:
+              - link "Opp" [ref=e2510] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SFWvfAAH
+          - row "POR APAC PSAH Group Pty Ltd Inbound 1/16/2026 0 CONVERTED_SQO Syrinx System for ... - Opp" [ref=e2511]:
+            - cell "POR" [ref=e2512]:
+              - generic [ref=e2513]: POR
+            - cell "APAC" [ref=e2514]
+            - cell "PSAH Group Pty Ltd" [ref=e2515]
+            - cell "Inbound" [ref=e2516]
+            - cell "1/16/2026" [ref=e2517]
+            - cell "0" [ref=e2518]
+            - cell "CONVERTED_SQO" [ref=e2519]:
+              - generic [ref=e2520]: CONVERTED_SQO
+            - cell "Syrinx System for ..." [ref=e2521]
+            - cell "-" [ref=e2522]
+            - cell "Opp" [ref=e2523]:
+              - link "Opp" [ref=e2524] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000SDzdRAAT
+          - row "POR AMER vtp motorports INBOUND 1/16/2026 1 ACTIVE vtp motorports- - Opp" [ref=e2525]:
+            - cell "POR" [ref=e2526]:
+              - generic [ref=e2527]: POR
+            - cell "AMER" [ref=e2528]
+            - cell "vtp motorports" [ref=e2529]
+            - cell "INBOUND" [ref=e2530]
+            - cell "1/16/2026" [ref=e2531]
+            - cell "1" [ref=e2532]
+            - cell "ACTIVE" [ref=e2533]:
+              - generic [ref=e2534]: ACTIVE
+            - cell "vtp motorports-" [ref=e2535]
+            - cell "-" [ref=e2536]
+            - cell "Opp" [ref=e2537]:
+              - link "Opp" [ref=e2538] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SGnkhAAD
+          - row "POR AMER Rose Brand Wipers INBOUND 1/14/2026 1 CONVERTED_SAL Rose Brand Wipers- - Opp" [ref=e2539]:
+            - cell "POR" [ref=e2540]:
+              - generic [ref=e2541]: POR
+            - cell "AMER" [ref=e2542]
+            - cell "Rose Brand Wipers" [ref=e2543]
+            - cell "INBOUND" [ref=e2544]
+            - cell "1/14/2026" [ref=e2545]
+            - cell "1" [ref=e2546]
+            - cell "CONVERTED_SAL" [ref=e2547]:
+              - generic [ref=e2548]: CONVERTED_SAL
+            - cell "Rose Brand Wipers-" [ref=e2549]
+            - cell "-" [ref=e2550]
+            - cell "Opp" [ref=e2551]:
+              - link "Opp" [ref=e2552] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000S4iFKAAZ
+          - row "POR EMEA s c crawford building co... INBOUND 1/14/2026 40 WON C Hire Ltd - Opp" [ref=e2553]:
+            - cell "POR" [ref=e2554]:
+              - generic [ref=e2555]: POR
+            - cell "EMEA" [ref=e2556]
+            - cell "s c crawford building co..." [ref=e2557]
+            - cell "INBOUND" [ref=e2558]
+            - cell "1/14/2026" [ref=e2559]
+            - cell "40" [ref=e2560]
+            - cell "WON" [ref=e2561]:
+              - generic [ref=e2562]: WON
+            - cell "C Hire Ltd" [ref=e2563]
+            - cell "-" [ref=e2564]
+            - cell "Opp" [ref=e2565]:
+              - link "Opp" [ref=e2566] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006Ki000005vpYZIAY
+          - row "POR AMER Canatex INBOUND 1/14/2026 1 CONVERTED_SQO Rental Elite Syste... - Opp" [ref=e2567]:
+            - cell "POR" [ref=e2568]:
+              - generic [ref=e2569]: POR
+            - cell "AMER" [ref=e2570]
+            - cell "Canatex" [ref=e2571]
+            - cell "INBOUND" [ref=e2572]
+            - cell "1/14/2026" [ref=e2573]
+            - cell "1" [ref=e2574]
+            - cell "CONVERTED_SQO" [ref=e2575]:
+              - generic [ref=e2576]: CONVERTED_SQO
+            - cell "Rental Elite Syste..." [ref=e2577]
+            - cell "-" [ref=e2578]
+            - cell "Opp" [ref=e2579]:
+              - link "Opp" [ref=e2580] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000S63WAAAZ
+          - row "POR AMER Next Level Tent INBOUND 1/13/2026 77 WON PartyCAD system fo... - Opp" [ref=e2581]:
+            - cell "POR" [ref=e2582]:
+              - generic [ref=e2583]: POR
+            - cell "AMER" [ref=e2584]
+            - cell "Next Level Tent" [ref=e2585]
+            - cell "INBOUND" [ref=e2586]
+            - cell "1/13/2026" [ref=e2587]
+            - cell "77" [ref=e2588]
+            - cell "WON" [ref=e2589]:
+              - generic [ref=e2590]: WON
+            - cell "PartyCAD system fo..." [ref=e2591]
+            - cell "-" [ref=e2592]
+            - cell "Opp" [ref=e2593]:
+              - link "Opp" [ref=e2594] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RyR5uAAF
+          - row "POR AMER Down Neck Equipment Renta... INBOUND 1/13/2026 1 CONVERTED_SQO Rental Elite Syste... - Opp" [ref=e2595]:
+            - cell "POR" [ref=e2596]:
+              - generic [ref=e2597]: POR
+            - cell "AMER" [ref=e2598]
+            - cell "Down Neck Equipment Renta..." [ref=e2599]
+            - cell "INBOUND" [ref=e2600]
+            - cell "1/13/2026" [ref=e2601]
+            - cell "1" [ref=e2602]
+            - cell "CONVERTED_SQO" [ref=e2603]:
+              - generic [ref=e2604]: CONVERTED_SQO
+            - cell "Rental Elite Syste..." [ref=e2605]
+            - cell "-" [ref=e2606]
+            - cell "Opp" [ref=e2607]:
+              - link "Opp" [ref=e2608] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RxxcSAAR
+          - row "POR AMER Truth and Fellowship Chur... INBOUND 1/13/2026 4 CONVERTED_SAL Truth and Fellowsh... - Opp" [ref=e2609]:
+            - cell "POR" [ref=e2610]:
+              - generic [ref=e2611]: POR
+            - cell "AMER" [ref=e2612]
+            - cell "Truth and Fellowship Chur..." [ref=e2613]
+            - cell "INBOUND" [ref=e2614]
+            - cell "1/13/2026" [ref=e2615]
+            - cell "4" [ref=e2616]
+            - cell "CONVERTED_SAL" [ref=e2617]:
+              - generic [ref=e2618]: CONVERTED_SAL
+            - cell "Truth and Fellowsh..." [ref=e2619]
+            - cell "-" [ref=e2620]
+            - cell "Opp" [ref=e2621]:
+              - link "Opp" [ref=e2622] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RzTwpAAF
+          - row "POR EMEA Rental Services Group Ltd INBOUND 1/12/2026 3 CONVERTED_SAL Rental Services Gr... - Opp" [ref=e2623]:
+            - cell "POR" [ref=e2624]:
+              - generic [ref=e2625]: POR
+            - cell "EMEA" [ref=e2626]
+            - cell "Rental Services Group Ltd" [ref=e2627]
+            - cell "INBOUND" [ref=e2628]
+            - cell "1/12/2026" [ref=e2629]
+            - cell "3" [ref=e2630]
+            - cell "CONVERTED_SAL" [ref=e2631]:
+              - generic [ref=e2632]: CONVERTED_SAL
+            - cell "Rental Services Gr..." [ref=e2633]
+            - cell "-" [ref=e2634]
+            - cell "Opp" [ref=e2635]:
+              - link "Opp" [ref=e2636] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RpvHeAAJ
+          - row "POR AMER Total Party Planning INBOUND 1/12/2026 2 CONVERTED_SAL Total Party Planni... - Opp" [ref=e2637]:
+            - cell "POR" [ref=e2638]:
+              - generic [ref=e2639]: POR
+            - cell "AMER" [ref=e2640]
+            - cell "Total Party Planning" [ref=e2641]
+            - cell "INBOUND" [ref=e2642]
+            - cell "1/12/2026" [ref=e2643]
+            - cell "2" [ref=e2644]
+            - cell "CONVERTED_SAL" [ref=e2645]:
+              - generic [ref=e2646]: CONVERTED_SAL
+            - cell "Total Party Planni..." [ref=e2647]
+            - cell "-" [ref=e2648]
+            - cell "Opp" [ref=e2649]:
+              - link "Opp" [ref=e2650] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RrqLwAAJ
+          - row "POR AMER Change Connect INBOUND 1/12/2026 3 CONVERTED_SAL Rental Essentials ... - Opp" [ref=e2651]:
+            - cell "POR" [ref=e2652]:
+              - generic [ref=e2653]: POR
+            - cell "AMER" [ref=e2654]
+            - cell "Change Connect" [ref=e2655]
+            - cell "INBOUND" [ref=e2656]
+            - cell "1/12/2026" [ref=e2657]
+            - cell "3" [ref=e2658]
+            - cell "CONVERTED_SAL" [ref=e2659]:
+              - generic [ref=e2660]: CONVERTED_SAL
+            - cell "Rental Essentials ..." [ref=e2661]
+            - cell "-" [ref=e2662]
+            - cell "Opp" [ref=e2663]:
+              - link "Opp" [ref=e2664] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000Rs4WzAAJ
+          - row "POR AMER Gravixev INBOUND 1/9/2026 3 ACTIVE Gravixev- - Opp" [ref=e2665]:
+            - cell "POR" [ref=e2666]:
+              - generic [ref=e2667]: POR
+            - cell "AMER" [ref=e2668]
+            - cell "Gravixev" [ref=e2669]
+            - cell "INBOUND" [ref=e2670]
+            - cell "1/9/2026" [ref=e2671]
+            - cell "3" [ref=e2672]
+            - cell "ACTIVE" [ref=e2673]:
+              - generic [ref=e2674]: ACTIVE
+            - cell "Gravixev-" [ref=e2675]
+            - cell "-" [ref=e2676]
+            - cell "Opp" [ref=e2677]:
+              - link "Opp" [ref=e2678] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RhEY5AAN
+          - row "POR AMER Easy Appliance Rentals LL... INBOUND 1/9/2026 1 CONVERTED_SAL Easy Appliance Ren... - Opp" [ref=e2679]:
+            - cell "POR" [ref=e2680]:
+              - generic [ref=e2681]: POR
+            - cell "AMER" [ref=e2682]
+            - cell "Easy Appliance Rentals LL..." [ref=e2683]
+            - cell "INBOUND" [ref=e2684]
+            - cell "1/9/2026" [ref=e2685]
+            - cell "1" [ref=e2686]
+            - cell "CONVERTED_SAL" [ref=e2687]:
+              - generic [ref=e2688]: CONVERTED_SAL
+            - cell "Easy Appliance Ren..." [ref=e2689]
+            - cell "-" [ref=e2690]
+            - cell "Opp" [ref=e2691]:
+              - link "Opp" [ref=e2692] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RgW3xAAF
+          - row "POR AMER Freds Ski Shop INBOUND 1/8/2026 2 LOST Freds Ski Shop- Unresponsive Opp" [ref=e2693]:
+            - cell "POR" [ref=e2694]:
+              - generic [ref=e2695]: POR
+            - cell "AMER" [ref=e2696]
+            - cell "Freds Ski Shop" [ref=e2697]
+            - cell "INBOUND" [ref=e2698]
+            - cell "1/8/2026" [ref=e2699]
+            - cell "2" [ref=e2700]
+            - cell "LOST" [ref=e2701]:
+              - generic [ref=e2702]: LOST
+            - cell "Freds Ski Shop-" [ref=e2703]
+            - cell "Unresponsive" [ref=e2704]
+            - cell "Opp" [ref=e2705]:
+              - link "Opp" [ref=e2706] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RXvROAA1
+          - row "POR AMER Buddies Rentals INBOUND 1/7/2026 139 WON Rental Essentials ... - Opp" [ref=e2707]:
+            - cell "POR" [ref=e2708]:
+              - generic [ref=e2709]: POR
+            - cell "AMER" [ref=e2710]
+            - cell "Buddies Rentals" [ref=e2711]
+            - cell "INBOUND" [ref=e2712]
+            - cell "1/7/2026" [ref=e2713]
+            - cell "139" [ref=e2714]
+            - cell "WON" [ref=e2715]:
+              - generic [ref=e2716]: WON
+            - cell "Rental Essentials ..." [ref=e2717]
+            - cell "-" [ref=e2718]
+            - cell "Opp" [ref=e2719]:
+              - link "Opp" [ref=e2720] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006Ki000004DMo4IAG
+          - row "POR AMER Indy Event Rentals LLC INBOUND 1/7/2026 5 CONVERTED_SAL Indy Event Rentals... - Opp" [ref=e2721]:
+            - cell "POR" [ref=e2722]:
+              - generic [ref=e2723]: POR
+            - cell "AMER" [ref=e2724]
+            - cell "Indy Event Rentals LLC" [ref=e2725]
+            - cell "INBOUND" [ref=e2726]
+            - cell "1/7/2026" [ref=e2727]
+            - cell "5" [ref=e2728]
+            - cell "CONVERTED_SAL" [ref=e2729]:
+              - generic [ref=e2730]: CONVERTED_SAL
+            - cell "Indy Event Rentals..." [ref=e2731]
+            - cell "-" [ref=e2732]
+            - cell "Opp" [ref=e2733]:
+              - link "Opp" [ref=e2734] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RNXF5AAP
+          - row "POR AMER NLJ DECOR ET LOCATION INBOUND 1/7/2026 3 CONVERTED_SAL NLJ DECOR ET LOCAT... - Opp" [ref=e2735]:
+            - cell "POR" [ref=e2736]:
+              - generic [ref=e2737]: POR
+            - cell "AMER" [ref=e2738]
+            - cell "NLJ DECOR ET LOCATION" [ref=e2739]
+            - cell "INBOUND" [ref=e2740]
+            - cell "1/7/2026" [ref=e2741]
+            - cell "3" [ref=e2742]
+            - cell "CONVERTED_SAL" [ref=e2743]:
+              - generic [ref=e2744]: CONVERTED_SAL
+            - cell "NLJ DECOR ET LOCAT..." [ref=e2745]
+            - cell "-" [ref=e2746]
+            - cell "Opp" [ref=e2747]:
+              - link "Opp" [ref=e2748] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000ROa9FAAT
+          - row "POR APAC Portable Loos Northland INBOUND 1/6/2026 7 WON Rental Essentials ... - Opp" [ref=e2749]:
+            - cell "POR" [ref=e2750]:
+              - generic [ref=e2751]: POR
+            - cell "APAC" [ref=e2752]
+            - cell "Portable Loos Northland" [ref=e2753]
+            - cell "INBOUND" [ref=e2754]
+            - cell "1/6/2026" [ref=e2755]
+            - cell "7" [ref=e2756]
+            - cell "WON" [ref=e2757]:
+              - generic [ref=e2758]: WON
+            - cell "Rental Essentials ..." [ref=e2759]
+            - cell "-" [ref=e2760]
+            - cell "Opp" [ref=e2761]:
+              - link "Opp" [ref=e2762] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RICXpAAP
+          - row "POR EMEA Loler testing ltd INBOUND 1/6/2026 4 CONVERTED_SQO Syrinx System for ... - Opp" [ref=e2763]:
+            - cell "POR" [ref=e2764]:
+              - generic [ref=e2765]: POR
+            - cell "EMEA" [ref=e2766]
+            - cell "Loler testing ltd" [ref=e2767]
+            - cell "INBOUND" [ref=e2768]
+            - cell "1/6/2026" [ref=e2769]
+            - cell "4" [ref=e2770]
+            - cell "CONVERTED_SQO" [ref=e2771]:
+              - generic [ref=e2772]: CONVERTED_SQO
+            - cell "Syrinx System for ..." [ref=e2773]
+            - cell "-" [ref=e2774]
+            - cell "Opp" [ref=e2775]:
+              - link "Opp" [ref=e2776] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RElveAAD
+      - generic [ref=e2777]:
+        - button "« First" [disabled] [ref=e2778]
+        - button "‹ Prev" [disabled] [ref=e2779]
+        - generic [ref=e2780]: Page 1 of 3 (56 total)
+        - button "Next ›" [ref=e2781] [cursor=pointer]
+        - button "Last »" [ref=e2782] [cursor=pointer]
+      - generic [ref=e2783]:
+        - heading "Loss Reason Summary" [level=4] [ref=e2784]
+        - generic [ref=e2786]:
+          - generic [ref=e2787]: "3"
+          - generic [ref=e2788]: Unresponsive
+    - generic [ref=e2789]:
+      - heading "SAL Details (Sales Accepted Lead)" [level=2] [ref=e2790]
+      - paragraph [ref=e2791]: Sales Accepted Leads - qualified leads accepted by sales for opportunity development (POR only)
+      - generic [ref=e2792]:
+        - generic [ref=e2793]:
+          - generic [ref=e2794]: "164"
+          - generic [ref=e2795]: Total SALs
+        - generic [ref=e2796]:
+          - generic [ref=e2797]: "83"
+          - generic [ref=e2798]: Won
+        - generic [ref=e2799]:
+          - generic [ref=e2800]: "12"
+          - generic [ref=e2801]: Lost
+        - generic [ref=e2802]:
+          - generic [ref=e2803]: "139"
+          - generic [ref=e2804]: Converted SQO
+        - generic [ref=e2805]:
+          - generic [ref=e2806]: 84.8%
+          - generic [ref=e2807]: Conv. to SQO
+      - generic [ref=e2808]:
+        - generic [ref=e2809]:
+          - generic [ref=e2810]: "Product:"
+          - combobox [ref=e2811]:
+            - option "All Products" [selected]
+            - option "POR"
+        - generic [ref=e2812]:
+          - generic [ref=e2813]: "Region:"
+          - combobox [ref=e2814]:
+            - option "All Regions" [selected]
+            - option "AMER"
+            - option "EMEA"
+            - option "APAC"
+        - generic [ref=e2815]:
+          - generic [ref=e2816]: "Status:"
+          - combobox [ref=e2817]:
+            - option "All Statuses" [selected]
+            - option "Active"
+            - option "Converted to SQO"
+            - option "Won"
+            - option "Lost"
+            - option "Stalled"
+        - generic [ref=e2818]:
+          - generic [ref=e2819]: "Opp Type:"
+          - generic [ref=e2820]:
+            - button "NEW LOGO" [ref=e2821] [cursor=pointer]
+            - button "STRATEGIC" [ref=e2822] [cursor=pointer]
+            - button "EXPANSION" [ref=e2823] [cursor=pointer]
+            - button "MIGRATION" [ref=e2824] [cursor=pointer]
+        - generic [ref=e2825]:
+          - generic [ref=e2826]: "Search:"
+          - textbox "Company, email, opp name..." [ref=e2827]
+        - generic [ref=e2829]: 164 records
+      - table [ref=e2831]:
+        - rowgroup [ref=e2832]:
+          - row "Product Region Category Company Source SAL Date Days SQL-SAL Status Opportunity Salesforce" [ref=e2833]:
+            - columnheader "Product" [ref=e2834] [cursor=pointer]:
+              - generic [ref=e2835]: Product
+            - columnheader "Region" [ref=e2836] [cursor=pointer]:
+              - generic [ref=e2837]: Region
+            - columnheader "Category" [ref=e2838] [cursor=pointer]:
+              - generic [ref=e2839]: Category
+            - columnheader "Company" [ref=e2840] [cursor=pointer]:
+              - generic [ref=e2841]: Company
+            - columnheader "Source" [ref=e2842] [cursor=pointer]:
+              - generic [ref=e2843]: Source
+            - columnheader "SAL Date" [ref=e2844] [cursor=pointer]:
+              - generic [ref=e2845]: SAL Date
+            - columnheader "Days SQL-SAL" [ref=e2846] [cursor=pointer]:
+              - generic [ref=e2847]: Days SQL-SAL
+            - columnheader "Status" [ref=e2848] [cursor=pointer]:
+              - generic [ref=e2849]: Status
+            - columnheader "Opportunity" [ref=e2850] [cursor=pointer]:
+              - generic [ref=e2851]: Opportunity
+            - columnheader "Salesforce" [ref=e2852]
+        - rowgroup [ref=e2853]:
+          - row "POR 🇬🇧 EMEA EXPANSION Ord Industrial & Commerci... AM Sourced 2026-01-21 0 WON Workshop App for O... 🔗" [ref=e2854]:
+            - cell "POR" [ref=e2855]:
+              - generic [ref=e2856]: POR
+            - cell "🇬🇧 EMEA" [ref=e2857]:
+              - generic [ref=e2858]:
+                - generic [ref=e2859]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e2860]:
+              - generic [ref=e2861]: EXPANSION
+            - cell "Ord Industrial & Commerci..." [ref=e2862]
+            - cell "AM Sourced" [ref=e2863]
+            - cell "2026-01-21" [ref=e2864]
+            - cell "0" [ref=e2865]
+            - cell "WON" [ref=e2866]:
+              - generic [ref=e2867]: WON
+            - cell "Workshop App for O..." [ref=e2868]
+            - cell "🔗" [ref=e2869]:
+              - link "🔗" [ref=e2870] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SdjfuAAB
+          - row "POR 🇬🇧 EMEA EXPANSION Titan Platforms AM Sourced 2026-01-21 0 WON Driver App for Tit... 🔗" [ref=e2871]:
+            - cell "POR" [ref=e2872]:
+              - generic [ref=e2873]: POR
+            - cell "🇬🇧 EMEA" [ref=e2874]:
+              - generic [ref=e2875]:
+                - generic [ref=e2876]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e2877]:
+              - generic [ref=e2878]: EXPANSION
+            - cell "Titan Platforms" [ref=e2879]
+            - cell "AM Sourced" [ref=e2880]
+            - cell "2026-01-21" [ref=e2881]
+            - cell "0" [ref=e2882]
+            - cell "WON" [ref=e2883]:
+              - generic [ref=e2884]: WON
+            - cell "Driver App for Tit..." [ref=e2885]
+            - cell "🔗" [ref=e2886]:
+              - link "🔗" [ref=e2887] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000Sfq7OAAR
+          - row "POR 🇬🇧 EMEA EXPANSION Pulse Hire Ltd AM Sourced 2026-01-21 0 WON Workshop App for P... 🔗" [ref=e2888]:
+            - cell "POR" [ref=e2889]:
+              - generic [ref=e2890]: POR
+            - cell "🇬🇧 EMEA" [ref=e2891]:
+              - generic [ref=e2892]:
+                - generic [ref=e2893]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e2894]:
+              - generic [ref=e2895]: EXPANSION
+            - cell "Pulse Hire Ltd" [ref=e2896]
+            - cell "AM Sourced" [ref=e2897]
+            - cell "2026-01-21" [ref=e2898]
+            - cell "0" [ref=e2899]
+            - cell "WON" [ref=e2900]:
+              - generic [ref=e2901]: WON
+            - cell "Workshop App for P..." [ref=e2902]
+            - cell "🔗" [ref=e2903]:
+              - link "🔗" [ref=e2904] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SekCLAAZ
+          - row "POR 🇦🇺 APAC NEW LOGO PSAH Group Pty Ltd Inbound 2026-01-20 4 CONVERTED_SQO Syrinx System for ... 🔗" [ref=e2905]:
+            - cell "POR" [ref=e2906]:
+              - generic [ref=e2907]: POR
+            - cell "🇦🇺 APAC" [ref=e2908]:
+              - generic [ref=e2909]:
+                - generic [ref=e2910]: 🇦🇺
+                - text: APAC
+            - cell "NEW LOGO" [ref=e2911]:
+              - generic [ref=e2912]: NEW LOGO
+            - cell "PSAH Group Pty Ltd" [ref=e2913]
+            - cell "Inbound" [ref=e2914]
+            - cell "2026-01-20" [ref=e2915]
+            - cell "4" [ref=e2916]
+            - cell "CONVERTED_SQO" [ref=e2917]:
+              - generic [ref=e2918]: CONVERTED_SQO
+            - cell "Syrinx System for ..." [ref=e2919]
+            - cell "🔗" [ref=e2920]:
+              - link "🔗" [ref=e2921] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000SDzdRAAT
+          - row "POR 🇺🇸 AMER NEW LOGO SWS INBOUND 2026-01-20 0 ACTIVE SWS- 🔗" [ref=e2922]:
+            - cell "POR" [ref=e2923]:
+              - generic [ref=e2924]: POR
+            - cell "🇺🇸 AMER" [ref=e2925]:
+              - generic [ref=e2926]:
+                - generic [ref=e2927]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e2928]:
+              - generic [ref=e2929]: NEW LOGO
+            - cell "SWS" [ref=e2930]
+            - cell "INBOUND" [ref=e2931]
+            - cell "2026-01-20" [ref=e2932]
+            - cell "0" [ref=e2933]
+            - cell "ACTIVE" [ref=e2934]:
+              - generic [ref=e2935]: ACTIVE
+            - cell "SWS-" [ref=e2936]
+            - cell "🔗" [ref=e2937]:
+              - link "🔗" [ref=e2938] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SViMPAA1
+          - row "POR 🇺🇸 AMER NEW LOGO DETRIBEC INBOUND 2026-01-20 4 ACTIVE DETRIBEC- 🔗" [ref=e2939]:
+            - cell "POR" [ref=e2940]:
+              - generic [ref=e2941]: POR
+            - cell "🇺🇸 AMER" [ref=e2942]:
+              - generic [ref=e2943]:
+                - generic [ref=e2944]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e2945]:
+              - generic [ref=e2946]: NEW LOGO
+            - cell "DETRIBEC" [ref=e2947]
+            - cell "INBOUND" [ref=e2948]
+            - cell "2026-01-20" [ref=e2949]
+            - cell "4" [ref=e2950]
+            - cell "ACTIVE" [ref=e2951]:
+              - generic [ref=e2952]: ACTIVE
+            - cell "DETRIBEC-" [ref=e2953]
+            - cell "🔗" [ref=e2954]:
+              - link "🔗" [ref=e2955] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SHq29AAD
+          - row "POR 🇺🇸 AMER EXPANSION M & R Equipment Rental & ... Inbound 2026-01-20 0 CONVERTED_SQO Quote for adding a... 🔗" [ref=e2956]:
+            - cell "POR" [ref=e2957]:
+              - generic [ref=e2958]: POR
+            - cell "🇺🇸 AMER" [ref=e2959]:
+              - generic [ref=e2960]:
+                - generic [ref=e2961]: 🇺🇸
+                - text: AMER
+            - cell "EXPANSION" [ref=e2962]:
+              - generic [ref=e2963]: EXPANSION
+            - cell "M & R Equipment Rental & ..." [ref=e2964]
+            - cell "Inbound" [ref=e2965]
+            - cell "2026-01-20" [ref=e2966]
+            - cell "0" [ref=e2967]
+            - cell "CONVERTED_SQO" [ref=e2968]:
+              - generic [ref=e2969]: CONVERTED_SQO
+            - cell "Quote for adding a..." [ref=e2970]
+            - cell "🔗" [ref=e2971]:
+              - link "🔗" [ref=e2972] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SYPogAAH
+          - row "POR 🇬🇧 EMEA EXPANSION Adams Cundell Engineers L... AM Sourced 2026-01-20 0 CONVERTED_SQO Workshop App for A... 🔗" [ref=e2973]:
+            - cell "POR" [ref=e2974]:
+              - generic [ref=e2975]: POR
+            - cell "🇬🇧 EMEA" [ref=e2976]:
+              - generic [ref=e2977]:
+                - generic [ref=e2978]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e2979]:
+              - generic [ref=e2980]: EXPANSION
+            - cell "Adams Cundell Engineers L..." [ref=e2981]
+            - cell "AM Sourced" [ref=e2982]
+            - cell "2026-01-20" [ref=e2983]
+            - cell "0" [ref=e2984]
+            - cell "CONVERTED_SQO" [ref=e2985]:
+              - generic [ref=e2986]: CONVERTED_SQO
+            - cell "Workshop App for A..." [ref=e2987]
+            - cell "🔗" [ref=e2988]:
+              - link "🔗" [ref=e2989] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SUiwLAAT
+          - row "POR 🇬🇧 EMEA EXPANSION P. Flannery Plant Hire Lt... AM Sourced 2026-01-20 0 CONVERTED_SQO Syrinx POR One Wor... 🔗" [ref=e2990]:
+            - cell "POR" [ref=e2991]:
+              - generic [ref=e2992]: POR
+            - cell "🇬🇧 EMEA" [ref=e2993]:
+              - generic [ref=e2994]:
+                - generic [ref=e2995]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e2996]:
+              - generic [ref=e2997]: EXPANSION
+            - cell "P. Flannery Plant Hire Lt..." [ref=e2998]
+            - cell "AM Sourced" [ref=e2999]
+            - cell "2026-01-20" [ref=e3000]
+            - cell "0" [ref=e3001]
+            - cell "CONVERTED_SQO" [ref=e3002]:
+              - generic [ref=e3003]: CONVERTED_SQO
+            - cell "Syrinx POR One Wor..." [ref=e3004]
+            - cell "🔗" [ref=e3005]:
+              - link "🔗" [ref=e3006] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SVAnnAAH
+          - row "POR 🇬🇧 EMEA EXPANSION Tempower Ltd. AM Sourced 2026-01-20 0 WON Workshop App for T... 🔗" [ref=e3007]:
+            - cell "POR" [ref=e3008]:
+              - generic [ref=e3009]: POR
+            - cell "🇬🇧 EMEA" [ref=e3010]:
+              - generic [ref=e3011]:
+                - generic [ref=e3012]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e3013]:
+              - generic [ref=e3014]: EXPANSION
+            - cell "Tempower Ltd." [ref=e3015]
+            - cell "AM Sourced" [ref=e3016]
+            - cell "2026-01-20" [ref=e3017]
+            - cell "0" [ref=e3018]
+            - cell "WON" [ref=e3019]:
+              - generic [ref=e3020]: WON
+            - cell "Workshop App for T..." [ref=e3021]
+            - cell "🔗" [ref=e3022]:
+              - link "🔗" [ref=e3023] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SWSQuAAP
+          - row "POR 🇬🇧 EMEA EXPANSION Tube Lines Limited t/a Lo... AM Sourced 2026-01-20 0 CONVERTED_SQO Workshop App for T... 🔗" [ref=e3024]:
+            - cell "POR" [ref=e3025]:
+              - generic [ref=e3026]: POR
+            - cell "🇬🇧 EMEA" [ref=e3027]:
+              - generic [ref=e3028]:
+                - generic [ref=e3029]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e3030]:
+              - generic [ref=e3031]: EXPANSION
+            - cell "Tube Lines Limited t/a Lo..." [ref=e3032]
+            - cell "AM Sourced" [ref=e3033]
+            - cell "2026-01-20" [ref=e3034]
+            - cell "0" [ref=e3035]
+            - cell "CONVERTED_SQO" [ref=e3036]:
+              - generic [ref=e3037]: CONVERTED_SQO
+            - cell "Workshop App for T..." [ref=e3038]
+            - cell "🔗" [ref=e3039]:
+              - link "🔗" [ref=e3040] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SUpWPAA1
+          - row "POR 🇬🇧 EMEA EXPANSION BPH Construction Equipmen... AM Sourced 2026-01-20 0 WON Add User for BPH C... 🔗" [ref=e3041]:
+            - cell "POR" [ref=e3042]:
+              - generic [ref=e3043]: POR
+            - cell "🇬🇧 EMEA" [ref=e3044]:
+              - generic [ref=e3045]:
+                - generic [ref=e3046]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e3047]:
+              - generic [ref=e3048]: EXPANSION
+            - cell "BPH Construction Equipmen..." [ref=e3049]
+            - cell "AM Sourced" [ref=e3050]
+            - cell "2026-01-20" [ref=e3051]
+            - cell "0" [ref=e3052]
+            - cell "WON" [ref=e3053]:
+              - generic [ref=e3054]: WON
+            - cell "Add User for BPH C..." [ref=e3055]
+            - cell "🔗" [ref=e3056]:
+              - link "🔗" [ref=e3057] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SUXssAAH
+          - row "POR 🇺🇸 AMER EXPANSION ANT Equipment LTD. (ANT R... Inbound 2026-01-20 0 WON 2 POR Users for AN... 🔗" [ref=e3058]:
+            - cell "POR" [ref=e3059]:
+              - generic [ref=e3060]: POR
+            - cell "🇺🇸 AMER" [ref=e3061]:
+              - generic [ref=e3062]:
+                - generic [ref=e3063]: 🇺🇸
+                - text: AMER
+            - cell "EXPANSION" [ref=e3064]:
+              - generic [ref=e3065]: EXPANSION
+            - cell "ANT Equipment LTD. (ANT R..." [ref=e3066]
+            - cell "Inbound" [ref=e3067]
+            - cell "2026-01-20" [ref=e3068]
+            - cell "0" [ref=e3069]
+            - cell "WON" [ref=e3070]:
+              - generic [ref=e3071]: WON
+            - cell "2 POR Users for AN..." [ref=e3072]
+            - cell "🔗" [ref=e3073]:
+              - link "🔗" [ref=e3074] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SURttAAH
+          - row "POR 🇺🇸 AMER EXPANSION Rapid Prep Inbound 2026-01-20 0 WON Quote for adding 1... 🔗" [ref=e3075]:
+            - cell "POR" [ref=e3076]:
+              - generic [ref=e3077]: POR
+            - cell "🇺🇸 AMER" [ref=e3078]:
+              - generic [ref=e3079]:
+                - generic [ref=e3080]: 🇺🇸
+                - text: AMER
+            - cell "EXPANSION" [ref=e3081]:
+              - generic [ref=e3082]: EXPANSION
+            - cell "Rapid Prep" [ref=e3083]
+            - cell "Inbound" [ref=e3084]
+            - cell "2026-01-20" [ref=e3085]
+            - cell "0" [ref=e3086]
+            - cell "WON" [ref=e3087]:
+              - generic [ref=e3088]: WON
+            - cell "Quote for adding 1..." [ref=e3089]
+            - cell "🔗" [ref=e3090]:
+              - link "🔗" [ref=e3091] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SVwAuAAL
+          - row "POR 🇬🇧 EMEA EXPANSION P. Flannery Plant Hire Lt... AM Sourced 2026-01-20 0 CONVERTED_SQO Syrinx POR One Wor... 🔗" [ref=e3092]:
+            - cell "POR" [ref=e3093]:
+              - generic [ref=e3094]: POR
+            - cell "🇬🇧 EMEA" [ref=e3095]:
+              - generic [ref=e3096]:
+                - generic [ref=e3097]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e3098]:
+              - generic [ref=e3099]: EXPANSION
+            - cell "P. Flannery Plant Hire Lt..." [ref=e3100]
+            - cell "AM Sourced" [ref=e3101]
+            - cell "2026-01-20" [ref=e3102]
+            - cell "0" [ref=e3103]
+            - cell "CONVERTED_SQO" [ref=e3104]:
+              - generic [ref=e3105]: CONVERTED_SQO
+            - cell "Syrinx POR One Wor..." [ref=e3106]
+            - cell "🔗" [ref=e3107]:
+              - link "🔗" [ref=e3108] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SUw89AAD
+          - row "POR 🇬🇧 EMEA EXPANSION G B Digger Hire Ltd. AM Sourced 2026-01-20 0 WON Add User for G B D... 🔗" [ref=e3109]:
+            - cell "POR" [ref=e3110]:
+              - generic [ref=e3111]: POR
+            - cell "🇬🇧 EMEA" [ref=e3112]:
+              - generic [ref=e3113]:
+                - generic [ref=e3114]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e3115]:
+              - generic [ref=e3116]: EXPANSION
+            - cell "G B Digger Hire Ltd." [ref=e3117]
+            - cell "AM Sourced" [ref=e3118]
+            - cell "2026-01-20" [ref=e3119]
+            - cell "0" [ref=e3120]
+            - cell "WON" [ref=e3121]:
+              - generic [ref=e3122]: WON
+            - cell "Add User for G B D..." [ref=e3123]
+            - cell "🔗" [ref=e3124]:
+              - link "🔗" [ref=e3125] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SVd3OAAT
+          - row "POR 🇺🇸 AMER EXPANSION Over The Top Rental Linen... Inbound 2026-01-19 0 WON Adding 4 POR One L... 🔗" [ref=e3126]:
+            - cell "POR" [ref=e3127]:
+              - generic [ref=e3128]: POR
+            - cell "🇺🇸 AMER" [ref=e3129]:
+              - generic [ref=e3130]:
+                - generic [ref=e3131]: 🇺🇸
+                - text: AMER
+            - cell "EXPANSION" [ref=e3132]:
+              - generic [ref=e3133]: EXPANSION
+            - cell "Over The Top Rental Linen..." [ref=e3134]
+            - cell "Inbound" [ref=e3135]
+            - cell "2026-01-19" [ref=e3136]
+            - cell "0" [ref=e3137]
+            - cell "WON" [ref=e3138]:
+              - generic [ref=e3139]: WON
+            - cell "Adding 4 POR One L..." [ref=e3140]
+            - cell "🔗" [ref=e3141]:
+              - link "🔗" [ref=e3142] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SPfXkAAL
+          - row "POR 🇺🇸 AMER EXPANSION Pentamax Equipment Corp Inbound 2026-01-19 0 CONVERTED_SQO 2 POR One Basic Us... 🔗" [ref=e3143]:
+            - cell "POR" [ref=e3144]:
+              - generic [ref=e3145]: POR
+            - cell "🇺🇸 AMER" [ref=e3146]:
+              - generic [ref=e3147]:
+                - generic [ref=e3148]: 🇺🇸
+                - text: AMER
+            - cell "EXPANSION" [ref=e3149]:
+              - generic [ref=e3150]: EXPANSION
+            - cell "Pentamax Equipment Corp" [ref=e3151]
+            - cell "Inbound" [ref=e3152]
+            - cell "2026-01-19" [ref=e3153]
+            - cell "0" [ref=e3154]
+            - cell "CONVERTED_SQO" [ref=e3155]:
+              - generic [ref=e3156]: CONVERTED_SQO
+            - cell "2 POR One Basic Us..." [ref=e3157]
+            - cell "🔗" [ref=e3158]:
+              - link "🔗" [ref=e3159] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SS2ZtAAL
+          - row "POR 🇬🇧 EMEA EXPANSION The Hire Shop AM Sourced 2026-01-19 0 CONVERTED_SQO Support for The Hi... 🔗" [ref=e3160]:
+            - cell "POR" [ref=e3161]:
+              - generic [ref=e3162]: POR
+            - cell "🇬🇧 EMEA" [ref=e3163]:
+              - generic [ref=e3164]:
+                - generic [ref=e3165]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e3166]:
+              - generic [ref=e3167]: EXPANSION
+            - cell "The Hire Shop" [ref=e3168]
+            - cell "AM Sourced" [ref=e3169]
+            - cell "2026-01-19" [ref=e3170]
+            - cell "0" [ref=e3171]
+            - cell "CONVERTED_SQO" [ref=e3172]:
+              - generic [ref=e3173]: CONVERTED_SQO
+            - cell "Support for The Hi..." [ref=e3174]
+            - cell "🔗" [ref=e3175]:
+              - link "🔗" [ref=e3176] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SPR6XAAX
+          - row "POR 🇺🇸 AMER EXPANSION Hugg and Hall Equipment Inbound 2026-01-19 0 WON 3 Months POR99 for... 🔗" [ref=e3177]:
+            - cell "POR" [ref=e3178]:
+              - generic [ref=e3179]: POR
+            - cell "🇺🇸 AMER" [ref=e3180]:
+              - generic [ref=e3181]:
+                - generic [ref=e3182]: 🇺🇸
+                - text: AMER
+            - cell "EXPANSION" [ref=e3183]:
+              - generic [ref=e3184]: EXPANSION
+            - cell "Hugg and Hall Equipment" [ref=e3185]
+            - cell "Inbound" [ref=e3186]
+            - cell "2026-01-19" [ref=e3187]
+            - cell "0" [ref=e3188]
+            - cell "WON" [ref=e3189]:
+              - generic [ref=e3190]: WON
+            - cell "3 Months POR99 for..." [ref=e3191]
+            - cell "🔗" [ref=e3192]:
+              - link "🔗" [ref=e3193] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SQQbRAAX
+          - row "POR 🇺🇸 AMER EXPANSION Portapros Inbound 2026-01-19 0 WON 2 POR One Basic Li... 🔗" [ref=e3194]:
+            - cell "POR" [ref=e3195]:
+              - generic [ref=e3196]: POR
+            - cell "🇺🇸 AMER" [ref=e3197]:
+              - generic [ref=e3198]:
+                - generic [ref=e3199]: 🇺🇸
+                - text: AMER
+            - cell "EXPANSION" [ref=e3200]:
+              - generic [ref=e3201]: EXPANSION
+            - cell "Portapros" [ref=e3202]
+            - cell "Inbound" [ref=e3203]
+            - cell "2026-01-19" [ref=e3204]
+            - cell "0" [ref=e3205]
+            - cell "WON" [ref=e3206]:
+              - generic [ref=e3207]: WON
+            - cell "2 POR One Basic Li..." [ref=e3208]
+            - cell "🔗" [ref=e3209]:
+              - link "🔗" [ref=e3210] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SRgcdAAD
+          - row "POR 🇺🇸 AMER EXPANSION Rentco Equipment, Ltd. Inbound 2026-01-19 0 WON RDS USer -for Rent... 🔗" [ref=e3211]:
+            - cell "POR" [ref=e3212]:
+              - generic [ref=e3213]: POR
+            - cell "🇺🇸 AMER" [ref=e3214]:
+              - generic [ref=e3215]:
+                - generic [ref=e3216]: 🇺🇸
+                - text: AMER
+            - cell "EXPANSION" [ref=e3217]:
+              - generic [ref=e3218]: EXPANSION
+            - cell "Rentco Equipment, Ltd." [ref=e3219]
+            - cell "Inbound" [ref=e3220]
+            - cell "2026-01-19" [ref=e3221]
+            - cell "0" [ref=e3222]
+            - cell "WON" [ref=e3223]:
+              - generic [ref=e3224]: WON
+            - cell "RDS USer -for Rent..." [ref=e3225]
+            - cell "🔗" [ref=e3226]:
+              - link "🔗" [ref=e3227] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SQFxrAAH
+          - row "POR 🇬🇧 EMEA EXPANSION THX Ltd. AM Sourced 2026-01-19 0 WON Add User for THX L... 🔗" [ref=e3228]:
+            - cell "POR" [ref=e3229]:
+              - generic [ref=e3230]: POR
+            - cell "🇬🇧 EMEA" [ref=e3231]:
+              - generic [ref=e3232]:
+                - generic [ref=e3233]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e3234]:
+              - generic [ref=e3235]: EXPANSION
+            - cell "THX Ltd." [ref=e3236]
+            - cell "AM Sourced" [ref=e3237]
+            - cell "2026-01-19" [ref=e3238]
+            - cell "0" [ref=e3239]
+            - cell "WON" [ref=e3240]:
+              - generic [ref=e3241]: WON
+            - cell "Add User for THX L..." [ref=e3242]
+            - cell "🔗" [ref=e3243]:
+              - link "🔗" [ref=e3244] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SQNKEAA5
+          - row "POR 🇺🇸 AMER EXPANSION Pentamax Equipment Corp Inbound 2026-01-19 0 CONVERTED_SQO Fulfillment Module... 🔗" [ref=e3245]:
+            - cell "POR" [ref=e3246]:
+              - generic [ref=e3247]: POR
+            - cell "🇺🇸 AMER" [ref=e3248]:
+              - generic [ref=e3249]:
+                - generic [ref=e3250]: 🇺🇸
+                - text: AMER
+            - cell "EXPANSION" [ref=e3251]:
+              - generic [ref=e3252]: EXPANSION
+            - cell "Pentamax Equipment Corp" [ref=e3253]
+            - cell "Inbound" [ref=e3254]
+            - cell "2026-01-19" [ref=e3255]
+            - cell "0" [ref=e3256]
+            - cell "CONVERTED_SQO" [ref=e3257]:
+              - generic [ref=e3258]: CONVERTED_SQO
+            - cell "Fulfillment Module..." [ref=e3259]
+            - cell "🔗" [ref=e3260]:
+              - link "🔗" [ref=e3261] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SRgsmAAD
+          - row "POR 🇬🇧 EMEA EXPANSION Potter Plant Hire AM Sourced 2026-01-19 0 WON Workshop App for P... 🔗" [ref=e3262]:
+            - cell "POR" [ref=e3263]:
+              - generic [ref=e3264]: POR
+            - cell "🇬🇧 EMEA" [ref=e3265]:
+              - generic [ref=e3266]:
+                - generic [ref=e3267]: 🇬🇧
+                - text: EMEA
+            - cell "EXPANSION" [ref=e3268]:
+              - generic [ref=e3269]: EXPANSION
+            - cell "Potter Plant Hire" [ref=e3270]
+            - cell "AM Sourced" [ref=e3271]
+            - cell "2026-01-19" [ref=e3272]
+            - cell "0" [ref=e3273]
+            - cell "WON" [ref=e3274]:
+              - generic [ref=e3275]: WON
+            - cell "Workshop App for P..." [ref=e3276]
+            - cell "🔗" [ref=e3277]:
+              - link "🔗" [ref=e3278] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SQHxxAAH
+      - generic [ref=e3279]:
+        - button "« First" [disabled] [ref=e3280]
+        - button "‹ Prev" [disabled] [ref=e3281]
+        - generic [ref=e3282]: Page 1 of 7 (164 total)
+        - button "Next ›" [ref=e3283] [cursor=pointer]
+        - button "Last »" [ref=e3284] [cursor=pointer]
+      - generic [ref=e3285]:
+        - heading "Loss Reason Summary" [level=4] [ref=e3286]
+        - generic [ref=e3287]:
+          - generic [ref=e3288]:
+            - generic [ref=e3289]: "4"
+            - generic [ref=e3290]:
+              - generic [ref=e3291]: Not Ready to Buy
+              - generic [ref=e3292]: $20,918
+          - generic [ref=e3293]:
+            - generic [ref=e3294]: "6"
+            - generic [ref=e3295]:
+              - generic [ref=e3296]: No Reason Provided
+              - generic [ref=e3297]: $10,670
+          - generic [ref=e3298]:
+            - generic [ref=e3299]: "2"
+            - generic [ref=e3300]:
+              - generic [ref=e3301]: Duplicate or Incorrect Opportunity
+              - generic [ref=e3302]: $4,065
+    - generic [ref=e3303]:
+      - heading "SQO Details (Sales Qualified Opportunity)" [level=2] [ref=e3304]
+      - paragraph [ref=e3305]: Sales Qualified Opportunities - qualified opportunities in active sales pipeline
+      - generic [ref=e3306]:
+        - generic [ref=e3307]:
+          - generic [ref=e3308]: "48"
+          - generic [ref=e3309]: Total SQOs
+        - generic [ref=e3310]:
+          - generic [ref=e3311]: "11"
+          - generic [ref=e3312]: Won
+        - generic [ref=e3313]:
+          - generic [ref=e3314]: "4"
+          - generic [ref=e3315]: Lost
+        - generic [ref=e3316]:
+          - generic [ref=e3317]: "33"
+          - generic [ref=e3318]: Active
+        - generic [ref=e3319]:
+          - generic [ref=e3320]: 73.3%
+          - generic [ref=e3321]: Win Rate
+        - generic [ref=e3322]:
+          - generic [ref=e3323]: $38,744
+          - generic [ref=e3324]: Won ACV
+        - generic [ref=e3325]:
+          - generic [ref=e3326]: 16d
+          - generic [ref=e3327]: Avg Cycle
+      - generic [ref=e3328]:
+        - generic [ref=e3329]:
+          - generic [ref=e3330]: "Product:"
+          - combobox [ref=e3331]:
+            - option "All Products" [selected]
+            - option "POR"
+            - option "R360"
+        - generic [ref=e3332]:
+          - generic [ref=e3333]: "Region:"
+          - combobox [ref=e3334]:
+            - option "All Regions" [selected]
+            - option "AMER"
+            - option "EMEA"
+            - option "APAC"
+        - generic [ref=e3335]:
+          - generic [ref=e3336]: "Status:"
+          - combobox [ref=e3337]:
+            - option "All Statuses" [selected]
+            - option "Active"
+            - option "Won"
+            - option "Lost"
+            - option "Stalled"
+        - generic [ref=e3338]:
+          - generic [ref=e3339]: "Opp Type:"
+          - generic [ref=e3340]:
+            - button "NEW LOGO" [ref=e3341] [cursor=pointer]
+            - button "STRATEGIC" [ref=e3342] [cursor=pointer]
+            - button "EXPANSION" [ref=e3343] [cursor=pointer]
+            - button "MIGRATION" [ref=e3344] [cursor=pointer]
+        - generic [ref=e3345]:
+          - generic [ref=e3346]: "Search:"
+          - textbox "Company, opp name, stage..." [ref=e3347]
+        - generic [ref=e3349]: 48 records
+      - table [ref=e3351]:
+        - rowgroup [ref=e3352]:
+          - row "Product Region Category Company Source SQO Date Total Cycle Stage ACV Status Lost Reason Salesforce" [ref=e3353]:
+            - columnheader "Product" [ref=e3354] [cursor=pointer]:
+              - generic [ref=e3355]: Product
+            - columnheader "Region" [ref=e3356] [cursor=pointer]:
+              - generic [ref=e3357]: Region
+            - columnheader "Category" [ref=e3358] [cursor=pointer]:
+              - generic [ref=e3359]: Category
+            - columnheader "Company" [ref=e3360] [cursor=pointer]:
+              - generic [ref=e3361]: Company
+            - columnheader "Source" [ref=e3362] [cursor=pointer]:
+              - generic [ref=e3363]: Source
+            - columnheader "SQO Date" [ref=e3364] [cursor=pointer]:
+              - generic [ref=e3365]: SQO Date
+            - columnheader "Total Cycle" [ref=e3366] [cursor=pointer]:
+              - generic [ref=e3367]: Total Cycle
+            - columnheader "Stage" [ref=e3368] [cursor=pointer]:
+              - generic [ref=e3369]: Stage
+            - columnheader "ACV" [ref=e3370] [cursor=pointer]:
+              - generic [ref=e3371]: ACV
+            - columnheader "Status" [ref=e3372] [cursor=pointer]:
+              - generic [ref=e3373]: Status
+            - columnheader "Lost Reason" [ref=e3374] [cursor=pointer]:
+              - generic [ref=e3375]: Lost Reason
+            - columnheader "Salesforce" [ref=e3376]
+        - rowgroup [ref=e3377]:
+          - row "POR 🇦🇺 APAC NEW LOGO PSAH Group Pty Ltd Inbound 2026-01-20 4d Stage 3 $0 ACTIVE - 🔗" [ref=e3378]:
+            - cell "POR" [ref=e3379]:
+              - generic [ref=e3380]: POR
+            - cell "🇦🇺 APAC" [ref=e3381]:
+              - generic [ref=e3382]:
+                - generic [ref=e3383]: 🇦🇺
+                - text: APAC
+            - cell "NEW LOGO" [ref=e3384]:
+              - generic [ref=e3385]: NEW LOGO
+            - cell "PSAH Group Pty Ltd" [ref=e3386]
+            - cell "Inbound" [ref=e3387]
+            - cell "2026-01-20" [ref=e3388]
+            - cell "4d" [ref=e3389]
+            - cell "Stage 3" [ref=e3390]
+            - cell "$0" [ref=e3391]
+            - cell "ACTIVE" [ref=e3392]:
+              - generic [ref=e3393]: ACTIVE
+            - cell "-" [ref=e3394]
+            - cell "🔗" [ref=e3395]:
+              - link "🔗" [ref=e3396] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000SDzdRAAT
+          - row "POR 🇺🇸 AMER NEW LOGO Solo Equipment Inbound 2026-01-19 0d Stage 3 $0 ACTIVE - 🔗" [ref=e3397]:
+            - cell "POR" [ref=e3398]:
+              - generic [ref=e3399]: POR
+            - cell "🇺🇸 AMER" [ref=e3400]:
+              - generic [ref=e3401]:
+                - generic [ref=e3402]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3403]:
+              - generic [ref=e3404]: NEW LOGO
+            - cell "Solo Equipment" [ref=e3405]
+            - cell "Inbound" [ref=e3406]
+            - cell "2026-01-19" [ref=e3407]
+            - cell "0d" [ref=e3408]
+            - cell "Stage 3" [ref=e3409]
+            - cell "$0" [ref=e3410]
+            - cell "ACTIVE" [ref=e3411]:
+              - generic [ref=e3412]: ACTIVE
+            - cell "-" [ref=e3413]
+            - cell "🔗" [ref=e3414]:
+              - link "🔗" [ref=e3415] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000SGCUwAAP
+          - row "POR 🇺🇸 AMER NEW LOGO Rockforce Inbound 2026-01-16 0d Closed Lost - N... $0 LOST Product deficie... 🔗" [ref=e3416]:
+            - cell "POR" [ref=e3417]:
+              - generic [ref=e3418]: POR
+            - cell "🇺🇸 AMER" [ref=e3419]:
+              - generic [ref=e3420]:
+                - generic [ref=e3421]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3422]:
+              - generic [ref=e3423]: NEW LOGO
+            - cell "Rockforce" [ref=e3424]
+            - cell "Inbound" [ref=e3425]
+            - cell "2026-01-16" [ref=e3426]
+            - cell "0d" [ref=e3427]
+            - cell "Closed Lost - N..." [ref=e3428]
+            - cell "$0" [ref=e3429]
+            - cell "LOST" [ref=e3430]:
+              - generic [ref=e3431]: LOST
+            - cell "Product deficie..." [ref=e3432]
+            - cell "🔗" [ref=e3433]:
+              - link "🔗" [ref=e3434] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000SBxEOAA1
+          - row "POR 🇺🇸 AMER NEW LOGO Canatex Inbound 2026-01-16 3d Stage 3 $14,995 ACTIVE - 🔗" [ref=e3435]:
+            - cell "POR" [ref=e3436]:
+              - generic [ref=e3437]: POR
+            - cell "🇺🇸 AMER" [ref=e3438]:
+              - generic [ref=e3439]:
+                - generic [ref=e3440]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3441]:
+              - generic [ref=e3442]: NEW LOGO
+            - cell "Canatex" [ref=e3443]
+            - cell "Inbound" [ref=e3444]
+            - cell "2026-01-16" [ref=e3445]
+            - cell "3d" [ref=e3446]
+            - cell "Stage 3" [ref=e3447]
+            - cell "$14,995" [ref=e3448]
+            - cell "ACTIVE" [ref=e3449]:
+              - generic [ref=e3450]: ACTIVE
+            - cell "-" [ref=e3451]
+            - cell "🔗" [ref=e3452]:
+              - link "🔗" [ref=e3453] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000S63WAAAZ
+          - row "POR 🇺🇸 AMER NEW LOGO Middle Tennessee Tra... Inbound 2026-01-16 0d Stage 3 $0 ACTIVE - 🔗" [ref=e3454]:
+            - cell "POR" [ref=e3455]:
+              - generic [ref=e3456]: POR
+            - cell "🇺🇸 AMER" [ref=e3457]:
+              - generic [ref=e3458]:
+                - generic [ref=e3459]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3460]:
+              - generic [ref=e3461]: NEW LOGO
+            - cell "Middle Tennessee Tra..." [ref=e3462]
+            - cell "Inbound" [ref=e3463]
+            - cell "2026-01-16" [ref=e3464]
+            - cell "0d" [ref=e3465]
+            - cell "Stage 3" [ref=e3466]
+            - cell "$0" [ref=e3467]
+            - cell "ACTIVE" [ref=e3468]:
+              - generic [ref=e3469]: ACTIVE
+            - cell "-" [ref=e3470]
+            - cell "🔗" [ref=e3471]:
+              - link "🔗" [ref=e3472] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000Rzc0pAAB
+          - row "POR 🇺🇸 AMER NEW LOGO City Stroller Rental... Inbound 2026-01-15 17d Stage 3 $3,912 ACTIVE - 🔗" [ref=e3473]:
+            - cell "POR" [ref=e3474]:
+              - generic [ref=e3475]: POR
+            - cell "🇺🇸 AMER" [ref=e3476]:
+              - generic [ref=e3477]:
+                - generic [ref=e3478]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3479]:
+              - generic [ref=e3480]: NEW LOGO
+            - cell "City Stroller Rental..." [ref=e3481]
+            - cell "Inbound" [ref=e3482]
+            - cell "2026-01-15" [ref=e3483]
+            - cell "17d" [ref=e3484]
+            - cell "Stage 3" [ref=e3485]
+            - cell "$3,912" [ref=e3486]
+            - cell "ACTIVE" [ref=e3487]:
+              - generic [ref=e3488]: ACTIVE
+            - cell "-" [ref=e3489]
+            - cell "🔗" [ref=e3490]:
+              - link "🔗" [ref=e3491] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000QlkhyAAB
+          - row "POR 🇦🇺 APAC NEW LOGO Portable Loos Northl... Inbound 2026-01-15 16d Closed Won $1,498 WON - 🔗" [ref=e3492]:
+            - cell "POR" [ref=e3493]:
+              - generic [ref=e3494]: POR
+            - cell "🇦🇺 APAC" [ref=e3495]:
+              - generic [ref=e3496]:
+                - generic [ref=e3497]: 🇦🇺
+                - text: APAC
+            - cell "NEW LOGO" [ref=e3498]:
+              - generic [ref=e3499]: NEW LOGO
+            - cell "Portable Loos Northl..." [ref=e3500]
+            - cell "Inbound" [ref=e3501]
+            - cell "2026-01-15" [ref=e3502]
+            - cell "16d" [ref=e3503]
+            - cell "Closed Won" [ref=e3504]
+            - cell "$1,498" [ref=e3505]
+            - cell "WON" [ref=e3506]:
+              - generic [ref=e3507]: WON
+            - cell "-" [ref=e3508]
+            - cell "🔗" [ref=e3509]:
+              - link "🔗" [ref=e3510] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000RICXpAAP
+          - row "POR 🇺🇸 AMER NEW LOGO Down Neck Equipment ... Inbound 2026-01-14 2d Stage 4 $18,038 ACTIVE - 🔗" [ref=e3511]:
+            - cell "POR" [ref=e3512]:
+              - generic [ref=e3513]: POR
+            - cell "🇺🇸 AMER" [ref=e3514]:
+              - generic [ref=e3515]:
+                - generic [ref=e3516]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3517]:
+              - generic [ref=e3518]: NEW LOGO
+            - cell "Down Neck Equipment ..." [ref=e3519]
+            - cell "Inbound" [ref=e3520]
+            - cell "2026-01-14" [ref=e3521]
+            - cell "2d" [ref=e3522]
+            - cell "Stage 4" [ref=e3523]
+            - cell "$18,038" [ref=e3524]
+            - cell "ACTIVE" [ref=e3525]:
+              - generic [ref=e3526]: ACTIVE
+            - cell "-" [ref=e3527]
+            - cell "🔗" [ref=e3528]:
+              - link "🔗" [ref=e3529] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000RxxcSAAR
+          - row "POR 🇺🇸 AMER NEW LOGO Southern Equipment S... Inbound 2026-01-13 5d Closed Won $3,912 WON - 🔗" [ref=e3530]:
+            - cell "POR" [ref=e3531]:
+              - generic [ref=e3532]: POR
+            - cell "🇺🇸 AMER" [ref=e3533]:
+              - generic [ref=e3534]:
+                - generic [ref=e3535]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3536]:
+              - generic [ref=e3537]: NEW LOGO
+            - cell "Southern Equipment S..." [ref=e3538]
+            - cell "Inbound" [ref=e3539]
+            - cell "2026-01-13" [ref=e3540]
+            - cell "5d" [ref=e3541]
+            - cell "Closed Won" [ref=e3542]
+            - cell "$3,912" [ref=e3543]
+            - cell "WON" [ref=e3544]:
+              - generic [ref=e3545]: WON
+            - cell "-" [ref=e3546]
+            - cell "🔗" [ref=e3547]:
+              - link "🔗" [ref=e3548] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000RYDJSAA5
+          - row "POR 🇺🇸 AMER NEW LOGO Workseq Inbound 2026-01-12 7d Closed Lost - N... $0 LOST Not Ready to Bu... 🔗" [ref=e3549]:
+            - cell "POR" [ref=e3550]:
+              - generic [ref=e3551]: POR
+            - cell "🇺🇸 AMER" [ref=e3552]:
+              - generic [ref=e3553]:
+                - generic [ref=e3554]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3555]:
+              - generic [ref=e3556]: NEW LOGO
+            - cell "Workseq" [ref=e3557]
+            - cell "Inbound" [ref=e3558]
+            - cell "2026-01-12" [ref=e3559]
+            - cell "7d" [ref=e3560]
+            - cell "Closed Lost - N..." [ref=e3561]
+            - cell "$0" [ref=e3562]
+            - cell "LOST" [ref=e3563]:
+              - generic [ref=e3564]: LOST
+            - cell "Not Ready to Bu..." [ref=e3565]
+            - cell "🔗" [ref=e3566]:
+              - link "🔗" [ref=e3567] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000RAZTFAA5
+          - row "POR 🇺🇸 AMER NEW LOGO A-1 Equipment Rental... Inbound 2026-01-11 0d Stage 3 $0 ACTIVE - 🔗" [ref=e3568]:
+            - cell "POR" [ref=e3569]:
+              - generic [ref=e3570]: POR
+            - cell "🇺🇸 AMER" [ref=e3571]:
+              - generic [ref=e3572]:
+                - generic [ref=e3573]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3574]:
+              - generic [ref=e3575]: NEW LOGO
+            - cell "A-1 Equipment Rental..." [ref=e3576]
+            - cell "Inbound" [ref=e3577]
+            - cell "2026-01-11" [ref=e3578]
+            - cell "0d" [ref=e3579]
+            - cell "Stage 3" [ref=e3580]
+            - cell "$0" [ref=e3581]
+            - cell "ACTIVE" [ref=e3582]:
+              - generic [ref=e3583]: ACTIVE
+            - cell "-" [ref=e3584]
+            - cell "🔗" [ref=e3585]:
+              - link "🔗" [ref=e3586] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000R0EgFAAV
+          - row "POR 🇬🇧 EMEA NEW LOGO Direct 365 Inbound 2026-01-09 0d Demonstration $0 ACTIVE - 🔗" [ref=e3587]:
+            - cell "POR" [ref=e3588]:
+              - generic [ref=e3589]: POR
+            - cell "🇬🇧 EMEA" [ref=e3590]:
+              - generic [ref=e3591]:
+                - generic [ref=e3592]: 🇬🇧
+                - text: EMEA
+            - cell "NEW LOGO" [ref=e3593]:
+              - generic [ref=e3594]: NEW LOGO
+            - cell "Direct 365" [ref=e3595]
+            - cell "Inbound" [ref=e3596]
+            - cell "2026-01-09" [ref=e3597]
+            - cell "0d" [ref=e3598]
+            - cell "Demonstration" [ref=e3599]
+            - cell "$0" [ref=e3600]
+            - cell "ACTIVE" [ref=e3601]:
+              - generic [ref=e3602]: ACTIVE
+            - cell "-" [ref=e3603]
+            - cell "🔗" [ref=e3604]:
+              - link "🔗" [ref=e3605] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000R9ABuAAN
+          - row "POR 🇺🇸 AMER NEW LOGO A One Press Inbound 2026-01-09 1d Stage 3 $12,106 ACTIVE - 🔗" [ref=e3606]:
+            - cell "POR" [ref=e3607]:
+              - generic [ref=e3608]: POR
+            - cell "🇺🇸 AMER" [ref=e3609]:
+              - generic [ref=e3610]:
+                - generic [ref=e3611]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3612]:
+              - generic [ref=e3613]: NEW LOGO
+            - cell "A One Press" [ref=e3614]
+            - cell "Inbound" [ref=e3615]
+            - cell "2026-01-09" [ref=e3616]
+            - cell "1d" [ref=e3617]
+            - cell "Stage 3" [ref=e3618]
+            - cell "$12,106" [ref=e3619]
+            - cell "ACTIVE" [ref=e3620]:
+              - generic [ref=e3621]: ACTIVE
+            - cell "-" [ref=e3622]
+            - cell "🔗" [ref=e3623]:
+              - link "🔗" [ref=e3624] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000RW70UAAT
+          - row "POR 🇺🇸 AMER NEW LOGO Kensington Oval Inbound 2026-01-09 3d Stage 3 $0 ACTIVE - 🔗" [ref=e3625]:
+            - cell "POR" [ref=e3626]:
+              - generic [ref=e3627]: POR
+            - cell "🇺🇸 AMER" [ref=e3628]:
+              - generic [ref=e3629]:
+                - generic [ref=e3630]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3631]:
+              - generic [ref=e3632]: NEW LOGO
+            - cell "Kensington Oval" [ref=e3633]
+            - cell "Inbound" [ref=e3634]
+            - cell "2026-01-09" [ref=e3635]
+            - cell "3d" [ref=e3636]
+            - cell "Stage 3" [ref=e3637]
+            - cell "$0" [ref=e3638]
+            - cell "ACTIVE" [ref=e3639]:
+              - generic [ref=e3640]: ACTIVE
+            - cell "-" [ref=e3641]
+            - cell "🔗" [ref=e3642]:
+              - link "🔗" [ref=e3643] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000RGNZ0AAP
+          - row "POR 🇺🇸 AMER NEW LOGO Evolution Dome US Inbound 2026-01-08 24d Closed Won $3,912 WON - 🔗" [ref=e3644]:
+            - cell "POR" [ref=e3645]:
+              - generic [ref=e3646]: POR
+            - cell "🇺🇸 AMER" [ref=e3647]:
+              - generic [ref=e3648]:
+                - generic [ref=e3649]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3650]:
+              - generic [ref=e3651]: NEW LOGO
+            - cell "Evolution Dome US" [ref=e3652]
+            - cell "Inbound" [ref=e3653]
+            - cell "2026-01-08" [ref=e3654]
+            - cell "24d" [ref=e3655]
+            - cell "Closed Won" [ref=e3656]
+            - cell "$3,912" [ref=e3657]
+            - cell "WON" [ref=e3658]:
+              - generic [ref=e3659]: WON
+            - cell "-" [ref=e3660]
+            - cell "🔗" [ref=e3661]:
+              - link "🔗" [ref=e3662] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000Pyc42AAB
+          - row "POR 🇺🇸 AMER NEW LOGO Freedom Containers Inbound 2026-01-08 0d Closed Won $3,912 WON - 🔗" [ref=e3663]:
+            - cell "POR" [ref=e3664]:
+              - generic [ref=e3665]: POR
+            - cell "🇺🇸 AMER" [ref=e3666]:
+              - generic [ref=e3667]:
+                - generic [ref=e3668]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3669]:
+              - generic [ref=e3670]: NEW LOGO
+            - cell "Freedom Containers" [ref=e3671]
+            - cell "Inbound" [ref=e3672]
+            - cell "2026-01-08" [ref=e3673]
+            - cell "0d" [ref=e3674]
+            - cell "Closed Won" [ref=e3675]
+            - cell "$3,912" [ref=e3676]
+            - cell "WON" [ref=e3677]:
+              - generic [ref=e3678]: WON
+            - cell "-" [ref=e3679]
+            - cell "🔗" [ref=e3680]:
+              - link "🔗" [ref=e3681] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000R9BpYAAV
+          - row "POR 🇺🇸 AMER NEW LOGO Dansby's Taylor Rent... Inbound 2026-01-07 1d Closed Won $3,912 WON - 🔗" [ref=e3682]:
+            - cell "POR" [ref=e3683]:
+              - generic [ref=e3684]: POR
+            - cell "🇺🇸 AMER" [ref=e3685]:
+              - generic [ref=e3686]:
+                - generic [ref=e3687]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3688]:
+              - generic [ref=e3689]: NEW LOGO
+            - cell "Dansby's Taylor Rent..." [ref=e3690]
+            - cell "Inbound" [ref=e3691]
+            - cell "2026-01-07" [ref=e3692]
+            - cell "1d" [ref=e3693]
+            - cell "Closed Won" [ref=e3694]
+            - cell "$3,912" [ref=e3695]
+            - cell "WON" [ref=e3696]:
+              - generic [ref=e3697]: WON
+            - cell "-" [ref=e3698]
+            - cell "🔗" [ref=e3699]:
+              - link "🔗" [ref=e3700] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000RHG2TAAX
+          - row "POR 🇦🇺 APAC NEW LOGO Dawnview Commercial ... Inbound 2026-01-07 0d Discovery $6,098 ACTIVE - 🔗" [ref=e3701]:
+            - cell "POR" [ref=e3702]:
+              - generic [ref=e3703]: POR
+            - cell "🇦🇺 APAC" [ref=e3704]:
+              - generic [ref=e3705]:
+                - generic [ref=e3706]: 🇦🇺
+                - text: APAC
+            - cell "NEW LOGO" [ref=e3707]:
+              - generic [ref=e3708]: NEW LOGO
+            - cell "Dawnview Commercial ..." [ref=e3709]
+            - cell "Inbound" [ref=e3710]
+            - cell "2026-01-07" [ref=e3711]
+            - cell "0d" [ref=e3712]
+            - cell "Discovery" [ref=e3713]
+            - cell "$6,098" [ref=e3714]
+            - cell "ACTIVE" [ref=e3715]:
+              - generic [ref=e3716]: ACTIVE
+            - cell "-" [ref=e3717]
+            - cell "🔗" [ref=e3718]:
+              - link "🔗" [ref=e3719] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000RJcziAAD
+          - row "POR 🇬🇧 EMEA NEW LOGO Loler Testing LTD Inbound 2026-01-07 5d Negotiation $4,940 ACTIVE - 🔗" [ref=e3720]:
+            - cell "POR" [ref=e3721]:
+              - generic [ref=e3722]: POR
+            - cell "🇬🇧 EMEA" [ref=e3723]:
+              - generic [ref=e3724]:
+                - generic [ref=e3725]: 🇬🇧
+                - text: EMEA
+            - cell "NEW LOGO" [ref=e3726]:
+              - generic [ref=e3727]: NEW LOGO
+            - cell "Loler Testing LTD" [ref=e3728]
+            - cell "Inbound" [ref=e3729]
+            - cell "2026-01-07" [ref=e3730]
+            - cell "5d" [ref=e3731]
+            - cell "Negotiation" [ref=e3732]
+            - cell "$4,940" [ref=e3733]
+            - cell "ACTIVE" [ref=e3734]:
+              - generic [ref=e3735]: ACTIVE
+            - cell "-" [ref=e3736]
+            - cell "🔗" [ref=e3737]:
+              - link "🔗" [ref=e3738] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000RElveAAD
+          - row "POR 🇦🇺 APAC NEW LOGO Pearl Plant Hire Pty... Inbound 2026-01-07 2d Closed Won $7,182 WON - 🔗" [ref=e3739]:
+            - cell "POR" [ref=e3740]:
+              - generic [ref=e3741]: POR
+            - cell "🇦🇺 APAC" [ref=e3742]:
+              - generic [ref=e3743]:
+                - generic [ref=e3744]: 🇦🇺
+                - text: APAC
+            - cell "NEW LOGO" [ref=e3745]:
+              - generic [ref=e3746]: NEW LOGO
+            - cell "Pearl Plant Hire Pty..." [ref=e3747]
+            - cell "Inbound" [ref=e3748]
+            - cell "2026-01-07" [ref=e3749]
+            - cell "2d" [ref=e3750]
+            - cell "Closed Won" [ref=e3751]
+            - cell "$7,182" [ref=e3752]
+            - cell "WON" [ref=e3753]:
+              - generic [ref=e3754]: WON
+            - cell "-" [ref=e3755]
+            - cell "🔗" [ref=e3756]:
+              - link "🔗" [ref=e3757] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000RBp2uAAD
+          - row "POR 🇺🇸 AMER NEW LOGO Reunion AV Installat... Inbound 2026-01-06 80d Stage 3 $0 ACTIVE - 🔗" [ref=e3758]:
+            - cell "POR" [ref=e3759]:
+              - generic [ref=e3760]: POR
+            - cell "🇺🇸 AMER" [ref=e3761]:
+              - generic [ref=e3762]:
+                - generic [ref=e3763]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3764]:
+              - generic [ref=e3765]: NEW LOGO
+            - cell "Reunion AV Installat..." [ref=e3766]
+            - cell "Inbound" [ref=e3767]
+            - cell "2026-01-06" [ref=e3768]
+            - cell "80d" [ref=e3769]
+            - cell "Stage 3" [ref=e3770]
+            - cell "$0" [ref=e3771]
+            - cell "ACTIVE" [ref=e3772]:
+              - generic [ref=e3773]: ACTIVE
+            - cell "-" [ref=e3774]
+            - cell "🔗" [ref=e3775]:
+              - link "🔗" [ref=e3776] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000RB6sCAAT
+          - row "POR 🇺🇸 AMER NEW LOGO Reunion AV Installat... INBOUND 2026-01-06 80d Closed Lost - N... $0 LOST Unresponsive 🔗" [ref=e3777]:
+            - cell "POR" [ref=e3778]:
+              - generic [ref=e3779]: POR
+            - cell "🇺🇸 AMER" [ref=e3780]:
+              - generic [ref=e3781]:
+                - generic [ref=e3782]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3783]:
+              - generic [ref=e3784]: NEW LOGO
+            - cell "Reunion AV Installat..." [ref=e3785]
+            - cell "INBOUND" [ref=e3786]
+            - cell "2026-01-06" [ref=e3787]
+            - cell "80d" [ref=e3788]
+            - cell "Closed Lost - N..." [ref=e3789]
+            - cell "$0" [ref=e3790]
+            - cell "LOST" [ref=e3791]:
+              - generic [ref=e3792]: LOST
+            - cell "Unresponsive" [ref=e3793]
+            - cell "🔗" [ref=e3794]:
+              - link "🔗" [ref=e3795] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006Ki000004DhDKIA0
+          - row "POR 🇺🇸 AMER NEW LOGO SOLV Energy Inbound 2026-01-05 0d Stage 3 $0 ACTIVE - 🔗" [ref=e3796]:
+            - cell "POR" [ref=e3797]:
+              - generic [ref=e3798]: POR
+            - cell "🇺🇸 AMER" [ref=e3799]:
+              - generic [ref=e3800]:
+                - generic [ref=e3801]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3802]:
+              - generic [ref=e3803]: NEW LOGO
+            - cell "SOLV Energy" [ref=e3804]
+            - cell "Inbound" [ref=e3805]
+            - cell "2026-01-05" [ref=e3806]
+            - cell "0d" [ref=e3807]
+            - cell "Stage 3" [ref=e3808]
+            - cell "$0" [ref=e3809]
+            - cell "ACTIVE" [ref=e3810]:
+              - generic [ref=e3811]: ACTIVE
+            - cell "-" [ref=e3812]
+            - cell "🔗" [ref=e3813]:
+              - link "🔗" [ref=e3814] [cursor=pointer]:
+                - /url: https://por.lightning.force.com/006an00000QlUGcAAN
+          - row "R360 🇺🇸 AMER NEW LOGO Octane Performance Inbound 2026-01-20 0d Discovery $0 ACTIVE - 🔗" [ref=e3815]:
+            - cell "R360" [ref=e3816]:
+              - generic [ref=e3817]: R360
+            - cell "🇺🇸 AMER" [ref=e3818]:
+              - generic [ref=e3819]:
+                - generic [ref=e3820]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3821]:
+              - generic [ref=e3822]: NEW LOGO
+            - cell "Octane Performance" [ref=e3823]
+            - cell "Inbound" [ref=e3824]
+            - cell "2026-01-20" [ref=e3825]
+            - cell "0d" [ref=e3826]
+            - cell "Discovery" [ref=e3827]
+            - cell "$0" [ref=e3828]
+            - cell "ACTIVE" [ref=e3829]:
+              - generic [ref=e3830]: ACTIVE
+            - cell "-" [ref=e3831]
+            - cell "🔗" [ref=e3832]:
+              - link "🔗" [ref=e3833] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SYJUkAAP
+          - row "R360 🇺🇸 AMER NEW LOGO GigUpRides Inbound 2026-01-20 0d Discovery $0 ACTIVE - 🔗" [ref=e3834]:
+            - cell "R360" [ref=e3835]:
+              - generic [ref=e3836]: R360
+            - cell "🇺🇸 AMER" [ref=e3837]:
+              - generic [ref=e3838]:
+                - generic [ref=e3839]: 🇺🇸
+                - text: AMER
+            - cell "NEW LOGO" [ref=e3840]:
+              - generic [ref=e3841]: NEW LOGO
+            - cell "GigUpRides" [ref=e3842]
+            - cell "Inbound" [ref=e3843]
+            - cell "2026-01-20" [ref=e3844]
+            - cell "0d" [ref=e3845]
+            - cell "Discovery" [ref=e3846]
+            - cell "$0" [ref=e3847]
+            - cell "ACTIVE" [ref=e3848]:
+              - generic [ref=e3849]: ACTIVE
+            - cell "-" [ref=e3850]
+            - cell "🔗" [ref=e3851]:
+              - link "🔗" [ref=e3852] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SXSbiAAH
+      - generic [ref=e3853]:
+        - button "« First" [disabled] [ref=e3854]
+        - button "‹ Prev" [disabled] [ref=e3855]
+        - generic [ref=e3856]: Page 1 of 2 (48 total)
+        - button "Next ›" [ref=e3857] [cursor=pointer]
+        - button "Last »" [ref=e3858] [cursor=pointer]
+      - generic [ref=e3859]:
+        - heading "Loss Reason Summary" [level=4] [ref=e3860]
+        - generic [ref=e3861]:
+          - generic [ref=e3862]:
+            - generic [ref=e3863]: "1"
+            - generic [ref=e3864]:
+              - generic [ref=e3865]: Too expensive
+              - generic [ref=e3866]: $4,557
+          - generic [ref=e3867]:
+            - generic [ref=e3868]: "1"
+            - generic [ref=e3869]:
+              - generic [ref=e3870]: Product deficiency
+              - generic [ref=e3871]: $0
+          - generic [ref=e3872]:
+            - generic [ref=e3873]: "1"
+            - generic [ref=e3874]:
+              - generic [ref=e3875]: Not Ready to Buy
+              - generic [ref=e3876]: $0
+          - generic [ref=e3877]:
+            - generic [ref=e3878]: "1"
+            - generic [ref=e3879]:
+              - generic [ref=e3880]: Unresponsive
+              - generic [ref=e3881]: $0
+    - generic [ref=e3882]:
+      - heading "4. Hits & Misses with RCA" [level=2] [ref=e3883]
+      - heading "HITS - On Track" [level=3] [ref=e3884]
+      - table [ref=e3886]:
+        - rowgroup [ref=e3887]:
+          - row "Prod Region Cat Att% QTD Act Cov Win%" [ref=e3888]:
+            - columnheader "Prod" [ref=e3889] [cursor=pointer]:
+              - generic [ref=e3890]: Prod
+            - columnheader "Region" [ref=e3891] [cursor=pointer]:
+              - generic [ref=e3892]: Region
+            - columnheader "Cat" [ref=e3893] [cursor=pointer]:
+              - generic [ref=e3894]: Cat
+            - columnheader "Att%" [ref=e3895] [cursor=pointer]:
+              - generic [ref=e3896]: Att%
+            - columnheader "QTD Act" [ref=e3897] [cursor=pointer]:
+              - generic [ref=e3898]: QTD Act
+            - columnheader "Cov" [ref=e3899] [cursor=pointer]:
+              - generic [ref=e3900]: Cov
+            - columnheader "Win%" [ref=e3901] [cursor=pointer]:
+              - generic [ref=e3902]: Win%
+        - rowgroup [ref=e3903]:
+          - row "POR APAC EXPANSION 227% $24,484 0.3x 89%" [ref=e3904]:
+            - cell "POR" [ref=e3905]
+            - cell "APAC" [ref=e3906]
+            - cell "EXPANSION" [ref=e3907]
+            - cell "227%" [ref=e3908]
+            - cell "$24,484" [ref=e3909]
+            - cell "0.3x" [ref=e3910]
+            - cell "89%" [ref=e3911]
+          - row "POR AMER EXPANSION 147% $284,113 0.6x 47%" [ref=e3912]:
+            - cell "POR" [ref=e3913]
+            - cell "AMER" [ref=e3914]
+            - cell "EXPANSION" [ref=e3915]
+            - cell "147%" [ref=e3916]
+            - cell "$284,113" [ref=e3917]
+            - cell "0.6x" [ref=e3918]
+            - cell "47%" [ref=e3919]
+          - row "POR AMER RENEWAL 131% $332,899 1.9x 100%" [ref=e3920]:
+            - cell "POR" [ref=e3921]
+            - cell "AMER" [ref=e3922]
+            - cell "RENEWAL" [ref=e3923]
+            - cell "131%" [ref=e3924]
+            - cell "$332,899" [ref=e3925]
+            - cell "1.9x" [ref=e3926]
+            - cell "100%" [ref=e3927]
+          - row "POR APAC STRATEGIC 100% $0 0.0x 0%" [ref=e3928]:
+            - cell "POR" [ref=e3929]
+            - cell "APAC" [ref=e3930]
+            - cell "STRATEGIC" [ref=e3931]
+            - cell "100%" [ref=e3932]
+            - cell "$0" [ref=e3933]
+            - cell "0.0x" [ref=e3934]
+            - cell "0%" [ref=e3935]
+          - row "POR AMER NEW LOGO 93% $77,927 1.1x 17%" [ref=e3936]:
+            - cell "POR" [ref=e3937]
+            - cell "AMER" [ref=e3938]
+            - cell "NEW LOGO" [ref=e3939]
+            - cell "93%" [ref=e3940]
+            - cell "$77,927" [ref=e3941]
+            - cell "1.1x" [ref=e3942]
+            - cell "17%" [ref=e3943]
+      - heading "MISSES - Needs Attention" [level=3] [ref=e3944]
+      - table [ref=e3946]:
+        - rowgroup [ref=e3947]:
+          - row "Prod Region Cat Att% QTD Var Cov RCA / Action (incl. funnel & loss analysis)" [ref=e3948]:
+            - columnheader "Prod" [ref=e3949] [cursor=pointer]:
+              - generic [ref=e3950]: Prod
+            - columnheader "Region" [ref=e3951] [cursor=pointer]:
+              - generic [ref=e3952]: Region
+            - columnheader "Cat" [ref=e3953] [cursor=pointer]:
+              - generic [ref=e3954]: Cat
+            - columnheader "Att%" [ref=e3955] [cursor=pointer]:
+              - generic [ref=e3956]: Att%
+            - columnheader "QTD Var" [ref=e3957] [cursor=pointer]:
+              - generic [ref=e3958]: QTD Var
+            - columnheader "Cov" [ref=e3959] [cursor=pointer]:
+              - generic [ref=e3960]: Cov
+            - columnheader "RCA / Action (incl. funnel & loss analysis)" [ref=e3961]
+        - rowgroup [ref=e3962]:
+          - 'row "POR EMEA RENEWAL 49% -$88,911 0.8x Funnel gaps: SQL at 35%, SAL at 29%. Top losses: Too expensive, Not Ready to Buy → Review pipeline" [ref=e3963]':
+            - cell "POR" [ref=e3964]
+            - cell "EMEA" [ref=e3965]
+            - cell "RENEWAL" [ref=e3966]
+            - cell "49%" [ref=e3967]
+            - cell "-$88,911" [ref=e3968]
+            - cell "0.8x" [ref=e3969]
+            - 'cell "Funnel gaps: SQL at 35%, SAL at 29%. Top losses: Too expensive, Not Ready to Buy → Review pipeline" [ref=e3970]'
+          - 'row "R360 AMER NEW LOGO 37% -$59,410 2.5x Funnel gaps: MQL at 46%, SQL at 20%. Top losses: Pricing was too high, Not Ready to Buy → Increase top-of-funnel marketing" [ref=e3971]':
+            - cell "R360" [ref=e3972]
+            - cell "AMER" [ref=e3973]
+            - cell "NEW LOGO" [ref=e3974]
+            - cell "37%" [ref=e3975]
+            - cell "-$59,410" [ref=e3976]
+            - cell "2.5x" [ref=e3977]
+            - 'cell "Funnel gaps: MQL at 46%, SQL at 20%. Top losses: Pricing was too high, Not Ready to Buy → Increase top-of-funnel marketing" [ref=e3978]'
+          - 'row "POR AMER STRATEGIC 0% -$38,701 0.7x Funnel gaps: SQO at 29%. Top losses: Not Ready to Buy, Duplicate or Incorrect Opportunity → Improve qualification process" [ref=e3979]':
+            - cell "POR" [ref=e3980]
+            - cell "AMER" [ref=e3981]
+            - cell "STRATEGIC" [ref=e3982]
+            - cell "0%" [ref=e3983]
+            - cell "-$38,701" [ref=e3984]
+            - cell "0.7x" [ref=e3985]
+            - 'cell "Funnel gaps: SQO at 29%. Top losses: Not Ready to Buy, Duplicate or Incorrect Opportunity → Improve qualification process" [ref=e3986]'
+          - 'row "POR AMER MIGRATION 40% -$36,763 1.5x Funnel gaps: SQO at 29%. Top losses: Not Ready to Buy, Duplicate or Incorrect Opportunity → Improve qualification process" [ref=e3987]':
+            - cell "POR" [ref=e3988]
+            - cell "AMER" [ref=e3989]
+            - cell "MIGRATION" [ref=e3990]
+            - cell "40%" [ref=e3991]
+            - cell "-$36,763" [ref=e3992]
+            - cell "1.5x" [ref=e3993]
+            - 'cell "Funnel gaps: SQO at 29%. Top losses: Not Ready to Buy, Duplicate or Incorrect Opportunity → Improve qualification process" [ref=e3994]'
+          - 'row "POR EMEA STRATEGIC 0% -$19,479 1.4x Funnel gaps: SQL at 35%, SAL at 29%. Top losses: Too expensive, Not Ready to Buy → Review pipeline" [ref=e3995]':
+            - cell "POR" [ref=e3996]
+            - cell "EMEA" [ref=e3997]
+            - cell "STRATEGIC" [ref=e3998]
+            - cell "0%" [ref=e3999]
+            - cell "-$19,479" [ref=e4000]
+            - cell "1.4x" [ref=e4001]
+            - 'cell "Funnel gaps: SQL at 35%, SAL at 29%. Top losses: Too expensive, Not Ready to Buy → Review pipeline" [ref=e4002]'
+          - 'row "POR EMEA MIGRATION 77% -$14,666 3.2x Funnel gaps: SQL at 35%, SAL at 29%. Top losses: Too expensive, Not Ready to Buy → Review pipeline" [ref=e4003]':
+            - cell "POR" [ref=e4004]
+            - cell "EMEA" [ref=e4005]
+            - cell "MIGRATION" [ref=e4006]
+            - cell "77%" [ref=e4007]
+            - cell "-$14,666" [ref=e4008]
+            - cell "3.2x" [ref=e4009]
+            - 'cell "Funnel gaps: SQL at 35%, SAL at 29%. Top losses: Too expensive, Not Ready to Buy → Review pipeline" [ref=e4010]'
+          - 'row "POR APAC MIGRATION 0% -$13,665 1.8x Funnel gaps: MQL at 56%, SQL at 20%. Top losses: Duplicate or Incorrect Opportunity → Increase top-of-funnel marketing" [ref=e4011]':
+            - cell "POR" [ref=e4012]
+            - cell "APAC" [ref=e4013]
+            - cell "MIGRATION" [ref=e4014]
+            - cell "0%" [ref=e4015]
+            - cell "-$13,665" [ref=e4016]
+            - cell "1.8x" [ref=e4017]
+            - 'cell "Funnel gaps: MQL at 56%, SQL at 20%. Top losses: Duplicate or Incorrect Opportunity → Increase top-of-funnel marketing" [ref=e4018]'
+          - 'row "POR APAC NEW LOGO 40% -$13,223 2.7x Funnel gaps: MQL at 56%, SQL at 20%. Top losses: Duplicate or Incorrect Opportunity → Increase top-of-funnel marketing" [ref=e4019]':
+            - cell "POR" [ref=e4020]
+            - cell "APAC" [ref=e4021]
+            - cell "NEW LOGO" [ref=e4022]
+            - cell "40%" [ref=e4023]
+            - cell "-$13,223" [ref=e4024]
+            - cell "2.7x" [ref=e4025]
+            - 'cell "Funnel gaps: MQL at 56%, SQL at 20%. Top losses: Duplicate or Incorrect Opportunity → Increase top-of-funnel marketing" [ref=e4026]'
+          - 'row "R360 AMER EXPANSION 76% -$11,754 1.2x Funnel gaps: MQL at 46%, SQL at 20%. Top losses: Pricing was too high, Not Ready to Buy → Increase top-of-funnel marketing" [ref=e4027]':
+            - cell "R360" [ref=e4028]
+            - cell "AMER" [ref=e4029]
+            - cell "EXPANSION" [ref=e4030]
+            - cell "76%" [ref=e4031]
+            - cell "-$11,754" [ref=e4032]
+            - cell "1.2x" [ref=e4033]
+            - 'cell "Funnel gaps: MQL at 46%, SQL at 20%. Top losses: Pricing was too high, Not Ready to Buy → Increase top-of-funnel marketing" [ref=e4034]'
+          - 'row "POR APAC RENEWAL 85% -$5,046 1.1x Funnel gaps: MQL at 56%, SQL at 20%. Top losses: Duplicate or Incorrect Opportunity → Increase top-of-funnel marketing" [ref=e4035]':
+            - cell "POR" [ref=e4036]
+            - cell "APAC" [ref=e4037]
+            - cell "RENEWAL" [ref=e4038]
+            - cell "85%" [ref=e4039]
+            - cell "-$5,046" [ref=e4040]
+            - cell "1.1x" [ref=e4041]
+            - 'cell "Funnel gaps: MQL at 56%, SQL at 20%. Top losses: Duplicate or Incorrect Opportunity → Increase top-of-funnel marketing" [ref=e4042]'
+    - generic [ref=e4043]:
+      - heading "5. Pipeline Coverage by Region & Product" [level=2] [ref=e4044]
+      - table [ref=e4046]:
+        - rowgroup [ref=e4047]:
+          - row "Region Prod Cat Pipe Cov Age Health" [ref=e4048]:
+            - columnheader "Region" [ref=e4049] [cursor=pointer]:
+              - generic [ref=e4050]: Region
+            - columnheader "Prod" [ref=e4051] [cursor=pointer]:
+              - generic [ref=e4052]: Prod
+            - columnheader "Cat" [ref=e4053] [cursor=pointer]:
+              - generic [ref=e4054]: Cat
+            - columnheader "Pipe" [ref=e4055] [cursor=pointer]:
+              - generic [ref=e4056]: Pipe
+            - columnheader "Cov" [ref=e4057] [cursor=pointer]:
+              - generic [ref=e4058]: Cov
+            - columnheader "Age" [ref=e4059] [cursor=pointer]:
+              - generic [ref=e4060]: Age
+            - columnheader "Health" [ref=e4061] [cursor=pointer]:
+              - generic [ref=e4062]: Health
+        - rowgroup [ref=e4063]:
+          - row "AMER POR EXPANSION $318,646 0.6x 15 days AT RISK" [ref=e4064]:
+            - cell "AMER" [ref=e4065]
+            - cell "POR" [ref=e4066]
+            - cell "EXPANSION" [ref=e4067]
+            - cell "$318,646" [ref=e4068]
+            - cell "0.6x" [ref=e4069]
+            - cell "15 days" [ref=e4070]
+            - cell "AT RISK" [ref=e4071]:
+              - generic [ref=e4072]: AT RISK
+          - row "AMER POR MIGRATION $357,745 1.5x 130 days AT RISK" [ref=e4073]:
+            - cell "AMER" [ref=e4074]
+            - cell "POR" [ref=e4075]
+            - cell "MIGRATION" [ref=e4076]
+            - cell "$357,745" [ref=e4077]
+            - cell "1.5x" [ref=e4078]
+            - cell "130 days" [ref=e4079]
+            - cell "AT RISK" [ref=e4080]:
+              - generic [ref=e4081]: AT RISK
+          - row "AMER POR NEW LOGO $312,816 1.1x 90 days AT RISK" [ref=e4082]:
+            - cell "AMER" [ref=e4083]
+            - cell "POR" [ref=e4084]
+            - cell "NEW LOGO" [ref=e4085]
+            - cell "$312,816" [ref=e4086]
+            - cell "1.1x" [ref=e4087]
+            - cell "90 days" [ref=e4088]
+            - cell "AT RISK" [ref=e4089]:
+              - generic [ref=e4090]: AT RISK
+          - row "AMER POR RENEWAL $428,494 1.9x 230 days AT RISK" [ref=e4091]:
+            - cell "AMER" [ref=e4092]
+            - cell "POR" [ref=e4093]
+            - cell "RENEWAL" [ref=e4094]
+            - cell "$428,494" [ref=e4095]
+            - cell "1.9x" [ref=e4096]
+            - cell "230 days" [ref=e4097]
+            - cell "AT RISK" [ref=e4098]:
+              - generic [ref=e4099]: AT RISK
+          - row "AMER POR STRATEGIC $121,874 0.7x 35 days AT RISK" [ref=e4100]:
+            - cell "AMER" [ref=e4101]
+            - cell "POR" [ref=e4102]
+            - cell "STRATEGIC" [ref=e4103]
+            - cell "$121,874" [ref=e4104]
+            - cell "0.7x" [ref=e4105]
+            - cell "35 days" [ref=e4106]
+            - cell "AT RISK" [ref=e4107]:
+              - generic [ref=e4108]: AT RISK
+          - row "AMER R360 EXPANSION $210,000 1.2x 67 days AT RISK" [ref=e4109]:
+            - cell "AMER" [ref=e4110]
+            - cell "R360" [ref=e4111]
+            - cell "EXPANSION" [ref=e4112]
+            - cell "$210,000" [ref=e4113]
+            - cell "1.2x" [ref=e4114]
+            - cell "67 days" [ref=e4115]
+            - cell "AT RISK" [ref=e4116]:
+              - generic [ref=e4117]: AT RISK
+          - row "AMER R360 NEW LOGO $922,029 2.5x 88 days ADEQUATE" [ref=e4118]:
+            - cell "AMER" [ref=e4119]
+            - cell "R360" [ref=e4120]
+            - cell "NEW LOGO" [ref=e4121]
+            - cell "$922,029" [ref=e4122]
+            - cell "2.5x" [ref=e4123]
+            - cell "88 days" [ref=e4124]
+            - cell "ADEQUATE" [ref=e4125]:
+              - generic [ref=e4126]: ADEQUATE
+          - row "AMER R360 STRATEGIC $112,320 0.9x 56 days AT RISK" [ref=e4127]:
+            - cell "AMER" [ref=e4128]
+            - cell "R360" [ref=e4129]
+            - cell "STRATEGIC" [ref=e4130]
+            - cell "$112,320" [ref=e4131]
+            - cell "0.9x" [ref=e4132]
+            - cell "56 days" [ref=e4133]
+            - cell "AT RISK" [ref=e4134]:
+              - generic [ref=e4135]: AT RISK
+          - row "APAC POR EXPANSION $6,168 0.3x 83 days AT RISK" [ref=e4136]:
+            - cell "APAC" [ref=e4137]
+            - cell "POR" [ref=e4138]
+            - cell "EXPANSION" [ref=e4139]
+            - cell "$6,168" [ref=e4140]
+            - cell "0.3x" [ref=e4141]
+            - cell "83 days" [ref=e4142]
+            - cell "AT RISK" [ref=e4143]:
+              - generic [ref=e4144]: AT RISK
+          - row "APAC POR MIGRATION $102,945 1.8x 113 days AT RISK" [ref=e4145]:
+            - cell "APAC" [ref=e4146]
+            - cell "POR" [ref=e4147]
+            - cell "MIGRATION" [ref=e4148]
+            - cell "$102,945" [ref=e4149]
+            - cell "1.8x" [ref=e4150]
+            - cell "113 days" [ref=e4151]
+            - cell "AT RISK" [ref=e4152]:
+              - generic [ref=e4153]: AT RISK
+          - row "APAC POR NEW LOGO $233,534 2.7x 110 days ADEQUATE" [ref=e4154]:
+            - cell "APAC" [ref=e4155]
+            - cell "POR" [ref=e4156]
+            - cell "NEW LOGO" [ref=e4157]
+            - cell "$233,534" [ref=e4158]
+            - cell "2.7x" [ref=e4159]
+            - cell "110 days" [ref=e4160]
+            - cell "ADEQUATE" [ref=e4161]:
+              - generic [ref=e4162]: ADEQUATE
+          - row "APAC POR RENEWAL $33,663 1.1x 229 days AT RISK" [ref=e4163]:
+            - cell "APAC" [ref=e4164]
+            - cell "POR" [ref=e4165]
+            - cell "RENEWAL" [ref=e4166]
+            - cell "$33,663" [ref=e4167]
+            - cell "1.1x" [ref=e4168]
+            - cell "229 days" [ref=e4169]
+            - cell "AT RISK" [ref=e4170]:
+              - generic [ref=e4171]: AT RISK
+          - row "APAC POR STRATEGIC $1,053,859 0.0x 284 days AT RISK" [ref=e4172]:
+            - cell "APAC" [ref=e4173]
+            - cell "POR" [ref=e4174]
+            - cell "STRATEGIC" [ref=e4175]
+            - cell "$1,053,859" [ref=e4176]
+            - cell "0.0x" [ref=e4177]
+            - cell "284 days" [ref=e4178]
+            - cell "AT RISK" [ref=e4179]:
+              - generic [ref=e4180]: AT RISK
+          - row "EMEA POR EXPANSION $340,534 2.8x 33 days ADEQUATE" [ref=e4181]:
+            - cell "EMEA" [ref=e4182]
+            - cell "POR" [ref=e4183]
+            - cell "EXPANSION" [ref=e4184]
+            - cell "$340,534" [ref=e4185]
+            - cell "2.8x" [ref=e4186]
+            - cell "33 days" [ref=e4187]
+            - cell "ADEQUATE" [ref=e4188]:
+              - generic [ref=e4189]: ADEQUATE
+          - row "EMEA POR MIGRATION $710,866 3.2x 76 days HEALTHY" [ref=e4190]:
+            - cell "EMEA" [ref=e4191]
+            - cell "POR" [ref=e4192]
+            - cell "MIGRATION" [ref=e4193]
+            - cell "$710,866" [ref=e4194]
+            - cell "3.2x" [ref=e4195]
+            - cell "76 days" [ref=e4196]
+            - cell "HEALTHY" [ref=e4197]:
+              - generic [ref=e4198]: HEALTHY
+          - row "EMEA POR NEW LOGO $234,121 2.1x 65 days ADEQUATE" [ref=e4199]:
+            - cell "EMEA" [ref=e4200]
+            - cell "POR" [ref=e4201]
+            - cell "NEW LOGO" [ref=e4202]
+            - cell "$234,121" [ref=e4203]
+            - cell "2.1x" [ref=e4204]
+            - cell "65 days" [ref=e4205]
+            - cell "ADEQUATE" [ref=e4206]:
+              - generic [ref=e4207]: ADEQUATE
+          - row "EMEA POR RENEWAL $133,303 0.8x 224 days AT RISK" [ref=e4208]:
+            - cell "EMEA" [ref=e4209]
+            - cell "POR" [ref=e4210]
+            - cell "RENEWAL" [ref=e4211]
+            - cell "$133,303" [ref=e4212]
+            - cell "0.8x" [ref=e4213]
+            - cell "224 days" [ref=e4214]
+            - cell "AT RISK" [ref=e4215]:
+              - generic [ref=e4216]: AT RISK
+          - row "EMEA POR STRATEGIC $114,055 1.4x 323 days AT RISK" [ref=e4217]:
+            - cell "EMEA" [ref=e4218]
+            - cell "POR" [ref=e4219]
+            - cell "STRATEGIC" [ref=e4220]
+            - cell "$114,055" [ref=e4221]
+            - cell "1.4x" [ref=e4222]
+            - cell "323 days" [ref=e4223]
+            - cell "AT RISK" [ref=e4224]:
+              - generic [ref=e4225]: AT RISK
+          - row "EMEA R360 EXPANSION $19,435 0.0x 97 days AT RISK" [ref=e4226]:
+            - cell "EMEA" [ref=e4227]
+            - cell "R360" [ref=e4228]
+            - cell "EXPANSION" [ref=e4229]
+            - cell "$19,435" [ref=e4230]
+            - cell "0.0x" [ref=e4231]
+            - cell "97 days" [ref=e4232]
+            - cell "AT RISK" [ref=e4233]:
+              - generic [ref=e4234]: AT RISK
+          - row "EMEA R360 NEW LOGO $192,959 2.6x 51 days ADEQUATE" [ref=e4235]:
+            - cell "EMEA" [ref=e4236]
+            - cell "R360" [ref=e4237]
+            - cell "NEW LOGO" [ref=e4238]
+            - cell "$192,959" [ref=e4239]
+            - cell "2.6x" [ref=e4240]
+            - cell "51 days" [ref=e4241]
+            - cell "ADEQUATE" [ref=e4242]:
+              - generic [ref=e4243]: ADEQUATE
+    - generic [ref=e4244]:
+      - heading "6. Lost Opportunities Analysis" [level=2] [ref=e4245]
+      - heading "Lost Deals by Product" [level=3] [ref=e4246]
+      - table [ref=e4248]:
+        - rowgroup [ref=e4249]:
+          - row "Product Deals Lost ACV Lost Avg Deal Size" [ref=e4250]:
+            - columnheader "Product" [ref=e4251] [cursor=pointer]:
+              - generic [ref=e4252]: Product
+            - columnheader "Deals Lost" [ref=e4253] [cursor=pointer]:
+              - generic [ref=e4254]: Deals Lost
+            - columnheader "ACV Lost" [ref=e4255] [cursor=pointer]:
+              - generic [ref=e4256]: ACV Lost
+            - columnheader "Avg Deal Size" [ref=e4257] [cursor=pointer]:
+              - generic [ref=e4258]: Avg Deal Size
+        - rowgroup [ref=e4259]:
+          - row "POR 150 $375,627 $2,504" [ref=e4260]:
+            - cell "POR" [ref=e4261]
+            - cell "150" [ref=e4262]
+            - cell "$375,627" [ref=e4263]
+            - cell "$2,504" [ref=e4264]
+          - row "R360 37 $247,028 $6,676" [ref=e4265]:
+            - cell "R360" [ref=e4266]
+            - cell "37" [ref=e4267]
+            - cell "$247,028" [ref=e4268]
+            - cell "$6,676" [ref=e4269]
+          - row "TOTAL 187 $622,655 $3,330" [ref=e4270]:
+            - cell "TOTAL" [ref=e4271]
+            - cell "187" [ref=e4272]
+            - cell "$622,655" [ref=e4273]
+            - cell "$3,330" [ref=e4274]
+      - heading "Lost Deals by Region" [level=3] [ref=e4275]
+      - table [ref=e4277]:
+        - rowgroup [ref=e4278]:
+          - row "Region POR Deals POR ACV R360 Deals R360 ACV Total ACV" [ref=e4279]:
+            - columnheader "Region" [ref=e4280] [cursor=pointer]:
+              - generic [ref=e4281]: Region
+            - columnheader "POR Deals" [ref=e4282] [cursor=pointer]:
+              - generic [ref=e4283]: POR Deals
+            - columnheader "POR ACV" [ref=e4284] [cursor=pointer]:
+              - generic [ref=e4285]: POR ACV
+            - columnheader "R360 Deals" [ref=e4286] [cursor=pointer]:
+              - generic [ref=e4287]: R360 Deals
+            - columnheader "R360 ACV" [ref=e4288] [cursor=pointer]:
+              - generic [ref=e4289]: R360 ACV
+            - columnheader "Total ACV" [ref=e4290] [cursor=pointer]:
+              - generic [ref=e4291]: Total ACV
+        - rowgroup [ref=e4292]:
+          - row "AMER 128 $309,856 17 $137,937 $447,793" [ref=e4293]:
+            - cell "AMER" [ref=e4294]
+            - cell "128" [ref=e4295]
+            - cell "$309,856" [ref=e4296]
+            - cell "17" [ref=e4297]
+            - cell "$137,937" [ref=e4298]
+            - cell "$447,793" [ref=e4299]:
+              - strong [ref=e4300]: $447,793
+          - row "EMEA 21 $61,382 19 $98,051 $159,432" [ref=e4301]:
+            - cell "EMEA" [ref=e4302]
+            - cell "21" [ref=e4303]
+            - cell "$61,382" [ref=e4304]
+            - cell "19" [ref=e4305]
+            - cell "$98,051" [ref=e4306]
+            - cell "$159,432" [ref=e4307]:
+              - strong [ref=e4308]: $159,432
+          - row "APAC 1 $4,390 1 $11,040 $15,430" [ref=e4309]:
+            - cell "APAC" [ref=e4310]
+            - cell "1" [ref=e4311]
+            - cell "$4,390" [ref=e4312]
+            - cell "1" [ref=e4313]
+            - cell "$11,040" [ref=e4314]
+            - cell "$15,430" [ref=e4315]:
+              - strong [ref=e4316]: $15,430
+      - heading "Loss Reasons - 28 total" [level=3] [ref=e4317]
+      - generic [ref=e4318]:
+        - table [ref=e4319]:
+          - rowgroup [ref=e4320]:
+            - row "Prod Region Reason Deals ACV Lost Severity" [ref=e4321]:
+              - columnheader "Prod" [ref=e4322] [cursor=pointer]:
+                - generic [ref=e4323]: Prod
+              - columnheader "Region" [ref=e4324] [cursor=pointer]:
+                - generic [ref=e4325]: Region
+              - columnheader "Reason" [ref=e4326] [cursor=pointer]:
+                - generic [ref=e4327]: Reason
+              - columnheader "Deals" [ref=e4328] [cursor=pointer]:
+                - generic [ref=e4329]: Deals
+              - columnheader "ACV Lost" [ref=e4330] [cursor=pointer]:
+                - generic [ref=e4331]: ACV Lost
+              - columnheader "Severity" [ref=e4332] [cursor=pointer]:
+                - generic [ref=e4333]: Severity
+          - rowgroup [ref=e4334]:
+            - row "POR AMER Not Ready to Buy 22 $121,283 CRITICAL" [ref=e4335]:
+              - cell "POR" [ref=e4336]
+              - cell "AMER" [ref=e4337]
+              - cell "Not Ready to Buy" [ref=e4338]
+              - cell "22" [ref=e4339]
+              - cell "$121,283" [ref=e4340]
+              - cell "CRITICAL" [ref=e4341]:
+                - generic [ref=e4342]: CRITICAL
+            - row "R360 AMER Pricing was too high 9 $102,504 CRITICAL" [ref=e4343]:
+              - cell "R360" [ref=e4344]
+              - cell "AMER" [ref=e4345]
+              - cell "Pricing was too high" [ref=e4346]
+              - cell "9" [ref=e4347]
+              - cell "$102,504" [ref=e4348]
+              - cell "CRITICAL" [ref=e4349]:
+                - generic [ref=e4350]: CRITICAL
+            - row "POR AMER Duplicate or Incorrect... 10 $31,682 HIGH" [ref=e4351]:
+              - cell "POR" [ref=e4352]
+              - cell "AMER" [ref=e4353]
+              - cell "Duplicate or Incorrect..." [ref=e4354]
+              - cell "10" [ref=e4355]
+              - cell "$31,682" [ref=e4356]
+              - cell "HIGH" [ref=e4357]:
+                - generic [ref=e4358]: HIGH
+            - row "POR AMER Integration 3 $28,252 HIGH" [ref=e4359]:
+              - cell "POR" [ref=e4360]
+              - cell "AMER" [ref=e4361]
+              - cell "Integration" [ref=e4362]
+              - cell "3" [ref=e4363]
+              - cell "$28,252" [ref=e4364]
+              - cell "HIGH" [ref=e4365]:
+                - generic [ref=e4366]: HIGH
+            - row "POR EMEA Too expensive 3 $27,718 HIGH" [ref=e4367]:
+              - cell "POR" [ref=e4368]
+              - cell "EMEA" [ref=e4369]
+              - cell "Too expensive" [ref=e4370]
+              - cell "3" [ref=e4371]
+              - cell "$27,718" [ref=e4372]
+              - cell "HIGH" [ref=e4373]:
+                - generic [ref=e4374]: HIGH
+            - row "POR AMER Unresponsive 28 $24,763 HIGH" [ref=e4375]:
+              - cell "POR" [ref=e4376]
+              - cell "AMER" [ref=e4377]
+              - cell "Unresponsive" [ref=e4378]
+              - cell "28" [ref=e4379]
+              - cell "$24,763" [ref=e4380]
+              - cell "HIGH" [ref=e4381]:
+                - generic [ref=e4382]: HIGH
+            - row "POR EMEA Not Ready to Buy 3 $24,734 HIGH" [ref=e4383]:
+              - cell "POR" [ref=e4384]
+              - cell "EMEA" [ref=e4385]
+              - cell "Not Ready to Buy" [ref=e4386]
+              - cell "3" [ref=e4387]
+              - cell "$24,734" [ref=e4388]
+              - cell "HIGH" [ref=e4389]:
+                - generic [ref=e4390]: HIGH
+            - row "R360 EMEA Duplicate or Incorrect... 1 $24,304 HIGH" [ref=e4391]:
+              - cell "R360" [ref=e4392]
+              - cell "EMEA" [ref=e4393]
+              - cell "Duplicate or Incorrect..." [ref=e4394]
+              - cell "1" [ref=e4395]
+              - cell "$24,304" [ref=e4396]
+              - cell "HIGH" [ref=e4397]:
+                - generic [ref=e4398]: HIGH
+            - row "R360 EMEA Not Interested 6 $22,633 HIGH" [ref=e4399]:
+              - cell "R360" [ref=e4400]
+              - cell "EMEA" [ref=e4401]
+              - cell "Not Interested" [ref=e4402]
+              - cell "6" [ref=e4403]
+              - cell "$22,633" [ref=e4404]
+              - cell "HIGH" [ref=e4405]:
+                - generic [ref=e4406]: HIGH
+            - row "POR AMER Not Interested 8 $20,241 HIGH" [ref=e4407]:
+              - cell "POR" [ref=e4408]
+              - cell "AMER" [ref=e4409]
+              - cell "Not Interested" [ref=e4410]
+              - cell "8" [ref=e4411]
+              - cell "$20,241" [ref=e4412]
+              - cell "HIGH" [ref=e4413]:
+                - generic [ref=e4414]: HIGH
+            - row "R360 AMER Not Ready to Buy 3 $18,993 MEDIUM" [ref=e4415]:
+              - cell "R360" [ref=e4416]
+              - cell "AMER" [ref=e4417]
+              - cell "Not Ready to Buy" [ref=e4418]
+              - cell "3" [ref=e4419]
+              - cell "$18,993" [ref=e4420]
+              - cell "MEDIUM" [ref=e4421]:
+                - generic [ref=e4422]: MEDIUM
+            - row "POR AMER Too expensive 5 $18,869 MEDIUM" [ref=e4423]:
+              - cell "POR" [ref=e4424]
+              - cell "AMER" [ref=e4425]
+              - cell "Too expensive" [ref=e4426]
+              - cell "5" [ref=e4427]
+              - cell "$18,869" [ref=e4428]
+              - cell "MEDIUM" [ref=e4429]:
+                - generic [ref=e4430]: MEDIUM
+            - row "R360 EMEA Timing 3 $15,038 MEDIUM" [ref=e4431]:
+              - cell "R360" [ref=e4432]
+              - cell "EMEA" [ref=e4433]
+              - cell "Timing" [ref=e4434]
+              - cell "3" [ref=e4435]
+              - cell "$15,038" [ref=e4436]
+              - cell "MEDIUM" [ref=e4437]:
+                - generic [ref=e4438]: MEDIUM
+            - row "R360 EMEA Not Ready to Buy 5 $14,886 MEDIUM" [ref=e4439]:
+              - cell "R360" [ref=e4440]
+              - cell "EMEA" [ref=e4441]
+              - cell "Not Ready to Buy" [ref=e4442]
+              - cell "5" [ref=e4443]
+              - cell "$14,886" [ref=e4444]
+              - cell "MEDIUM" [ref=e4445]:
+                - generic [ref=e4446]: MEDIUM
+            - row "R360 APAC Unresponsive 1 $11,040 MEDIUM" [ref=e4447]:
+              - cell "R360" [ref=e4448]
+              - cell "APAC" [ref=e4449]
+              - cell "Unresponsive" [ref=e4450]
+              - cell "1" [ref=e4451]
+              - cell "$11,040" [ref=e4452]
+              - cell "MEDIUM" [ref=e4453]:
+                - generic [ref=e4454]: MEDIUM
+        - generic [ref=e4455]:
+          - button "« First" [disabled] [ref=e4456]
+          - button "‹ Prev" [disabled] [ref=e4457]
+          - generic [ref=e4458]: Page 1 of 2
+          - button "Next ›" [ref=e4459] [cursor=pointer]
+          - button "Last »" [ref=e4460] [cursor=pointer]
+    - generic [ref=e4461]:
+      - heading "Opportunities" [level=2] [ref=e4462]
+      - generic [ref=e4463]:
+        - generic [ref=e4464]:
+          - generic [ref=e4465]: Status
+          - generic [ref=e4466]:
+            - button "Won" [ref=e4467] [cursor=pointer]
+            - button "Lost" [ref=e4468] [cursor=pointer]
+            - button "Pipeline" [ref=e4469] [cursor=pointer]
+        - generic [ref=e4470]:
+          - generic [ref=e4471]: Category
+          - combobox [ref=e4472]:
+            - option "All Categories" [selected]
+            - option "New Logo"
+            - option "Strategic"
+            - option "Expansion"
+            - option "Migration"
+        - generic [ref=e4473]:
+          - generic [ref=e4474]: Product
+          - combobox [ref=e4475]:
+            - option "All Products" [selected]
+            - option "Point of Rental"
+            - option "Record360"
+        - generic [ref=e4476]:
+          - generic [ref=e4477]: Source
+          - combobox [ref=e4478]:
+            - option "All Sources" [selected]
+            - option "INBOUND"
+            - option "OUTBOUND"
+            - option "AE SOURCED"
+            - option "AM SOURCED"
+            - option "TRADESHOW"
+            - option "PARTNERSHIPS"
+        - generic [ref=e4479]:
+          - generic [ref=e4480]: Deal Type
+          - combobox [ref=e4481]:
+            - option "All Types" [selected]
+            - option "Existing Business"
+            - option "Migration"
+            - option "New Business"
+            - option "Renewal"
+        - generic [ref=e4482]:
+          - generic [ref=e4483]:
+            - strong [ref=e4484]: "227"
+            - text: deals
+          - generic [ref=e4485]:
+            - strong [ref=e4486]: $868,000
+            - text: total ACV
+      - table [ref=e4488]:
+        - rowgroup [ref=e4489]:
+          - row "Opportunity Product Region Category ACV ↓ Owner Close Date Stage Source SF Link" [ref=e4490]:
+            - columnheader "Opportunity" [ref=e4491] [cursor=pointer]
+            - columnheader "Product" [ref=e4492]
+            - columnheader "Region" [ref=e4493]
+            - columnheader "Category" [ref=e4494]
+            - columnheader "ACV ↓" [ref=e4495] [cursor=pointer]
+            - columnheader "Owner" [ref=e4496] [cursor=pointer]
+            - columnheader "Close Date" [ref=e4497] [cursor=pointer]
+            - columnheader "Stage" [ref=e4498] [cursor=pointer]
+            - columnheader "Source" [ref=e4499] [cursor=pointer]
+            - columnheader "SF Link" [ref=e4500]
+        - rowgroup [ref=e4501]:
+          - row "Testing Environment Advanced Cloud Users & Basic POR One users - for The Papé Group Inc POR AMER EXPANSION $37,555 Harry Shelton 2026-01-07 Closed Won AM Sourced 🔗" [ref=e4502]:
+            - cell "Testing Environment Advanced Cloud Users & Basic POR One users - for The Papé Group Inc" [ref=e4503]
+            - cell "POR" [ref=e4504]:
+              - generic [ref=e4505]: POR
+            - cell "AMER" [ref=e4506]
+            - cell "EXPANSION" [ref=e4507]
+            - cell "$37,555" [ref=e4508]
+            - cell "Harry Shelton" [ref=e4509]
+            - cell "2026-01-07" [ref=e4510]
+            - cell "Closed Won" [ref=e4511]:
+              - generic [ref=e4512]: Closed Won
+            - cell "AM Sourced" [ref=e4513]
+            - cell "🔗" [ref=e4514]:
+              - link "🔗" [ref=e4515] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000ROLLVAA5
+          - row "System Rental License for Eventworks POR AMER EXPANSION $36,005 Mike Lopez 2026-01-08 Closed Won AM Sourced 🔗" [ref=e4516]:
+            - cell "System Rental License for Eventworks" [ref=e4517]
+            - cell "POR" [ref=e4518]:
+              - generic [ref=e4519]: POR
+            - cell "AMER" [ref=e4520]
+            - cell "EXPANSION" [ref=e4521]
+            - cell "$36,005" [ref=e4522]
+            - cell "Mike Lopez" [ref=e4523]
+            - cell "2026-01-08" [ref=e4524]
+            - cell "Closed Won" [ref=e4525]:
+              - generic [ref=e4526]: Closed Won
+            - cell "AM Sourced" [ref=e4527]
+            - cell "🔗" [ref=e4528]:
+              - link "🔗" [ref=e4529] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000REdd3AAD
+          - row "Quote for Rapid Prep to go from Elite Basic User License (Cloud) to Elite Advanced User License (Cloud) for Rapid Prep POR AMER EXPANSION $34,316 Ciaran Buckley 2026-01-07 Closed Won Inbound 🔗" [ref=e4530]:
+            - cell "Quote for Rapid Prep to go from Elite Basic User License (Cloud) to Elite Advanced User License (Cloud) for Rapid Prep" [ref=e4531]
+            - cell "POR" [ref=e4532]:
+              - generic [ref=e4533]: POR
+            - cell "AMER" [ref=e4534]
+            - cell "EXPANSION" [ref=e4535]
+            - cell "$34,316" [ref=e4536]
+            - cell "Ciaran Buckley" [ref=e4537]
+            - cell "2026-01-07" [ref=e4538]
+            - cell "Closed Won" [ref=e4539]:
+              - generic [ref=e4540]: Closed Won
+            - cell "Inbound" [ref=e4541]
+            - cell "🔗" [ref=e4542]:
+              - link "🔗" [ref=e4543] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000PYZpmAAH
+          - row "Syrinx Migration for APS POR EMEA MIGRATION $24,652 Ian Young 2026-01-07 Closed Won AE Sourced 🔗" [ref=e4544]:
+            - cell "Syrinx Migration for APS" [ref=e4545]
+            - cell "POR" [ref=e4546]:
+              - generic [ref=e4547]: POR
+            - cell "EMEA" [ref=e4548]
+            - cell "MIGRATION" [ref=e4549]
+            - cell "$24,652" [ref=e4550]
+            - cell "Ian Young" [ref=e4551]
+            - cell "2026-01-07" [ref=e4552]
+            - cell "Closed Won" [ref=e4553]:
+              - generic [ref=e4554]: Closed Won
+            - cell "AE Sourced" [ref=e4555]
+            - cell "🔗" [ref=e4556]:
+              - link "🔗" [ref=e4557] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000QCHz6AAH
+          - row "New Pending Record360 System for Liebherr-Rental Ltd R360 EMEA NEW LOGO $24,304 Ian Green 2026-01-15 Closed Won Tradeshow 🔗" [ref=e4558]:
+            - cell "New Pending Record360 System for Liebherr-Rental Ltd" [ref=e4559]
+            - cell "R360" [ref=e4560]:
+              - generic [ref=e4561]: R360
+            - cell "EMEA" [ref=e4562]
+            - cell "NEW LOGO" [ref=e4563]
+            - cell "$24,304" [ref=e4564]
+            - cell "Ian Green" [ref=e4565]
+            - cell "2026-01-15" [ref=e4566]
+            - cell "Closed Won" [ref=e4567]:
+              - generic [ref=e4568]: Closed Won
+            - cell "Tradeshow" [ref=e4569]
+            - cell "🔗" [ref=e4570]:
+              - link "🔗" [ref=e4571] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006Ki000003LqsnIAC
+          - row "Store 4 and 6 users for ANT Rentals ltd. POR AMER EXPANSION $23,366 Harry Shelton 2026-01-19 Closed Won AM Sourced 🔗" [ref=e4572]:
+            - cell "Store 4 and 6 users for ANT Rentals ltd." [ref=e4573]
+            - cell "POR" [ref=e4574]:
+              - generic [ref=e4575]: POR
+            - cell "AMER" [ref=e4576]
+            - cell "EXPANSION" [ref=e4577]
+            - cell "$23,366" [ref=e4578]
+            - cell "Harry Shelton" [ref=e4579]
+            - cell "2026-01-19" [ref=e4580]
+            - cell "Closed Won" [ref=e4581]:
+              - generic [ref=e4582]: Closed Won
+            - cell "AM Sourced" [ref=e4583]
+            - cell "🔗" [ref=e4584]:
+              - link "🔗" [ref=e4585] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000SRs99AAD
+          - row "Add User for THX Ltd. POR EMEA EXPANSION $19,586 Peter Wright 2026-01-12 Closed Won AM Sourced 🔗" [ref=e4586]:
+            - cell "Add User for THX Ltd." [ref=e4587]
+            - cell "POR" [ref=e4588]:
+              - generic [ref=e4589]: POR
+            - cell "EMEA" [ref=e4590]
+            - cell "EXPANSION" [ref=e4591]
+            - cell "$19,586" [ref=e4592]
+            - cell "Peter Wright" [ref=e4593]
+            - cell "2026-01-12" [ref=e4594]
+            - cell "Closed Won" [ref=e4595]:
+              - generic [ref=e4596]: Closed Won
+            - cell "AM Sourced" [ref=e4597]
+            - cell "🔗" [ref=e4598]:
+              - link "🔗" [ref=e4599] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RliyvAAB
+          - row "Removing Basic and upgrading to Advanced Licenses for Worldwide Power Products POR AMER EXPANSION $18,251 Mike Lopez 2026-01-12 Closed Won AM Sourced 🔗" [ref=e4600]:
+            - cell "Removing Basic and upgrading to Advanced Licenses for Worldwide Power Products" [ref=e4601]
+            - cell "POR" [ref=e4602]:
+              - generic [ref=e4603]: POR
+            - cell "AMER" [ref=e4604]
+            - cell "EXPANSION" [ref=e4605]
+            - cell "$18,251" [ref=e4606]
+            - cell "Mike Lopez" [ref=e4607]
+            - cell "2026-01-12" [ref=e4608]
+            - cell "Closed Won" [ref=e4609]:
+              - generic [ref=e4610]: Closed Won
+            - cell "AM Sourced" [ref=e4611]
+            - cell "🔗" [ref=e4612]:
+              - link "🔗" [ref=e4613] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000QuU7hAAF
+          - row "New Pending Record360 System for Bunce Rental R360 AMER NEW LOGO $17,952 Reed Murray 2026-01-06 Closed Won AE Sourced 🔗" [ref=e4614]:
+            - cell "New Pending Record360 System for Bunce Rental" [ref=e4615]
+            - cell "R360" [ref=e4616]:
+              - generic [ref=e4617]: R360
+            - cell "AMER" [ref=e4618]
+            - cell "NEW LOGO" [ref=e4619]
+            - cell "$17,952" [ref=e4620]
+            - cell "Reed Murray" [ref=e4621]
+            - cell "2026-01-06" [ref=e4622]
+            - cell "Closed Won" [ref=e4623]:
+              - generic [ref=e4624]: Closed Won
+            - cell "AE Sourced" [ref=e4625]
+            - cell "🔗" [ref=e4626]:
+              - link "🔗" [ref=e4627] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006Ki000004DiZbIAK
+          - row "4 User Licenses for Lonestar Equipment Solutions POR AMER EXPANSION $17,503 Mike Lopez 2026-01-14 Closed Won AM Sourced 🔗" [ref=e4628]:
+            - cell "4 User Licenses for Lonestar Equipment Solutions" [ref=e4629]
+            - cell "POR" [ref=e4630]:
+              - generic [ref=e4631]: POR
+            - cell "AMER" [ref=e4632]
+            - cell "EXPANSION" [ref=e4633]
+            - cell "$17,503" [ref=e4634]
+            - cell "Mike Lopez" [ref=e4635]
+            - cell "2026-01-14" [ref=e4636]
+            - cell "Closed Won" [ref=e4637]:
+              - generic [ref=e4638]: Closed Won
+            - cell "AM Sourced" [ref=e4639]
+            - cell "🔗" [ref=e4640]:
+              - link "🔗" [ref=e4641] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000S2LoIAAV
+          - row "Syrinx System for Harringtons Builders POR EMEA NEW LOGO $16,785 Amelia Reed 2026-01-05 Closed Won Inbound 🔗" [ref=e4642]:
+            - cell "Syrinx System for Harringtons Builders" [ref=e4643]
+            - cell "POR" [ref=e4644]:
+              - generic [ref=e4645]: POR
+            - cell "EMEA" [ref=e4646]
+            - cell "NEW LOGO" [ref=e4647]
+            - cell "$16,785" [ref=e4648]
+            - cell "Amelia Reed" [ref=e4649]
+            - cell "2026-01-05" [ref=e4650]
+            - cell "Closed Won" [ref=e4651]:
+              - generic [ref=e4652]: Closed Won
+            - cell "Inbound" [ref=e4653]
+            - cell "🔗" [ref=e4654]:
+              - link "🔗" [ref=e4655] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006Ki000004DgRLIA0
+          - row "Syrinx System for Soil Engineering POR EMEA EXPANSION $16,381 Ian Young 2026-01-13 Closed Won AM Sourced 🔗" [ref=e4656]:
+            - cell "Syrinx System for Soil Engineering" [ref=e4657]
+            - cell "POR" [ref=e4658]:
+              - generic [ref=e4659]: POR
+            - cell "EMEA" [ref=e4660]
+            - cell "EXPANSION" [ref=e4661]
+            - cell "$16,381" [ref=e4662]
+            - cell "Ian Young" [ref=e4663]
+            - cell "2026-01-13" [ref=e4664]
+            - cell "Closed Won" [ref=e4665]:
+              - generic [ref=e4666]: Closed Won
+            - cell "AM Sourced" [ref=e4667]
+            - cell "🔗" [ref=e4668]:
+              - link "🔗" [ref=e4669] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000QCnFpAAL
+          - row "C Hire Ltd POR EMEA NEW LOGO $14,884 Amelia Reed 2026-01-14 Closed Won Inbound 🔗" [ref=e4670]:
+            - cell "C Hire Ltd" [ref=e4671]
+            - cell "POR" [ref=e4672]:
+              - generic [ref=e4673]: POR
+            - cell "EMEA" [ref=e4674]
+            - cell "NEW LOGO" [ref=e4675]
+            - cell "$14,884" [ref=e4676]
+            - cell "Amelia Reed" [ref=e4677]
+            - cell "2026-01-14" [ref=e4678]
+            - cell "Closed Won" [ref=e4679]:
+              - generic [ref=e4680]: Closed Won
+            - cell "Inbound" [ref=e4681]
+            - cell "🔗" [ref=e4682]:
+              - link "🔗" [ref=e4683] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006Ki000005vpYZIAY
+          - row "Syrinx System for Hydra Capsule POR EMEA NEW LOGO $14,199 Amelia Reed 2026-01-07 Closed Won Outbound 🔗" [ref=e4684]:
+            - cell "Syrinx System for Hydra Capsule" [ref=e4685]
+            - cell "POR" [ref=e4686]:
+              - generic [ref=e4687]: POR
+            - cell "EMEA" [ref=e4688]
+            - cell "NEW LOGO" [ref=e4689]
+            - cell "$14,199" [ref=e4690]
+            - cell "Amelia Reed" [ref=e4691]
+            - cell "2026-01-07" [ref=e4692]
+            - cell "Closed Won" [ref=e4693]:
+              - generic [ref=e4694]: Closed Won
+            - cell "Outbound" [ref=e4695]
+            - cell "🔗" [ref=e4696]:
+              - link "🔗" [ref=e4697] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006Ki000004DkiuIAC
+          - row "3 User Licenses for Rogers-O'Brien Construction POR AMER EXPANSION $13,887 Mike Lopez 2026-01-12 Closed Won AM Sourced 🔗" [ref=e4698]:
+            - cell "3 User Licenses for Rogers-O'Brien Construction" [ref=e4699]
+            - cell "POR" [ref=e4700]:
+              - generic [ref=e4701]: POR
+            - cell "AMER" [ref=e4702]
+            - cell "EXPANSION" [ref=e4703]
+            - cell "$13,887" [ref=e4704]
+            - cell "Mike Lopez" [ref=e4705]
+            - cell "2026-01-12" [ref=e4706]
+            - cell "Closed Won" [ref=e4707]:
+              - generic [ref=e4708]: Closed Won
+            - cell "AM Sourced" [ref=e4709]
+            - cell "🔗" [ref=e4710]:
+              - link "🔗" [ref=e4711] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000Rfo2vAAB
+          - row "Rental Elite System for Twinco Inc. POR AMER NEW LOGO $13,822 Jon Hoffer 2026-01-09 Closed Won Inbound 🔗" [ref=e4712]:
+            - cell "Rental Elite System for Twinco Inc." [ref=e4713]
+            - cell "POR" [ref=e4714]:
+              - generic [ref=e4715]: POR
+            - cell "AMER" [ref=e4716]
+            - cell "NEW LOGO" [ref=e4717]
+            - cell "$13,822" [ref=e4718]
+            - cell "Jon Hoffer" [ref=e4719]
+            - cell "2026-01-09" [ref=e4720]
+            - cell "Closed Won" [ref=e4721]:
+              - generic [ref=e4722]: Closed Won
+            - cell "Inbound" [ref=e4723]
+            - cell "🔗" [ref=e4724]:
+              - link "🔗" [ref=e4725] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000QEz7tAAD
+          - row "Syrinx System for Rodio Swissboring POR EMEA EXPANSION $13,145 Ian Young 2026-01-16 Closed Won AM Sourced 🔗" [ref=e4726]:
+            - cell "Syrinx System for Rodio Swissboring" [ref=e4727]
+            - cell "POR" [ref=e4728]:
+              - generic [ref=e4729]: POR
+            - cell "EMEA" [ref=e4730]
+            - cell "EXPANSION" [ref=e4731]
+            - cell "$13,145" [ref=e4732]
+            - cell "Ian Young" [ref=e4733]
+            - cell "2026-01-16" [ref=e4734]
+            - cell "Closed Won" [ref=e4735]:
+              - generic [ref=e4736]: Closed Won
+            - cell "AM Sourced" [ref=e4737]
+            - cell "🔗" [ref=e4738]:
+              - link "🔗" [ref=e4739] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000Q7cPoAAJ
+          - row "Syrinx Migration for K T Montgomery Plant POR EMEA MIGRATION $12,341 Peter Wright 2026-01-20 Closed Won AE Sourced 🔗" [ref=e4740]:
+            - cell "Syrinx Migration for K T Montgomery Plant" [ref=e4741]
+            - cell "POR" [ref=e4742]:
+              - generic [ref=e4743]: POR
+            - cell "EMEA" [ref=e4744]
+            - cell "MIGRATION" [ref=e4745]
+            - cell "$12,341" [ref=e4746]
+            - cell "Peter Wright" [ref=e4747]
+            - cell "2026-01-20" [ref=e4748]
+            - cell "Closed Won" [ref=e4749]:
+              - generic [ref=e4750]: Closed Won
+            - cell "AE Sourced" [ref=e4751]
+            - cell "🔗" [ref=e4752]:
+              - link "🔗" [ref=e4753] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000RqvKSAAZ
+          - row "Syrinx Migration for Camberwell Plant Hire Ltd. POR EMEA MIGRATION $12,090 Rob Pullen 2026-01-14 Closed Won AE Sourced 🔗" [ref=e4754]:
+            - cell "Syrinx Migration for Camberwell Plant Hire Ltd." [ref=e4755]
+            - cell "POR" [ref=e4756]:
+              - generic [ref=e4757]: POR
+            - cell "EMEA" [ref=e4758]
+            - cell "MIGRATION" [ref=e4759]
+            - cell "$12,090" [ref=e4760]
+            - cell "Rob Pullen" [ref=e4761]
+            - cell "2026-01-14" [ref=e4762]
+            - cell "Closed Won" [ref=e4763]:
+              - generic [ref=e4764]: Closed Won
+            - cell "AE Sourced" [ref=e4765]
+            - cell "🔗" [ref=e4766]:
+              - link "🔗" [ref=e4767] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000QP2cLAAT
+          - row "Syrinx System for Bachy Soletanche Singapore Pte. Ltd. POR EMEA EXPANSION $12,006 Ian Young 2026-01-11 Closed Won AM Sourced 🔗" [ref=e4768]:
+            - cell "Syrinx System for Bachy Soletanche Singapore Pte. Ltd." [ref=e4769]
+            - cell "POR" [ref=e4770]:
+              - generic [ref=e4771]: POR
+            - cell "EMEA" [ref=e4772]
+            - cell "EXPANSION" [ref=e4773]
+            - cell "$12,006" [ref=e4774]
+            - cell "Ian Young" [ref=e4775]
+            - cell "2026-01-11" [ref=e4776]
+            - cell "Closed Won" [ref=e4777]:
+              - generic [ref=e4778]: Closed Won
+            - cell "AM Sourced" [ref=e4779]
+            - cell "🔗" [ref=e4780]:
+              - link "🔗" [ref=e4781] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000QD2ZiAAL
+          - row "Syrinx System for Foundation Alliance Pte. Ltd. POR EMEA EXPANSION $11,246 Ian Young 2026-01-13 Closed Won AM Sourced 🔗" [ref=e4782]:
+            - cell "Syrinx System for Foundation Alliance Pte. Ltd." [ref=e4783]
+            - cell "POR" [ref=e4784]:
+              - generic [ref=e4785]: POR
+            - cell "EMEA" [ref=e4786]
+            - cell "EXPANSION" [ref=e4787]
+            - cell "$11,246" [ref=e4788]
+            - cell "Ian Young" [ref=e4789]
+            - cell "2026-01-13" [ref=e4790]
+            - cell "Closed Won" [ref=e4791]:
+              - generic [ref=e4792]: Closed Won
+            - cell "AM Sourced" [ref=e4793]
+            - cell "🔗" [ref=e4794]:
+              - link "🔗" [ref=e4795] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000QD8vKAAT
+          - row "Syrinx System for Bachy Soletanche Group Limited POR EMEA EXPANSION $11,246 Ian Young 2026-01-06 Closed Won AM Sourced 🔗" [ref=e4796]:
+            - cell "Syrinx System for Bachy Soletanche Group Limited" [ref=e4797]
+            - cell "POR" [ref=e4798]:
+              - generic [ref=e4799]: POR
+            - cell "EMEA" [ref=e4800]
+            - cell "EXPANSION" [ref=e4801]
+            - cell "$11,246" [ref=e4802]
+            - cell "Ian Young" [ref=e4803]
+            - cell "2026-01-06" [ref=e4804]
+            - cell "Closed Won" [ref=e4805]:
+              - generic [ref=e4806]: Closed Won
+            - cell "AM Sourced" [ref=e4807]
+            - cell "🔗" [ref=e4808]:
+              - link "🔗" [ref=e4809] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000Q7A71AAF
+          - row "Syrinx System for Bachy Soletanche Vietnam POR EMEA NEW LOGO $11,246 Trevor Lovell 2026-01-16 Closed Won Inbound 🔗" [ref=e4810]:
+            - cell "Syrinx System for Bachy Soletanche Vietnam" [ref=e4811]
+            - cell "POR" [ref=e4812]:
+              - generic [ref=e4813]: POR
+            - cell "EMEA" [ref=e4814]
+            - cell "NEW LOGO" [ref=e4815]
+            - cell "$11,246" [ref=e4816]
+            - cell "Trevor Lovell" [ref=e4817]
+            - cell "2026-01-16" [ref=e4818]
+            - cell "Closed Won" [ref=e4819]:
+              - generic [ref=e4820]: Closed Won
+            - cell "Inbound" [ref=e4821]
+            - cell "🔗" [ref=e4822]:
+              - link "🔗" [ref=e4823] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000QBrV9AAL
+          - row "Syrinx System for GEOTECHNICAL ALLIANCE SDN. BHD. POR EMEA NEW LOGO $11,246 Trevor Lovell 2026-01-20 Closed Won AE Sourced 🔗" [ref=e4824]:
+            - cell "Syrinx System for GEOTECHNICAL ALLIANCE SDN. BHD." [ref=e4825]
+            - cell "POR" [ref=e4826]:
+              - generic [ref=e4827]: POR
+            - cell "EMEA" [ref=e4828]
+            - cell "NEW LOGO" [ref=e4829]
+            - cell "$11,246" [ref=e4830]
+            - cell "Trevor Lovell" [ref=e4831]
+            - cell "2026-01-20" [ref=e4832]
+            - cell "Closed Won" [ref=e4833]:
+              - generic [ref=e4834]: Closed Won
+            - cell "AE Sourced" [ref=e4835]
+            - cell "🔗" [ref=e4836]:
+              - link "🔗" [ref=e4837] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000Q70duAAB
+          - row "Rental Elite System for Delano Rental POR AMER NEW LOGO $10,641 Mark Jordan 2026-01-16 Closed Won N/A 🔗" [ref=e4838]:
+            - cell "Rental Elite System for Delano Rental" [ref=e4839]
+            - cell "POR" [ref=e4840]:
+              - generic [ref=e4841]: POR
+            - cell "AMER" [ref=e4842]
+            - cell "NEW LOGO" [ref=e4843]
+            - cell "$10,641" [ref=e4844]
+            - cell "Mark Jordan" [ref=e4845]
+            - cell "2026-01-16" [ref=e4846]
+            - cell "Closed Won" [ref=e4847]:
+              - generic [ref=e4848]: Closed Won
+            - cell "N/A" [ref=e4849]
+            - cell "🔗" [ref=e4850]:
+              - link "🔗" [ref=e4851] [cursor=pointer]:
+                - /url: https://por.my.salesforce.com/006an00000QDbPSAA1
+      - generic [ref=e4852]:
+        - button "« First" [disabled] [ref=e4853]
+        - button "‹ Prev" [disabled] [ref=e4854]
+        - generic [ref=e4855]: Page 1 of 10
+        - button "Next ›" [ref=e4856] [cursor=pointer]
+        - button "Last »" [ref=e4857] [cursor=pointer]
+    - generic [ref=e4858]:
+      - heading "7. Google Ads Performance" [level=2] [ref=e4859]
+      - table [ref=e4861]:
+        - rowgroup [ref=e4862]:
+          - row "Product / Region Impr Clicks CTR Spend CPC Conv CPA" [ref=e4863]:
+            - columnheader "Product / Region" [ref=e4864] [cursor=pointer]:
+              - generic [ref=e4865]: Product / Region
+            - columnheader "Impr" [ref=e4866] [cursor=pointer]:
+              - generic [ref=e4867]: Impr
+            - columnheader "Clicks" [ref=e4868] [cursor=pointer]:
+              - generic [ref=e4869]: Clicks
+            - columnheader "CTR" [ref=e4870] [cursor=pointer]:
+              - generic [ref=e4871]: CTR
+            - columnheader "Spend" [ref=e4872] [cursor=pointer]:
+              - generic [ref=e4873]: Spend
+            - columnheader "CPC" [ref=e4874] [cursor=pointer]:
+              - generic [ref=e4875]: CPC
+            - columnheader "Conv" [ref=e4876] [cursor=pointer]:
+              - generic [ref=e4877]: Conv
+            - columnheader "CPA" [ref=e4878] [cursor=pointer]:
+              - generic [ref=e4879]: CPA
+        - rowgroup [ref=e4880]:
+          - row "POR 20,893 2,063 9.87% $20,689 $10.03 88 $236" [ref=e4881]:
+            - cell "POR" [ref=e4882]
+            - cell "20,893" [ref=e4883]
+            - cell "2,063" [ref=e4884]
+            - cell "9.87%" [ref=e4885]
+            - cell "$20,689" [ref=e4886]
+            - cell "$10.03" [ref=e4887]
+            - cell "88" [ref=e4888]
+            - cell "$236" [ref=e4889]
+          - row "↳ AMER 11,132 1,266 11.37% $11,901 $9.40 73 $163" [ref=e4890]:
+            - cell "↳ AMER" [ref=e4891]
+            - cell "11,132" [ref=e4892]
+            - cell "1,266" [ref=e4893]
+            - cell "11.37%" [ref=e4894]
+            - cell "$11,901" [ref=e4895]
+            - cell "$9.40" [ref=e4896]
+            - cell "73" [ref=e4897]
+            - cell "$163" [ref=e4898]
+          - row "↳ APAC 3,125 236 7.55% $3,378 $14.31 4 $845" [ref=e4899]:
+            - cell "↳ APAC" [ref=e4900]
+            - cell "3,125" [ref=e4901]
+            - cell "236" [ref=e4902]
+            - cell "7.55%" [ref=e4903]
+            - cell "$3,378" [ref=e4904]
+            - cell "$14.31" [ref=e4905]
+            - cell "4" [ref=e4906]
+            - cell "$845" [ref=e4907]
+          - row "↳ EMEA 6,636 561 8.45% $5,410 $9.64 10 $518" [ref=e4908]:
+            - cell "↳ EMEA" [ref=e4909]
+            - cell "6,636" [ref=e4910]
+            - cell "561" [ref=e4911]
+            - cell "8.45%" [ref=e4912]
+            - cell "$5,410" [ref=e4913]
+            - cell "$9.64" [ref=e4914]
+            - cell "10" [ref=e4915]
+            - cell "$518" [ref=e4916]
+          - row "R360 9,382 1,048 11.17% $19,583 $18.69 33 $595" [ref=e4917]:
+            - cell "R360" [ref=e4918]
+            - cell "9,382" [ref=e4919]
+            - cell "1,048" [ref=e4920]
+            - cell "11.17%" [ref=e4921]
+            - cell "$19,583" [ref=e4922]
+            - cell "$18.69" [ref=e4923]
+            - cell "33" [ref=e4924]
+            - cell "$595" [ref=e4925]
+          - row "↳ AMER 6,141 851 13.86% $16,638 $19.55 22 $759" [ref=e4926]:
+            - cell "↳ AMER" [ref=e4927]
+            - cell "6,141" [ref=e4928]
+            - cell "851" [ref=e4929]
+            - cell "13.86%" [ref=e4930]
+            - cell "$16,638" [ref=e4931]
+            - cell "$19.55" [ref=e4932]
+            - cell "22" [ref=e4933]
+            - cell "$759" [ref=e4934]
+          - row "↳ APAC 156 29 18.59% $595 $20.53 4 $149" [ref=e4935]:
+            - cell "↳ APAC" [ref=e4936]
+            - cell "156" [ref=e4937]
+            - cell "29" [ref=e4938]
+            - cell "18.59%" [ref=e4939]
+            - cell "$595" [ref=e4940]
+            - cell "$20.53" [ref=e4941]
+            - cell "4" [ref=e4942]
+            - cell "$149" [ref=e4943]
+          - row "↳ EMEA 3,085 168 5.45% $2,350 $13.99 7 $336" [ref=e4944]:
+            - cell "↳ EMEA" [ref=e4945]
+            - cell "3,085" [ref=e4946]
+            - cell "168" [ref=e4947]
+            - cell "5.45%" [ref=e4948]
+            - cell "$2,350" [ref=e4949]
+            - cell "$13.99" [ref=e4950]
+            - cell "7" [ref=e4951]
+            - cell "$336" [ref=e4952]
+    - generic [ref=e4953]:
+      - generic [ref=e4954]:
+        - generic [ref=e4955]:
+          - generic [ref=e4956]: AI
+          - heading "Analysis & Recommendations" [level=2] [ref=e4957]
+        - button "Generate Analysis" [ref=e4959] [cursor=pointer]
+      - generic [ref=e4960]:
+        - generic [ref=e4961]:
+          - generic [ref=e4962]: "Analyzing:"
+          - generic [ref=e4963]: R360 • All Regions
+        - generic [ref=e4965]:
+          - generic [ref=e4966]: AI
+          - paragraph [ref=e4967]:
+            - text: Click
+            - strong [ref=e4968]: Generate Analysis
+            - text: to get AI-powered insights and recommendations for the current filter selection.
+          - paragraph [ref=e4969]: Use the filters above to narrow down to specific products or regions before generating.
+    - generic [ref=e4970]:
+      - generic [ref=e4971]:
+        - generic [ref=e4972]:
+          - generic [ref=e4973]: AI
+          - heading "Inbound Marketing Deep Dive" [level=2] [ref=e4974]
+        - button "Generate Analysis" [ref=e4976] [cursor=pointer]
+      - generic [ref=e4977]:
+        - generic [ref=e4978]:
+          - generic [ref=e4979]: "Analyzing:"
+          - generic [ref=e4980]: R360 • All Regions
+        - generic [ref=e4982]:
+          - generic [ref=e4983]: AI
+          - paragraph [ref=e4984]:
+            - text: Click
+            - strong [ref=e4985]: Generate Analysis
+            - text: to get AI-powered insights on funnel performance, conversion rates, and Google Ads metrics.
+          - paragraph [ref=e4986]: Use the filters above to narrow down to specific products or regions before generating.
+    - contentinfo [ref=e4987]:
+      - paragraph [ref=e4988]: Generated 2026-01-21 | Version 3.0.0-live | Data as of 2026-01-21
+```
