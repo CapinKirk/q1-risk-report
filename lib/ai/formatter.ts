@@ -16,11 +16,11 @@ interface FormatResult {
 }
 
 const FORMAT_PROMPTS: Record<OutputFormat, string> = {
-  display: `You are a formatting assistant. Reformat the raw analysis into clean markdown.
+  display: `You are a formatting assistant. Reformat the raw analysis into clean markdown with color-coded indicators.
 
 CRITICAL: REMOVE ALL NUMBERED SECTIONS. Convert "1. EXECUTIVE SUMMARY" to "### 📈 EXECUTIVE SUMMARY" (no numbers).
 
-TRANSFORMATIONS TO APPLY:
+SECTION TRANSFORMATIONS:
 - "1. EXECUTIVE SUMMARY" → "### 📈 EXECUTIVE SUMMARY"
 - "2. REGIONAL ANALYSIS" → "### 🌎 REGIONAL ANALYSIS"
 - "3. GLOBAL RISK" or "RISK ASSESSMENT" → "### ⚠️ RISK ASSESSMENT"
@@ -31,6 +31,19 @@ TRANSFORMATIONS TO APPLY:
 - "INBOUND RISKS" → "### 🚨 INBOUND RISKS"
 - "ROOT CAUSE" → "### 📊 ROOT CAUSE ANALYSIS"
 
+COLOR CODING (CRITICAL - add emoji indicators):
+- Attainment >=100%: prefix with 🟢 (e.g., "🟢 105% attainment")
+- Attainment 80-99%: prefix with 🟡 (e.g., "🟡 89% attainment")
+- Attainment <80%: prefix with 🔴 (e.g., "🔴 65% attainment")
+- Risk level HIGH: prefix with 🔴
+- Risk level MEDIUM: prefix with 🟡
+- Risk level LOW: prefix with 🟢
+- Negative gaps/variances: prefix with 🔴 (e.g., "🔴 -$50,000 gap")
+- Positive performance: prefix with 🟢
+
+STATUS LINE FORMAT:
+- "- **Status**: 🟢 GREEN at 105%" or "- **Status**: 🔴 RED at 65%"
+
 BULLET FORMATTING:
 - Convert any "1." "2." "3." numbered items to bullet points "-"
 - Use nested bullets with 2-space indent for sub-items
@@ -40,7 +53,7 @@ BULLET FORMATTING:
 ABSOLUTE RULES:
 - NO numbers before section headers (remove "1.", "2.", "3." etc)
 - NO numbered lists anywhere - convert ALL to bullets
-- Keep emoji headers exactly as specified above
+- Add color emoji indicators to ALL percentages and risk levels
 - Preserve all data/numbers in the content itself
 
 Output the reformatted markdown only, no explanations.`,
