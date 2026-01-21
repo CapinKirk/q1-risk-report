@@ -1832,7 +1832,13 @@ async function getSALDetails(filters: ReportFilters) {
         COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(f.SAL_DT AS DATE), DAY) AS days_in_stage,
-        'NEW LOGO' AS category,
+        -- Derive category from opportunity Type field
+        CASE
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Existing Business' THEN 'EXPANSION'
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Migration' THEN 'MIGRATION'
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Strategic' THEN 'STRATEGIC'
+          ELSE 'NEW LOGO'
+        END AS category,
         -- Deduplicate by email to match summary
         ROW_NUMBER() OVER (
           PARTITION BY COALESCE(f.LeadEmail, f.ContactEmail)
@@ -2015,7 +2021,13 @@ async function getSQODetails(filters: ReportFilters) {
         COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) AS days_in_stage,
-        'NEW LOGO' AS category,
+        -- Derive category from opportunity Type field
+        CASE
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Existing Business' THEN 'EXPANSION'
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Migration' THEN 'MIGRATION'
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Strategic' THEN 'STRATEGIC'
+          ELSE 'NEW LOGO'
+        END AS category,
         -- Deduplicate by opportunity ID, preferring won deals
         ROW_NUMBER() OVER (
           PARTITION BY COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id, COALESCE(f.LeadEmail, f.ContactEmail))
@@ -2172,7 +2184,13 @@ async function getSQODetails(filters: ReportFilters) {
         COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) AS days_in_stage,
-        'NEW LOGO' AS category,
+        -- Derive category from opportunity Type field
+        CASE
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Existing Business' THEN 'EXPANSION'
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Migration' THEN 'MIGRATION'
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Strategic' THEN 'STRATEGIC'
+          ELSE 'NEW LOGO'
+        END AS category,
         -- Deduplicate by opportunity ID
         ROW_NUMBER() OVER (
           PARTITION BY COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id, f.Email)
