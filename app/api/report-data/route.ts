@@ -1889,10 +1889,60 @@ async function getSALDetails(filters: ReportFilters) {
         AND CAST(f.SAL_DT AS DATE) >= '${filters.startDate}'
         AND CAST(f.SAL_DT AS DATE) <= '${filters.endDate}'
         ${regionClause}
+    ),
+    -- EXPANSION and MIGRATION opportunities that have reached SAL stage
+    -- SAL stage = past Needs Analysis (Stage 1-2 are Discovery/Qualification, Stage 3 is Needs Analysis)
+    expansion_migration_sals AS (
+      SELECT
+        'POR' AS product,
+        CASE o.Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        o.Id AS record_id,
+        CONCAT('https://por.my.salesforce.com/', o.Id) AS salesforce_url,
+        COALESCE(o.AccountName, 'Unknown') AS company_name,
+        'N/A' AS email,
+        COALESCE(NULLIF(COALESCE(o.SDRSource, o.POR_SDRSource), ''), 'EXPANSION') AS source,
+        CAST(o.CreatedDate AS STRING) AS sal_date,
+        CAST(NULL AS STRING) AS sql_date,
+        CAST(NULL AS STRING) AS mql_date,
+        0 AS days_sql_to_sal,
+        CASE WHEN o.Won OR o.StageName IN ('Proposal', 'Negotiation', 'Closed Won') THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        'Yes' AS has_opportunity,
+        CASE
+          WHEN o.Won THEN 'WON'
+          WHEN o.StageName IN ('Proposal', 'Negotiation', 'Closed Won') THEN 'CONVERTED_SQO'
+          WHEN o.IsClosed AND NOT o.Won THEN 'LOST'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) > 45 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sal_status,
+        o.Id AS opportunity_id,
+        o.OpportunityName AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        o.ACV AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) AS days_in_stage,
+        CASE
+          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN o.Type = 'Migration' THEN 'MIGRATION'
+        END AS category,
+        ROW_NUMBER() OVER (PARTITION BY o.Id ORDER BY o.CreatedDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+      WHERE o.por_record__c = true
+        AND o.Division IN ('US', 'UK', 'AU')
+        AND o.Type IN ('Existing Business', 'Migration')
+        AND o.ACV > 0
+        -- SAL stage = past Needs Analysis stage OR Won
+        AND (o.StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') OR o.Won)
+        AND CAST(o.CreatedDate AS DATE) >= '${filters.startDate}'
+        AND CAST(o.CreatedDate AS DATE) <= '${filters.endDate}'
+        ${regionClause.replace(/f\.Division/g, 'o.Division')}
     )
-    SELECT * EXCEPT(rn)
-    FROM ranked_sals
-    WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM ranked_sals WHERE rn = 1
+    UNION ALL
+    SELECT * EXCEPT(rn) FROM expansion_migration_sals WHERE rn = 1
     ORDER BY sal_date DESC
   `;
 
