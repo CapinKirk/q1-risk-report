@@ -80,6 +80,11 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
   // Get MQL disqualification summary
   const dqSummary = mql_disqualification_summary || { POR: {}, R360: {} };
 
+  // Determine which regions to include based on filter context
+  const activeRegions = filterContext?.isFiltered && filterContext.regions.length > 0
+    ? filterContext.regions
+    : ['AMER', 'EMEA', 'APAC'];
+
   // Group attainment data by region for regional breakdowns
   const amerAttainment = allAttainment.filter((r: any) => r.region === 'AMER');
   const emeaAttainment = allAttainment.filter((r: any) => r.region === 'EMEA');
@@ -98,6 +103,65 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
   const emeaTotal = calcRegionTotal(emeaAttainment);
   const apacTotal = calcRegionTotal(apacAttainment);
 
+  // Build regional summary sections (only for active regions)
+  const buildRegionalSummary = () => {
+    const sections: string[] = [];
+
+    if (activeRegions.includes('AMER')) {
+      sections.push(`### AMER Region Total
+- QTD Actual: $${amerTotal.qtdAcv.toLocaleString()}
+- QTD Target: $${amerTotal.qtdTarget.toLocaleString()}
+- Attainment: ${amerTotal.attainment}%
+- Gap: $${amerTotal.gap.toLocaleString()}`);
+    }
+
+    if (activeRegions.includes('EMEA')) {
+      sections.push(`### EMEA Region Total
+- QTD Actual: $${emeaTotal.qtdAcv.toLocaleString()}
+- QTD Target: $${emeaTotal.qtdTarget.toLocaleString()}
+- Attainment: ${emeaTotal.attainment}%
+- Gap: $${emeaTotal.gap.toLocaleString()}`);
+    }
+
+    if (activeRegions.includes('APAC')) {
+      sections.push(`### APAC Region Total
+- QTD Actual: $${apacTotal.qtdAcv.toLocaleString()}
+- QTD Target: $${apacTotal.qtdTarget.toLocaleString()}
+- Attainment: ${apacTotal.attainment}%
+- Gap: $${apacTotal.gap.toLocaleString()}`);
+    }
+
+    return sections.join('\n\n');
+  };
+
+  // Build regional segment detail sections (only for active regions)
+  const buildRegionalDetail = () => {
+    const sections: string[] = [];
+
+    if (activeRegions.includes('AMER')) {
+      const amerDetail = amerAttainment.map((row: any) =>
+        `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
+      ).join('\n') || 'No AMER data';
+      sections.push(`## AMER Segment Detail\n${amerDetail}`);
+    }
+
+    if (activeRegions.includes('EMEA')) {
+      const emeaDetail = emeaAttainment.map((row: any) =>
+        `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
+      ).join('\n') || 'No EMEA data';
+      sections.push(`## EMEA Segment Detail\n${emeaDetail}`);
+    }
+
+    if (activeRegions.includes('APAC')) {
+      const apacDetail = apacAttainment.map((row: any) =>
+        `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
+      ).join('\n') || 'No APAC data';
+      sections.push(`## APAC Segment Detail\n${apacDetail}`);
+    }
+
+    return sections.join('\n\n');
+  };
+
   // Build comprehensive context
   const prompt = `You are a Revenue Operations analyst reviewing Q1 2026 Bookings performance data.
 
@@ -107,7 +171,7 @@ EXECUTIVE SUMMARY:
 Write 2-3 sentences on overall global Q1 performance status.
 
 REGIONAL ANALYSIS:
-For each region (AMER, EMEA, APAC), provide:
+For each region included in this analysis (${activeRegions.join(', ')}), provide:
 - Status: GREEN/YELLOW/RED and attainment percentage
 - Gap: Dollar amount to target
 - Key Risks: 1-2 specific risks with dollar impact
@@ -133,23 +197,7 @@ ${filterDescription}
 - QTD Actual: $${(grand_total?.total_qtd_acv || 0).toLocaleString()}
 
 ## REGIONAL SUMMARY (USE THESE NUMBERS)
-### AMER Region Total
-- QTD Actual: $${amerTotal.qtdAcv.toLocaleString()}
-- QTD Target: $${amerTotal.qtdTarget.toLocaleString()}
-- Attainment: ${amerTotal.attainment}%
-- Gap: $${amerTotal.gap.toLocaleString()}
-
-### EMEA Region Total
-- QTD Actual: $${emeaTotal.qtdAcv.toLocaleString()}
-- QTD Target: $${emeaTotal.qtdTarget.toLocaleString()}
-- Attainment: ${emeaTotal.attainment}%
-- Gap: $${emeaTotal.gap.toLocaleString()}
-
-### APAC Region Total
-- QTD Actual: $${apacTotal.qtdAcv.toLocaleString()}
-- QTD Target: $${apacTotal.qtdTarget.toLocaleString()}
-- Attainment: ${apacTotal.attainment}%
-- Gap: $${apacTotal.gap.toLocaleString()}
+${buildRegionalSummary()}
 
 ## POR Performance
 - Q1 Target: $${(porTotal.total_q1_target || 0).toLocaleString()}
@@ -165,20 +213,7 @@ ${filterDescription}
 - Pipeline Coverage: ${r360Total.total_pipeline_coverage_x || 0}x
 - Lost Deals: ${r360Total.total_lost_deals || 0} worth $${(r360Total.total_lost_acv || 0).toLocaleString()}
 
-## AMER Segment Detail
-${amerAttainment.map((row: any) =>
-  `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
-).join('\n') || 'No AMER data'}
-
-## EMEA Segment Detail
-${emeaAttainment.map((row: any) =>
-  `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
-).join('\n') || 'No EMEA data'}
-
-## APAC Segment Detail
-${apacAttainment.map((row: any) =>
-  `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
-).join('\n') || 'No APAC data'}
+${buildRegionalDetail()}
 
 ## Critical Misses (Below 70% Attainment)
 ${criticalMisses.length > 0 ? criticalMisses.map((row: any) =>

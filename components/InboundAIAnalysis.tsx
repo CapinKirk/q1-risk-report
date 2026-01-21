@@ -692,12 +692,11 @@ export default function InboundAIAnalysis({ reportData, selectedProducts, select
 
     try {
       const filteredData = filterReportData(reportData, selectedProducts, selectedRegions);
-      const response = await fetch('/api/ai-analysis', {
+      const response = await fetch('/api/ai-analysis-inbound', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reportData: filteredData,
-          analysisType: 'inbound_marketing',
           filterContext: {
             products: selectedProducts.length === 0 ? ['POR', 'R360'] : selectedProducts,
             regions: selectedRegions.length === 0 ? ['AMER', 'EMEA', 'APAC'] : selectedRegions,
