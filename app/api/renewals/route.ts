@@ -100,9 +100,9 @@ function calculateRAG(attainmentPct: number): 'GREEN' | 'YELLOW' | 'RED' {
   return 'RED';
 }
 
-// Query renewal targets from RAW_2026_Plan_by_Month (Q1_Actual_2025 = renewal baseline)
-// RATIONALE: Renewal targets use prior year actuals as the baseline, not planned targets
-// This matches the 2026 Bookings Plan where Q1_Actual_2025 represents the renewal baseline
+// Query renewal targets from RAW_2026_Plan_by_Month (Q1_Plan_2026 = 2026 target)
+// RATIONALE: Use 2026 plan targets, with Q1_Actual_2025 as fallback for products without 2026 plan
+// This matches the report-data route's renewal target calculation
 async function getRenewalTargets(): Promise<RenewalTargets> {
   const emptyRegionalTargets: Record<Region, RegionalTargets> = {
     AMER: { q1Target: 0, qtdActual: 0, attainmentPct: 0 },
@@ -114,13 +114,13 @@ async function getRenewalTargets(): Promise<RenewalTargets> {
     const bigquery = getBigQueryClient();
 
     // Query RAW_2026_Plan_by_Month for renewal targets
-    // Q1_Actual_2025 is the correct baseline for renewal targets (prior year actuals)
+    // Use Q1_Plan_2026 as primary, Q1_Actual_2025 as fallback (for products without 2026 plan)
     // Division format: "AMER POR", "EMEA POR", "APAC POR", "AMER R360"
     const query = `
       SELECT
         Division,
         Booking_Type,
-        ROUND(COALESCE(Q1_Actual_2025, 0), 2) AS q1_target
+        ROUND(COALESCE(Q1_Plan_2026, Q1_Actual_2025, 0), 2) AS q1_target
       FROM \`data-analytics-306119.Staging.RAW_2026_Plan_by_Month\`
       WHERE LOWER(Booking_Type) = 'renewal'
     `;
@@ -171,7 +171,7 @@ async function getRenewalTargets(): Promise<RenewalTargets> {
       }
     }
 
-    console.log('Renewal targets (Q1_Actual_2025 from RAW_2026_Plan_by_Month):', JSON.stringify(targets, null, 2));
+    console.log('Renewal targets (Q1_Plan_2026 from RAW_2026_Plan_by_Month):', JSON.stringify(targets, null, 2));
     return targets;
   } catch (error: any) {
     console.error('Failed to fetch renewal targets from RAW_2026_Plan_by_Month:', error.message);
