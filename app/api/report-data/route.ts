@@ -2619,15 +2619,18 @@ export async function POST(request: Request) {
       const qtdDeals = actual ? actual.deal_count : 0;
       const q1Target = parseFloat(target.q1_target) || 0;
 
-      // For RENEWAL category: add upcoming uplift for forecasted bookings
+      // For RENEWAL category: calculate forecast including expected uplift (for RAG status)
+      // CRITICAL: qtdAcv should only show ACTUAL closed deals, not expected uplift
       let qtdAcv = wonAcv;
       let q1Forecast = wonAcv; // Projected Q1 total (for RAG calculation)
+      let renewalUplift = 0; // Track uplift separately for display
       if (target.category === 'RENEWAL') {
         const upliftKey = `${target.product}-${target.region}-RENEWAL`;
-        const uplift = renewalUpliftMap.get(upliftKey) || 0;
-        qtdAcv = wonAcv + uplift;
-        q1Forecast = wonAcv + uplift; // For renewals, forecast = won + expected uplift
-        console.log(`RENEWAL ${target.product}-${target.region}: Won=${wonAcv}, Uplift=${uplift}, Forecasted=${q1Forecast}, Q1Target=${q1Target}`);
+        renewalUplift = renewalUpliftMap.get(upliftKey) || 0;
+        // DO NOT add uplift to qtdAcv - that's expected, not actual
+        // Only forecast includes uplift for RAG calculation
+        q1Forecast = wonAcv + renewalUplift;
+        console.log(`RENEWAL ${target.product}-${target.region}: Won=${wonAcv}, Uplift=${renewalUplift}, Forecasted=${q1Forecast}, Q1Target=${q1Target}`);
       }
 
       // Calculate QTD target based on period progress
@@ -2680,12 +2683,16 @@ export async function POST(request: Request) {
         category: target.category,
         fy_target: fyTarget,
         q1_target: q1Target,
-        // For RENEWAL: use Q1 target as "QTD target" since qtd_acv includes full Q1 forecast
-        // This ensures Executive Summary shows correct attainment when filtered to RENEWAL
-        qtd_target: target.category === 'RENEWAL' ? q1Target : Math.round(qtdTarget * 100) / 100,
+        // QTD target is always prorated (qtd_acv now shows only actual closed deals)
+        qtd_target: Math.round(qtdTarget * 100) / 100,
         qtd_deals: qtdDeals,
-        qtd_acv: qtdAcv,
+        qtd_acv: qtdAcv, // ACTUAL closed deals only (not including expected uplift)
+        // For RENEWAL: attainment is based on forecast vs Q1 target (since renewals come in lumps)
+        // This provides meaningful attainment metric for planning purposes
         qtd_attainment_pct: target.category === 'RENEWAL' ? ragAttainmentPct : attainmentPct,
+        // Include renewal-specific fields for transparency
+        renewal_uplift: renewalUplift, // Expected uplift from expiring contracts
+        q1_forecast: target.category === 'RENEWAL' ? Math.round(q1Forecast * 100) / 100 : undefined, // Won + expected uplift
         q1_progress_pct: progressPct,
         fy_progress_pct: fyProgressPct,
         qtd_gap: Math.round(gap * 100) / 100,
