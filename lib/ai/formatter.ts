@@ -16,99 +16,91 @@ interface FormatResult {
 }
 
 const FORMAT_PROMPTS: Record<OutputFormat, string> = {
-  display: `You are a formatting assistant. Convert the raw analysis into clean, readable markdown for a web dashboard.
+  display: `You are a formatting assistant. Reformat the raw analysis into clean markdown.
 
-STRICT FORMATTING RULES:
-- Use emoji headers: 📈 for summary, 🌎 for regional, 🇺🇸 🇬🇧 🇦🇺 for regions, ⚠️ for risks, ✅ for actions
-- Use ### for main sections, #### for subsections
-- Use nested bullet points with proper indentation:
-  - Top level: "- **Bold label**: value"
-  - Nested: "  - Sub-item details"
-- NO numbered lists (1. 2. 3.) - use bullets only
-- Keep content concise - one line per point
-- Use **bold** for labels and emphasis
+CRITICAL: REMOVE ALL NUMBERED SECTIONS. Convert "1. EXECUTIVE SUMMARY" to "### 📈 EXECUTIVE SUMMARY" (no numbers).
 
-OUTPUT FORMAT:
-### 📈 EXECUTIVE SUMMARY
-[2-3 sentences]
+TRANSFORMATIONS TO APPLY:
+- "1. EXECUTIVE SUMMARY" → "### 📈 EXECUTIVE SUMMARY"
+- "2. REGIONAL ANALYSIS" → "### 🌎 REGIONAL ANALYSIS"
+- "3. GLOBAL RISK" or "RISK ASSESSMENT" → "### ⚠️ RISK ASSESSMENT"
+- "AMER" sections → "#### 🇺🇸 AMER"
+- "EMEA" sections → "#### 🇬🇧 EMEA"
+- "APAC" sections → "#### 🇦🇺 APAC"
+- "ACTION ITEMS" → "### ✅ ACTION ITEMS"
+- "INBOUND RISKS" → "### 🚨 INBOUND RISKS"
+- "ROOT CAUSE" → "### 📊 ROOT CAUSE ANALYSIS"
 
-### 🌎 REGIONAL ANALYSIS
+BULLET FORMATTING:
+- Convert any "1." "2." "3." numbered items to bullet points "-"
+- Use nested bullets with 2-space indent for sub-items
+- Format: "- **Label**: value" for key-value pairs
+- Format: "  - Sub-item" for nested items
 
-#### 🇺🇸 AMER
-- **Status**: [RAG] at [X]% attainment
-- **Gap**: $[amount]
-- **Risks**:
-  - [Risk 1]
-  - [Risk 2]
-- **Actions**:
-  - [Action] → Owner: [Role]
+ABSOLUTE RULES:
+- NO numbers before section headers (remove "1.", "2.", "3." etc)
+- NO numbered lists anywhere - convert ALL to bullets
+- Keep emoji headers exactly as specified above
+- Preserve all data/numbers in the content itself
 
-[Repeat for EMEA and APAC]
+Output the reformatted markdown only, no explanations.`,
 
-### ⚠️ RISK ASSESSMENT
-- **Risk Level**: [HIGH/MEDIUM/LOW]
-- **$ at Risk**: [amount]
-- **Top Priorities**:
-  - [Priority 1]
-  - [Priority 2]`,
+  html: `You are a formatting assistant. Convert the raw analysis into semantic HTML.
 
-  html: `You are a formatting assistant. Convert the raw analysis into clean semantic HTML for a report.
+CRITICAL: REMOVE ALL NUMBERED SECTIONS. Convert "1. EXECUTIVE SUMMARY" to "<h3>📈 Executive Summary</h3>" (no numbers).
 
-STRICT FORMATTING RULES:
-- Use semantic HTML: <section>, <h3>, <h4>, <ul>, <li>, <strong>
-- Add data attributes for styling: data-status="green|yellow|red"
-- Use emoji in headings: 📈 🌎 🇺🇸 🇬🇧 🇦🇺 ⚠️ ✅
-- Nest lists properly with <ul><li><ul><li></li></ul></li></ul>
-- NO inline styles - use classes only
-- Add class names: section-summary, section-regional, region-amer, region-emea, region-apac, section-risks
+TRANSFORMATIONS:
+- "1. EXECUTIVE SUMMARY" → <h3>📈 Executive Summary</h3>
+- "2. REGIONAL ANALYSIS" → <h3>🌎 Regional Analysis</h3>
+- "3. GLOBAL RISK" → <h3>⚠️ Risk Assessment</h3>
+- "AMER" → <h4>🇺🇸 AMER</h4>
+- "EMEA" → <h4>🇬🇧 EMEA</h4>
+- "APAC" → <h4>🇦🇺 APAC</h4>
 
-OUTPUT FORMAT:
+HTML STRUCTURE:
 <section class="ai-report">
   <section class="section-summary">
     <h3>📈 Executive Summary</h3>
-    <p>[Summary text]</p>
+    <p>[content]</p>
   </section>
-
   <section class="section-regional">
     <h3>🌎 Regional Analysis</h3>
-
     <div class="region-amer">
       <h4>🇺🇸 AMER</h4>
       <ul>
         <li><strong>Status:</strong> <span data-status="yellow">YELLOW</span> at X%</li>
-        <li><strong>Gap:</strong> $X</li>
         <li><strong>Risks:</strong>
-          <ul>
-            <li>[Risk item]</li>
-          </ul>
+          <ul><li>[risk]</li></ul>
         </li>
       </ul>
     </div>
-
-    [Repeat for other regions]
   </section>
-
   <section class="section-risks">
     <h3>⚠️ Risk Assessment</h3>
-    <ul>
-      <li><strong>Risk Level:</strong> [HIGH/MEDIUM/LOW]</li>
-      <li><strong>$ at Risk:</strong> [amount]</li>
-    </ul>
+    <ul><li><strong>Risk Level:</strong> HIGH/MEDIUM/LOW</li></ul>
   </section>
-</section>`,
+</section>
+
+RULES:
+- NO numbered sections (remove 1., 2., 3.)
+- Convert all numbered lists to <ul><li>
+- Use data-status="green|yellow|red" for status spans
+- Output HTML only, no explanations`,
 
   slack: `You are a formatting assistant. Convert the raw analysis into Slack mrkdwn format.
 
-STRICT FORMATTING RULES:
-- Use Slack mrkdwn: *bold*, _italic_, \`code\`
-- Use emoji: :chart_with_upwards_trend: :earth_americas: :flag-us: :flag-gb: :flag-au: :warning: :white_check_mark:
-- NO markdown headers (# ## ###) - Slack doesn't support them
-- Use *bold text* for section titles on their own line
-- Use bullet points with • (not -)
-- Keep each line under 100 chars for mobile readability
-- Add blank lines between sections
+CRITICAL: REMOVE ALL NUMBERED SECTIONS. Convert "1. EXECUTIVE SUMMARY" to ":chart_with_upwards_trend: *EXECUTIVE SUMMARY*" (no numbers).
 
-OUTPUT FORMAT:
+TRANSFORMATIONS:
+- "1. EXECUTIVE SUMMARY" → :chart_with_upwards_trend: *EXECUTIVE SUMMARY*
+- "2. REGIONAL ANALYSIS" → :earth_americas: *REGIONAL ANALYSIS*
+- "3. GLOBAL RISK" → :warning: *RISK ASSESSMENT*
+- "AMER" → :flag-us: *AMER*
+- "EMEA" → :flag-gb: *EMEA*
+- "APAC" → :flag-au: *APAC*
+- "ACTION ITEMS" → :white_check_mark: *ACTION ITEMS*
+
+SLACK FORMAT:
 :chart_with_upwards_trend: *EXECUTIVE SUMMARY*
 [2-3 sentences]
 
@@ -119,22 +111,25 @@ OUTPUT FORMAT:
 • *Gap:* $X
 • *Risks:*
     • [Risk 1]
-    • [Risk 2]
 • *Actions:*
     • [Action] → Owner: [Role]
 
 :flag-gb: *EMEA*
-[Same format]
+[Same structure]
 
 :flag-au: *APAC*
-[Same format]
+[Same structure]
 
 :warning: *RISK ASSESSMENT*
 • *Risk Level:* HIGH/MEDIUM/LOW
 • *$ at Risk:* [amount]
-• *Top Priorities:*
-    • [Priority 1]
-    • [Priority 2]`
+
+RULES:
+- NO numbered sections (1., 2., 3.) - remove them entirely
+- Convert numbered lists to bullets (•)
+- Use Slack emoji codes (:emoji:) not Unicode
+- Keep lines under 100 chars
+- Output Slack mrkdwn only, no explanations`
 };
 
 /**
@@ -165,7 +160,7 @@ export async function formatAnalysis(
           content: `Format this analysis:\n\n${rawAnalysis}`
         }
       ],
-      temperature: 0.3, // Low temperature for consistent formatting
+      temperature: 0.1, // Very low temperature for consistent formatting
       max_tokens: 2000,
     }),
   });
