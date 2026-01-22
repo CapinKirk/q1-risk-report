@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getBigQueryClient } from '@/lib/bigquery-client';
 import {
+  executeSoqlQuery,
+  isSalesforceConfigured,
+  divisionToRegion as sfDivisionToRegion,
+} from '@/lib/salesforce-client';
+import {
   RenewalsData,
   RenewalOpportunity,
   RenewalSummary,
@@ -317,6 +322,135 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
     });
   } catch (error: any) {
     console.error('BigQuery Contract query error:', error.message);
+    return [];
+  }
+}
+
+// Query Contract data directly from Salesforce (real-time)
+// This bypasses BigQuery sync delay for up-to-date data
+async function queryContractsFromSalesforce(): Promise<SalesforceContract[]> {
+  if (!isSalesforceConfigured()) {
+    console.log('Salesforce credentials not configured, skipping direct SF query');
+    return [];
+  }
+
+  try {
+    console.log('Querying Contract data directly from Salesforce...');
+
+    // SOQL query to get contract data with currency conversion
+    // Note: CurrencyType lookup must be done separately as SOQL doesn't support cross-object currency joins
+    const soql = `
+      SELECT
+        Id,
+        ContractNumber,
+        AccountId,
+        Account.Name,
+        StartDate,
+        EndDate,
+        ContractTerm,
+        Status,
+        Renewal_Status__c,
+        neo_automaticrenewal__c,
+        manual_renewal__c,
+        SBQQ__Evergreen__c,
+        CurrencyIsoCode,
+        ACV__c,
+        Starting_ACV__c,
+        Ending_ACV__c,
+        SBQQ__RenewalUpliftRate__c,
+        SBQQ__RenewalOpportunity__c,
+        r360_record__c,
+        Account_Division__c
+      FROM Contract
+      WHERE Status = 'Activated'
+        AND EndDate >= TODAY
+        AND EndDate <= 2026-03-31
+        AND Account_Division__c IN ('US', 'UK', 'AU')
+        AND (Renewal_Status__c = null
+             OR Renewal_Status__c NOT IN ('Non Renewing', 'Success'))
+        AND ACV__c > 0
+      ORDER BY EndDate ASC
+      LIMIT 2000
+    `;
+
+    // Also query currency conversion rates
+    const currencySoql = `
+      SELECT IsoCode, ConversionRate
+      FROM CurrencyType
+      WHERE IsActive = true
+    `;
+
+    const [contracts, currencies] = await Promise.all([
+      executeSoqlQuery<any>(soql),
+      executeSoqlQuery<{ IsoCode: string; ConversionRate: number }>(currencySoql),
+    ]);
+
+    // Build currency rate map
+    const currencyRates = new Map<string, number>();
+    for (const curr of currencies) {
+      currencyRates.set(curr.IsoCode?.toUpperCase(), curr.ConversionRate || 1);
+    }
+
+    const today = new Date();
+
+    return contracts.map((record: any) => {
+      const endDate = new Date(record.EndDate);
+      const daysUntilRenewal = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+      // Product: r360_record__c = true means R360, otherwise POR
+      const isR360 = record.r360_record__c === true;
+      const product: Product = isR360 ? 'R360' : 'POR';
+
+      // Region from Account_Division__c
+      const region = sfDivisionToRegion(record.Account_Division__c);
+
+      // Currency conversion
+      const currencyCode = record.CurrencyIsoCode?.toUpperCase() || 'USD';
+      const conversionRate = currencyRates.get(currencyCode) || 1;
+
+      const acvLocal = record.ACV__c || record.Starting_ACV__c || 0;
+      const currentACV = Math.round((acvLocal / conversionRate) * 100) / 100;
+
+      // Uplift calculation
+      const upliftPct = record.SBQQ__RenewalUpliftRate__c || DEFAULT_RENEWAL_UPLIFT_PCT;
+      const upliftAmount = Math.round(currentACV * (upliftPct / 100) * 100) / 100;
+      const endingACV = currentACV + upliftAmount;
+
+      // Auto-renewal check
+      const renewalStatus = record.Renewal_Status__c || '';
+      const isAutoRenewalFlag = record.neo_automaticrenewal__c === true;
+      const isEvergreen = record.SBQQ__Evergreen__c === true;
+      const isFutureRenewal = renewalStatus === 'Future Renewal';
+      const isAutoRenewal = isAutoRenewalFlag || isEvergreen || isFutureRenewal;
+
+      // At risk = expiring within 30 days and NOT auto-renewing
+      const isAtRisk = daysUntilRenewal <= 30 && !isAutoRenewal;
+
+      return {
+        Id: record.Id,
+        ContractNumber: record.ContractNumber,
+        AccountId: record.AccountId,
+        AccountName: record.Account?.Name || 'Unknown',
+        StartDate: record.StartDate,
+        EndDate: record.EndDate,
+        ContractTerm: record.ContractTerm || 12,
+        Status: record.Status,
+        AutoRenewal: isAutoRenewal,
+        CurrentACV: currentACV,
+        EndingACV: endingACV,
+        UpliftAmount: upliftAmount,
+        UpliftPct: upliftPct,
+        Product: product,
+        Region: region,
+        DaysUntilRenewal: daysUntilRenewal,
+        IsAtRisk: isAtRisk,
+        RenewalOpportunityId: record.SBQQ__RenewalOpportunity__c,
+        RenewalOpportunityName: '',
+        SalesforceUrl: `https://por.my.salesforce.com/${record.Id}`,
+      };
+    });
+  } catch (error: any) {
+    console.error('Salesforce Contract query error:', error.message);
     return [];
   }
 }
@@ -658,16 +792,41 @@ export async function GET(request: Request) {
       regions: searchParams.get('regions')?.split(',').filter(Boolean) || [],
     };
 
-    console.log('Renewals API called with filters:', filters);
+    // Check if refresh from Salesforce is requested
+    const forceRefresh = searchParams.get('refresh') === 'true';
+    const sfConfigured = isSalesforceConfigured();
 
-    // Fetch data in parallel - Contract data from BigQuery (synced from SF), plus targets
-    const [contracts, bqRenewals, renewalTargets] = await Promise.all([
-      queryContractsFromBigQuery(),
+    console.log('Renewals API called with filters:', filters, 'refresh:', forceRefresh, 'SF configured:', sfConfigured);
+
+    // Fetch contract data - use Salesforce directly if refresh requested and configured
+    let contracts: SalesforceContract[];
+    let dataSource: 'salesforce' | 'bigquery';
+
+    if (forceRefresh && sfConfigured) {
+      // Query Salesforce directly for real-time data
+      contracts = await queryContractsFromSalesforce();
+      dataSource = 'salesforce';
+
+      // If SF query fails, fall back to BigQuery
+      if (contracts.length === 0) {
+        console.log('Salesforce query returned no results, falling back to BigQuery');
+        contracts = await queryContractsFromBigQuery();
+        dataSource = 'bigquery';
+      }
+    } else {
+      // Use BigQuery (faster, but may be delayed)
+      contracts = await queryContractsFromBigQuery();
+      dataSource = 'bigquery';
+    }
+
+    // Fetch renewal opportunities and targets in parallel
+    const [bqRenewals, renewalTargets] = await Promise.all([
       getRenewalOpportunities(filters),
       getRenewalTargets(),
     ]);
 
     const sfAvailable = contracts.length > 0;
+    const isLiveData = dataSource === 'salesforce';
     console.log(`Contracts from BQ: ${contracts.length}, BQ Renewals: won=${bqRenewals.won.length}, lost=${bqRenewals.lost.length}, pipeline=${bqRenewals.pipeline.length}`);
     console.log('Renewal targets:', renewalTargets);
 
@@ -750,6 +909,8 @@ export async function GET(request: Request) {
       data: renewalsData,
       metadata: {
         sfAvailable,
+        isLiveData,
+        dataSource,
         contractCount: contracts.length,
         wonRenewalsCount: bqRenewals.won.length,
         lostRenewalsCount: bqRenewals.lost.length,

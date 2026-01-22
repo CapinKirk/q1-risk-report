@@ -336,6 +336,7 @@ function ReportContent() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [useLiveData, setUseLiveData] = useState(true); // Default to live mode
+  const [renewalsRefreshKey, setRenewalsRefreshKey] = useState(0); // Increment to force renewals refresh
   const [lastFetchTime, setLastFetchTime] = useState<string | null>(null);
 
   // Date range state - default to Q1 2026
@@ -395,6 +396,9 @@ function ReportContent() {
 
   // Handle manual data refresh
   const handleRefresh = async () => {
+    // Trigger renewals section to refresh from Salesforce directly
+    setRenewalsRefreshKey(prev => prev + 1);
+
     const liveData = await fetchLiveData(selectedProducts, selectedRegions, startDate, endDate);
     if (liveData) {
       const filtered = filterReportData(liveData, selectedRegions, selectedProducts, selectedCategories, selectedSources);
@@ -567,6 +571,7 @@ function ReportContent() {
       <RenewalsSection
         products={selectedProducts}
         regions={selectedRegions}
+        refreshKey={renewalsRefreshKey}
       />
 
       {/* Pipeline Milestone Attainment - MQL/SQL/SAL/SQO with Funnel Score */}

@@ -16,6 +16,7 @@ import { useSortableTable } from '@/lib/useSortableTable';
 interface RenewalsSectionProps {
   products: Product[];
   regions: Region[];
+  refreshKey?: number; // Increment to force re-fetch
 }
 
 // Product colors
@@ -31,11 +32,12 @@ const RAG_COLORS: Record<string, { bg: string; border: string; text: string }> =
   RED: { bg: '#fef2f2', border: '#dc2626', text: '#dc2626' },
 };
 
-export default function RenewalsSection({ products, regions }: RenewalsSectionProps) {
+export default function RenewalsSection({ products, regions, refreshKey = 0 }: RenewalsSectionProps) {
   const [renewalsData, setRenewalsData] = useState<RenewalsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'won' | 'pipeline' | 'upcoming' | 'atrisk' | 'missinguplift'>('won');
+  const [activeTab, setActiveTab] = useState<'won' | 'pipeline' | 'upcoming' | 'missinguplift'>('won');
+  const [dataSource, setDataSource] = useState<string>('');
 
   // Fetch renewals data
   useEffect(() => {
@@ -52,6 +54,11 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           params.set('regions', regions.join(','));
         }
 
+        // When refreshKey > 0, request live Salesforce data
+        if (refreshKey > 0) {
+          params.set('refresh', 'true');
+        }
+
         const response = await fetch(`/api/renewals?${params.toString()}`);
         const data = await response.json();
 
@@ -60,6 +67,7 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
         }
 
         setRenewalsData(data.data);
+        setDataSource(data.metadata?.dataSource || 'bigquery');
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -68,7 +76,7 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
     };
 
     fetchRenewals();
-  }, [products, regions]);
+  }, [products, regions, refreshKey]);
 
   // Calculate RAG from attainment
   const getRAG = (attainmentPct: number): 'GREEN' | 'YELLOW' | 'RED' => {
@@ -170,7 +178,7 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
     return opps.filter(o => selectedRegions.includes(o.region));
   };
 
-  const getFilteredContracts = (type: 'upcoming' | 'atrisk' | 'missinguplift'): SalesforceContract[] => {
+  const getFilteredContracts = (type: 'upcoming' | 'missinguplift'): SalesforceContract[] => {
     if (!renewalsData) return [];
 
     const selectedProducts = products.length > 0 ? products : ['POR', 'R360'] as Product[];
@@ -181,8 +189,6 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
       let data: SalesforceContract[];
       if (type === 'upcoming') {
         data = renewalsData.upcomingContracts[p];
-      } else if (type === 'atrisk') {
-        data = renewalsData.atRiskContracts[p];
       } else {
         data = renewalsData.missingUpliftContracts?.[p] || [];
       }
@@ -206,7 +212,6 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
   const wonOpps = getFilteredOpps('won');
   const pipelineOpps = getFilteredOpps('pipeline');
   const upcomingContracts = getFilteredContracts('upcoming');
-  const atRiskContracts = getFilteredContracts('atrisk');
   const missingUpliftContractsData = getFilteredContracts('missinguplift');
 
   // Sorting hooks for each table
@@ -247,24 +252,6 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
   const contractsTableUpcoming = useSortableTable(
     upcomingContracts,
     upcomingContracts,
-    (item: SalesforceContract, column: string) => {
-      switch (column) {
-        case 'ContractNumber': return item.ContractNumber;
-        case 'AccountName': return item.AccountName;
-        case 'Product': return item.Product;
-        case 'Region': return item.Region;
-        case 'EndDate': return item.EndDate;
-        case 'DaysUntilRenewal': return item.DaysUntilRenewal;
-        case 'AutoRenewal': return item.AutoRenewal;
-        case 'IsAtRisk': return item.IsAtRisk;
-        default: return '';
-      }
-    }
-  );
-
-  const contractsTableAtRisk = useSortableTable(
-    atRiskContracts,
-    atRiskContracts,
     (item: SalesforceContract, column: string) => {
       switch (column) {
         case 'ContractNumber': return item.ContractNumber;
@@ -468,11 +455,6 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           <div className="kpi-value">{safeSummary.upcomingRenewals30}</div>
           <div className="kpi-sub">{formatCurrency(safeSummary.upcomingRenewals30ACV)} ACV</div>
         </div>
-        <div className="kpi-card red card-danger">
-          <div className="kpi-label">At-Risk Contracts</div>
-          <div className="kpi-value">{safeSummary.atRiskCount}</div>
-          <div className="kpi-sub">{formatCurrency(safeSummary.atRiskACV)} at risk</div>
-        </div>
         <div className="kpi-card gray card-danger">
           <div className="kpi-label">Lost Renewals</div>
           <div className="kpi-value">{formatCurrency(safeSummary.lostRenewalACV)}</div>
@@ -526,12 +508,6 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           onClick={() => setActiveTab('upcoming')}
         >
           Upcoming ({safeSummary.upcomingRenewals90})
-        </button>
-        <button
-          className={`tab ${activeTab === 'atrisk' ? 'active' : ''}`}
-          onClick={() => setActiveTab('atrisk')}
-        >
-          At Risk ({safeSummary.atRiskCount})
         </button>
         {filteredMissingUpliftCount > 0 && (
           <button
@@ -630,62 +606,62 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
           </table>
         )}
 
-        {(activeTab === 'upcoming' || activeTab === 'atrisk') && (
+        {activeTab === 'upcoming' && (
           <table className="renewals-table">
             <thead>
               <tr>
                 <SortableHeader
                   label="Contract"
                   column="ContractNumber"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('ContractNumber') : contractsTableAtRisk.getSortDirection('ContractNumber')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
+                  sortDirection={contractsTableUpcoming.getSortDirection('ContractNumber')}
+                  onSort={contractsTableUpcoming.handleSort}
                 />
                 <SortableHeader
                   label="Account"
                   column="AccountName"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('AccountName') : contractsTableAtRisk.getSortDirection('AccountName')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
+                  sortDirection={contractsTableUpcoming.getSortDirection('AccountName')}
+                  onSort={contractsTableUpcoming.handleSort}
                 />
                 <SortableHeader
                   label="Product"
                   column="Product"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('Product') : contractsTableAtRisk.getSortDirection('Product')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
+                  sortDirection={contractsTableUpcoming.getSortDirection('Product')}
+                  onSort={contractsTableUpcoming.handleSort}
                 />
                 <SortableHeader
                   label="Region"
                   column="Region"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('Region') : contractsTableAtRisk.getSortDirection('Region')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
+                  sortDirection={contractsTableUpcoming.getSortDirection('Region')}
+                  onSort={contractsTableUpcoming.handleSort}
                 />
                 <SortableHeader
                   label="End Date"
                   column="EndDate"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('EndDate') : contractsTableAtRisk.getSortDirection('EndDate')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
+                  sortDirection={contractsTableUpcoming.getSortDirection('EndDate')}
+                  onSort={contractsTableUpcoming.handleSort}
                 />
                 <SortableHeader
                   label="Days Until"
                   column="DaysUntilRenewal"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('DaysUntilRenewal') : contractsTableAtRisk.getSortDirection('DaysUntilRenewal')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
+                  sortDirection={contractsTableUpcoming.getSortDirection('DaysUntilRenewal')}
+                  onSort={contractsTableUpcoming.handleSort}
                 />
                 <SortableHeader
                   label="Auto-Renew"
                   column="AutoRenewal"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('AutoRenewal') : contractsTableAtRisk.getSortDirection('AutoRenewal')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
+                  sortDirection={contractsTableUpcoming.getSortDirection('AutoRenewal')}
+                  onSort={contractsTableUpcoming.handleSort}
                 />
                 <SortableHeader
                   label="Status"
                   column="IsAtRisk"
-                  sortDirection={activeTab === 'upcoming' ? contractsTableUpcoming.getSortDirection('IsAtRisk') : contractsTableAtRisk.getSortDirection('IsAtRisk')}
-                  onSort={activeTab === 'upcoming' ? contractsTableUpcoming.handleSort : contractsTableAtRisk.handleSort}
+                  sortDirection={contractsTableUpcoming.getSortDirection('IsAtRisk')}
+                  onSort={contractsTableUpcoming.handleSort}
                 />
               </tr>
             </thead>
             <tbody>
-              {(activeTab === 'upcoming' ? contractsTableUpcoming.sortedData : contractsTableAtRisk.sortedData).slice(0, 20).map((contract, i) => (
+              {contractsTableUpcoming.sortedData.slice(0, 20).map((contract, i) => (
                 <tr key={i}>
                   <td>
                     <a
@@ -725,11 +701,11 @@ export default function RenewalsSection({ products, regions }: RenewalsSectionPr
                   </td>
                 </tr>
               ))}
-              {(activeTab === 'upcoming' ? contractsTableUpcoming.sortedData : contractsTableAtRisk.sortedData).length === 0 && (
+              {contractsTableUpcoming.sortedData.length === 0 && (
                 <tr>
                   <td colSpan={8} className="empty-row">
                     {safeData.sfAvailable
-                      ? `No ${activeTab === 'upcoming' ? 'upcoming' : 'at-risk'} contracts found`
+                      ? 'No upcoming contracts found'
                       : 'Salesforce data unavailable - showing BigQuery data only'}
                   </td>
                 </tr>
