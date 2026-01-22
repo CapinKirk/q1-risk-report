@@ -74,10 +74,12 @@ export interface RenewalSummary {
   upcomingRenewals90ACV: number;
   wonRenewalCount: number;
   wonRenewalACV: number;
+  wonRenewalUplift: number;       // UPLIFT from won renewals (actual incremental bookings)
   lostRenewalCount: number;
   lostRenewalACV: number;
   pipelineRenewalCount: number;
   pipelineRenewalACV: number;
+  pipelineRenewalUplift: number;  // UPLIFT from pipeline renewals (expected incremental)
   // Renewal Risk Calculation: (Expected Renewal ACV with uplift) vs Target
   expectedRenewalACV: number;       // Upcoming ACV with 5% uplift applied
   expectedRenewalACVWithUplift: number; // Same but explicitly named
@@ -87,7 +89,7 @@ export interface RenewalSummary {
   q1Target: number;                 // Full Q1 renewal bookings target (P75)
   qtdTarget: number;                // Same as q1Target for renewals (no prorating)
   qtdAttainmentPct: number;         // (Won renewals + Expected uplift) / Q1 Target * 100
-  forecastedBookings: number;       // Won ACV + Expected uplift from upcoming contracts
+  forecastedBookings: number;       // Won UPLIFT + Expected Q1 uplift from upcoming contracts
   ragStatus: RAGStatus;             // GREEN/YELLOW/RED based on Q1 attainment
   // NEW: Missing uplift tracking
   missingUpliftCount: number;       // Contracts with ACV > 0 but UpliftAmount = 0

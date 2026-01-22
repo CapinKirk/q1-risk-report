@@ -35,10 +35,12 @@ function getEmptySummary(): RenewalSummary {
     upcomingRenewals90ACV: 0,
     wonRenewalCount: 0,
     wonRenewalACV: 0,
+    wonRenewalUplift: 0,
     lostRenewalCount: 0,
     lostRenewalACV: 0,
     pipelineRenewalCount: 0,
     pipelineRenewalACV: 0,
+    pipelineRenewalUplift: 0,
     expectedRenewalACV: 0,
     expectedRenewalACVWithUplift: 0,
     renewalRiskGap: 0,
@@ -671,9 +673,13 @@ function calculateRenewalSummary(
 
   // QTD target equals Q1 target for renewal forecast (we track against full quarter)
   const effectiveQtdTarget = effectiveQ1Target;
+  // Contract values (prior ACV) - for display only
   const wonRenewalACV = wonOpps.reduce((sum, o) => sum + (o.acv || 0), 0);
   const lostRenewalACV = lostOpps.reduce((sum, o) => sum + (o.acv || 0), 0);
   const pipelineRenewalACV = pipelineOpps.reduce((sum, o) => sum + (o.acv || 0), 0);
+  // CRITICAL: Uplift values - this is what counts for BOOKINGS
+  const wonRenewalUplift = wonOpps.reduce((sum, o) => sum + (o.uplift_amount || 0), 0);
+  const pipelineRenewalUplift = pipelineOpps.reduce((sum, o) => sum + (o.uplift_amount || 0), 0);
 
   const autoRenewalContracts = contracts.filter(c => c.AutoRenewal);
   const manualRenewalContracts = contracts.filter(c => !c.AutoRenewal);
@@ -718,9 +724,10 @@ function calculateRenewalSummary(
   // This is the actual new revenue expected to book in Q1
   const expectedUpliftBookings = q1ExpectedUplift;
 
-  // FORECASTED BOOKINGS = Won renewal ACV + expected Q1 uplift from upcoming contracts
+  // FORECASTED BOOKINGS = Won renewal UPLIFT + expected Q1 uplift from upcoming contracts
+  // CRITICAL: Use uplift (incremental revenue), not full contract ACV!
   // This is what we compare against Q1 target for RAG status
-  const forecastedBookings = wonRenewalACV + expectedUpliftBookings;
+  const forecastedBookings = wonRenewalUplift + expectedUpliftBookings;
 
   // Risk gap: Expected uplift bookings vs any lost renewal value
   // Positive = ahead of plan, Negative = behind
@@ -742,7 +749,7 @@ function calculateRenewalSummary(
 
   const ragStatus = calculateRAG(qtdAttainmentPct);
 
-  console.log(`Renewal Forecast (P75): Won=${wonRenewalACV}, Q1 Uplift=${q1ExpectedUplift}, Total Forecast=${forecastedBookings}, Q1 Target=${effectiveQ1Target}, Attainment=${qtdAttainmentPct}%, RAG=${ragStatus}`);
+  console.log(`Renewal Forecast (P75): Won Uplift=${wonRenewalUplift}, Q1 Expected Uplift=${q1ExpectedUplift}, Total Forecast=${forecastedBookings}, Q1 Target=${effectiveQ1Target}, Attainment=${qtdAttainmentPct}%, RAG=${ragStatus}`);
 
   // Track contracts with ACV but missing uplift - these are revenue leakage!
   // CRITICAL: Use passed-in list if provided to ensure 100% consistency with response
@@ -770,10 +777,12 @@ function calculateRenewalSummary(
     upcomingRenewals90ACV: upcoming90ACV,
     wonRenewalCount: wonOpps.length,
     wonRenewalACV,
+    wonRenewalUplift,
     lostRenewalCount: lostOpps.length,
     lostRenewalACV,
     pipelineRenewalCount: pipelineOpps.length,
     pipelineRenewalACV,
+    pipelineRenewalUplift,
     expectedRenewalACV,
     expectedRenewalACVWithUplift,
     renewalRiskGap,

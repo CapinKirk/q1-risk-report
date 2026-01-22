@@ -123,10 +123,12 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
       upcomingRenewals90ACV: summaries.reduce((sum, s) => sum + s.upcomingRenewals90ACV, 0),
       wonRenewalCount: summaries.reduce((sum, s) => sum + s.wonRenewalCount, 0),
       wonRenewalACV: summaries.reduce((sum, s) => sum + s.wonRenewalACV, 0),
+      wonRenewalUplift: summaries.reduce((sum, s) => sum + (s.wonRenewalUplift || 0), 0),
       lostRenewalCount: summaries.reduce((sum, s) => sum + s.lostRenewalCount, 0),
       lostRenewalACV: summaries.reduce((sum, s) => sum + s.lostRenewalACV, 0),
       pipelineRenewalCount: summaries.reduce((sum, s) => sum + s.pipelineRenewalCount, 0),
       pipelineRenewalACV: summaries.reduce((sum, s) => sum + s.pipelineRenewalACV, 0),
+      pipelineRenewalUplift: summaries.reduce((sum, s) => sum + (s.pipelineRenewalUplift || 0), 0),
       expectedRenewalACV: summaries.reduce((sum, s) => sum + (s.expectedRenewalACV || 0), 0),
       expectedRenewalACVWithUplift: summaries.reduce((sum, s) => sum + (s.expectedRenewalACVWithUplift || 0), 0),
       renewalRiskGap: summaries.reduce((sum, s) => sum + (s.renewalRiskGap || 0), 0),
@@ -336,8 +338,10 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
   const safeSummary = summary || {
     wonRenewalCount: 0,
     wonRenewalACV: 0,
+    wonRenewalUplift: 0,
     pipelineRenewalCount: 0,
     pipelineRenewalACV: 0,
+    pipelineRenewalUplift: 0,
     avgUpliftPct: 0,
     totalUpliftAmount: 0,
     upcomingRenewals30: 0,
@@ -407,7 +411,7 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
               {formatCurrency(safeSummary.forecastedBookings || 0)}
             </span>
             <span className="metric-sub">
-              Won ({formatCurrency(safeSummary.wonRenewalACV || 0)}) + Q1 Uplift ({formatCurrency(safeSummary.totalUpliftAmount || 0)})
+              Won Uplift ({formatCurrency(safeSummary.wonRenewalUplift || 0)}) + Q1 Uplift ({formatCurrency(safeSummary.totalUpliftAmount || 0)})
             </span>
           </div>
           <div className="forecast-metric">
@@ -439,13 +443,13 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
       <div className="kpi-grid">
         <div className="kpi-card green card-success">
           <div className="kpi-label">Won Renewals (QTD)</div>
-          <div className="kpi-value">{formatCurrency(safeSummary.wonRenewalACV)}</div>
-          <div className="kpi-sub">{safeSummary.wonRenewalCount} deals</div>
+          <div className="kpi-value">{formatCurrency(safeSummary.wonRenewalUplift || 0)}</div>
+          <div className="kpi-sub">{safeSummary.wonRenewalCount} deals ({formatCurrency(safeSummary.wonRenewalACV)} prior ACV)</div>
         </div>
         <div className="kpi-card blue card-info">
           <div className="kpi-label">Pipeline Renewals</div>
-          <div className="kpi-value">{formatCurrency(safeSummary.pipelineRenewalACV)}</div>
-          <div className="kpi-sub">{safeSummary.pipelineRenewalCount} deals</div>
+          <div className="kpi-value">{formatCurrency(safeSummary.pipelineRenewalUplift || 0)}</div>
+          <div className="kpi-sub">{safeSummary.pipelineRenewalCount} deals ({formatCurrency(safeSummary.pipelineRenewalACV)} prior ACV)</div>
         </div>
         <div className="kpi-card purple">
           <div className="kpi-label">Avg Uplift</div>
