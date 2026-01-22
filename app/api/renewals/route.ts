@@ -107,9 +107,9 @@ function calculateRAG(attainmentPct: number): 'GREEN' | 'YELLOW' | 'RED' {
   return 'RED';
 }
 
-// Query renewal targets from RAW_2026_Plan_by_Month (Q1_Plan_2026 = 2026 target)
-// RATIONALE: Use 2026 plan targets, with Q1_Actual_2025 as fallback for products without 2026 plan
-// This matches the report-data route's renewal target calculation
+// Query renewal targets from RevOpsReport (Layer 5 - PRIMARY SOURCE)
+// RATIONALE: RevOpsReport is the single source of truth for all bookings targets
+// Use P75 risk profile and QTD horizon for Q1 targets
 async function getRenewalTargets(): Promise<RenewalTargets> {
   const emptyRegionalTargets: Record<Region, RegionalTargets> = {
     AMER: { q1Target: 0, qtdActual: 0, attainmentPct: 0 },
@@ -120,16 +120,18 @@ async function getRenewalTargets(): Promise<RenewalTargets> {
   try {
     const bigquery = getBigQueryClient();
 
-    // Query RAW_2026_Plan_by_Month for renewal targets
-    // Use Q1_Plan_2026 as primary, Q1_Actual_2025 as fallback (for products without 2026 plan)
-    // Division format: "AMER POR", "EMEA POR", "APAC POR", "AMER R360"
+    // Query RevOpsReport for renewal targets (P75 risk profile)
+    // This is the official source of truth for all bookings targets
     const query = `
       SELECT
-        Division,
-        Booking_Type,
-        ROUND(COALESCE(Q1_Plan_2026, Q1_Actual_2025, 0), 2) AS q1_target
-      FROM \`data-analytics-306119.Staging.RAW_2026_Plan_by_Month\`
-      WHERE LOWER(Booking_Type) = 'renewal'
+        RecordType AS product,
+        Region AS region,
+        ROUND(Target_ACV, 2) AS q1_target
+      FROM \`data-analytics-306119.Staging.RevOpsReport\`
+      WHERE RiskProfile = 'P75'
+        AND Horizon = 'QTD'
+        AND OpportunityType = 'Renewal'
+        AND Period_Start_Date = '2026-01-01'
     `;
 
     const [rows] = await bigquery.query({ query });
@@ -146,24 +148,13 @@ async function getRenewalTargets(): Promise<RenewalTargets> {
       },
     };
 
-    // Process rows and aggregate by product/region
-    // Division format: "AMER POR", "EMEA POR", "APAC POR", "AMER R360"
+    // Process rows from RevOpsReport
     for (const row of rows as any[]) {
-      const division = (row.Division || '').toUpperCase();
+      const product = row.product as Product;
+      const region = row.region as Region;
       const q1Target = row.q1_target || 0;
 
-      // Parse Division to extract region and product
-      let region: Region | null = null;
-      let product: Product | null = null;
-
-      if (division.includes('AMER')) region = 'AMER';
-      else if (division.includes('EMEA')) region = 'EMEA';
-      else if (division.includes('APAC')) region = 'APAC';
-
-      if (division.includes('R360')) product = 'R360';
-      else if (division.includes('POR')) product = 'POR';
-
-      if (product && region) {
+      if (product && region && (product === 'POR' || product === 'R360')) {
         // Store regional targets
         targets[product].byRegion[region] = {
           q1Target: q1Target,
@@ -178,10 +169,10 @@ async function getRenewalTargets(): Promise<RenewalTargets> {
       }
     }
 
-    console.log('Renewal targets (Q1_Plan_2026 from RAW_2026_Plan_by_Month):', JSON.stringify(targets, null, 2));
+    console.log('Renewal targets (P75 from RevOpsReport):', JSON.stringify(targets, null, 2));
     return targets;
   } catch (error: any) {
-    console.error('Failed to fetch renewal targets from RAW_2026_Plan_by_Month:', error.message);
+    console.error('Failed to fetch renewal targets from RevOpsReport:', error.message);
     return {
       POR: {
         total: { q1Target: 0, qtdTarget: 0 },

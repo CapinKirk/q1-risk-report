@@ -36,40 +36,31 @@ function getBigQuery() {
 }
 
 /**
- * Get renewal targets from RAW_2026_Plan_by_Month
- * Uses Q1_Plan_2026 as primary target, falling back to Q1_Actual_2025 for POR regions
- * R360 renewal targets must use Q1_Plan_2026 since R360 had no renewal revenue in 2025
+ * Get renewal targets from RevOpsReport (Layer 5 - PRIMARY SOURCE)
+ * Uses P75 risk profile and QTD horizon for Q1 targets
+ * This is the single source of truth for all bookings targets
  */
 async function getRenewalTargetsFromRawPlan(): Promise<Map<string, number>> {
   try {
     const query = `
       SELECT
-        Division,
-        Booking_Type,
-        -- Use Q1_Plan_2026 as primary target; Q1_Actual_2025 may be 0 for new products like R360
-        ROUND(COALESCE(Q1_Plan_2026, Q1_Actual_2025, 0), 2) AS q1_target
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RAW_2026_Plan_by_Month\`
-      WHERE LOWER(Booking_Type) = 'renewal'
+        RecordType AS product,
+        Region AS region,
+        ROUND(Target_ACV, 2) AS q1_target
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsReport\`
+      WHERE RiskProfile = 'P75'
+        AND Horizon = 'QTD'
+        AND OpportunityType = 'Renewal'
+        AND Period_Start_Date = '2026-01-01'
     `;
 
     const [rows] = await getBigQuery().query({ query });
     const renewalTargetMap = new Map<string, number>();
 
-    // Division format: "AMER POR", "EMEA POR", "APAC POR", "AMER R360"
     for (const row of rows as any[]) {
-      const division = (row.Division || '').toUpperCase();
+      const product = row.product;
+      const region = row.region;
       const q1Target = parseFloat(row.q1_target) || 0;
-
-      // Parse Division to extract region and product
-      let region: string | null = null;
-      let product: string | null = null;
-
-      if (division.includes('AMER')) region = 'AMER';
-      else if (division.includes('EMEA')) region = 'EMEA';
-      else if (division.includes('APAC')) region = 'APAC';
-
-      if (division.includes('R360')) product = 'R360';
-      else if (division.includes('POR')) product = 'POR';
 
       if (product && region) {
         const key = `${product}-${region}-RENEWAL`;
@@ -77,10 +68,10 @@ async function getRenewalTargetsFromRawPlan(): Promise<Map<string, number>> {
       }
     }
 
-    console.log('Renewal targets from RAW_2026_Plan_by_Month (Q1_Actual_2025):', Object.fromEntries(renewalTargetMap));
+    console.log('Renewal targets from RevOpsReport (P75):', Object.fromEntries(renewalTargetMap));
     return renewalTargetMap;
   } catch (error: any) {
-    console.error('Failed to fetch renewal targets from RAW_2026_Plan_by_Month:', error.message);
+    console.error('Failed to fetch renewal targets from RevOpsReport:', error.message);
     return new Map();
   }
 }
@@ -2535,8 +2526,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // CRITICAL: Override RENEWAL targets with Q1_Actual_2025 from RAW_2026_Plan_by_Month
-    // Renewal targets use prior year actuals as the baseline, not planned targets
+    // CRITICAL: Ensure RENEWAL targets are present from RevOpsReport (P75)
+    // This ensures renewal targets are included even if RevOpsReport main query missed them
     for (const [key, correctTarget] of Array.from(renewalTargetsMap.entries())) {
       if (revOpsTargetMap.has(key)) {
         const existingRow = revOpsTargetMap.get(key);
