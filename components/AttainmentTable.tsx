@@ -43,6 +43,7 @@ function ProductAttainmentTable({
       case 'category': return row.category;
       case 'fy_target': return (row as any).fy_target || 0;
       case 'q1_target': return row.q1_target || 0;
+      case 'qtd_target': return row.qtd_target || 0;
       case 'qtd_acv': return row.qtd_acv || 0;
       case 'qtd_attainment_pct': return row.qtd_attainment_pct || 0;
       case 'fy_progress_pct': return (row as any).fy_progress_pct || 0;
@@ -71,6 +72,7 @@ function ProductAttainmentTable({
               <SortableHeader label="Cat" column="category" sortDirection={getSortDirection('category')} onSort={handleSort} />
               <SortableHeader label="FY Tgt" column="fy_target" sortDirection={getSortDirection('fy_target')} onSort={handleSort} className="right" />
               <SortableHeader label="Q1 Tgt" column="q1_target" sortDirection={getSortDirection('q1_target')} onSort={handleSort} className="right" />
+              <SortableHeader label="QTD Tgt" column="qtd_target" sortDirection={getSortDirection('qtd_target')} onSort={handleSort} className="right" />
               <SortableHeader label="QTD Act" column="qtd_acv" sortDirection={getSortDirection('qtd_acv')} onSort={handleSort} className="right" />
               <SortableHeader label="QTD Att" column="qtd_attainment_pct" sortDirection={getSortDirection('qtd_attainment_pct')} onSort={handleSort} className="right" />
               <SortableHeader label="QTD Var" column="qtd_gap" sortDirection={getSortDirection('qtd_gap')} onSort={handleSort} className="right" />
@@ -99,6 +101,7 @@ function ProductAttainmentTable({
                   <td>{row.category}</td>
                   <td className="right">{formatCurrency(fyTarget)}</td>
                   <td className="right">{formatCurrency(row.q1_target)}</td>
+                  <td className="right">{formatCurrency(row.qtd_target)}</td>
                   <td
                     className={`right ${hasDeals ? 'clickable' : ''}`}
                     onClick={() => hasDeals && onCellClick('won', row)}
