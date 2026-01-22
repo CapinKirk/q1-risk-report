@@ -480,10 +480,10 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
     }
 
     // Query for closed renewals (Q1 2026)
-    // Join to Contract via SBQQ__RenewedContract__c to get prior ACV and calculate uplift
-    // Renewal Opportunity ACV = new contract value (including uplift)
-    // Prior ACV = original contract value before renewal
-    // Uplift = ACV - Prior ACV (the increase)
+    // NOTE: Renewal Opportunity ACV field actually contains the UPLIFT amount (not full ACV)
+    // Join to Contract via Contract.SBQQ__RenewalOpportunity__c to get prior ACV
+    // Prior ACV = original contract value before renewal (from Contract.ACV__c)
+    // Uplift = Opportunity.ACV (already the uplift amount in SF)
     const closedQuery = `
       SELECT
         o.Id AS opportunity_id,
@@ -496,7 +496,8 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
           WHEN 'UK' THEN 'EMEA'
           WHEN 'AU' THEN 'APAC'
         END AS region,
-        ROUND(COALESCE(o.ACV, 0), 2) AS acv,
+        -- Prior ACV from contract (converted to USD) - this is the base contract value
+        ROUND(COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) AS acv,
         CAST(o.CloseDate AS STRING) AS close_date,
         o.StageName AS stage,
         o.Won AS is_won,
@@ -505,13 +506,13 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
         o.Owner AS owner_name,
         CONCAT('https://por.my.salesforce.com/', o.Id) AS salesforce_url,
         COALESCE(c.Id, '') AS contract_id,
-        -- Prior ACV from renewed contract (converted to USD)
+        -- Prior ACV (same as acv for display consistency)
         ROUND(COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) AS prior_acv,
-        -- Uplift = new ACV - prior ACV
-        ROUND(COALESCE(o.ACV, 0) - (COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1)), 2) AS uplift_amount
+        -- Uplift = the Opportunity.ACV (which IS the uplift in SF)
+        ROUND(COALESCE(o.ACV, 0), 2) AS uplift_amount
       FROM \`data-analytics-306119.sfdc.OpportunityViewTable\` o
       LEFT JOIN \`data-analytics-306119.sfdc.Contract\` c
-        ON o.sbqq__renewedcontract__c = c.Id
+        ON c.sbqq__renewalopportunity__c = o.Id
       LEFT JOIN \`data-analytics-306119.sfdc.CurrencyType\` ct
         ON LOWER(c.currencyisocode) = LOWER(ct.isocode)
       WHERE o.Type = 'Renewal'
@@ -527,7 +528,7 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
     `;
 
     // Query for pipeline renewals (open, close date in Q1 2026)
-    // Same join logic to get prior ACV and uplift
+    // Same join logic - Contract links TO Opportunity via SBQQ__RenewalOpportunity__c
     const pipelineQuery = `
       SELECT
         o.Id AS opportunity_id,
@@ -540,7 +541,8 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
           WHEN 'UK' THEN 'EMEA'
           WHEN 'AU' THEN 'APAC'
         END AS region,
-        ROUND(COALESCE(o.ACV, 0), 2) AS acv,
+        -- Prior ACV from contract (converted to USD) - this is the base contract value
+        ROUND(COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) AS acv,
         CAST(o.CloseDate AS STRING) AS close_date,
         o.StageName AS stage,
         o.Won AS is_won,
@@ -549,13 +551,13 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
         o.Owner AS owner_name,
         CONCAT('https://por.my.salesforce.com/', o.Id) AS salesforce_url,
         COALESCE(c.Id, '') AS contract_id,
-        -- Prior ACV from renewed contract (converted to USD)
+        -- Prior ACV (same as acv for display consistency)
         ROUND(COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) AS prior_acv,
-        -- Uplift = new ACV - prior ACV
-        ROUND(COALESCE(o.ACV, 0) - (COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1)), 2) AS uplift_amount
+        -- Uplift = the Opportunity.ACV (which IS the uplift in SF)
+        ROUND(COALESCE(o.ACV, 0), 2) AS uplift_amount
       FROM \`data-analytics-306119.sfdc.OpportunityViewTable\` o
       LEFT JOIN \`data-analytics-306119.sfdc.Contract\` c
-        ON o.sbqq__renewedcontract__c = c.Id
+        ON c.sbqq__renewalopportunity__c = o.Id
       LEFT JOIN \`data-analytics-306119.sfdc.CurrencyType\` ct
         ON LOWER(c.currencyisocode) = LOWER(ct.isocode)
       WHERE o.Type = 'Renewal'
