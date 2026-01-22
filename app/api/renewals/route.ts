@@ -479,7 +479,7 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
       regionClause = `AND Division IN (${divisions})`;
     }
 
-    // Query for closed renewals (Q1 2026)
+    // Query for closed renewals (Q1 2026) - Updated 2026-01-22
     // NOTE: Renewal Opportunity ACV field actually contains the UPLIFT amount (not full ACV)
     // Join to Contract via Contract.SBQQ__RenewalOpportunity__c to get prior ACV
     // Prior ACV = original contract value before renewal (from Contract.ACV__c)
