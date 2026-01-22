@@ -224,7 +224,7 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
         case 'product': return item.product;
         case 'region': return item.region;
         case 'acv': return item.acv;
-        case 'uplift_amount': return item.uplift_amount || 0;
+        case 'stage': return item.stage || '';
         case 'close_date': return item.close_date;
         case 'owner_name': return item.owner_name;
         default: return '';
@@ -241,7 +241,7 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
         case 'product': return item.product;
         case 'region': return item.region;
         case 'acv': return item.acv;
-        case 'uplift_amount': return item.uplift_amount || 0;
+        case 'stage': return item.stage || '';
         case 'close_date': return item.close_date;
         case 'owner_name': return item.owner_name;
         default: return '';
@@ -544,15 +544,15 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
                   onSort={activeTab === 'won' ? renewalsTableWon.handleSort : renewalsTablePipeline.handleSort}
                 />
                 <SortableHeader
-                  label="ACV"
+                  label="Opp Value"
                   column="acv"
                   sortDirection={activeTab === 'won' ? renewalsTableWon.getSortDirection('acv') : renewalsTablePipeline.getSortDirection('acv')}
                   onSort={activeTab === 'won' ? renewalsTableWon.handleSort : renewalsTablePipeline.handleSort}
                 />
                 <SortableHeader
-                  label="Uplift"
-                  column="uplift_amount"
-                  sortDirection={activeTab === 'won' ? renewalsTableWon.getSortDirection('uplift_amount') : renewalsTablePipeline.getSortDirection('uplift_amount')}
+                  label="Stage"
+                  column="stage"
+                  sortDirection={activeTab === 'won' ? renewalsTableWon.getSortDirection('stage') : renewalsTablePipeline.getSortDirection('stage')}
                   onSort={activeTab === 'won' ? renewalsTableWon.handleSort : renewalsTablePipeline.handleSort}
                 />
                 <SortableHeader
@@ -590,9 +590,7 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
                   </td>
                   <td>{opp.region}</td>
                   <td className="money">{formatCurrency(opp.acv)}</td>
-                  <td className={`money ${(opp.uplift_amount || 0) > 0 ? 'positive' : ''}`}>
-                    {formatCurrency(opp.uplift_amount || 0)}
-                  </td>
+                  <td>{opp.stage || '-'}</td>
                   <td>{new Date(opp.close_date).toLocaleDateString()}</td>
                   <td>{opp.owner_name}</td>
                 </tr>
