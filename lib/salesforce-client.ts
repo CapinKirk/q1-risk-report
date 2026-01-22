@@ -1,30 +1,104 @@
 /**
  * Salesforce Client for Real-time Data Queries
  *
- * Supports two authentication methods:
- * 1. Username-Password Flow (simpler, requires SALESFORCE_USERNAME, SALESFORCE_PASSWORD, SALESFORCE_SECURITY_TOKEN)
- * 2. JWT Bearer Flow (more secure, requires SALESFORCE_CLIENT_ID, SALESFORCE_PRIVATE_KEY, SALESFORCE_USERNAME)
+ * Supports three methods (in order of preference):
+ * 1. SF CLI (if available) - Uses existing `sf` CLI authentication
+ * 2. Username-Password Flow - Requires SALESFORCE_USERNAME, SALESFORCE_PASSWORD, SALESFORCE_SECURITY_TOKEN
+ * 3. JWT Bearer Flow - Requires SALESFORCE_CLIENT_ID, SALESFORCE_PRIVATE_KEY, SALESFORCE_USERNAME
  *
- * Environment Variables Required:
- * - SALESFORCE_LOGIN_URL (default: https://login.salesforce.com)
+ * Environment Variables (optional if SF CLI is configured):
+ * - SALESFORCE_LOGIN_URL (default: https://por.my.salesforce.com)
  * - SALESFORCE_USERNAME
  * - SALESFORCE_PASSWORD (for username-password flow)
  * - SALESFORCE_SECURITY_TOKEN (for username-password flow)
  * - SALESFORCE_CLIENT_ID (for JWT flow)
  * - SALESFORCE_PRIVATE_KEY (for JWT flow, base64 encoded)
+ * - SALESFORCE_TARGET_ORG (default: por-prod) - for SF CLI
  */
 
 import jsforce, { Connection } from 'jsforce';
+import { execSync } from 'child_process';
 
 // Singleton connection instance
 let connectionInstance: Connection | null = null;
 let connectionExpiry: number = 0;
 
+// Cache SF CLI availability check
+let sfCliAvailable: boolean | null = null;
+
 // Connection timeout (tokens typically last 2 hours, refresh after 1.5)
 const CONNECTION_TTL_MS = 90 * 60 * 1000; // 90 minutes
 
 /**
- * Get or create a Salesforce connection
+ * Check if SF CLI is available and authenticated
+ */
+export function isSfCliAvailable(): boolean {
+  if (sfCliAvailable !== null) {
+    return sfCliAvailable;
+  }
+
+  try {
+    const targetOrg = process.env.SALESFORCE_TARGET_ORG || 'por-prod';
+    // Check if sf CLI is installed and can reach the org
+    execSync(`sf org display --target-org ${targetOrg} --json`, {
+      encoding: 'utf-8',
+      timeout: 10000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    sfCliAvailable = true;
+    console.log('Salesforce: SF CLI available with org', targetOrg);
+    return true;
+  } catch {
+    sfCliAvailable = false;
+    console.log('Salesforce: SF CLI not available, will use API credentials');
+    return false;
+  }
+}
+
+/**
+ * Execute a SOQL query using SF CLI
+ */
+export function executeSoqlViaCLI<T = any>(soql: string): T[] {
+  const targetOrg = process.env.SALESFORCE_TARGET_ORG || 'por-prod';
+
+  try {
+    // Escape the SOQL query for shell
+    const escapedSoql = soql.replace(/"/g, '\\"');
+
+    const result = execSync(
+      `sf data query --target-org ${targetOrg} --query "${escapedSoql}" --json`,
+      {
+        encoding: 'utf-8',
+        timeout: 60000, // 60 second timeout for queries
+        maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large result sets
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }
+    );
+
+    const parsed = JSON.parse(result);
+
+    if (parsed.status !== 0) {
+      throw new Error(parsed.message || 'SF CLI query failed');
+    }
+
+    return (parsed.result?.records || []) as T[];
+  } catch (error: any) {
+    // Parse error message from CLI output if available
+    if (error.stdout) {
+      try {
+        const errorOutput = JSON.parse(error.stdout);
+        throw new Error(errorOutput.message || error.message);
+      } catch {
+        // Fall through to original error
+      }
+    }
+    console.error('SF CLI query error:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get or create a Salesforce connection (for API-based queries)
  */
 export async function getSalesforceConnection(): Promise<Connection> {
   const now = Date.now();
@@ -90,8 +164,15 @@ export async function getSalesforceConnection(): Promise<Connection> {
 
 /**
  * Execute a SOQL query against Salesforce
+ * Tries SF CLI first, falls back to API if not available
  */
 export async function executeSoqlQuery<T = any>(soql: string): Promise<T[]> {
+  // Try SF CLI first (preferred for local development)
+  if (isSfCliAvailable()) {
+    return executeSoqlViaCLI<T>(soql);
+  }
+
+  // Fall back to API-based query
   const conn = await getSalesforceConnection();
 
   try {
@@ -114,9 +195,15 @@ export async function executeSoqlQuery<T = any>(soql: string): Promise<T[]> {
 }
 
 /**
- * Check if Salesforce credentials are configured
+ * Check if Salesforce credentials are configured (CLI or API)
  */
 export function isSalesforceConfigured(): boolean {
+  // Check SF CLI first
+  if (isSfCliAvailable()) {
+    return true;
+  }
+
+  // Fall back to checking API credentials
   const username = process.env.SALESFORCE_USERNAME;
   const password = process.env.SALESFORCE_PASSWORD;
   const clientId = process.env.SALESFORCE_CLIENT_ID;

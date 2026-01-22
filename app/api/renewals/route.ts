@@ -480,76 +480,93 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
     }
 
     // Query for closed renewals (Q1 2026)
+    // Join to Contract via SBQQ__RenewedContract__c to get prior ACV and calculate uplift
+    // Renewal Opportunity ACV = new contract value (including uplift)
+    // Prior ACV = original contract value before renewal
+    // Uplift = ACV - Prior ACV (the increase)
     const closedQuery = `
       SELECT
-        Id AS opportunity_id,
-        AccountId AS account_id,
-        AccountName AS account_name,
-        OpportunityName AS opportunity_name,
-        CASE WHEN por_record__c THEN 'POR' ELSE 'R360' END AS product,
-        CASE Division
+        o.Id AS opportunity_id,
+        o.AccountId AS account_id,
+        o.AccountName AS account_name,
+        o.OpportunityName AS opportunity_name,
+        CASE WHEN o.por_record__c THEN 'POR' ELSE 'R360' END AS product,
+        CASE o.Division
           WHEN 'US' THEN 'AMER'
           WHEN 'UK' THEN 'EMEA'
           WHEN 'AU' THEN 'APAC'
         END AS region,
-        ROUND(COALESCE(ACV, 0), 2) AS acv,
-        CAST(CloseDate AS STRING) AS close_date,
-        StageName AS stage,
-        Won AS is_won,
-        IsClosed AS is_closed,
-        ClosedLostReason AS loss_reason,
-        Owner AS owner_name,
-        CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url,
-        '' AS contract_id,
-        0 AS uplift_amount,
-        0 AS prior_acv
-      FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
-      WHERE Type = 'Renewal'
-        AND IsClosed = true
-        AND CloseDate >= '2026-01-01'
-        AND CloseDate <= CURRENT_DATE()
-        AND Division IN ('US', 'UK', 'AU')
-        AND ACV > 0  -- Exclude negative ACV renewals (credits, downgrades)
-        ${productClause}
-        ${regionClause}
-      ORDER BY CloseDate DESC
+        ROUND(COALESCE(o.ACV, 0), 2) AS acv,
+        CAST(o.CloseDate AS STRING) AS close_date,
+        o.StageName AS stage,
+        o.Won AS is_won,
+        o.IsClosed AS is_closed,
+        o.ClosedLostReason AS loss_reason,
+        o.Owner AS owner_name,
+        CONCAT('https://por.my.salesforce.com/', o.Id) AS salesforce_url,
+        COALESCE(c.Id, '') AS contract_id,
+        -- Prior ACV from renewed contract (converted to USD)
+        ROUND(COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) AS prior_acv,
+        -- Uplift = new ACV - prior ACV
+        ROUND(COALESCE(o.ACV, 0) - (COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1)), 2) AS uplift_amount
+      FROM \`data-analytics-306119.sfdc.OpportunityViewTable\` o
+      LEFT JOIN \`data-analytics-306119.sfdc.Contract\` c
+        ON o.sbqq__renewedcontract__c = c.Id
+      LEFT JOIN \`data-analytics-306119.sfdc.CurrencyType\` ct
+        ON LOWER(c.currencyisocode) = LOWER(ct.isocode)
+      WHERE o.Type = 'Renewal'
+        AND o.IsClosed = true
+        AND o.CloseDate >= '2026-01-01'
+        AND o.CloseDate <= CURRENT_DATE()
+        AND o.Division IN ('US', 'UK', 'AU')
+        AND o.ACV > 0  -- Exclude negative ACV renewals (credits, downgrades)
+        ${productClause.replace(/por_record__c/g, 'o.por_record__c').replace(/r360_record__c/g, 'o.r360_record__c')}
+        ${regionClause.replace(/Division/g, 'o.Division')}
+      ORDER BY o.CloseDate DESC
       LIMIT 200
     `;
 
     // Query for pipeline renewals (open, close date in Q1 2026)
+    // Same join logic to get prior ACV and uplift
     const pipelineQuery = `
       SELECT
-        Id AS opportunity_id,
-        AccountId AS account_id,
-        AccountName AS account_name,
-        OpportunityName AS opportunity_name,
-        CASE WHEN por_record__c THEN 'POR' ELSE 'R360' END AS product,
-        CASE Division
+        o.Id AS opportunity_id,
+        o.AccountId AS account_id,
+        o.AccountName AS account_name,
+        o.OpportunityName AS opportunity_name,
+        CASE WHEN o.por_record__c THEN 'POR' ELSE 'R360' END AS product,
+        CASE o.Division
           WHEN 'US' THEN 'AMER'
           WHEN 'UK' THEN 'EMEA'
           WHEN 'AU' THEN 'APAC'
         END AS region,
-        ROUND(COALESCE(ACV, 0), 2) AS acv,
-        CAST(CloseDate AS STRING) AS close_date,
-        StageName AS stage,
-        Won AS is_won,
-        IsClosed AS is_closed,
-        ClosedLostReason AS loss_reason,
-        Owner AS owner_name,
-        CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url,
-        '' AS contract_id,
-        0 AS uplift_amount,
-        0 AS prior_acv
-      FROM \`data-analytics-306119.sfdc.OpportunityViewTable\`
-      WHERE Type = 'Renewal'
-        AND IsClosed = false
-        AND CloseDate >= '2026-01-01'
-        AND CloseDate <= '2026-03-31'
-        AND Division IN ('US', 'UK', 'AU')
-        AND ACV > 0  -- Exclude negative ACV renewals (credits, downgrades)
-        ${productClause}
-        ${regionClause}
-      ORDER BY CloseDate ASC
+        ROUND(COALESCE(o.ACV, 0), 2) AS acv,
+        CAST(o.CloseDate AS STRING) AS close_date,
+        o.StageName AS stage,
+        o.Won AS is_won,
+        o.IsClosed AS is_closed,
+        o.ClosedLostReason AS loss_reason,
+        o.Owner AS owner_name,
+        CONCAT('https://por.my.salesforce.com/', o.Id) AS salesforce_url,
+        COALESCE(c.Id, '') AS contract_id,
+        -- Prior ACV from renewed contract (converted to USD)
+        ROUND(COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1), 2) AS prior_acv,
+        -- Uplift = new ACV - prior ACV
+        ROUND(COALESCE(o.ACV, 0) - (COALESCE(c.acv__c, 0) / COALESCE(ct.conversionrate, 1)), 2) AS uplift_amount
+      FROM \`data-analytics-306119.sfdc.OpportunityViewTable\` o
+      LEFT JOIN \`data-analytics-306119.sfdc.Contract\` c
+        ON o.sbqq__renewedcontract__c = c.Id
+      LEFT JOIN \`data-analytics-306119.sfdc.CurrencyType\` ct
+        ON LOWER(c.currencyisocode) = LOWER(ct.isocode)
+      WHERE o.Type = 'Renewal'
+        AND o.IsClosed = false
+        AND o.CloseDate >= '2026-01-01'
+        AND o.CloseDate <= '2026-03-31'
+        AND o.Division IN ('US', 'UK', 'AU')
+        AND o.ACV > 0  -- Exclude negative ACV renewals (credits, downgrades)
+        ${productClause.replace(/por_record__c/g, 'o.por_record__c').replace(/r360_record__c/g, 'o.r360_record__c')}
+        ${regionClause.replace(/Division/g, 'o.Division')}
+      ORDER BY o.CloseDate ASC
       LIMIT 200
     `;
 
