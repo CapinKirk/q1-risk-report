@@ -3167,6 +3167,7 @@ export async function POST(request: Request) {
       const q1TargetSql = parseInt(row.target_sql) || 0;
       const q1TargetSal = parseInt(row.target_sal) || 0;
       const q1TargetSqo = parseInt(row.target_sqo) || 0;
+      const q1TargetAcv = Math.round(parseFloat(row.target_acv) || 0);
       // Calculate QTD targets by applying proration factor
       const qtdTargetMql = Math.round(q1TargetMql * sourceQtdProrationFactor);
       const qtdTargetSql = Math.round(q1TargetSql * sourceQtdProrationFactor);
@@ -3180,6 +3181,7 @@ export async function POST(request: Request) {
       funnelBySource.POR.push({
         region: row.region,
         source: row.source,
+        target_acv: q1TargetAcv,
         actual_mql: actualMql,
         actual_sql: actualSql,
         actual_sal: actualSal,
@@ -3212,6 +3214,7 @@ export async function POST(request: Request) {
       const q1TargetMql = parseInt(row.target_mql) || 0;
       const q1TargetSql = parseInt(row.target_sql) || 0;
       const q1TargetSqo = parseInt(row.target_sqo) || 0;
+      const q1TargetAcv = Math.round(parseFloat(row.target_acv) || 0);
       // Calculate QTD targets by applying proration factor
       const qtdTargetMql = Math.round(q1TargetMql * sourceQtdProrationFactor);
       const qtdTargetSql = Math.round(q1TargetSql * sourceQtdProrationFactor);
@@ -3223,6 +3226,7 @@ export async function POST(request: Request) {
       funnelBySource.R360.push({
         region: row.region,
         source: row.source,
+        target_acv: q1TargetAcv,
         actual_mql: actualMql,
         actual_sql: actualSql,
         actual_sal: 0,  // R360 has no SAL stage
