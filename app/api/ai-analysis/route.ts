@@ -337,7 +337,7 @@ export async function POST(request: Request) {
 
     const prompt = buildAnalysisPrompt(reportData, analysisType, filterContext);
 
-    // STAGE 1: Generate raw insights with GPT-4o
+    // STAGE 1: Generate raw insights with GPT-5.2 Instant
     const insightResponse = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
@@ -345,7 +345,7 @@ export async function POST(request: Request) {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5.2-chat-latest',
         messages: [
           {
             role: 'system',
@@ -357,7 +357,7 @@ export async function POST(request: Request) {
           }
         ],
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: 2500,
       }),
     });
 
