@@ -97,9 +97,29 @@ function filterReportData(reportData: ReportData, products: Product[], regions: 
       POR: includePOR ? filterByRegion(reportData.funnel_by_source?.POR) : [],
       R360: includeR360 ? filterByRegion(reportData.funnel_by_source?.R360) : [],
     },
+    source_attainment: {
+      POR: includePOR ? filterByRegion(reportData.source_attainment?.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.source_attainment?.R360) : [],
+    },
     google_ads: {
       POR: includePOR ? filterByRegion(reportData.google_ads?.POR) : [],
       R360: includeR360 ? filterByRegion(reportData.google_ads?.R360) : [],
+    },
+    google_ads_rca: {
+      POR: includePOR ? (reportData.google_ads_rca?.POR || []) : [],
+      R360: includeR360 ? (reportData.google_ads_rca?.R360 || []) : [],
+    },
+    mql_details: {
+      POR: includePOR ? filterByRegion(reportData.mql_details?.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.mql_details?.R360) : [],
+    },
+    sql_details: {
+      POR: includePOR ? filterByRegion(reportData.sql_details?.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.sql_details?.R360) : [],
+    },
+    sal_details: {
+      POR: includePOR ? filterByRegion(reportData.sal_details?.POR) : [],
+      R360: includeR360 ? filterByRegion(reportData.sal_details?.R360) : [],
     },
   };
 }
@@ -145,13 +165,13 @@ function getSectionType(text: string): { type: string; emoji: string; color: str
   const t = text.toLowerCase();
   // Region-specific sections
   if (t.includes('amer') || t.includes('americas') || t.includes('us ') || t.includes('united states')) {
-    return { type: 'region-amer', emoji: '🇺🇸', color: '#1e3a5f' };
+    return { type: 'region-amer', emoji: '🇺🇸', color: '#2563eb' };
   }
   if (t.includes('emea') || t.includes('europe') || t.includes('uk ') || t.includes('united kingdom')) {
-    return { type: 'region-emea', emoji: '🇬🇧', color: '#581c87' };
+    return { type: 'region-emea', emoji: '🇬🇧', color: '#7c3aed' };
   }
   if (t.includes('apac') || t.includes('asia') || t.includes('pacific') || t.includes('australia')) {
-    return { type: 'region-apac', emoji: '🇦🇺', color: '#115e59' };
+    return { type: 'region-apac', emoji: '🇦🇺', color: '#0d9488' };
   }
   if (t.includes('risk') && (t.includes('inbound') || t.includes('q1') || t.includes('plan'))) {
     return { type: 'risks', emoji: '🚨', color: '#dc2626' };
@@ -1115,17 +1135,17 @@ export default function InboundAIAnalysis({ reportData, selectedProducts, select
           align-items: center;
           gap: 10px;
           margin: 24px 0 16px;
-          padding: 12px 16px;
-          background: color-mix(in srgb, var(--section-color) 8%, transparent);
-          border-left: 4px solid var(--section-color);
+          padding: 14px 18px;
+          background: color-mix(in srgb, var(--section-color) 12%, transparent);
+          border-left: 5px solid var(--section-color);
           border-radius: 0 8px 8px 0;
         }
         .analysis-content :global(.section-header:first-child) { margin-top: 0; }
-        .analysis-content :global(.section-emoji) { font-size: 1.2rem; }
+        .analysis-content :global(.section-emoji) { font-size: 1.3rem; }
         .analysis-content :global(.section-title) {
           margin: 0;
-          font-size: 1rem;
-          font-weight: 600;
+          font-size: 1.05rem;
+          font-weight: 700;
           color: var(--section-color);
           text-transform: uppercase;
           letter-spacing: 0.5px;
