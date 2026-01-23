@@ -178,6 +178,14 @@ For each region included in this analysis (${activeRegions.join(', ')}), provide
 - Root Cause: Why the region is missing or exceeding
 - Actions: 1-2 specific action items with owner roles
 
+CHANNEL PERFORMANCE:
+For each product (POR, R360), identify:
+- Underperforming channels: Sources below 80% attainment with dollar gap and RAG status
+- Overperforming channels: Sources above 120% attainment
+- Biggest dollar gaps: Which source channels are contributing most to the overall miss
+- Funnel bottlenecks by source: Where conversion rates are weakest
+Note: "Channels" here means revenue sources (INBOUND, AE SOURCED, AM SOURCED, OUTBOUND, TRADESHOW, PARTNERSHIPS). Use the Source Channel Attainment data below.
+
 GLOBAL RISK ASSESSMENT:
 - Q1 Outlook: HIGH/MEDIUM/LOW risk level
 - Dollar amount at risk if issues not addressed
@@ -248,12 +256,12 @@ ${(loss_reason_rca?.R360 || []).slice(0, 8).map((row: any) =>
 
 ## Funnel Performance by Source (POR)
 ${funnelBySourceData.POR.map((row: any) =>
-  `- ${row.source} (${row.region}): MQL ${row.actual_mql}/${row.target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), Conversion MQL→SQL: ${row.mql_to_sql_rate || 0}%`
+  `- ${row.source} (${row.region}): Target ACV $${(row.target_acv || 0).toLocaleString()}, MQL ${row.actual_mql}/${row.target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.target_sqo || 0}, Conversion MQL→SQL: ${row.mql_to_sql_rate || 0}%`
 ).join('\n') || 'No POR source data'}
 
 ## Funnel Performance by Source (R360)
 ${funnelBySourceData.R360.map((row: any) =>
-  `- ${row.source} (${row.region}): MQL ${row.actual_mql}/${row.target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), Conversion MQL→SQL: ${row.mql_to_sql_rate || 0}%`
+  `- ${row.source} (${row.region}): Target ACV $${(row.target_acv || 0).toLocaleString()}, MQL ${row.actual_mql}/${row.target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.target_sqo || 0}, Conversion MQL→SQL: ${row.mql_to_sql_rate || 0}%`
 ).join('\n') || 'No R360 source data'}
 
 ## MQL Disqualification/Reversion Summary
@@ -285,12 +293,12 @@ ${googleAdsData.R360.map((row: any) =>
 ## Source Channel Attainment (Revenue by Source)
 ### POR by Source
 ${sourceAttainmentData.POR.map((row: any) =>
-  `- ${row.source} (${row.region}): ${row.attainment_pct || 0}% attainment, $${(row.gap || 0).toLocaleString()} gap, RAG: ${row.rag_status || 'N/A'}`
+  `- ${row.source} (${row.region}): Q1 Target $${(row.q1_target || 0).toLocaleString()}, QTD Target $${(row.qtd_target || 0).toLocaleString()}, QTD Actual $${(row.qtd_acv || 0).toLocaleString()}, Attainment ${row.attainment_pct || 0}%, Gap $${(row.gap || 0).toLocaleString()}, RAG: ${row.rag_status || 'N/A'}`
 ).join('\n') || 'No POR source attainment data'}
 
 ### R360 by Source
 ${sourceAttainmentData.R360.map((row: any) =>
-  `- ${row.source} (${row.region}): ${row.attainment_pct || 0}% attainment, $${(row.gap || 0).toLocaleString()} gap, RAG: ${row.rag_status || 'N/A'}`
+  `- ${row.source} (${row.region}): Q1 Target $${(row.q1_target || 0).toLocaleString()}, QTD Target $${(row.qtd_target || 0).toLocaleString()}, QTD Actual $${(row.qtd_acv || 0).toLocaleString()}, Attainment ${row.attainment_pct || 0}%, Gap $${(row.gap || 0).toLocaleString()}, RAG: ${row.rag_status || 'N/A'}`
 ).join('\n') || 'No R360 source attainment data'}
 
 ## CRITICAL RULES
@@ -298,8 +306,10 @@ ${sourceAttainmentData.R360.map((row: any) =>
 - Include realistic assessments - don't sugarcoat underperformance
 - Focus on loss patterns by product
 - Analyze MQL disqualification rates for lead quality
-- Evaluate source channel performance
-- Identify funnel conversion bottlenecks`;
+- ALWAYS identify underperforming channels using the Source Channel Attainment data above (RED/YELLOW RAG = underperforming)
+- NEVER say "underperforming channels not identified due to lack of UTM data" - you have full source-level revenue attainment data above
+- Identify funnel conversion bottlenecks by source
+- Highlight which specific sources have the largest dollar gaps`;
 
   return prompt;
 }
