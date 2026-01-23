@@ -162,34 +162,116 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
     return sections.join('\n\n');
   };
 
+  // Compute derived metrics for richer analysis
+  const totalQtdAcv = grand_total?.total_qtd_acv || 0;
+  const totalQ1Target = grand_total?.total_q1_target || 0;
+  const daysElapsed = period?.days_elapsed || 1;
+  const daysRemaining = period?.days_remaining || 68;
+  const dailyRunRate = totalQtdAcv / daysElapsed;
+  const requiredDailyRate = (totalQ1Target - totalQtdAcv) / daysRemaining;
+  const projectedQ1 = totalQtdAcv + (dailyRunRate * daysRemaining);
+  const projectedAttainment = totalQ1Target > 0 ? Math.round((projectedQ1 / totalQ1Target) * 100) : 0;
+
+  const porQtdAcv = porTotal.total_qtd_acv || 0;
+  const r360QtdAcv = r360Total.total_qtd_acv || 0;
+  const porQ1Target = porTotal.total_q1_target || 0;
+  const r360Q1Target = r360Total.total_q1_target || 0;
+  const porDailyRate = porQtdAcv / daysElapsed;
+  const r360DailyRate = r360QtdAcv / daysElapsed;
+  const porProjected = porQtdAcv + (porDailyRate * daysRemaining);
+  const r360Projected = r360QtdAcv + (r360DailyRate * daysRemaining);
+
+  // Identify top source gaps
+  const allSourceGaps = [...sourceAttainmentData.POR.map((r: any) => ({...r, product: 'POR'})), ...sourceAttainmentData.R360.map((r: any) => ({...r, product: 'R360'}))];
+  const topGaps = allSourceGaps.filter((r: any) => r.gap < 0).sort((a: any, b: any) => a.gap - b.gap).slice(0, 10);
+  const topOverperformers = allSourceGaps.filter((r: any) => r.attainment_pct > 120 && r.q1_target > 10000).sort((a: any, b: any) => b.gap - a.gap).slice(0, 5);
+
+  // Identify worst funnel bottlenecks
+  const allFunnelRows = [...funnelBySourceData.POR.map((r: any) => ({...r, product: 'POR'})), ...funnelBySourceData.R360.map((r: any) => ({...r, product: 'R360'}))];
+  const worstSqoPacing = allFunnelRows.filter((r: any) => (r.q1_target_sqo || 0) > 5).sort((a: any, b: any) => (a.sqo_pacing_pct || 0) - (b.sqo_pacing_pct || 0)).slice(0, 5);
+
   // Build comprehensive context
-  const prompt = `You are a Revenue Operations analyst reviewing Q1 2026 Bookings performance data.
+  const prompt = `You are a senior Revenue Operations analyst at a B2B SaaS company (Point of Rental Software). You are reviewing Q1 2026 Bookings performance data for two products: POR (rental management) and R360 (asset inspection).
 
-Provide a structured analysis with the following sections. Use plain text with clear section headers.
+Provide a comprehensive, data-driven analysis. Frame ALL suggested actions as RECOMMENDATIONS (never "actions" or "next steps"). Be specific with dollar amounts, percentages, and segment names. Every insight must reference the data provided.
 
-EXECUTIVE SUMMARY:
-Write 2-3 sentences on overall global Q1 performance status.
+---
 
-REGIONAL ANALYSIS:
-For each region included in this analysis (${activeRegions.join(', ')}), provide:
-- Status: GREEN/YELLOW/RED and attainment percentage
-- Gap: Dollar amount to target
-- Key Risks: 1-2 specific risks with dollar impact
-- Root Cause: Why the region is missing or exceeding
-- Actions: 1-2 specific action items with owner roles
+## REQUIRED OUTPUT SECTIONS
 
-CHANNEL PERFORMANCE:
-For each product (POR, R360), identify:
-- Underperforming channels: Sources below 80% attainment with dollar gap and RAG status
-- Overperforming channels: Sources above 120% attainment
-- Biggest dollar gaps: Which source channels are contributing most to the overall miss
-- Funnel bottlenecks by source: Where conversion rates are weakest
-Note: "Channels" here means revenue sources (INBOUND, AE SOURCED, AM SOURCED, OUTBOUND, TRADESHOW, PARTNERSHIPS). Use the Source Channel Attainment data below.
+### 1. EXECUTIVE SUMMARY (3-4 sentences)
+- Overall Q1 trajectory: on-track, at-risk, or behind
+- Current daily run rate vs required daily rate to hit target
+- Biggest single risk factor with dollar impact
+- Product divergence summary (POR vs R360)
 
-GLOBAL RISK ASSESSMENT:
-- Q1 Outlook: HIGH/MEDIUM/LOW risk level
-- Dollar amount at risk if issues not addressed
-- Top 3 priorities
+### 2. REVENUE ATTAINMENT DEEP DIVE
+For each product (POR, R360) by region:
+- Current attainment % vs QTD target
+- Segment-level performance ranking (best to worst)
+- Concentration risk: which segments are carrying the load vs dragging
+- Win rate analysis and deal velocity indicators
+
+### 3. CHANNEL PERFORMANCE ANALYSIS
+Using the Source Channel Attainment data:
+- Rank ALL channels by dollar gap (largest miss first)
+- Identify RED channels (below 50% attainment) with dollar impact
+- Identify YELLOW channels (50-80% attainment) with recovery potential
+- Identify overperforming channels (above 120%) as acceleration opportunities
+- Channel diversification risk: over-reliance on any single source
+- Channel mix recommendations by product
+
+### 4. FUNNEL HEALTH & VELOCITY
+- Stage-by-stage conversion analysis (MQL→SQL→SAL→SQO)
+- Identify the worst funnel bottleneck by source and region
+- Compare conversion rates across sources (which sources produce highest quality leads)
+- Funnel pacing vs plan: where is top-of-funnel vs bottom-of-funnel relative to targets
+- Lead quality indicators: MQL reversion rates, stall rates
+
+### 5. PIPELINE RISK ASSESSMENT
+- Coverage adequacy by segment (need 3x for healthy, below 2x is critical)
+- Pipeline aging: segments with avg age >60 days (stale pipeline risk)
+- Pipeline quality: segments marked "AT RISK" or "CRITICAL"
+- Close probability: given current win rates, how much pipeline will actually close
+
+### 6. WIN/LOSS PATTERN ANALYSIS
+- Top loss reasons ranked by dollar impact
+- Winnable losses: losses due to process failures (unresponsive, timing) vs market (competition, pricing)
+- Loss rate trends by region and product
+- Loss concentration: are losses concentrated in specific segments or distributed
+
+### 7. MARKETING & CHANNEL EFFICIENCY
+- Google Ads ROI by region: CPA relative to average deal size
+- Spend efficiency: regions with highest/lowest conversion rates
+- Channel cost-effectiveness ranking
+- Recommendations for budget reallocation
+
+### 8. PREDICTIVE INDICATORS & FORECAST
+- Current daily run rate: $${Math.round(dailyRunRate).toLocaleString()}/day
+- Required daily rate to hit Q1 target: $${Math.round(requiredDailyRate).toLocaleString()}/day
+- Projected Q1 close (at current pace): $${Math.round(projectedQ1).toLocaleString()} (${projectedAttainment}% of target)
+- POR projected: $${Math.round(porProjected).toLocaleString()} vs $${Math.round(porQ1Target).toLocaleString()} target
+- R360 projected: $${Math.round(r360Projected).toLocaleString()} vs $${Math.round(r360Q1Target).toLocaleString()} target
+- Pipeline sufficiency: is there enough pipeline to close the remaining gap?
+- Risk-adjusted forecast considering win rates and pipeline age
+
+### 9. PRIORITIZED RECOMMENDATIONS
+Provide 5-7 specific recommendations, each with:
+- Priority level (P1/P2/P3)
+- Segment/region/source it applies to
+- Expected dollar impact if addressed
+- Recommended owner (role, not name)
+- Timeframe for implementation
+
+---
+
+## FORMATTING RULES
+- Use plain text with clear section headers (no markdown)
+- Always include specific dollar amounts and percentages
+- Rank items by dollar impact (largest first)
+- Be direct and honest - do not sugarcoat underperformance
+- Every recommendation must be backed by specific data from this report
+- Frame suggestions as "Recommend..." not "Action:" or "Next step:"
 
 ## Filter Context
 ${filterDescription}
@@ -301,15 +383,37 @@ ${sourceAttainmentData.R360.map((row: any) =>
   `- ${row.source} (${row.region}): Q1 Target $${(row.q1_target || 0).toLocaleString()}, QTD Target $${(row.qtd_target || 0).toLocaleString()}, QTD Actual $${(row.qtd_acv || 0).toLocaleString()}, Attainment ${row.attainment_pct || 0}%, Gap $${(row.gap || 0).toLocaleString()}, RAG: ${row.rag_status || 'N/A'}`
 ).join('\n') || 'No R360 source attainment data'}
 
+## PRE-COMPUTED KEY INSIGHTS (use these to anchor your analysis)
+
+### Top Revenue Gaps (sorted by dollar impact)
+${topGaps.map((r: any) => `- ${r.product} ${r.source} (${r.region}): -$${Math.abs(r.gap || 0).toLocaleString()} gap, ${r.attainment_pct || 0}% attainment, RAG: ${r.rag_status}`).join('\n') || 'No gaps identified'}
+
+### Overperforming Channels (>120% attainment, >$10K target)
+${topOverperformers.map((r: any) => `- ${r.product} ${r.source} (${r.region}): +$${(r.gap || 0).toLocaleString()} surplus, ${r.attainment_pct || 0}% attainment`).join('\n') || 'No overperformers identified'}
+
+### Worst Funnel Bottlenecks (lowest SQO pacing)
+${worstSqoPacing.map((r: any) => `- ${r.product} ${r.source} (${r.region}): SQO pacing ${r.sqo_pacing_pct || 0}%, SQL pacing ${r.sql_pacing_pct || 0}%, MQL→SQL rate ${r.mql_to_sql_rate || 0}%`).join('\n') || 'No bottlenecks identified'}
+
+### Projection Summary
+- Daily run rate: $${Math.round(dailyRunRate).toLocaleString()}/day (${daysElapsed} days elapsed)
+- Required rate: $${Math.round(requiredDailyRate).toLocaleString()}/day (${daysRemaining} days remaining)
+- Projected Q1: $${Math.round(projectedQ1).toLocaleString()} (${projectedAttainment}% of $${Math.round(totalQ1Target).toLocaleString()} target)
+- POR projected: $${Math.round(porProjected).toLocaleString()} (${porQ1Target > 0 ? Math.round((porProjected / porQ1Target) * 100) : 0}% of target)
+- R360 projected: $${Math.round(r360Projected).toLocaleString()} (${r360Q1Target > 0 ? Math.round((r360Projected / r360Q1Target) * 100) : 0}% of target)
+
 ## CRITICAL RULES
-- Be specific about which segments need attention
-- Include realistic assessments - don't sugarcoat underperformance
-- Focus on loss patterns by product
-- Analyze MQL disqualification rates for lead quality
-- ALWAYS identify underperforming channels using the Source Channel Attainment data above (RED/YELLOW RAG = underperforming)
-- NEVER say "underperforming channels not identified due to lack of UTM data" - you have full source-level revenue attainment data above
-- Identify funnel conversion bottlenecks by source
-- Highlight which specific sources have the largest dollar gaps`;
+1. PRODUCE ALL 9 SECTIONS - do not skip any section
+2. Use SPECIFIC dollar amounts and percentages from the data above - never generalize
+3. Reference the pre-computed insights above to ensure accuracy
+4. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
+5. RAG status meanings: GREEN (>80%), YELLOW (50-80%), RED (<50%) - call these out explicitly
+6. For channel analysis: ALWAYS rank by dollar gap, ALWAYS identify RED channels by name
+7. NEVER say "underperforming channels not identified" or "insufficient data" - the Source Channel Attainment section has COMPLETE data
+8. Pipeline coverage: 3x+ = healthy, 2-3x = adequate, <2x = critical risk
+9. Be DIRECT about underperformance - if a segment is failing, say so clearly with the dollar impact
+10. Each recommendation must specify: target segment, expected dollar impact, and responsible role
+11. Prioritize recommendations by ROI potential (largest gap with quickest fix first)
+12. Compare products: explicitly note where R360 is trailing POR and why`;
 
   return prompt;
 }
@@ -349,15 +453,15 @@ export async function POST(request: Request) {
         messages: [
           {
             role: 'system',
-            content: 'You are an expert Revenue Operations analyst specializing in B2B SaaS bookings analysis. Provide data-driven insights with specific, actionable recommendations. Be direct and honest about performance issues. Output plain text analysis without markdown formatting - formatting will be applied separately.'
+            content: 'You are a senior Revenue Operations analyst at a B2B SaaS company. You produce comprehensive quarterly bookings analysis covering revenue attainment, channel performance, funnel health, pipeline risk, win/loss patterns, and marketing efficiency. Your analysis is data-driven, specific (always cite dollar amounts and percentages), and brutally honest about underperformance. Frame all suggestions as recommendations with priority levels. Output plain text with clear section headers - no markdown formatting.'
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 2500,
+        temperature: 0.6,
+        max_tokens: 4000,
       }),
     });
 
