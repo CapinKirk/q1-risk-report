@@ -111,6 +111,20 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
   const totalConversionsPOR = googleAdsPOR.reduce((sum: number, a: any) => sum + (a.conversions || 0), 0);
   const totalConversionsR360 = googleAdsR360.reduce((sum: number, a: any) => sum + (a.conversions || 0), 0);
 
+  // Derived pacing metrics
+  const daysElapsed = period?.days_elapsed || 1;
+  const daysRemaining = period?.days_remaining || 68;
+  const quarterPctComplete = period?.quarter_pct_complete || 0;
+
+  // Pre-compute worst funnel bottlenecks
+  const allInboundFunnel = [...inboundSourcePOR.map((r: any) => ({...r, product: 'POR'})), ...inboundSourceR360.map((r: any) => ({...r, product: 'R360'}))];
+  const worstMqlPacing = allInboundFunnel.filter((r: any) => (r.qtd_target_mql || 0) > 5).sort((a: any, b: any) => (a.mql_pacing_pct || 0) - (b.mql_pacing_pct || 0)).slice(0, 5);
+  const worstSqoPacing = allInboundFunnel.filter((r: any) => (r.qtd_target_sqo || 0) > 2).sort((a: any, b: any) => (a.sqo_pacing_pct || 0) - (b.sqo_pacing_pct || 0)).slice(0, 5);
+
+  // Pre-compute worst inbound revenue gaps
+  const allInboundAttainment = [...inboundAttainmentPOR.map((r: any) => ({...r, product: 'POR'})), ...inboundAttainmentR360.map((r: any) => ({...r, product: 'R360'}))];
+  const worstInboundGaps = allInboundAttainment.filter((r: any) => (r.gap || 0) < 0).sort((a: any, b: any) => (a.gap || 0) - (b.gap || 0));
+
   // UTM Analysis - aggregate MQL data by UTM fields
   const getUtmBreakdown = (mqls: any[], field: string) => {
     const grouped: Record<string, { total: number; converted: number; stalled: number }> = {};
@@ -147,30 +161,108 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
   const utmKeywordPOR = getUtmBreakdown(mqlDetailsPOR, 'utm_keyword');
   const utmKeywordR360 = getUtmBreakdown(mqlDetailsR360, 'utm_keyword');
 
-  const prompt = `You are a Risk Analyst for Inbound Marketing reviewing Q1 2026 performance data.
+  // Best/worst converting UTM sources (depends on UTM declarations above)
+  const topConvertingUtmPOR = utmSourcePOR.filter(s => s.total >= 3).sort((a, b) => b.convRate - a.convRate).slice(0, 5);
+  const worstConvertingUtmPOR = utmSourcePOR.filter(s => s.total >= 3).sort((a, b) => a.convRate - b.convRate).slice(0, 5);
+  const topConvertingUtmR360 = utmSourceR360.filter(s => s.total >= 3).sort((a, b) => b.convRate - a.convRate).slice(0, 5);
 
-## CRITICAL INSTRUCTION: RISKS ONLY
+  // Ads efficiency (high CPA / low CTR)
+  const highCpaAds = [...googleAdsPOR.map((r: any) => ({...r, product: 'POR'})), ...googleAdsR360.map((r: any) => ({...r, product: 'R360'}))]
+    .filter((r: any) => r.cpa_usd && r.cpa_usd > 200)
+    .sort((a: any, b: any) => (b.cpa_usd || 0) - (a.cpa_usd || 0));
+  const lowCtrAds = [...googleAdsPOR.map((r: any) => ({...r, product: 'POR'})), ...googleAdsR360.map((r: any) => ({...r, product: 'R360'}))]
+    .filter((r: any) => r.ctr_pct != null && r.ctr_pct < 3)
+    .sort((a: any, b: any) => (a.ctr_pct || 0) - (b.ctr_pct || 0));
 
-**DO NOT include any positive information, wins, or things going well.**
-**ONLY report risks to inbound targets, root cause analysis, and action items to fix.**
+  const prompt = `You are a senior Inbound Marketing analyst at a B2B SaaS company (Point of Rental Software) reviewing Q1 2026 inbound performance for two products: POR (rental management) and R360 (asset inspection).
+
+Provide a comprehensive, data-driven inbound marketing analysis. Frame ALL suggested actions as RECOMMENDATIONS (never "actions" or "next steps"). Be specific with numbers, percentages, and dollar amounts. Every insight must reference the data provided.
 
 **R360 NOTE**: R360 does NOT have a SAL stage. R360 flows directly from SQL to SQO.
 
-## OUTPUT FORMAT (plain text, formatting applied separately)
+---
 
-INBOUND RISKS TO Q1 PLAN:
-List all inbound risks with: Product, Region, Metric, Gap percentage, Risk level (HIGH/MEDIUM/LOW), Dollar impact.
+## REQUIRED OUTPUT SECTIONS
 
-ROOT CAUSE ANALYSIS:
-For Lead Volume Risks: List each product/region behind pacing with root cause and underperforming channels.
-For Conversion Rate Risks: List each stage below threshold (MQL to SQL below 30%, SQL to SAL below 50%, SAL to SQO below 60%, SQL to SQO below 50% for R360).
-For Google Ads Risks: List CPA above $200 or CTR below 3% with root causes.
+### 1. EXECUTIVE SUMMARY (3-4 sentences)
+- Overall inbound health: on-track, at-risk, or failing
+- Lead volume pacing vs plan (MQL generation rate)
+- Biggest single inbound risk with dollar impact
+- Product divergence summary (POR vs R360 inbound performance)
 
-ACTION ITEMS:
-For each risk, provide: Action, Owner (Marketing/Sales/SDR), Timeline (Immediate/This Week/This Month), Expected Impact.
+### 2. LEAD VOLUME & PACING ANALYSIS
+For each product/region:
+- MQL pacing vs target (actual/target, pacing %)
+- SQL creation pacing vs target
+- SQO creation pacing vs target
+- Daily lead generation rate vs required rate to hit Q1 targets
+- Volume gaps ranked by severity
 
-OVERALL RISK ASSESSMENT:
-Risk Level (HIGH/MEDIUM/LOW), Key Risk (single biggest threat), Dollar amount at risk, Confidence percentage of hitting inbound targets.
+### 3. FUNNEL CONVERSION ANALYSIS
+Stage-by-stage breakdown:
+- MQL→SQL conversion rates by product/region (threshold: 30%)
+- SQL→SAL conversion (POR only, threshold: 50%)
+- SAL→SQO conversion (POR only, threshold: 60%)
+- SQL→SQO conversion (R360 only, threshold: 50%)
+- Identify worst bottleneck by product/region with root cause
+- Compare conversion rates across UTM sources (which sources produce highest quality leads)
+
+### 4. FUNNEL VELOCITY & STALL ANALYSIS
+- Average days in each stage by product
+- Stall rates: % of leads stuck >30 days in a stage
+- MQL reversion/disqualification rates and causes
+- Stage-specific velocity issues (where are leads getting stuck?)
+- Impact of stalls on downstream pipeline creation
+
+### 5. CHANNEL & CAMPAIGN EFFECTIVENESS
+Using UTM data:
+- Rank UTM sources by conversion rate and volume
+- Identify top-performing campaigns with conversion rates
+- Identify worst-performing campaigns (high volume, low conversion)
+- Channel mix analysis: which channels drive quality vs quantity
+- Keyword/term effectiveness for paid channels
+- Cross-channel attribution insights
+
+### 6. GOOGLE ADS PERFORMANCE & ROI
+- Spend efficiency by product and region
+- CPA analysis: which regions are above $200 threshold (risk)
+- CTR analysis: which regions are below 3% threshold (risk)
+- Cost per qualified lead (factoring in conversion rates)
+- Budget allocation recommendations based on efficiency
+- Specific ads performance issues from RCA data
+
+### 7. INBOUND REVENUE ATTRIBUTION
+Using source attainment data:
+- Revenue generated from inbound channel by product/region
+- Attainment % vs target (RAG status)
+- Dollar gaps from inbound underperformance
+- Correlation between lead quality and revenue outcomes
+- Inbound contribution to overall bookings targets
+
+### 8. PREDICTIVE INDICATORS & FORECAST
+- At current MQL rate, projected Q1 total MQLs vs target
+- At current conversion rates, projected SQLs and SQOs
+- Pipeline generation forecast from inbound
+- Risk-adjusted forecast considering stall rates and conversion trends
+- Leading indicators: are trends improving or deteriorating?
+
+### 9. PRIORITIZED RECOMMENDATIONS
+Provide 5-7 specific recommendations, each with:
+- Priority level (P1/P2/P3)
+- Product/region/channel it applies to
+- Expected impact (lead volume, conversion rate, or dollar amount)
+- Recommended owner (Marketing/Sales/SDR/Revenue Operations)
+- Timeframe (Immediate/This Week/This Month/This Quarter)
+
+---
+
+## FORMATTING RULES
+- Use plain text with clear section headers (no markdown)
+- Always include specific numbers and percentages
+- Rank items by impact (largest gap or worst performance first)
+- Be direct about underperformance - name specific channels/campaigns that are failing
+- Every recommendation must be backed by specific data from this report
+- Frame suggestions as "Recommend..." not "Action:" or "Next step:"
 
 ${filterDescription}
 
@@ -309,18 +401,45 @@ ${(google_ads_rca?.POR || []).concat(google_ads_rca?.R360 || []).map((row: any) 
 - Converted to SQO: ${inboundSqlR360.filter((s: any) => s.converted_to_sqo === 'Yes').length}
 - Average Days MQL→SQL: ${Math.round(inboundSqlR360.reduce((sum: number, s: any) => sum + (s.days_mql_to_sql || 0), 0) / (inboundSqlR360.length || 1))}
 
+## PRE-COMPUTED KEY INSIGHTS (use these to anchor your analysis)
+
+### Worst Inbound Revenue Gaps
+${worstInboundGaps.map((r: any) => `- ${r.product} Inbound (${r.region}): -$${Math.abs(r.gap || 0).toLocaleString()} gap, ${r.attainment_pct || 0}% attainment, RAG: ${r.rag_status}`).join('\n') || 'No inbound gaps identified'}
+
+### Worst MQL Pacing
+${worstMqlPacing.map((r: any) => `- ${r.product} (${r.region}): MQL pacing ${r.mql_pacing_pct || 0}% (${r.actual_mql || 0} of ${r.qtd_target_mql || 0} target)`).join('\n') || 'All MQL pacing on track'}
+
+### Worst SQO Pacing
+${worstSqoPacing.map((r: any) => `- ${r.product} (${r.region}): SQO pacing ${r.sqo_pacing_pct || 0}% (${r.actual_sqo || 0} of ${r.qtd_target_sqo || 0} target)`).join('\n') || 'All SQO pacing on track'}
+
+### High CPA Regions (above $200 threshold)
+${highCpaAds.map((r: any) => `- ${r.product} (${r.region}): CPA $${r.cpa_usd}, spend $${(r.ad_spend_usd || 0).toLocaleString()}, ${r.conversions || 0} conversions`).join('\n') || 'All CPAs below threshold'}
+
+### Low CTR Regions (below 3% threshold)
+${lowCtrAds.map((r: any) => `- ${r.product} (${r.region}): CTR ${r.ctr_pct}%, ${r.clicks || 0} clicks, spend $${(r.ad_spend_usd || 0).toLocaleString()}`).join('\n') || 'All CTRs above threshold'}
+
+### Top Converting UTM Sources (POR)
+${topConvertingUtmPOR.map(s => `- ${s.name}: ${s.convRate}% conversion, ${s.total} MQLs`).join('\n') || 'No UTM source data'}
+
+### Worst Converting UTM Sources (POR)
+${worstConvertingUtmPOR.map(s => `- ${s.name}: ${s.convRate}% conversion, ${s.total} MQLs, ${s.stallRate}% stalled`).join('\n') || 'No UTM source data'}
+
+### Period Context
+- Quarter ${quarterPctComplete}% complete (${daysElapsed} days elapsed, ${daysRemaining} remaining)
+
 ## CRITICAL RULES
-- **NO POSITIVE INFO** - Only report problems and risks
-- **ROOT CAUSE REQUIRED** - Every risk must explain WHY
-- **ACTION REQUIRED** - Every risk needs a fix
-- **R360 NOTE** - R360 has no SAL stage (SQL→SQO direct)
-- **Thresholds**:
-  - MQL→SQL: 30% (below = risk)
-  - SQL→SAL: 50% (POR only)
-  - SAL→SQO: 60% (POR only)
-  - SQL→SQO: 50% (R360 only)
-  - CPA: <$200 (above = risk)
-  - CTR: >3% (below = risk)`;
+1. PRODUCE ALL 9 SECTIONS - do not skip any section
+2. Use SPECIFIC numbers and percentages from the data - never generalize
+3. Reference the pre-computed insights above to ensure accuracy
+4. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
+5. R360 has NO SAL stage - flows directly from SQL to SQO
+6. Conversion thresholds: MQL→SQL 30%, SQL→SAL 50% (POR), SAL→SQO 60% (POR), SQL→SQO 50% (R360)
+7. Ads thresholds: CPA above $200 = risk, CTR below 3% = risk
+8. Be DIRECT about failures - name specific channels, campaigns, and regions that are underperforming
+9. Every recommendation must specify: target product/region/channel, expected impact, owner, and timeframe
+10. When UTM data shows no matches, analyze the available funnel and ads data instead
+11. Compare POR vs R360 inbound effectiveness explicitly
+12. Prioritize recommendations by lead-to-revenue impact potential`;
 
   return prompt;
 }
@@ -360,14 +479,14 @@ export async function POST(request: Request) {
         messages: [
           {
             role: 'system',
-            content: 'You are a Risk Analyst for Inbound Marketing. Your ONLY job is to identify RISKS to inbound targets, provide root cause analysis using UTM/channel/keyword data, and recommend fixes. DO NOT include any positive information. Output plain text analysis without markdown formatting - formatting will be applied separately.'
+            content: 'You are a senior Inbound Marketing analyst at a B2B SaaS company. You produce comprehensive quarterly inbound analysis covering lead volume pacing, funnel conversion, velocity, channel effectiveness, ads ROI, revenue attribution, and predictive forecasting. Your analysis is data-driven, specific (always cite numbers and percentages), and direct about underperformance. Frame all suggestions as recommendations with priority levels. Output plain text with clear section headers - no markdown formatting.'
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_completion_tokens: 2500,
+        max_completion_tokens: 4000,
       }),
     });
 
