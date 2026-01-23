@@ -475,7 +475,7 @@ export async function POST(request: Request) {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-5.2-chat-latest',
+        model: 'gpt-realtime-mini',
         messages: [
           {
             role: 'system',
