@@ -475,7 +475,8 @@ export async function POST(request: Request) {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-realtime-mini',
+        model: 'gpt-4o-mini-audio-preview',
+        modalities: ['text'],
         messages: [
           {
             role: 'system',
