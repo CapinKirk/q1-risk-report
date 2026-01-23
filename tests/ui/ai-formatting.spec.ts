@@ -59,7 +59,7 @@ test.describe('AI Analysis Formatting', () => {
 
   test('Inbound AI Analysis uses emoji headers after regeneration', async ({ page }) => {
     // Find the Inbound AI Analysis section
-    const inboundSection = page.locator('[data-testid="ai-analysis-inbound"]');
+    const inboundSection = page.locator('[data-testid="inbound-ai-analysis"]');
     await expect(inboundSection).toBeVisible();
 
     // Click Clear to remove any cached analysis
@@ -75,7 +75,7 @@ test.describe('AI Analysis Formatting', () => {
     await generateBtn.click();
 
     // Wait for the analysis to generate
-    await page.waitForSelector('[data-testid="ai-analysis-inbound"] .analysis-content', {
+    await page.waitForSelector('[data-testid="inbound-ai-analysis"] .analysis-content', {
       timeout: 60000,
     });
 

@@ -13,7 +13,7 @@ test.describe('AI Analysis Components', () => {
 
   test('AI Risk Analysis should have correct header', async ({ page }) => {
     const header = page.locator('[data-testid="ai-analysis"] h2');
-    await expect(header).toContainText('AI');
+    await expect(header).toContainText('Analysis');
   });
 
   test('AI Risk Analysis should show Generate button', async ({ page }) => {
@@ -22,15 +22,15 @@ test.describe('AI Analysis Components', () => {
   });
 
   test('AI Risk Analysis should show scope indicator', async ({ page }) => {
-    const scopeBar = page.locator('[data-testid="ai-analysis"] .scope-bar');
-    await expect(scopeBar).toBeVisible();
-    await expect(scopeBar).toContainText('All Products');
+    const filterContext = page.locator('[data-testid="ai-analysis"] .filter-context');
+    await expect(filterContext).toBeVisible();
+    await expect(filterContext).toContainText('All Products');
   });
 
   test('AI Risk Analysis should show placeholder when no analysis', async ({ page }) => {
     const placeholder = page.locator('[data-testid="ai-analysis"] .placeholder');
     await expect(placeholder).toBeVisible();
-    await expect(placeholder).toContainText('Ready to Analyze');
+    await expect(placeholder).toContainText('Generate Analysis');
   });
 
   test('Inbound AI Analysis section should be visible', async ({ page }) => {
@@ -51,7 +51,7 @@ test.describe('AI Analysis Components', () => {
   test('Inbound AI Analysis should show placeholder', async ({ page }) => {
     const placeholder = page.locator('[data-testid="inbound-ai-analysis"] .placeholder');
     await expect(placeholder).toBeVisible();
-    await expect(placeholder).toContainText('Inbound');
+    await expect(placeholder).toContainText('Generate Analysis');
   });
 });
 
@@ -91,7 +91,7 @@ test.describe('AI Analysis Layout', () => {
     await expect(section.locator('.ai-icon')).toBeVisible();
 
     // Content area
-    await expect(section.locator('.content-area')).toBeVisible();
+    await expect(section.locator('.panel-content')).toBeVisible();
   });
 
   test('Inbound Analysis should have proper structure', async ({ page }) => {
@@ -104,7 +104,7 @@ test.describe('AI Analysis Layout', () => {
     await expect(section.locator('.ai-title')).toBeVisible();
 
     // Content area
-    await expect(section.locator('.content-area')).toBeVisible();
+    await expect(section.locator('.panel-content')).toBeVisible();
   });
 });
 
