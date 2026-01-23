@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const maxDuration = 180; // Allow up to 180s for retries with longer outputs
+
 // OpenAI API endpoint
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -25,45 +27,52 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
     mql_disqualification_summary
   } = reportData;
 
+  // Determine which products are active based on filter context
+  const activeProducts = filterContext?.isFiltered && filterContext.products.length > 0
+    ? filterContext.products
+    : ['POR', 'R360'];
+  const includePOR = activeProducts.includes('POR');
+  const includeR360 = activeProducts.includes('R360');
+
   // Build filter context string for the prompt
   const filterDescription = filterContext?.isFiltered
-    ? `**IMPORTANT: This analysis is FILTERED to show only ${filterContext.products.join(' and ')} data for ${filterContext.regions.join(', ')} region(s). Focus your analysis on these specific segments only.**`
+    ? `**CRITICAL FILTER INSTRUCTION: This analysis is FILTERED to show ONLY ${filterContext.products.join(' and ')} data for ${filterContext.regions.join(', ')} region(s). You MUST ONLY analyze and discuss ${filterContext.products.join(' and ')}. Do NOT mention, reference, or compare to ${filterContext.products.includes('POR') ? 'R360' : 'POR'} at all - it is excluded from this analysis. Any sections that would normally cover the excluded product should instead provide deeper analysis of the included product(s).**`
     : 'This analysis covers ALL products (POR and R360) and ALL regions (AMER, EMEA, APAC).';
 
-  // Extract INBOUND source data only
-  const inboundSourcePOR = (funnel_by_source?.POR || []).filter((row: any) =>
+  // Extract INBOUND source data only (for active products)
+  const inboundSourcePOR = includePOR ? (funnel_by_source?.POR || []).filter((row: any) =>
     row.source?.toUpperCase() === 'INBOUND'
-  );
-  const inboundSourceR360 = (funnel_by_source?.R360 || []).filter((row: any) =>
+  ) : [];
+  const inboundSourceR360 = includeR360 ? (funnel_by_source?.R360 || []).filter((row: any) =>
     row.source?.toUpperCase() === 'INBOUND'
-  );
+  ) : [];
 
   // Get NEW LOGO category funnel data (primary inbound category)
-  const newLogoPOR = (funnel_by_category?.POR || []).filter((row: any) =>
+  const newLogoPOR = includePOR ? (funnel_by_category?.POR || []).filter((row: any) =>
     row.category === 'NEW LOGO'
-  );
-  const newLogoR360 = (funnel_by_category?.R360 || []).filter((row: any) =>
+  ) : [];
+  const newLogoR360 = includeR360 ? (funnel_by_category?.R360 || []).filter((row: any) =>
     row.category === 'NEW LOGO'
-  );
+  ) : [];
 
   // Source attainment for inbound
-  const inboundAttainmentPOR = (source_attainment?.POR || []).filter((row: any) =>
+  const inboundAttainmentPOR = includePOR ? (source_attainment?.POR || []).filter((row: any) =>
     row.source?.toUpperCase() === 'INBOUND'
-  );
-  const inboundAttainmentR360 = (source_attainment?.R360 || []).filter((row: any) =>
+  ) : [];
+  const inboundAttainmentR360 = includeR360 ? (source_attainment?.R360 || []).filter((row: any) =>
     row.source?.toUpperCase() === 'INBOUND'
-  );
+  ) : [];
 
   // Google Ads data (paid inbound)
-  const googleAdsPOR = google_ads?.POR || [];
-  const googleAdsR360 = google_ads?.R360 || [];
+  const googleAdsPOR = includePOR ? (google_ads?.POR || []) : [];
+  const googleAdsR360 = includeR360 ? (google_ads?.R360 || []) : [];
 
   // MQL disqualification summary
   const dqSummary = mql_disqualification_summary || { POR: {}, R360: {} };
 
-  // MQL detail statistics
-  const mqlDetailsPOR = mql_details?.POR || [];
-  const mqlDetailsR360 = mql_details?.R360 || [];
+  // MQL detail statistics (for active products)
+  const mqlDetailsPOR = includePOR ? (mql_details?.POR || []) : [];
+  const mqlDetailsR360 = includeR360 ? (mql_details?.R360 || []) : [];
 
   // Calculate inbound MQL counts
   const inboundMqlPOR = mqlDetailsPOR.filter((m: any) =>
@@ -73,9 +82,9 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
     m.source?.toUpperCase()?.includes('INBOUND') || m.source?.toUpperCase()?.includes('ORGANIC')
   );
 
-  // SQL details for conversion analysis
-  const sqlDetailsPOR = sql_details?.POR || [];
-  const sqlDetailsR360 = sql_details?.R360 || [];
+  // SQL details for conversion analysis (for active products)
+  const sqlDetailsPOR = includePOR ? (sql_details?.POR || []) : [];
+  const sqlDetailsR360 = includeR360 ? (sql_details?.R360 || []) : [];
   const inboundSqlPOR = sqlDetailsPOR.filter((s: any) =>
     s.source?.toUpperCase()?.includes('INBOUND') || s.source?.toUpperCase()?.includes('ORGANIC')
   );
@@ -174,11 +183,17 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
     .filter((r: any) => r.ctr_pct != null && r.ctr_pct < 3)
     .sort((a: any, b: any) => (a.ctr_pct || 0) - (b.ctr_pct || 0));
 
-  const prompt = `You are a senior Inbound Marketing analyst at a B2B SaaS company (Point of Rental Software) reviewing Q1 2026 inbound performance for two products: POR (rental management) and R360 (asset inspection).
+  const productDescription = includePOR && includeR360
+    ? 'two products: POR (rental management) and R360 (asset inspection)'
+    : includePOR
+      ? 'POR (rental management software)'
+      : 'R360 (asset inspection software)';
+
+  const prompt = `You are a senior Inbound Marketing analyst at a B2B SaaS company (Point of Rental Software) reviewing Q1 2026 inbound performance for ${productDescription}.
 
 Provide a comprehensive, data-driven inbound marketing analysis. Frame ALL suggested actions as RECOMMENDATIONS (never "actions" or "next steps"). Be specific with numbers, percentages, and dollar amounts. Every insight must reference the data provided.
 
-**R360 NOTE**: R360 does NOT have a SAL stage. R360 flows directly from SQL to SQO.
+${includeR360 ? '**R360 NOTE**: R360 does NOT have a SAL stage. R360 flows directly from SQL to SQO.' : ''}
 
 ---
 
@@ -188,7 +203,7 @@ Provide a comprehensive, data-driven inbound marketing analysis. Frame ALL sugge
 - Overall inbound health: on-track, at-risk, or failing
 - Lead volume pacing vs plan (MQL generation rate)
 - Biggest single inbound risk with dollar impact
-- Product divergence summary (POR vs R360 inbound performance)
+${includePOR && includeR360 ? '- Product divergence summary (POR vs R360 inbound performance)' : `- Regional performance summary for ${includePOR ? 'POR' : 'R360'} inbound`}
 
 ### 2. LEAD VOLUME & PACING ANALYSIS
 For each product/region:
@@ -271,135 +286,135 @@ ${filterDescription}
 - Quarter Progress: ${period?.quarter_pct_complete || 0}% complete
 - Days Elapsed: ${period?.days_elapsed || 0} of ${period?.total_days || 90}
 
-## POR INBOUND FUNNEL DATA BY REGION
+${includePOR ? `## POR INBOUND FUNNEL DATA BY REGION
 ${inboundSourcePOR.map((row: any) =>
   `- ${row.region}: MQL ${row.actual_mql || 0}/${row.qtd_target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql || 0}/${row.qtd_target_sql || 0} (${row.sql_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.qtd_target_sqo || 0} (${row.sqo_pacing_pct || 0}%)`
-).join('\n') || 'No POR inbound data available'}
+).join('\n') || 'No POR inbound data available'}` : ''}
 
-## R360 INBOUND FUNNEL DATA BY REGION
+${includeR360 ? `## R360 INBOUND FUNNEL DATA BY REGION
 ${inboundSourceR360.map((row: any) =>
   `- ${row.region}: MQL ${row.actual_mql || 0}/${row.qtd_target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql || 0}/${row.qtd_target_sql || 0} (${row.sql_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.qtd_target_sqo || 0} (${row.sqo_pacing_pct || 0}%)`
-).join('\n') || 'No R360 inbound data available'}
+).join('\n') || 'No R360 inbound data available'}` : ''}
 
-## POR NEW LOGO FUNNEL (Primary Inbound Category)
+${includePOR ? `## POR NEW LOGO FUNNEL (Primary Inbound Category)
 ${newLogoPOR.map((row: any) =>
   `- ${row.region}: MQL ${row.actual_mql || 0}/${row.qtd_target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql || 0}/${row.qtd_target_sql || 0} (${row.sql_pacing_pct || 0}%), SAL ${row.actual_sal || 0}/${row.qtd_target_sal || 0} (${row.sal_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.qtd_target_sqo || 0} (${row.sqo_pacing_pct || 0}%)`
-).join('\n') || 'No POR NEW LOGO data'}
+).join('\n') || 'No POR NEW LOGO data'}` : ''}
 
-## R360 NEW LOGO FUNNEL (Note: R360 has no SAL stage - direct SQL→SQO)
+${includeR360 ? `## R360 NEW LOGO FUNNEL (Note: R360 has no SAL stage - direct SQL→SQO)
 ${newLogoR360.map((row: any) =>
   `- ${row.region}: MQL ${row.actual_mql || 0}/${row.qtd_target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql || 0}/${row.qtd_target_sql || 0} (${row.sql_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.qtd_target_sqo || 0} (${row.sqo_pacing_pct || 0}%)`
-).join('\n') || 'No R360 NEW LOGO data'}
+).join('\n') || 'No R360 NEW LOGO data'}` : ''}
 
 ## INBOUND SOURCE ATTAINMENT (Revenue)
-### POR Inbound Revenue Attainment
+${includePOR ? `### POR Inbound Revenue Attainment
 ${inboundAttainmentPOR.map((row: any) =>
   `- ${row.region}: ${row.attainment_pct || 0}% attainment, $${(row.gap || 0).toLocaleString()} gap, RAG: ${row.rag_status || 'N/A'}`
-).join('\n') || 'No POR inbound attainment data'}
+).join('\n') || 'No POR inbound attainment data'}` : ''}
 
-### R360 Inbound Revenue Attainment
+${includeR360 ? `### R360 Inbound Revenue Attainment
 ${inboundAttainmentR360.map((row: any) =>
   `- ${row.region}: ${row.attainment_pct || 0}% attainment, $${(row.gap || 0).toLocaleString()} gap, RAG: ${row.rag_status || 'N/A'}`
-).join('\n') || 'No R360 inbound attainment data'}
+).join('\n') || 'No R360 inbound attainment data'}` : ''}
 
 ## MQL QUALITY ANALYSIS
-### POR MQL Status Breakdown
+${includePOR ? `### POR MQL Status Breakdown
 - Total Inbound MQLs: ${porMqlStatus.total}
 - Converted to SQL: ${porMqlStatus.converted} (${calcConversionRate(porMqlStatus.converted, porMqlStatus.total)}%)
 - Reverted/Disqualified: ${porMqlStatus.reverted} (${calcConversionRate(porMqlStatus.reverted, porMqlStatus.total)}%)
 - Stalled (>30 days): ${porMqlStatus.stalled} (${calcConversionRate(porMqlStatus.stalled, porMqlStatus.total)}%)
 - Active: ${porMqlStatus.active}
-- Average Days in MQL Stage: ${avgDaysInStage(inboundMqlPOR)}
+- Average Days in MQL Stage: ${avgDaysInStage(inboundMqlPOR)}` : ''}
 
-### R360 MQL Status Breakdown
+${includeR360 ? `### R360 MQL Status Breakdown
 - Total Inbound MQLs: ${r360MqlStatus.total}
 - Converted to SQL: ${r360MqlStatus.converted} (${calcConversionRate(r360MqlStatus.converted, r360MqlStatus.total)}%)
 - Reverted/Disqualified: ${r360MqlStatus.reverted} (${calcConversionRate(r360MqlStatus.reverted, r360MqlStatus.total)}%)
 - Stalled (>30 days): ${r360MqlStatus.stalled} (${calcConversionRate(r360MqlStatus.stalled, r360MqlStatus.total)}%)
 - Active: ${r360MqlStatus.active}
-- Average Days in MQL Stage: ${avgDaysInStage(inboundMqlR360)}
+- Average Days in MQL Stage: ${avgDaysInStage(inboundMqlR360)}` : ''}
 
 ### Overall MQL Disqualification Summary
-- POR: ${dqSummary.POR?.reverted_pct || 0}% reverted, ${dqSummary.POR?.converted_pct || 0}% converted, ${dqSummary.POR?.stalled_pct || 0}% stalled
-- R360: ${dqSummary.R360?.reverted_pct || 0}% reverted, ${dqSummary.R360?.converted_pct || 0}% converted, ${dqSummary.R360?.stalled_pct || 0}% stalled
+${includePOR ? `- POR: ${dqSummary.POR?.reverted_pct || 0}% reverted, ${dqSummary.POR?.converted_pct || 0}% converted, ${dqSummary.POR?.stalled_pct || 0}% stalled` : ''}
+${includeR360 ? `- R360: ${dqSummary.R360?.reverted_pct || 0}% reverted, ${dqSummary.R360?.converted_pct || 0}% converted, ${dqSummary.R360?.stalled_pct || 0}% stalled` : ''}
 
 ## UTM SOURCE ANALYSIS (Lead Origin Tracking)
-### POR - By UTM Source (Top 10)
+${includePOR ? `### POR - By UTM Source (Top 10)
 ${utmSourcePOR.length > 0 ? utmSourcePOR.map(s =>
   `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
-).join('\n') : 'No UTM source data'}
+).join('\n') : 'No UTM source data'}` : ''}
 
-### R360 - By UTM Source (Top 10)
+${includeR360 ? `### R360 - By UTM Source (Top 10)
 ${utmSourceR360.length > 0 ? utmSourceR360.map(s =>
   `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
-).join('\n') : 'No UTM source data'}
+).join('\n') : 'No UTM source data'}` : ''}
 
 ## UTM CHANNEL ANALYSIS
-### POR - By UTM Channel
+${includePOR ? `### POR - By UTM Channel
 ${utmChannelPOR.length > 0 ? utmChannelPOR.map(s =>
   `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
-).join('\n') : 'No UTM channel data'}
+).join('\n') : 'No UTM channel data'}` : ''}
 
-### R360 - By UTM Channel
+${includeR360 ? `### R360 - By UTM Channel
 ${utmChannelR360.length > 0 ? utmChannelR360.map(s =>
   `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
-).join('\n') : 'No UTM channel data'}
+).join('\n') : 'No UTM channel data'}` : ''}
 
 ## UTM CAMPAIGN ANALYSIS
-### POR - By UTM Campaign (Top 10)
+${includePOR ? `### POR - By UTM Campaign (Top 10)
 ${utmCampaignPOR.length > 0 ? utmCampaignPOR.map(s =>
   `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
-).join('\n') : 'No UTM campaign data'}
+).join('\n') : 'No UTM campaign data'}` : ''}
 
-### R360 - By UTM Campaign (Top 10)
+${includeR360 ? `### R360 - By UTM Campaign (Top 10)
 ${utmCampaignR360.length > 0 ? utmCampaignR360.map(s =>
   `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
-).join('\n') : 'No UTM campaign data'}
+).join('\n') : 'No UTM campaign data'}` : ''}
 
 ## UTM KEYWORD ANALYSIS
-### POR - By UTM Keyword/Term (Top 10)
+${includePOR ? `### POR - By UTM Keyword/Term (Top 10)
 ${utmKeywordPOR.length > 0 ? utmKeywordPOR.map(s =>
   `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
-).join('\n') : 'No UTM keyword data'}
+).join('\n') : 'No UTM keyword data'}` : ''}
 
-### R360 - By UTM Keyword/Term (Top 10)
+${includeR360 ? `### R360 - By UTM Keyword/Term (Top 10)
 ${utmKeywordR360.length > 0 ? utmKeywordR360.map(s =>
   `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
-).join('\n') : 'No UTM keyword data'}
+).join('\n') : 'No UTM keyword data'}` : ''}
 
 ## GOOGLE ADS PERFORMANCE (Paid Inbound)
-### POR Google Ads by Region
+${includePOR ? `### POR Google Ads by Region
 ${googleAdsPOR.map((row: any) =>
   `- ${row.region}: $${(row.ad_spend_usd || 0).toLocaleString()} spend, ${row.clicks || 0} clicks, CTR: ${row.ctr_pct || 0}%, ${row.conversions || 0} conversions, CPA: $${row.cpa_usd || 'N/A'}`
 ).join('\n') || 'No POR ads data'}
 
-Total POR Ad Spend: $${totalAdSpendPOR.toLocaleString()} | Total Conversions: ${totalConversionsPOR} | Blended CPA: $${totalConversionsPOR > 0 ? Math.round(totalAdSpendPOR / totalConversionsPOR) : 'N/A'}
+Total POR Ad Spend: $${totalAdSpendPOR.toLocaleString()} | Total Conversions: ${totalConversionsPOR} | Blended CPA: $${totalConversionsPOR > 0 ? Math.round(totalAdSpendPOR / totalConversionsPOR) : 'N/A'}` : ''}
 
-### R360 Google Ads by Region
+${includeR360 ? `### R360 Google Ads by Region
 ${googleAdsR360.map((row: any) =>
   `- ${row.region}: $${(row.ad_spend_usd || 0).toLocaleString()} spend, ${row.clicks || 0} clicks, CTR: ${row.ctr_pct || 0}%, ${row.conversions || 0} conversions, CPA: $${row.cpa_usd || 'N/A'}`
 ).join('\n') || 'No R360 ads data'}
 
-Total R360 Ad Spend: $${totalAdSpendR360.toLocaleString()} | Total Conversions: ${totalConversionsR360} | Blended CPA: $${totalConversionsR360 > 0 ? Math.round(totalAdSpendR360 / totalConversionsR360) : 'N/A'}
+Total R360 Ad Spend: $${totalAdSpendR360.toLocaleString()} | Total Conversions: ${totalConversionsR360} | Blended CPA: $${totalConversionsR360 > 0 ? Math.round(totalAdSpendR360 / totalConversionsR360) : 'N/A'}` : ''}
 
 ### Google Ads RCA (Performance Issues)
-${(google_ads_rca?.POR || []).concat(google_ads_rca?.R360 || []).map((row: any) =>
+${(includePOR ? (google_ads_rca?.POR || []) : []).concat(includeR360 ? (google_ads_rca?.R360 || []) : []).map((row: any) =>
   `- ${row.product} ${row.region}: CTR ${row.ctr_pct}% (${row.ctr_performance}), CPA $${row.cpa_usd} (${row.cpa_performance}). ${row.rca_commentary}`
 ).join('\n') || 'No ads RCA data'}
 
 ## SQL CONVERSION ANALYSIS
-### POR Inbound SQLs
+${includePOR ? `### POR Inbound SQLs
 - Total Inbound SQLs: ${inboundSqlPOR.length}
 - With Opportunity: ${inboundSqlPOR.filter((s: any) => s.has_opportunity === 'Yes').length}
 - Converted to SAL: ${inboundSqlPOR.filter((s: any) => s.converted_to_sal === 'Yes').length}
 - Converted to SQO: ${inboundSqlPOR.filter((s: any) => s.converted_to_sqo === 'Yes').length}
-- Average Days MQL→SQL: ${Math.round(inboundSqlPOR.reduce((sum: number, s: any) => sum + (s.days_mql_to_sql || 0), 0) / (inboundSqlPOR.length || 1))}
+- Average Days MQL→SQL: ${Math.round(inboundSqlPOR.reduce((sum: number, s: any) => sum + (s.days_mql_to_sql || 0), 0) / (inboundSqlPOR.length || 1))}` : ''}
 
-### R360 Inbound SQLs (Note: R360 has no SAL stage - direct SQL→SQO)
+${includeR360 ? `### R360 Inbound SQLs (Note: R360 has no SAL stage - direct SQL→SQO)
 - Total Inbound SQLs: ${inboundSqlR360.length}
 - With Opportunity: ${inboundSqlR360.filter((s: any) => s.has_opportunity === 'Yes').length}
 - Converted to SQO: ${inboundSqlR360.filter((s: any) => s.converted_to_sqo === 'Yes').length}
-- Average Days MQL→SQL: ${Math.round(inboundSqlR360.reduce((sum: number, s: any) => sum + (s.days_mql_to_sql || 0), 0) / (inboundSqlR360.length || 1))}
+- Average Days MQL→SQL: ${Math.round(inboundSqlR360.reduce((sum: number, s: any) => sum + (s.days_mql_to_sql || 0), 0) / (inboundSqlR360.length || 1))}` : ''}
 
 ## PRE-COMPUTED KEY INSIGHTS (use these to anchor your analysis)
 
@@ -418,28 +433,39 @@ ${highCpaAds.map((r: any) => `- ${r.product} (${r.region}): CPA $${r.cpa_usd}, s
 ### Low CTR Regions (below 3% threshold)
 ${lowCtrAds.map((r: any) => `- ${r.product} (${r.region}): CTR ${r.ctr_pct}%, ${r.clicks || 0} clicks, spend $${(r.ad_spend_usd || 0).toLocaleString()}`).join('\n') || 'All CTRs above threshold'}
 
-### Top Converting UTM Sources (POR)
+${includePOR ? `### Top Converting UTM Sources (POR)
 ${topConvertingUtmPOR.map(s => `- ${s.name}: ${s.convRate}% conversion, ${s.total} MQLs`).join('\n') || 'No UTM source data'}
 
 ### Worst Converting UTM Sources (POR)
-${worstConvertingUtmPOR.map(s => `- ${s.name}: ${s.convRate}% conversion, ${s.total} MQLs, ${s.stallRate}% stalled`).join('\n') || 'No UTM source data'}
+${worstConvertingUtmPOR.map(s => `- ${s.name}: ${s.convRate}% conversion, ${s.total} MQLs, ${s.stallRate}% stalled`).join('\n') || 'No UTM source data'}` : ''}
+
+${includeR360 ? `### Top Converting UTM Sources (R360)
+${topConvertingUtmR360.map(s => `- ${s.name}: ${s.convRate}% conversion, ${s.total} MQLs`).join('\n') || 'No UTM source data'}` : ''}
 
 ### Period Context
 - Quarter ${quarterPctComplete}% complete (${daysElapsed} days elapsed, ${daysRemaining} remaining)
 
 ## CRITICAL RULES
-1. PRODUCE ALL 9 SECTIONS - do not skip any section
-2. Use SPECIFIC numbers and percentages from the data - never generalize
+1. PRODUCE ALL 9 SECTIONS - do not skip any section. Each section must be DETAILED and COMPREHENSIVE.
+2. Use SPECIFIC numbers and percentages from the data - never generalize. Every paragraph needs at least 2 data points.
 3. Reference the pre-computed insights above to ensure accuracy
 4. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
-5. R360 has NO SAL stage - flows directly from SQL to SQO
-6. Conversion thresholds: MQL→SQL 30%, SQL→SAL 50% (POR), SAL→SQO 60% (POR), SQL→SQO 50% (R360)
-7. Ads thresholds: CPA above $200 = risk, CTR below 3% = risk
-8. Be DIRECT about failures - name specific channels, campaigns, and regions that are underperforming
-9. Every recommendation must specify: target product/region/channel, expected impact, owner, and timeframe
+5. R360 has NO SAL stage - flows directly from SQL to SQO. Explain this difference in funnel analysis.
+6. Conversion thresholds: MQL→SQL 30%, SQL→SAL 50% (POR), SAL→SQO 60% (POR), SQL→SQO 50% (R360). Call out EVERY threshold breach with specific numbers.
+7. Ads thresholds: CPA above $200 = risk, CTR below 3% = risk. Quantify the dollar waste for each breach.
+8. Be DIRECT about failures - name specific channels, campaigns, UTM sources, and regions that are underperforming with exact numbers
+9. Every recommendation must specify: target product/region/channel, expected impact in leads/dollars, owner, and implementation timeline
 10. When UTM data shows no matches, analyze the available funnel and ads data instead
-11. Compare POR vs R360 inbound effectiveness explicitly
-12. Prioritize recommendations by lead-to-revenue impact potential`;
+11. ${includePOR && includeR360 ? 'Compare POR vs R360 inbound effectiveness explicitly with specific conversion rate and volume comparisons per region' : `Focus exclusively on ${includePOR ? 'POR' : 'R360'} inbound performance. Do NOT mention or reference ${includePOR ? 'R360' : 'POR'} - it is excluded from this analysis.`}
+12. Prioritize recommendations by lead-to-revenue impact potential
+13. YOUR RESPONSE MUST BE AT LEAST 7000 CHARACTERS LONG AND CONTAIN ALL 9 SECTION HEADERS. DO NOT STOP EARLY OR ABBREVIATE. AIM FOR 8000-10000 CHARACTERS.
+14. Each section must have at least 5 specific data-backed observations. Never produce a section with fewer than 4 bullet points.
+15. Include regional breakdowns (AMER/EMEA/APAC) in EVERY section where data is available - do not aggregate away regional detail
+16. For Lead Volume section: break down MQL counts by region, by product, show pacing %, and compare to target for each
+17. For Google Ads: analyze each region separately with spend, CPA, CTR, conversion rate, and ROI assessment
+18. In Predictive Indicators: project Q1 lead volumes, conversion rates, and revenue impact by product and region based on current trends
+
+REMEMBER: Your output MUST exceed 7000 characters. Write in full detail for every section. Short responses will be rejected and regenerated.`;
 
   return prompt;
 }
@@ -467,41 +493,55 @@ export async function POST(request: Request) {
 
     const prompt = buildInboundAnalysisPrompt(reportData, filterContext);
 
-    // STAGE 1: Generate raw insights with GPT-5.2 Instant
-    const insightResponse = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini-audio-preview',
-        modalities: ['text'],
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a senior Inbound Marketing analyst at a B2B SaaS company. You produce comprehensive quarterly inbound analysis covering lead volume pacing, funnel conversion, velocity, channel effectiveness, ads ROI, revenue attribution, and predictive forecasting. Your analysis is data-driven, specific (always cite numbers and percentages), and direct about underperformance. Frame all suggestions as recommendations with priority levels. Output plain text with clear section headers - no markdown formatting.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_completion_tokens: 4000,
-      }),
-    });
+    // STAGE 1: Generate raw insights with GPT-5.2 (retry if output too short)
+    const MIN_ANALYSIS_LENGTH = 6000;
+    const MAX_RETRIES = 2;
+    let rawAnalysis = '';
+    let insightData: any = null;
 
-    if (!insightResponse.ok) {
-      const errorData = await insightResponse.json().catch(() => ({}));
-      console.error('OpenAI API error (insights):', errorData);
-      return NextResponse.json(
-        { error: 'Failed to generate insights', details: errorData },
-        { status: insightResponse.status }
-      );
+    const systemMessage = 'You are a senior Inbound Marketing analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly inbound analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 9 sections: Executive Summary, Lead Volume & Pacing, Funnel Conversion, Funnel Velocity & Stall, Channel & Campaign Effectiveness, Google Ads Performance, Inbound Revenue Attribution, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) and product comparisons (POR vs R360) in every section. Cite specific numbers, percentages, conversion rates, and dollar amounts throughout. Be direct about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). Output plain text only - no markdown, no emojis. Use dashes for lists. TARGET 8000-10000 CHARACTERS. NEVER stop before completing all 9 sections.';
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const insightResponse = await fetch(OPENAI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-5.2-chat-latest',
+          messages: [
+            { role: 'system', content: systemMessage },
+            { role: 'user', content: prompt }
+          ],
+          max_completion_tokens: 10000,
+        }),
+      });
+
+      if (!insightResponse.ok) {
+        const errorData = await insightResponse.json().catch(() => ({}));
+        console.error(`OpenAI API error (insights, attempt ${attempt + 1}):`, errorData);
+        if (attempt === MAX_RETRIES) {
+          return NextResponse.json(
+            { error: 'Failed to generate insights', details: errorData },
+            { status: insightResponse.status }
+          );
+        }
+        continue;
+      }
+
+      insightData = await insightResponse.json();
+      rawAnalysis = insightData.choices?.[0]?.message?.content || '';
+
+      if (rawAnalysis.length >= MIN_ANALYSIS_LENGTH) {
+        break;
+      }
+      console.log(`Inbound analysis too short (${rawAnalysis.length} chars), retrying (attempt ${attempt + 2})...`);
     }
 
-    const insightData = await insightResponse.json();
-    const rawAnalysis = insightData.choices?.[0]?.message?.content || 'No analysis generated';
+    if (!rawAnalysis) {
+      rawAnalysis = 'No analysis generated';
+    }
 
     // STAGE 2: Format with cheap model (GPT-4o-mini)
     const validFormats = formats.filter((f): f is OutputFormat =>
