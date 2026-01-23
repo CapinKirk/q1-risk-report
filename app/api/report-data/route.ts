@@ -36,9 +36,9 @@ function getBigQuery() {
 }
 
 /**
- * Get renewal targets from RevOpsReport (Layer 5 - PRIMARY SOURCE)
- * Uses P75 risk profile and QTD horizon for Q1 targets
- * This is the single source of truth for all bookings targets
+ * Get renewal targets from RevOpsPlan (Layer 3 - AUTHORITATIVE SOURCE)
+ * Q1 target = SUM(daily Target_ACV_Won) over ActivityQuarterYear='2026-Q1'
+ * RevOpsPlan is the single source of truth for ALL planned targets
  */
 async function getRenewalTargetsFromRawPlan(): Promise<Map<string, number>> {
   try {
@@ -46,12 +46,12 @@ async function getRenewalTargetsFromRawPlan(): Promise<Map<string, number>> {
       SELECT
         RecordType AS product,
         Region AS region,
-        ROUND(Target_ACV, 2) AS q1_target
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsReport\`
+        ROUND(SUM(COALESCE(Target_ACV_Won, 0)), 2) AS q1_target
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPlan\`
       WHERE RiskProfile = 'P75'
-        AND Horizon = 'QTD'
+        AND ActivityQuarterYear = '2026-Q1'
         AND OpportunityType = 'Renewal'
-        AND Period_Start_Date = '2026-01-01'
+      GROUP BY 1, 2
     `;
 
     const [rows] = await getBigQuery().query({ query });
@@ -68,10 +68,77 @@ async function getRenewalTargetsFromRawPlan(): Promise<Map<string, number>> {
       }
     }
 
-    console.log('Renewal targets from RevOpsReport (P75):', Object.fromEntries(renewalTargetMap));
+    console.log('Renewal targets from RevOpsPlan (P75):', Object.fromEntries(renewalTargetMap));
     return renewalTargetMap;
   } catch (error: any) {
-    console.error('Failed to fetch renewal targets from RevOpsReport:', error.message);
+    console.error('Failed to fetch renewal targets from RevOpsPlan:', error.message);
+    return new Map();
+  }
+}
+
+/**
+ * Get FY (Full Year) targets from RAW_2026_Plan_by_Month
+ * This is the source of truth for annual bookings targets from the Excel plan
+ * Returns Map<key, fy_target> where key = "product-region-category"
+ */
+async function getFYTargetsFromPlan(): Promise<Map<string, number>> {
+  try {
+    const query = `
+      SELECT
+        CASE
+          WHEN Division LIKE '%POR%' THEN 'POR'
+          WHEN Division LIKE '%R360%' THEN 'R360'
+        END AS product,
+        CASE
+          WHEN Division LIKE 'AMER%' THEN 'AMER'
+          WHEN Division LIKE 'EMEA%' THEN 'EMEA'
+          WHEN Division LIKE 'APAC%' THEN 'APAC'
+        END AS region,
+        CASE
+          WHEN Booking_Type = 'New Business SMB' THEN 'NEW LOGO'
+          WHEN Booking_Type = 'New Business Strat' THEN 'STRATEGIC'
+          WHEN Booking_Type = 'New Business' THEN 'NEW LOGO'
+          WHEN Booking_Type = 'New Business - UK' THEN 'NEW LOGO'
+          WHEN Booking_Type = 'New Business - EU' THEN 'NEW LOGO'
+          WHEN Booking_Type = 'Expansion' THEN 'EXPANSION'
+          WHEN Booking_Type = 'Migration' THEN 'MIGRATION'
+          WHEN Booking_Type = 'Renewal' THEN 'RENEWAL'
+          ELSE Booking_Type
+        END AS category,
+        ROUND(SUM(CAST(f_2026_Bookings_Target AS FLOAT64)), 2) AS fy_target
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RAW_2026_Plan_by_Month\`
+      WHERE Booking_Type IS NOT NULL
+        AND Booking_Type != ''
+        AND Division NOT LIKE '%Total%'
+        AND (Division LIKE 'AMER%' OR Division LIKE 'EMEA%' OR Division LIKE 'APAC%')
+      GROUP BY 1, 2, 3
+      HAVING product IS NOT NULL AND region IS NOT NULL
+    `;
+
+    const [rows] = await getBigQuery().query({ query });
+    const fyTargetMap = new Map<string, number>();
+
+    for (const row of rows as any[]) {
+      const { product, region, category, fy_target } = row;
+      if (product && region && category) {
+        const key = `${product}-${region}-${category}`;
+        // Aggregate in case of multiple rows per key (e.g., UK + EU → NEW LOGO)
+        const existing = fyTargetMap.get(key) || 0;
+        fyTargetMap.set(key, existing + (parseFloat(fy_target) || 0));
+      }
+    }
+
+    // Log totals for verification
+    let porTotal = 0, r360Total = 0;
+    Array.from(fyTargetMap.entries()).forEach(([key, value]) => {
+      if (key.startsWith('POR')) porTotal += value;
+      else if (key.startsWith('R360')) r360Total += value;
+    });
+    console.log(`FY Targets from RAW_2026_Plan_by_Month: POR=$${porTotal.toLocaleString()}, R360=$${r360Total.toLocaleString()}, Total=$${(porTotal + r360Total).toLocaleString()}`);
+
+    return fyTargetMap;
+  } catch (error: any) {
+    console.error('Failed to fetch FY targets from RAW_2026_Plan_by_Month:', error.message);
     return new Map();
   }
 }
@@ -172,56 +239,101 @@ async function getRevOpsQTDData(filters: ReportFilters) {
   const filterClause = buildRevOpsFilterClause(filters);
 
   const query = `
+    WITH plan_targets AS (
+      SELECT
+        RecordType AS product,
+        Region AS region,
+        CASE
+          WHEN OpportunityType = 'New Business' AND Segment = 'Strategic' THEN 'STRATEGIC'
+          WHEN OpportunityType = 'New Business' THEN 'NEW LOGO'
+          WHEN OpportunityType = 'Existing Business' THEN 'EXPANSION'
+          WHEN OpportunityType = 'Migration' THEN 'MIGRATION'
+          WHEN OpportunityType = 'Renewal' THEN 'RENEWAL'
+          ELSE OpportunityType
+        END AS category,
+        OpportunityType AS opportunity_type,
+        ROUND(SUM(COALESCE(Target_ACV_Won, 0)), 2) AS q1_target,
+        ROUND(SUM(COALESCE(Target_MQL, 0)), 0) AS target_mql,
+        ROUND(SUM(COALESCE(Target_SQL, 0)), 0) AS target_sql,
+        ROUND(SUM(COALESCE(Target_SAL, 0)), 0) AS target_sal,
+        ROUND(SUM(COALESCE(Target_SQO, 0)), 0) AS target_sqo,
+        ROUND(SUM(COALESCE(Target_Won, 0)), 0) AS target_won
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPlan\`
+      WHERE RiskProfile = 'P75'
+        AND ActivityQuarterYear = '2026-Q1'
+        AND RecordType IN ('POR', 'R360')
+        AND Region IN ('AMER', 'EMEA', 'APAC')
+        ${filterClause}
+      GROUP BY 1, 2, 3, 4
+    ),
+    report_actuals AS (
+      SELECT
+        RecordType AS product,
+        Region AS region,
+        CASE
+          WHEN OpportunityType = 'New Business' AND Segment = 'Strategic' THEN 'STRATEGIC'
+          WHEN OpportunityType = 'New Business' THEN 'NEW LOGO'
+          WHEN OpportunityType = 'Existing Business' THEN 'EXPANSION'
+          WHEN OpportunityType = 'Migration' THEN 'MIGRATION'
+          WHEN OpportunityType = 'Renewal' THEN 'RENEWAL'
+          ELSE OpportunityType
+        END AS category,
+        OpportunityType AS opportunity_type,
+        ROUND(SUM(COALESCE(Actual_ACV, 0)), 2) AS qtd_actual,
+        ROUND(SUM(COALESCE(Actual_MQL, 0)), 0) AS actual_mql,
+        ROUND(SUM(COALESCE(Actual_SQL, 0)), 0) AS actual_sql,
+        ROUND(SUM(COALESCE(Actual_SAL, 0)), 0) AS actual_sal,
+        ROUND(SUM(COALESCE(Actual_SQO, 0)), 0) AS actual_sqo,
+        ROUND(SUM(COALESCE(Actual_Won, 0)), 0) AS actual_won,
+        ROUND(AVG(COALESCE(MQL_to_SQL_Leakage_Variance, 0)), 1) AS mql_to_sql_leakage,
+        ROUND(AVG(COALESCE(SQL_to_SAL_Leakage_Variance, 0)), 1) AS sql_to_sal_leakage,
+        ROUND(AVG(COALESCE(SAL_to_SQO_Leakage_Variance, 0)), 1) AS sal_to_sqo_leakage
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsReport\`
+      WHERE Horizon = 'QTD'
+        AND RiskProfile = 'P75'
+        AND Period_Start_Date = '2026-01-01'
+        AND RecordType IN ('POR', 'R360')
+        AND Region IN ('AMER', 'EMEA', 'APAC')
+        ${filterClause}
+      GROUP BY 1, 2, 3, 4
+    )
     SELECT
-      RecordType AS product,
-      Region AS region,
-      -- Map OpportunityType + Segment to Category
-      CASE
-        WHEN OpportunityType = 'New Business' AND Segment = 'Strategic' THEN 'STRATEGIC'
-        WHEN OpportunityType = 'New Business' THEN 'NEW LOGO'
-        WHEN OpportunityType = 'Existing Business' THEN 'EXPANSION'
-        WHEN OpportunityType = 'Migration' THEN 'MIGRATION'
-        WHEN OpportunityType = 'Renewal' THEN 'RENEWAL'
-        ELSE OpportunityType
-      END AS category,
-      OpportunityType AS opportunity_type,
-      ROUND(COALESCE(Target_ACV, 0), 2) AS q1_target,
-      ROUND(COALESCE(Actual_ACV, 0), 2) AS qtd_actual,
-      -- Revenue_Pacing_Score is attainment as decimal (e.g., 0.85 = 85%)
-      ROUND(COALESCE(Revenue_Pacing_Score, 0) * 100, 1) AS attainment_pct,
-      -- Funnel metrics
-      ROUND(COALESCE(Target_MQL, 0), 0) AS target_mql,
-      ROUND(COALESCE(Actual_MQL, 0), 0) AS actual_mql,
-      ROUND(COALESCE(Target_SQL, 0), 0) AS target_sql,
-      ROUND(COALESCE(Actual_SQL, 0), 0) AS actual_sql,
-      ROUND(COALESCE(Target_SAL, 0), 0) AS target_sal,
-      ROUND(COALESCE(Actual_SAL, 0), 0) AS actual_sal,
-      ROUND(COALESCE(Target_SQO, 0), 0) AS target_sqo,
-      ROUND(COALESCE(Actual_SQO, 0), 0) AS actual_sqo,
-      ROUND(COALESCE(Target_Won, 0), 0) AS target_won,
-      ROUND(COALESCE(Actual_Won, 0), 0) AS actual_won,
-      -- Leakage metrics for RCA
-      ROUND(COALESCE(MQL_to_SQL_Leakage_Variance, 0), 1) AS mql_to_sql_leakage,
-      ROUND(COALESCE(SQL_to_SAL_Leakage_Variance, 0), 1) AS sql_to_sal_leakage,
-      ROUND(COALESCE(SAL_to_SQO_Leakage_Variance, 0), 1) AS sal_to_sqo_leakage,
-      RiskProfile AS risk_profile
-    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsReport\`
-    WHERE Horizon = 'QTD'
-      AND RiskProfile = 'P75'
-      AND Period_Start_Date = '2026-01-01'
-      AND RecordType IN ('POR', 'R360')
-      AND Region IN ('AMER', 'EMEA', 'APAC')
-      ${filterClause}
+      COALESCE(t.product, a.product) AS product,
+      COALESCE(t.region, a.region) AS region,
+      COALESCE(t.category, a.category) AS category,
+      COALESCE(t.opportunity_type, a.opportunity_type) AS opportunity_type,
+      COALESCE(t.q1_target, 0) AS q1_target,
+      COALESCE(a.qtd_actual, 0) AS qtd_actual,
+      CASE WHEN COALESCE(t.q1_target, 0) > 0
+        THEN ROUND(COALESCE(a.qtd_actual, 0) / t.q1_target * 100, 1)
+        ELSE 0
+      END AS attainment_pct,
+      COALESCE(t.target_mql, 0) AS target_mql,
+      COALESCE(a.actual_mql, 0) AS actual_mql,
+      COALESCE(t.target_sql, 0) AS target_sql,
+      COALESCE(a.actual_sql, 0) AS actual_sql,
+      COALESCE(t.target_sal, 0) AS target_sal,
+      COALESCE(a.actual_sal, 0) AS actual_sal,
+      COALESCE(t.target_sqo, 0) AS target_sqo,
+      COALESCE(a.actual_sqo, 0) AS actual_sqo,
+      COALESCE(t.target_won, 0) AS target_won,
+      COALESCE(a.actual_won, 0) AS actual_won,
+      COALESCE(a.mql_to_sql_leakage, 0) AS mql_to_sql_leakage,
+      COALESCE(a.sql_to_sal_leakage, 0) AS sql_to_sal_leakage,
+      COALESCE(a.sal_to_sqo_leakage, 0) AS sal_to_sqo_leakage,
+      'P75' AS risk_profile
+    FROM plan_targets t
+    FULL OUTER JOIN report_actuals a
+      ON t.product = a.product AND t.region = a.region AND t.category = a.category
     ORDER BY product, region, category
   `;
 
   try {
     const [rows] = await getBigQuery().query({ query });
-    console.log(`RevOpsReport QTD data: ${(rows as any[]).length} rows`);
+    console.log(`RevOpsPlan+Report QTD data: ${(rows as any[]).length} rows`);
     return rows as any[];
   } catch (error: any) {
-    console.error('RevOpsReport query failed:', error.message);
-    // Return empty array on error - will fall back to legacy data
+    console.error('RevOpsPlan+Report query failed:', error.message);
     return [];
   }
 }
@@ -244,21 +356,21 @@ async function getRevOpsQ1Targets(filters: ReportFilters) {
         WHEN OpportunityType = 'Renewal' THEN 'RENEWAL'
         ELSE OpportunityType
       END AS category,
-      ROUND(COALESCE(Target_ACV, 0), 2) AS q1_target
-    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsReport\`
-    WHERE Horizon = 'QTD'
-      AND RiskProfile = 'P75'
-      AND Period_Start_Date = '2026-01-01'
+      ROUND(SUM(COALESCE(Target_ACV_Won, 0)), 2) AS q1_target
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPlan\`
+    WHERE RiskProfile = 'P75'
+      AND ActivityQuarterYear = '2026-Q1'
       AND RecordType IN ('POR', 'R360')
       AND Region IN ('AMER', 'EMEA', 'APAC')
       ${filterClause}
+    GROUP BY 1, 2, 3
   `;
 
   try {
     const [rows] = await getBigQuery().query({ query });
     return rows as any[];
   } catch (error: any) {
-    console.error('RevOps Q1 targets query failed:', error.message);
+    console.error('RevOpsPlan Q1 targets query failed:', error.message);
     return [];
   }
 }
@@ -353,7 +465,8 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
 }
 
 // Query for funnel actuals by source using InboundFunnel (same source as MQL Details for consistency)
-// Uses COUNT(*) instead of COUNT(DISTINCT) to match MQL Details record count exactly
+// Uses RevOpsPlan (Layer 3) for Q1 targets and RevOpsReport for actuals
+// RevOpsPlan has daily target granularity - SUM over Q1 gives exact Q1 targets
 async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360') {
   // Source normalization to standard names
   const sourceNormCase = `
@@ -374,13 +487,30 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
-  // Use RevOpsReport for actuals - it has all source data including AM Sourced and Tradeshow
-  // Use MTD horizon for current month actuals, QTD for quarter totals
+  // Query RevOpsPlan (Layer 3) for Q1 targets by source
+  // SUM daily target values over the full quarter for Q1 totals
   const query = `
-    WITH actuals AS (
-      -- Get actuals from RevOpsReport (MTD for current period)
+    WITH plan_targets AS (
       SELECT
-        '${product}' AS product,
+        Region AS region,
+        ${sourceNormCase} AS source,
+        ROUND(SUM(COALESCE(Target_ACV_Won, 0)), 2) AS target_acv,
+        ROUND(SUM(COALESCE(Target_MQL, 0))) AS target_mql,
+        ROUND(SUM(COALESCE(Target_SQL, 0))) AS target_sql,
+        ROUND(SUM(COALESCE(Target_SAL, 0))) AS target_sal,
+        ROUND(SUM(COALESCE(Target_SQO, 0))) AS target_sqo,
+        ROUND(SUM(COALESCE(Target_Won, 0))) AS target_won
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsPlan\`
+      WHERE RecordType = '${recordType}'
+        AND RiskProfile = 'P75'
+        AND ActivityQuarterYear = '2026-Q1'
+        AND OpportunityType != 'Renewal'
+        AND Source IS NOT NULL AND Source != ''
+        ${regionFilter}
+      GROUP BY 1, 2
+    ),
+    report_actuals AS (
+      SELECT
         Region AS region,
         ${sourceNormCase} AS source,
         SUM(COALESCE(Actual_MQL, 0)) AS actual_mql,
@@ -391,80 +521,36 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
       WHERE RecordType = '${recordType}'
         AND RiskProfile = 'P75'
         AND Horizon = 'QTD'
-        AND Period_Start_Date >= '${filters.startDate}'
-        AND Source IS NOT NULL
-        AND Source != ''
+        AND Period_Start_Date = '2026-01-01'
+        AND Source IS NOT NULL AND Source != ''
+        AND OpportunityType != 'Renewal'
         ${regionFilter}
-      GROUP BY 1, 2, 3
+      GROUP BY 1, 2
     ),
-    plan_targets AS (
+    combined AS (
       SELECT
-        Region AS region,
-        ${sourceNormCase} AS source,
-        CAST(Annual_Booking_Target AS FLOAT64) AS annual_target,
-        CAST(Target_ADS AS FLOAT64) AS target_ads,
-        CAST(Rate_MQL_SQL AS FLOAT64) AS mql_to_sql,
-        CAST(Rate_SQL_SAL AS FLOAT64) AS sql_to_sal,
-        CAST(Rate_SAL_SQO AS FLOAT64) AS sal_to_sqo,
-        CAST(Rate_SQL_SQO AS FLOAT64) AS sql_to_sqo,
-        CAST(Rate_SQO_Won AS FLOAT64) AS sqo_to_won
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.Source_2026_${recordType}_Targets\`
-      WHERE TRUE ${regionFilter}
-    ),
-    targets_calc AS (
-      SELECT
-        region,
-        source,
-        -- Calculate Q1 targets (annual / 4) for each funnel stage
-        SUM(SAFE_DIVIDE(annual_target, target_ads * sqo_to_won) / 4) AS target_sqo,
-        SUM(CASE
-          WHEN sal_to_sqo IS NOT NULL AND sal_to_sqo > 0
-          THEN SAFE_DIVIDE(annual_target, target_ads * sqo_to_won * sal_to_sqo) / 4
-          ELSE 0
-        END) AS target_sal,
-        SUM(CASE
-          WHEN sql_to_sal IS NOT NULL AND sql_to_sal > 0 AND sal_to_sqo IS NOT NULL AND sal_to_sqo > 0
-          THEN SAFE_DIVIDE(annual_target, target_ads * sqo_to_won * sal_to_sqo * sql_to_sal) / 4
-          WHEN sql_to_sqo IS NOT NULL AND sql_to_sqo > 0
-          THEN SAFE_DIVIDE(annual_target, target_ads * sqo_to_won * sql_to_sqo) / 4
-          ELSE 0
-        END) AS target_sql,
-        SUM(CASE
-          WHEN mql_to_sql IS NOT NULL AND mql_to_sql > 0 THEN
-            SAFE_DIVIDE(
-              CASE
-                WHEN sql_to_sal IS NOT NULL AND sql_to_sal > 0 AND sal_to_sqo IS NOT NULL AND sal_to_sqo > 0
-                THEN SAFE_DIVIDE(annual_target, target_ads * sqo_to_won * sal_to_sqo * sql_to_sal)
-                WHEN sql_to_sqo IS NOT NULL AND sql_to_sqo > 0
-                THEN SAFE_DIVIDE(annual_target, target_ads * sqo_to_won * sql_to_sqo)
-                ELSE 0
-              END,
-              mql_to_sql
-            ) / 4
-          ELSE 0
-        END) AS target_mql
-      FROM plan_targets
-      GROUP BY region, source
+        '${product}' AS product,
+        COALESCE(t.region, a.region) AS region,
+        COALESCE(t.source, a.source) AS source,
+        COALESCE(a.actual_mql, 0) AS actual_mql,
+        COALESCE(a.actual_sql, 0) AS actual_sql,
+        COALESCE(a.actual_sal, 0) AS actual_sal,
+        COALESCE(a.actual_sqo, 0) AS actual_sqo,
+        CAST(COALESCE(t.target_mql, 0) AS INT64) AS target_mql,
+        CAST(COALESCE(t.target_sql, 0) AS INT64) AS target_sql,
+        CAST(COALESCE(t.target_sal, 0) AS INT64) AS target_sal,
+        CAST(COALESCE(t.target_sqo, 0) AS INT64) AS target_sqo,
+        COALESCE(t.target_acv, 0) AS target_acv
+      FROM plan_targets t
+      FULL OUTER JOIN report_actuals a ON t.region = a.region AND t.source = a.source
     )
-    SELECT
-      '${product}' AS product,
-      COALESCE(a.region, t.region) AS region,
-      COALESCE(a.source, t.source) AS source,
-      COALESCE(a.actual_mql, 0) AS actual_mql,
-      COALESCE(CAST(ROUND(t.target_mql) AS INT64), 0) AS target_mql,
-      COALESCE(a.actual_sql, 0) AS actual_sql,
-      COALESCE(CAST(ROUND(t.target_sql) AS INT64), 0) AS target_sql,
-      COALESCE(a.actual_sal, 0) AS actual_sal,
-      COALESCE(CAST(ROUND(t.target_sal) AS INT64), 0) AS target_sal,
-      COALESCE(a.actual_sqo, 0) AS actual_sqo,
-      COALESCE(CAST(ROUND(t.target_sqo) AS INT64), 0) AS target_sqo
-    FROM targets_calc t
-    FULL OUTER JOIN actuals a ON a.region = t.region AND a.source = t.source
-    WHERE COALESCE(a.source, t.source) NOT IN ('N/A', '')
-      AND (COALESCE(a.actual_sql, 0) > 0 OR COALESCE(a.actual_sal, 0) > 0 OR COALESCE(a.actual_sqo, 0) > 0
-           OR COALESCE(t.target_sql, 0) > 0 OR COALESCE(t.target_sal, 0) > 0 OR COALESCE(t.target_sqo, 0) > 0
-           OR COALESCE(a.actual_mql, 0) > 0 OR COALESCE(t.target_mql, 0) > 0)
-    ORDER BY COALESCE(a.region, t.region), COALESCE(a.source, t.source)
+    SELECT *
+    FROM combined
+    WHERE source NOT IN ('N/A', '')
+      AND (actual_sql > 0 OR actual_sal > 0 OR actual_sqo > 0
+           OR target_sql > 0 OR target_sal > 0 OR target_sqo > 0
+           OR actual_mql > 0 OR target_mql > 0)
+    ORDER BY region, source
   `;
 
   const [rows] = await getBigQuery().query({ query });
@@ -2458,7 +2544,8 @@ export async function POST(request: Request) {
       r360FunnelByCategory,
       renewalUpliftMap,
       renewalTargetsMap,
-      sourceMixMap,
+      ,  // sourceMixMap removed - source targets now from RevOpsReport directly
+      fyTargetsMap,
     ] = await Promise.all([
       getRevOpsQTDData(filters),
       getRevenueActuals(filters),
@@ -2493,7 +2580,8 @@ export async function POST(request: Request) {
         : Promise.resolve([]),
       getUpcomingRenewalUplift(),
       getRenewalTargetsFromRawPlan(),
-      getSourceMixAllocations(),
+      Promise.resolve(null),  // Source mix no longer needed - targets from RevOpsReport directly
+      getFYTargetsFromPlan(),
     ]);
 
     // Calculate period info
@@ -2652,8 +2740,10 @@ export async function POST(request: Request) {
         gap = qtdTarget > 0 ? qtdAcv - qtdTarget : 0;
       }
       const progressPct = q1Target > 0 ? Math.round((qtdAcv / q1Target) * 1000) / 10 : 0;
-      // FY target is 4x Q1 for simplicity (adjust if actual data available)
-      const fyTarget = q1Target * 4;
+      // Get FY target from RAW_2026_Plan_by_Month (actual plan values)
+      // Fall back to Q1 * 4 if not found (should not happen with proper data)
+      const fyTargetKey = `${target.product}-${target.region}-${target.category}`;
+      const fyTarget = fyTargetsMap.get(fyTargetKey) || (q1Target * 4);
       const fyProgressPct = fyTarget > 0 ? Math.round((qtdAcv / fyTarget) * 1000) / 10 : 0;
 
       // Calculate pipeline coverage (pipeline / remaining gap to Q1)
@@ -2999,7 +3089,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Build source attainment from won deals with computed targets from source mix
+    // Build source attainment from won deals with RevOpsReport targets
     const sourceAttainment: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
     const sourceActualsMap = new Map<string, number>();
     for (const a of sourceActualsRaw as any[]) {
@@ -3007,37 +3097,21 @@ export async function POST(request: Request) {
       sourceActualsMap.set(key, parseFloat(a.total_acv) || 0);
     }
 
-    // Compute source-level Q1 targets from category targets × source mix
-    // Formula: For each source, sum(category_target × source_mix) across all categories
+    // Get source-level Q1 ACV targets directly from RevOpsReport (via funnel data)
+    // This uses the same source of truth as category targets, eliminating variance
     const sourceTargetsMap = new Map<string, number>();
-    const allCategories = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
-    const allProducts = ['POR', 'R360'];
-    const allRegions = ['AMER', 'EMEA', 'APAC'];
-    const allSources = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];
-
-    for (const prod of allProducts) {
-      for (const reg of allRegions) {
-        for (const src of allSources) {
-          let q1Target = 0;
-          for (const cat of allCategories) {
-            // Get category target from RevOpsReport
-            const categoryKey = `${prod}-${reg}-${cat}`;
-            const categoryData = revOpsTargetMap.get(categoryKey);
-            const categoryTarget = categoryData?.q1_target || 0;
-
-            // Get source mix for this category-source combination
-            const sourceMixKey = `${prod}-${reg}-${cat}-${src}`;
-            const sourceMix = sourceMixMap.get(sourceMixKey) || 0;
-
-            // Allocate category target to source based on source mix
-            q1Target += categoryTarget * sourceMix;
-          }
-
-          if (q1Target > 0) {
-            const sourceKey = `${prod}-${reg}-${src}`;
-            sourceTargetsMap.set(sourceKey, Math.round(q1Target));
-          }
-        }
+    for (const row of porFunnelBySource as any[]) {
+      const key = `POR-${row.region}-${row.source}`;
+      const targetAcv = parseFloat(row.target_acv) || 0;
+      if (targetAcv > 0) {
+        sourceTargetsMap.set(key, Math.round(targetAcv));
+      }
+    }
+    for (const row of r360FunnelBySource as any[]) {
+      const key = `R360-${row.region}-${row.source}`;
+      const targetAcv = parseFloat(row.target_acv) || 0;
+      if (targetAcv > 0) {
+        sourceTargetsMap.set(key, Math.round(targetAcv));
       }
     }
 
