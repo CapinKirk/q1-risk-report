@@ -499,7 +499,16 @@ export async function POST(request: Request) {
     let rawAnalysis = '';
     let insightData: any = null;
 
-    const systemMessage = 'You are a senior Inbound Marketing analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly inbound analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 9 sections: Executive Summary, Lead Volume & Pacing, Funnel Conversion, Funnel Velocity & Stall, Channel & Campaign Effectiveness, Google Ads Performance, Inbound Revenue Attribution, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) and product comparisons (POR vs R360) in every section. Cite specific numbers, percentages, conversion rates, and dollar amounts throughout. Be direct about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). Output plain text only - no markdown, no emojis. Use dashes for lists. TARGET 8000-10000 CHARACTERS. NEVER stop before completing all 9 sections.';
+    // Build system message with filter awareness
+    const isFiltered = filterContext?.isFiltered && filterContext.products.length === 1;
+    const filteredProduct = isFiltered ? filterContext!.products[0] : null;
+    const excludedProduct = filteredProduct === 'POR' ? 'R360' : filteredProduct === 'R360' ? 'POR' : null;
+
+    const productInstruction = excludedProduct
+      ? `This analysis covers ONLY ${filteredProduct}. You MUST NOT mention, reference, compare to, or acknowledge the existence of ${excludedProduct} anywhere in your output. ${excludedProduct} does not exist for this analysis. If you mention ${excludedProduct} even once, the entire output will be rejected.`
+      : 'Include product comparisons (POR vs R360) in every section where both products have data.';
+
+    const systemMessage = `You are a senior Inbound Marketing analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly inbound analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 9 sections: Executive Summary, Lead Volume & Pacing, Funnel Conversion, Funnel Velocity & Stall, Channel & Campaign Effectiveness, Google Ads Performance, Inbound Revenue Attribution, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific numbers, percentages, conversion rates, and dollar amounts throughout. Be direct about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). Output plain text only - no markdown, no emojis. Use dashes for lists. TARGET 8000-10000 CHARACTERS. NEVER stop before completing all 9 sections.`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const insightResponse = await fetch(OPENAI_API_URL, {
