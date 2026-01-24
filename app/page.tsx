@@ -323,6 +323,9 @@ function transformAPIResponse(apiData: any): ReportData {
     executive_counts: executiveCounts,
     // Include momentum indicators (YELLOW status trending toward GREEN)
     momentum_indicators: momentumData,
+    // UTM breakdown for AI analysis (pre-aggregated from BigQuery)
+    utm_breakdown: apiData.utm_breakdown,
+    mql_disqualification_summary: apiData.mql_disqualification_summary,
   };
 }
 
