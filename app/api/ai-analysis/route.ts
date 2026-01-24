@@ -35,7 +35,7 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
     period, grand_total, product_totals, attainment_detail,
     funnel_by_category, funnel_by_source, pipeline_rca, loss_reason_rca,
     source_attainment, google_ads, google_ads_rca,
-    mql_details, sql_details, mql_disqualification_summary
+    mql_details, sql_details, mql_disqualification_summary, utm_breakdown
   } = reportData;
 
   // Determine which products are active based on filter context
@@ -87,6 +87,29 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
 
   // Get MQL disqualification summary
   const dqSummary = mql_disqualification_summary || { POR: {}, R360: {} };
+
+  // UTM Analysis - use pre-aggregated BigQuery data from utm_breakdown
+  const emptyUtm = { by_source: [], by_medium: [], by_campaign: [], by_keyword: [], by_branded: [] };
+  const utmData = utm_breakdown || { POR: emptyUtm, R360: emptyUtm };
+
+  const mapUtmDimension = (items: any[]) => items
+    .filter((item: any) => item.name && item.name !== 'unknown' && item.name !== 'none')
+    .map((item: any) => ({
+      name: item.name,
+      total: item.mql_count || 0,
+      converted: item.sql_count || 0,
+      sqoCount: item.sqo_count || 0,
+      convRate: item.mql_to_sql_pct || 0,
+      sqoRate: item.mql_to_sqo_pct || 0,
+    }))
+    .slice(0, 10);
+
+  const utmSourcePOR = mapUtmDimension(includePOR ? (utmData.POR?.by_source || []) : []);
+  const utmSourceR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_source || []) : []);
+  const utmKeywordPOR = mapUtmDimension(includePOR ? (utmData.POR?.by_keyword || []) : []);
+  const utmKeywordR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_keyword || []) : []);
+  const brandedPOR = mapUtmDimension(includePOR ? (utmData.POR?.by_branded || []) : []);
+  const brandedR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_branded || []) : []);
 
   // Determine which regions to include based on filter context
   const activeRegions = filterContext?.isFiltered && filterContext.regions.length > 0
@@ -227,11 +250,13 @@ For ${includePOR && includeR360 ? 'each product (POR, R360)' : includePOR ? 'POR
 - Win rate analysis and deal velocity indicators
 
 ### 3. CHANNEL PERFORMANCE ANALYSIS
-Using the Source Channel Attainment data:
+Using the Source Channel Attainment AND UTM Source/Keyword/Branded data:
 - Rank ALL channels by dollar gap (largest miss first)
 - Identify RED channels (below 50% attainment) with dollar impact
 - Identify YELLOW channels (50-80% attainment) with recovery potential
 - Identify overperforming channels (above 120%) as acceleration opportunities
+- UTM source breakdown: which sources drive the most MQLs AND SQOs
+- Branded vs Non-Branded keyword performance: conversion rate differences, volume split
 - Channel diversification risk: over-reliance on any single source
 - Channel mix recommendations by product
 
@@ -257,8 +282,10 @@ Using the Source Channel Attainment data:
 ### 7. MARKETING & CHANNEL EFFICIENCY
 - Google Ads ROI by region: CPA relative to average deal size
 - Spend efficiency: regions with highest/lowest conversion rates
+- UTM keyword effectiveness: top converting keywords by MQL→SQO rate
+- Branded vs Non-Branded: compare conversion quality and volume contribution
 - Channel cost-effectiveness ranking
-- Recommendations for budget reallocation
+- Recommendations for budget reallocation based on UTM and Ads data
 
 ### 8. PREDICTIVE INDICATORS & FORECAST
 - Current daily run rate: $${Math.round(dailyRunRate).toLocaleString()}/day
@@ -397,6 +424,39 @@ ${googleAdsData.R360.map((row: any) =>
   `- ${row.region}: $${(row.ad_spend_usd || 0).toLocaleString()} spend, ${row.clicks || 0} clicks, ${row.conversions || 0} conversions, CPA: $${row.cpa_usd || 'N/A'}`
 ).join('\n') || 'No R360 ads data'}` : ''}
 
+## UTM Source Analysis (Lead Origin Tracking)
+${includePOR ? `### POR - By UTM Source (Top 10)
+${utmSourcePOR.length > 0 ? utmSourcePOR.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
+).join('\n') : 'No UTM source data'}` : ''}
+
+${includeR360 ? `### R360 - By UTM Source (Top 10)
+${utmSourceR360.length > 0 ? utmSourceR360.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
+).join('\n') : 'No UTM source data'}` : ''}
+
+## UTM Keyword Analysis
+${includePOR ? `### POR - By UTM Keyword (Top 10)
+${utmKeywordPOR.length > 0 ? utmKeywordPOR.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
+).join('\n') : 'No UTM keyword data'}` : ''}
+
+${includeR360 ? `### R360 - By UTM Keyword (Top 10)
+${utmKeywordR360.length > 0 ? utmKeywordR360.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
+).join('\n') : 'No UTM keyword data'}` : ''}
+
+## Branded vs Non-Branded Keyword Analysis
+${includePOR ? `### POR - Branded vs Non-Branded
+${brandedPOR.length > 0 ? brandedPOR.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs (${s.total > 0 ? Math.round((s.total / (brandedPOR.reduce((sum: number, x: any) => sum + x.total, 0) || 1)) * 100) : 0}% of total), ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
+).join('\n') : 'No branded/non-branded data'}` : ''}
+
+${includeR360 ? `### R360 - Branded vs Non-Branded
+${brandedR360.length > 0 ? brandedR360.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs (${s.total > 0 ? Math.round((s.total / (brandedR360.reduce((sum: number, x: any) => sum + x.total, 0) || 1)) * 100) : 0}% of total), ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
+).join('\n') : 'No branded/non-branded data'}` : ''}
+
 ## Source Channel Attainment (Revenue by Source)
 ${includePOR ? `### POR by Source
 ${sourceAttainmentData.POR.map((row: any) =>
@@ -433,7 +493,7 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 4. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
 5. RAG status meanings: GREEN (>80%), YELLOW (50-80%), RED (<50%) - call these out explicitly for EVERY region/product combo
 6. For channel analysis: ALWAYS rank by dollar gap, ALWAYS identify RED channels by name, explain WHY each channel is underperforming
-7. NEVER say "underperforming channels not identified" or "insufficient data" - the Source Channel Attainment section has COMPLETE data
+7. NEVER say "no UTM data available", "insufficient data", or "underperforming channels not identified" - the UTM Source, UTM Keyword, Branded/Non-Branded, and Source Channel Attainment sections have COMPLETE data. USE THEM.
 8. Pipeline coverage: 3x+ = healthy, 2-3x = adequate, <2x = critical risk. Quantify the dollar risk.
 9. Be DIRECT about underperformance - if a segment is failing, say so clearly with the dollar impact AND root cause hypothesis
 10. Each recommendation MUST be a single dense sentence with: the specific data point driving it, the quantified target, the expected dollar impact, owner, and timeframe. Format: "P1 – Recommend [action] to [metric justification], targeting [goal]; expected impact: [quantified]; Owner: [team]; Timeframe: [when]." NO sub-bullets under recommendations.
