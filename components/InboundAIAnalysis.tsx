@@ -469,19 +469,54 @@ function parseContent(markdown: string): ContentSection[] {
       continue;
     }
 
-    // Regular paragraph
+    // Recommendation lines (P1/P2/P3 – Recommend...)
+    if (/^-?\s*P[1-3]\s*[-–—]/.test(line)) {
+      const recBullets: BulletItem[] = [];
+
+      while (i < lines.length) {
+        const rawLine = lines[i];
+        const recLine = rawLine.trim();
+        if (!recLine) { i++; continue; }
+        if (isSectionHeader(recLine)) break;
+        if (/^-?\s*P[1-3]\s*[-–—]/.test(recLine)) {
+          recBullets.push({ text: recLine.replace(/^-\s*/, ''), children: [] });
+          i++;
+        } else if (/^\s{2,}[-*]\s/.test(rawLine)) {
+          if (recBullets.length > 0) {
+            recBullets[recBullets.length - 1].children.push({ text: recLine.replace(/^[-*]\s*/, ''), children: [] });
+          }
+          i++;
+        } else {
+          break;
+        }
+      }
+
+      if (recBullets.length > 0) {
+        sections.push({ type: 'bullets', bullets: recBullets });
+      }
+      continue;
+    }
+
+    // Regular paragraph (with recommendation blob splitting)
     let paragraph = line;
     i++;
 
     while (i < lines.length) {
       const nextLine = lines[i].trim();
       if (!nextLine) { i++; break; }
-      if (isSectionHeader(nextLine) || isMetricItem(nextLine) || isActionItem(nextLine) || /^[-*•]\s/.test(nextLine)) break;
+      if (isSectionHeader(nextLine) || isMetricItem(nextLine) || isActionItem(nextLine) || /^[-*•]\s/.test(nextLine) || /^\d+\.\s/.test(nextLine) || /^P[1-3]\s*[-–—]/.test(nextLine)) break;
       paragraph += ' ' + nextLine;
       i++;
     }
 
-    sections.push({ type: 'paragraph', text: paragraph });
+    // Split paragraph blobs that contain multiple P1/P2/P3 recommendations
+    if (/P[1-3]\s*[-–—]\s*Recommend/i.test(paragraph) && (paragraph.match(/P[1-3]\s*[-–—]/g) || []).length > 1) {
+      const recItems = paragraph.split(/(?=P[1-3]\s*[-–—])/).filter(s => s.trim());
+      const recBullets: BulletItem[] = recItems.map(item => ({ text: item.trim(), children: [] }));
+      sections.push({ type: 'bullets', bullets: recBullets });
+    } else {
+      sections.push({ type: 'paragraph', text: paragraph });
+    }
   }
 
   return sections;

@@ -277,23 +277,26 @@ Provide 5-7 specific recommendations. Each recommendation MUST be a single dense
 - Expected quantified impact (e.g., "recovering ~$50K in bookings", "improving pacing by 15 points")
 - Owner and Timeframe at the end separated by semicolons
 
-FORMAT EACH RECOMMENDATION EXACTLY LIKE THIS (single line, no sub-bullets):
-"P1 – Recommend [specific action] to [address specific metric/gap from the data], targeting [quantified goal]; expected impact: [dollar/pipeline improvement]; Owner: [team]; Timeframe: [when]."
+FORMAT EACH RECOMMENDATION AS A SEPARATE BULLET starting with "- P1 –":
+- P1 – Recommend [specific action] to [address specific metric/gap from the data], targeting [quantified goal]; expected impact: [dollar/pipeline improvement]; Owner: [team]; Timeframe: [when].
 
 EXAMPLE:
-"P1 – Recommend accelerating 12 EMEA pipeline deals past Proposal stage to close the -$128K attainment gap, targeting $80K in incremental bookings this quarter; Owner: Sales Leadership; Timeframe: Immediate."
+- P1 – Recommend accelerating 12 EMEA pipeline deals past Proposal stage to close the -$128K attainment gap, targeting $80K in incremental bookings this quarter; Owner: Sales Leadership; Timeframe: Immediate.
+- P2 – Recommend reallocating senior AMER sales capacity to address the -$86,369 combined gap in AE-Sourced and Outbound; Owner: Sales Leadership; Timeframe: 30 days.
 
-CRITICAL: Every recommendation must reference a SPECIFIC number from the data above (an attainment %, a dollar gap, a deal count, a conversion rate). Generic recommendations without data references will be rejected.
+CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Every recommendation must reference a SPECIFIC number from the data. Generic recommendations will be rejected. NEVER combine multiple recommendations into one paragraph.
 
 ---
 
 ## FORMATTING RULES
-- Use plain text with clear section headers (no markdown)
-- Always include specific dollar amounts and percentages
-- Rank items by dollar impact (largest first)
-- Be direct and honest - do not sugarcoat underperformance
-- Every recommendation must be backed by specific data from this report
-- Frame suggestions as "Recommend..." not "Action:" or "Next step:"
+- NEVER write paragraph blobs. Every data point must be a bullet or sub-bullet.
+- Each section must use multi-level bullets: top-level "- " for main points, indented "  - " for supporting data.
+- Each top-level bullet should have a **bold label:** followed by the key insight, then 1-3 sub-bullets with supporting metrics.
+- Always include specific dollar amounts and percentages.
+- Rank items by dollar impact (largest first).
+- Be direct and honest - do not sugarcoat underperformance.
+- Frame suggestions as "Recommend..." not "Action:" or "Next step:".
+- Recommendations MUST each be on their own line starting with "- P[1-3] –".
 
 ## Filter Context
 ${filterDescription}
@@ -488,13 +491,25 @@ export async function POST(request: Request) {
 
     const systemMessage = `You are a senior Revenue Operations analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly bookings analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 9 sections: Executive Summary, Revenue Attainment Deep Dive, Channel Performance, Funnel Health & Velocity, Pipeline Risk, Win/Loss Patterns, Marketing & Channel Efficiency, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific dollar amounts, percentages, and gaps throughout. Be brutally honest about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 8000-10000 CHARACTERS. NEVER stop before completing all 9 sections.
 
-OUTPUT FORMAT:
+OUTPUT FORMAT (STRICT):
 - Use ### for section headers (e.g., ### Executive Summary)
-- Use #### for sub-headers (e.g., #### AMER)
-- Use "-" for top-level bullet points
-- Use "  -" (2-space indent) for sub-bullets under a parent bullet
-- Bold key labels with **label:** syntax
-- Do NOT use numbered lists for sections (no "1.", "2." prefix on headers)`;
+- Use #### for sub-headers when breaking down by region (e.g., #### AMER)
+- EVERY section MUST use multi-level bullets:
+  - Top-level: "- **Bold Label:** key insight or finding"
+  - Sub-bullets: "  - supporting metric, data point, or implication"
+- NEVER write paragraph blobs. ALL content must be structured as bullets with sub-bullets.
+- Each top-level bullet should have 1-3 sub-bullets with supporting data.
+- For Recommendations section: each recommendation on its own line starting with "- P[1-3] –"
+- NEVER combine multiple recommendations into one paragraph or line.
+- Do NOT use numbered lists for sections (no "1.", "2." prefix on headers)
+
+EXAMPLE SECTION FORMAT:
+### Revenue Attainment Deep Dive
+- **POR AMER:** Expansion at 160% carrying the region (+$132K surplus)
+  - Renewal at 116% (+$45K) provides secondary strength
+  - Strategic at 0% (-$44K, 0.7x coverage) indicates total reliance on non-strategic motions
+- **R360 AMER:** Structurally behind at 39% New Logo attainment (-$65K gap)
+  - Pipeline coverage at 2.6x suggests win rate issues, not demand`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const insightResponse = await fetch(OPENAI_API_URL, {
