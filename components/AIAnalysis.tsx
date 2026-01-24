@@ -141,6 +141,8 @@ function filterReportData(
       POR: includePOR ? filterByRegion(reportData.sql_details?.POR) : [],
       R360: includeR360 ? filterByRegion(reportData.sql_details?.R360) : [],
     },
+    utm_breakdown: reportData.utm_breakdown,
+    mql_disqualification_summary: reportData.mql_disqualification_summary,
   };
 }
 
