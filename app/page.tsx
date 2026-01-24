@@ -476,7 +476,7 @@ function ReportContent() {
     return <div className="loading">Loading report data...</div>;
   }
 
-  const { period, query_version } = filteredData;
+  const { period } = filteredData;
 
   return (
     <div className="container">
@@ -488,7 +488,7 @@ function ReportContent() {
           <div className="meta">
             <span>Report Date: {period.as_of_date}</span>
             <span>Q1 Progress: {period.quarter_pct_complete.toFixed(1)}% ({period.days_elapsed}/{period.total_days} days)</span>
-            <span>Version: {query_version || '2.7.0'}</span>
+
             {useLiveData && lastFetchTime && (
               <span className="live-indicator">
                 <span className="live-dot"></span>
@@ -636,7 +636,7 @@ function ReportContent() {
 
       <footer className="footer">
         <p>
-          Generated {new Date().toISOString().split('T')[0]} | Version {query_version || '2.7.0'} | Data as of {period.as_of_date}
+          Generated {new Date().toISOString().split('T')[0]} | Data as of {period.as_of_date}
         </p>
       </footer>
     </div>
