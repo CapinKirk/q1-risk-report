@@ -134,8 +134,9 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
   const worstInboundGaps = allInboundAttainment.filter((r: any) => (r.gap || 0) < 0).sort((a: any, b: any) => (a.gap || 0) - (b.gap || 0));
 
   // UTM Analysis - use pre-aggregated BigQuery data from utm_breakdown
-  // Structure: { POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] }, R360: {...} }
-  const utmData = utm_breakdown || { POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] }, R360: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] } };
+  // Structure: { POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [], by_branded: [] }, R360: {...} }
+  const emptyUtm = { by_source: [], by_medium: [], by_campaign: [], by_keyword: [], by_branded: [] };
+  const utmData = utm_breakdown || { POR: emptyUtm, R360: emptyUtm };
 
   const mapUtmDimension = (items: any[]) => items
     .filter((item: any) => item.name && item.name !== 'unknown' && item.name !== 'none')
@@ -158,10 +159,12 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
   const utmMediumR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_medium || []) : []);
   const utmCampaignPOR = mapUtmDimension(includePOR ? (utmData.POR?.by_campaign || []) : []);
   const utmCampaignR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_campaign || []) : []);
-  const utmChannelPOR: any[] = []; // Channel derived from medium in BigQuery data
-  const utmChannelR360: any[] = [];
   const utmKeywordPOR = mapUtmDimension(includePOR ? (utmData.POR?.by_keyword || []) : []);
   const utmKeywordR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_keyword || []) : []);
+
+  // Branded vs Non-Branded keyword breakdown
+  const brandedPOR = mapUtmDimension(includePOR ? (utmData.POR?.by_branded || []) : []);
+  const brandedR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_branded || []) : []);
 
   // Best/worst converting UTM sources (depends on UTM declarations above)
   const topConvertingUtmPOR = utmSourcePOR.filter(s => s.total >= 3).sort((a, b) => b.convRate - a.convRate).slice(0, 5);
@@ -224,12 +227,12 @@ Stage-by-stage breakdown:
 
 ### 5. CHANNEL & CAMPAIGN EFFECTIVENESS
 Using UTM data:
-- Rank UTM sources by conversion rate and volume
-- Identify top-performing campaigns with conversion rates
+- Rank UTM sources by MQL→SQL and MQL→SQO conversion rate
+- Identify top-performing campaigns with conversion rates and SQO output
 - Identify worst-performing campaigns (high volume, low conversion)
-- Channel mix analysis: which channels drive quality vs quantity
-- Keyword/term effectiveness for paid channels
-- Cross-channel attribution insights
+- Channel/medium mix analysis: which mediums (cpc, organic, etc.) drive quality vs quantity
+- **UTM Keyword Analysis**: Rank keywords by volume and conversion efficiency. Identify high-intent keywords (high SQL/SQO conversion) vs low-intent keywords (high MQL, low conversion). Call out specific keyword opportunities.
+- **Branded vs Non-Branded Breakdown**: Compare branded keyword performance (brand name searches) vs non-branded (generic/competitor terms). Analyze: volume split, conversion rate differences, SQO efficiency, and what this implies about demand generation vs demand capture strategy. Quantify the gap.
 
 ### 6. GOOGLE ADS PERFORMANCE & ROI
 - Spend efficiency by product and region
@@ -382,6 +385,17 @@ ${includeR360 ? `### R360 - By UTM Keyword/Term (Top 10)
 ${utmKeywordR360.length > 0 ? utmKeywordR360.map((s: any) =>
   `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
 ).join('\n') : 'No UTM keyword data'}` : ''}
+
+## BRANDED vs NON-BRANDED KEYWORD ANALYSIS
+${includePOR ? `### POR - Branded vs Non-Branded Keywords
+${brandedPOR.length > 0 ? brandedPOR.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs (${s.total > 0 ? Math.round((s.total / (brandedPOR.reduce((sum: number, x: any) => sum + x.total, 0) || 1)) * 100) : 0}% of total), ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
+).join('\n') : 'No branded/non-branded data'}` : ''}
+
+${includeR360 ? `### R360 - Branded vs Non-Branded Keywords
+${brandedR360.length > 0 ? brandedR360.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs (${s.total > 0 ? Math.round((s.total / (brandedR360.reduce((sum: number, x: any) => sum + x.total, 0) || 1)) * 100) : 0}% of total), ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
+).join('\n') : 'No branded/non-branded data'}` : ''}
 
 ## GOOGLE ADS PERFORMANCE (Paid Inbound)
 ${includePOR ? `### POR Google Ads by Region

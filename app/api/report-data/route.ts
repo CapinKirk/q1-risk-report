@@ -2476,15 +2476,43 @@ async function getUtmBreakdown(filters: ReportFilters) {
       SELECT 'R360' AS product, 'keyword' AS dimension, utm_keyword AS value,
         COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
       FROM r360_raw WHERE utm_keyword != 'none' GROUP BY utm_keyword
+    ),
+    -- POR branded vs non-branded (keyword classification)
+    por_by_branded AS (
+      SELECT 'POR' AS product, 'branded' AS dimension,
+        CASE
+          WHEN LOWER(utm_keyword) IN ('none', 'organic') THEN 'Untracked/Organic'
+          WHEN REGEXP_CONTAINS(LOWER(utm_keyword), r'point of rental|pointofrental|por |por$|point rental')
+            THEN 'Branded'
+          ELSE 'Non-Branded'
+        END AS value,
+        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+      FROM por_raw
+      GROUP BY value
+    ),
+    -- R360 branded vs non-branded
+    r360_by_branded AS (
+      SELECT 'R360' AS product, 'branded' AS dimension,
+        CASE
+          WHEN LOWER(utm_keyword) IN ('none', 'organic') THEN 'Untracked/Organic'
+          WHEN REGEXP_CONTAINS(LOWER(utm_keyword), r'record360|record 360|r360|record360\.com')
+            THEN 'Branded'
+          ELSE 'Non-Branded'
+        END AS value,
+        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+      FROM r360_raw
+      GROUP BY value
     )
     SELECT * FROM por_by_source
     UNION ALL SELECT * FROM por_by_medium
     UNION ALL SELECT * FROM por_by_campaign
     UNION ALL SELECT * FROM por_by_keyword
+    UNION ALL SELECT * FROM por_by_branded
     UNION ALL SELECT * FROM r360_by_source
     UNION ALL SELECT * FROM r360_by_medium
     UNION ALL SELECT * FROM r360_by_campaign
     UNION ALL SELECT * FROM r360_by_keyword
+    UNION ALL SELECT * FROM r360_by_branded
     ORDER BY product, dimension, mql_count DESC
   `;
 
@@ -2493,11 +2521,11 @@ async function getUtmBreakdown(filters: ReportFilters) {
     const [rows] = await bigquery.query({ query });
 
     const result: {
-      POR: { by_source: any[]; by_medium: any[]; by_campaign: any[]; by_keyword: any[] };
-      R360: { by_source: any[]; by_medium: any[]; by_campaign: any[]; by_keyword: any[] };
+      POR: { by_source: any[]; by_medium: any[]; by_campaign: any[]; by_keyword: any[]; by_branded: any[] };
+      R360: { by_source: any[]; by_medium: any[]; by_campaign: any[]; by_keyword: any[]; by_branded: any[] };
     } = {
-      POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] },
-      R360: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] },
+      POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [], by_branded: [] },
+      R360: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [], by_branded: [] },
     };
 
     for (const row of rows) {
@@ -2522,7 +2550,7 @@ async function getUtmBreakdown(filters: ReportFilters) {
 
     // Sort each array by mql_count desc and limit to top 15
     for (const product of ['POR', 'R360'] as const) {
-      for (const dim of ['by_source', 'by_medium', 'by_campaign', 'by_keyword'] as const) {
+      for (const dim of ['by_source', 'by_medium', 'by_campaign', 'by_keyword', 'by_branded'] as const) {
         result[product][dim] = result[product][dim]
           .sort((a, b) => b.mql_count - a.mql_count)
           .slice(0, 15);
@@ -2533,8 +2561,8 @@ async function getUtmBreakdown(filters: ReportFilters) {
   } catch (error: any) {
     console.error('UTM breakdown query error:', error.message);
     return {
-      POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] },
-      R360: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] },
+      POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [], by_branded: [] },
+      R360: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [], by_branded: [] },
     };
   }
 }
