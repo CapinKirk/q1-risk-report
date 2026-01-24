@@ -445,6 +445,7 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 16. Include regional breakdowns (AMER/EMEA/APAC) in EVERY section where data is available - do not aggregate away regional detail
 17. In Win/Loss Patterns, analyze EACH loss reason category with dollar amounts and suggest specific countermeasures
 18. In Predictive Indicators, provide SPECIFIC projected Q1 close amounts by category and region based on current run rates
+19. Do NOT output "---" horizontal rules between sections. Section headers provide separation.
 
 REMEMBER: Your output MUST exceed 7000 characters. Write in full detail for every section. Short responses will be rejected and regenerated.`;
 

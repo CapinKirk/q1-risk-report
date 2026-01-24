@@ -280,7 +280,7 @@ function parseContent(markdown: string): ContentSection[] {
     const line = lines[i].trim();
 
     // Skip empty lines and standalone numbers
-    if (!line || isStandaloneNumber(line)) {
+    if (!line || isStandaloneNumber(line) || /^-{2,}$/.test(line)) {
       i++;
       continue;
     }

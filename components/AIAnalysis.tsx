@@ -301,7 +301,7 @@ function parseContent(markdown: string): ContentSection[] {
   while (i < lines.length) {
     const line = lines[i].trim();
 
-    if (!line || isStandaloneNumber(line)) {
+    if (!line || isStandaloneNumber(line) || /^-{2,}$/.test(line)) {
       i++;
       continue;
     }

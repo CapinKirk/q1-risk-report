@@ -539,6 +539,7 @@ OUTPUT FORMAT (STRICT):
 - For Recommendations section: each recommendation on its own line starting with "- P[1-3] –"
 - NEVER combine multiple recommendations into one paragraph or line.
 - Do NOT use numbered lists for sections (no "1.", "2." prefix on headers)
+- Do NOT output "---" horizontal rules between sections. Section headers provide separation.
 
 EXAMPLE SECTION FORMAT:
 ### Lead Volume & Pacing Analysis
