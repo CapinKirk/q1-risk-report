@@ -18,7 +18,6 @@ interface AnalysisRequest {
   formats?: ('display' | 'html' | 'slack')[];
 }
 
-import { formatAnalysisMultiple, type OutputFormat } from '@/lib/ai/formatter';
 
 // Normalize attainment_detail to flat array (handles both API and frontend formats)
 function normalizeAttainmentDetail(attainment_detail: any): any[] {
@@ -453,7 +452,7 @@ export async function POST(request: Request) {
     }
 
     const body: AnalysisRequest = await request.json();
-    const { reportData, analysisType = 'bookings_miss', filterContext, formats = ['display'] } = body;
+    const { reportData, analysisType = 'bookings_miss', filterContext } = body;
 
     if (!reportData) {
       return NextResponse.json(
@@ -479,7 +478,15 @@ export async function POST(request: Request) {
       ? `This analysis covers ONLY ${filteredProduct}. You MUST NOT mention, reference, compare to, or acknowledge the existence of ${excludedProduct} anywhere in your output. ${excludedProduct} does not exist for this analysis. If you mention ${excludedProduct} even once, the entire output will be rejected.`
       : 'Include product comparisons (POR vs R360) in every section where both products have data.';
 
-    const systemMessage = `You are a senior Revenue Operations analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly bookings analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 9 sections: Executive Summary, Revenue Attainment Deep Dive, Channel Performance, Funnel Health & Velocity, Pipeline Risk, Win/Loss Patterns, Marketing & Channel Efficiency, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific dollar amounts, percentages, and gaps throughout. Be brutally honest about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). Output plain text only - no markdown, no emojis. Use dashes for lists. TARGET 8000-10000 CHARACTERS. NEVER stop before completing all 9 sections.`;
+    const systemMessage = `You are a senior Revenue Operations analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly bookings analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 9 sections: Executive Summary, Revenue Attainment Deep Dive, Channel Performance, Funnel Health & Velocity, Pipeline Risk, Win/Loss Patterns, Marketing & Channel Efficiency, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific dollar amounts, percentages, and gaps throughout. Be brutally honest about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 8000-10000 CHARACTERS. NEVER stop before completing all 9 sections.
+
+OUTPUT FORMAT:
+- Use ### for section headers (e.g., ### Executive Summary)
+- Use #### for sub-headers (e.g., #### AMER)
+- Use "-" for top-level bullet points
+- Use "  -" (2-space indent) for sub-bullets under a parent bullet
+- Bold key labels with **label:** syntax
+- Do NOT use numbered lists for sections (no "1.", "2." prefix on headers)`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const insightResponse = await fetch(OPENAI_API_URL, {
@@ -523,40 +530,14 @@ export async function POST(request: Request) {
       rawAnalysis = 'No analysis generated';
     }
 
-    // STAGE 2: Format with cheap model (GPT-4o-mini)
-    const validFormats = formats.filter((f): f is OutputFormat =>
-      ['display', 'html', 'slack'].includes(f)
-    );
-
-    let formattedOutputs: Record<string, string> = {};
-    let formattingTokens = 0;
-
-    if (validFormats.length > 0) {
-      try {
-        formattedOutputs = await formatAnalysisMultiple(rawAnalysis, validFormats, apiKey);
-        // Note: Token tracking would need to be added to formatAnalysisMultiple if needed
-      } catch (formatError: any) {
-        console.error('Formatting error:', formatError);
-        // Fallback to raw analysis if formatting fails
-        formattedOutputs = { display: rawAnalysis };
-      }
-    } else {
-      formattedOutputs = { display: rawAnalysis };
-    }
-
-    // Return the primary format as 'analysis' for backward compatibility
-    const primaryFormat = validFormats[0] || 'display';
+    // GPT-5.2 now outputs structured markdown directly — no formatter needed
 
     return NextResponse.json({
       success: true,
-      analysis: formattedOutputs[primaryFormat] || rawAnalysis,
-      raw_analysis: rawAnalysis,
-      formatted: formattedOutputs,
+      analysis: rawAnalysis,
       model: insightData.model,
       usage: {
-        insight_tokens: insightData.usage?.total_tokens || 0,
-        formatting_tokens: formattingTokens,
-        total_tokens: (insightData.usage?.total_tokens || 0) + formattingTokens,
+        total_tokens: insightData.usage?.total_tokens || 0,
       },
       generated_at: new Date().toISOString(),
     });

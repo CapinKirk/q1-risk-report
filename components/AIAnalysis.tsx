@@ -252,13 +252,19 @@ function isStandaloneNumber(line: string): boolean {
   return /^\d+$/.test(line.trim());
 }
 
+// Nested bullet item
+interface BulletItem {
+  text: string;
+  children: BulletItem[];
+}
+
 // Parse content into structured sections
 interface ContentSection {
   type: 'header' | 'metrics' | 'actions' | 'bullets' | 'numbered' | 'paragraph' | 'summary-box';
   header?: { title: string; emoji: string; color: string };
   metrics?: string[];
   actions?: { action: string; owner: string; timeline: string; impact: string }[];
-  bullets?: string[];
+  bullets?: BulletItem[];
   numbered?: { num: string; text: string }[];
   text?: string;
 }
@@ -413,18 +419,26 @@ function parseContent(markdown: string): ContentSection[] {
       continue;
     }
 
-    // Bullet list
-    if (/^[-*\u2022]\s/.test(line)) {
-      const bullets: string[] = [];
+    // Bullet list (with nesting support)
+    if (/^[-*\u2022\u25E6]\s/.test(line)) {
+      const bullets: BulletItem[] = [];
 
       while (i < lines.length) {
-        const bulletLine = lines[i].trim();
-        if (!bulletLine) { i++; continue; }
-        if (isSectionHeader(bulletLine) || isMetricItem(bulletLine) || isActionItem(bulletLine)) break;
+        const rawLine = lines[i];
+        const trimmed = rawLine.trim();
+        if (!trimmed) { i++; continue; }
+        if (isSectionHeader(trimmed) || isMetricItem(trimmed) || isActionItem(trimmed)) break;
 
-        const bulletMatch = bulletLine.match(/^[-*\u2022]\s*(.+)$/);
+        const indent = rawLine.length - rawLine.replace(/^\s+/, '').length;
+        const bulletMatch = trimmed.match(/^[-*\u2022\u25E6]\s*(.+)$/);
         if (bulletMatch) {
-          bullets.push(bulletMatch[1]);
+          if (indent >= 2 && bullets.length > 0) {
+            // Sub-bullet: attach to last top-level bullet
+            bullets[bullets.length - 1].children.push({ text: bulletMatch[1], children: [] });
+          } else {
+            // Top-level bullet
+            bullets.push({ text: bulletMatch[1], children: [] });
+          }
           i++;
         } else {
           break;
@@ -564,7 +578,16 @@ function renderContent(sections: ContentSection[]): JSX.Element[] {
         return (
           <ul key={idx} className="bullet-list">
             {section.bullets!.map((bullet, bIdx) => (
-              <li key={bIdx} dangerouslySetInnerHTML={{ __html: formatInline(bullet) }} />
+              <li key={bIdx}>
+                <span dangerouslySetInnerHTML={{ __html: formatInline(bullet.text) }} />
+                {bullet.children.length > 0 && (
+                  <ul className="bullet-list-nested">
+                    {bullet.children.map((child, cIdx) => (
+                      <li key={cIdx} dangerouslySetInnerHTML={{ __html: formatInline(child.text) }} />
+                    ))}
+                  </ul>
+                )}
+              </li>
             ))}
           </ul>
         );
@@ -693,7 +716,15 @@ function toHTMLExport(markdown: string, generatedAt: string | null): string {
       case 'bullets':
         html.push('<ul style="margin:12px 0;padding-left:20px;">');
         for (const bullet of section.bullets!) {
-          html.push(`<li style="margin:6px 0;font-size:14px;">${formatInline(bullet)}</li>`);
+          html.push(`<li style="margin:6px 0;font-size:14px;">${formatInline(bullet.text)}`);
+          if (bullet.children.length > 0) {
+            html.push('<ul style="margin:4px 0;padding-left:16px;">');
+            for (const child of bullet.children) {
+              html.push(`<li style="margin:3px 0;font-size:13px;color:#6b7280;">${formatInline(child.text)}</li>`);
+            }
+            html.push('</ul>');
+          }
+          html.push('</li>');
         }
         html.push('</ul>');
         break;
@@ -1316,6 +1347,30 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
           height: 5px;
           background: var(--text-tertiary);
           border-radius: 50%;
+        }
+        .analysis-content :global(.bullet-list-nested) {
+          margin: 6px 0 4px;
+          padding: 0 0 0 16px;
+          list-style: none;
+        }
+        .analysis-content :global(.bullet-list-nested li) {
+          position: relative;
+          margin-bottom: 4px;
+          padding-left: 12px;
+          font-size: 0.82rem;
+          line-height: 1.4;
+          color: var(--text-secondary);
+        }
+        .analysis-content :global(.bullet-list-nested li::before) {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 7px;
+          width: 4px;
+          height: 4px;
+          border: 1px solid var(--text-tertiary);
+          border-radius: 50%;
+          background: transparent;
         }
 
         /* Numbered List */
