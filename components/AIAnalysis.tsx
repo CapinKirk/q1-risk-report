@@ -231,6 +231,8 @@ function isSectionHeader(line: string): boolean {
   // Check for emoji-prefixed headers (code point > 255 at start)
   const firstCode = trimmed.codePointAt(0);
   if (firstCode && firstCode > 255) return true;
+  // ALL-CAPS section headers (e.g., "EXECUTIVE SUMMARY", "FUNNEL HEALTH & VELOCITY")
+  if (/^[A-Z][A-Z &\/\-']{8,}[A-Z]$/.test(trimmed)) return true;
   return false;
 }
 
@@ -331,6 +333,11 @@ function parseContent(markdown: string): ContentSection[] {
       if (emojiMatch) {
         emoji = emojiMatch[1];
         title = title.slice(emojiMatch[0].length);
+      }
+
+      // Convert ALL-CAPS to Title Case for display
+      if (/^[A-Z][A-Z &\/\-']+[A-Z]$/.test(title)) {
+        title = title.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
       }
 
       const sectionInfo = getSectionType(title);

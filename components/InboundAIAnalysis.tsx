@@ -203,6 +203,8 @@ function isSectionHeader(line: string): boolean {
   // Include country flag emojis (🇺🇸🇬🇧🇦🇺) and standard section emojis
   if (/^[🚨📊✅⚠️📈📋🔍💡🎯📌📢🇺🇸🇬🇧🇦🇺🌍🌎🌏]/.test(trimmed)) return true;
   if (/^#{1,4}\s+.+/.test(trimmed)) return true;  // Match 1-4 # markers
+  // ALL-CAPS section headers (e.g., "EXECUTIVE SUMMARY", "FUNNEL CONVERSION ANALYSIS")
+  if (/^[A-Z][A-Z &\/\-']{8,}[A-Z]$/.test(trimmed)) return true;
   return false;
 }
 
@@ -291,6 +293,11 @@ function parseContent(markdown: string): ContentSection[] {
       if (emojiMatch) {
         emoji = emojiMatch[1];
         title = title.slice(emojiMatch[0].length);
+      }
+
+      // Convert ALL-CAPS to Title Case for display
+      if (/^[A-Z][A-Z &\/\-']+[A-Z]$/.test(title)) {
+        title = title.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
       }
 
       const sectionInfo = getSectionType(title);
