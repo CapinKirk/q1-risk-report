@@ -166,6 +166,28 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
   const brandedPOR = mapUtmDimension(includePOR ? (utmData.POR?.by_branded || []) : []);
   const brandedR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_branded || []) : []);
 
+  // Campaign efficiency data (campaigns with spend data from Google Ads)
+  const mapCampaignEfficiency = (items: any[]) => items
+    .filter((item: any) => item.name && item.name !== 'unknown' && item.name !== 'none' && item.name !== 'Organic')
+    .map((item: any) => ({
+      name: item.name,
+      mql: item.mql_count || 0,
+      sql: item.sql_count || 0,
+      sal: item.sal_count || 0,
+      sqo: item.sqo_count || 0,
+      mql_to_sql_pct: item.mql_to_sql_pct || 0,
+      mql_to_sqo_pct: item.mql_to_sqo_pct || 0,
+      spend: item.ad_spend_usd || 0,
+      clicks: item.clicks || 0,
+      cost_per_mql: item.cost_per_mql || 0,
+      cost_per_sql: item.cost_per_sql || 0,
+      cost_per_sqo: item.cost_per_sqo || 0,
+    }))
+    .slice(0, 15);
+
+  const campaignEffPOR = mapCampaignEfficiency(includePOR ? (utmData.POR?.by_campaign || []) : []);
+  const campaignEffR360 = mapCampaignEfficiency(includeR360 ? (utmData.R360?.by_campaign || []) : []);
+
   // Best/worst converting UTM sources (depends on UTM declarations above)
   const topConvertingUtmPOR = utmSourcePOR.filter(s => s.total >= 3).sort((a, b) => b.convRate - a.convRate).slice(0, 5);
   const worstConvertingUtmPOR = utmSourcePOR.filter(s => s.total >= 3).sort((a, b) => a.convRate - b.convRate).slice(0, 5);
@@ -226,20 +248,24 @@ Stage-by-stage breakdown:
 - Impact of stalls on downstream pipeline creation
 
 ### 5. CHANNEL & CAMPAIGN EFFECTIVENESS
-Using UTM data:
+Using UTM data and Campaign Efficiency data:
 - Rank UTM sources by MQL→SQL and MQL→SQO conversion rate
 - Identify top-performing campaigns with conversion rates and SQO output
 - Identify worst-performing campaigns (high volume, low conversion)
 - Channel/medium mix analysis: which mediums (cpc, organic, etc.) drive quality vs quantity
+- **Campaign Conversion Variance Analysis**: For each campaign with spend data, analyze where leads leak in the funnel. Compare MQL→SQL, SQL→SAL, and SAL→SQO (or SQL→SQO for R360) conversion rates BETWEEN campaigns. Identify which campaigns have the widest variance at each stage. Call out campaigns that generate MQLs but fail to convert downstream (MQL factories) vs campaigns that produce fewer MQLs but convert efficiently to SQO.
+- **Campaign Attainment Contribution**: Calculate each campaign's share of total SQO output. Rank campaigns by their contribution to overall funnel attainment (SQO count / total SQOs). Identify campaigns punching above their spend weight (high SQO share relative to spend share) and those underperforming (high spend share, low SQO share).
 - **UTM Keyword Analysis**: Rank keywords by volume and conversion efficiency. Identify high-intent keywords (high SQL/SQO conversion) vs low-intent keywords (high MQL, low conversion). Call out specific keyword opportunities.
 - **Branded vs Non-Branded Breakdown**: Compare branded keyword performance (brand name searches) vs non-branded (generic/competitor terms). Analyze: volume split, conversion rate differences, SQO efficiency, and what this implies about demand generation vs demand capture strategy. Quantify the gap.
 
-### 6. GOOGLE ADS PERFORMANCE & ROI
+### 6. GOOGLE ADS PERFORMANCE, ROI & BUDGET OPTIMIZATION
 - Spend efficiency by product and region
 - CPA analysis: which regions are above $200 threshold (risk)
 - CTR analysis: which regions are below 3% threshold (risk)
-- Cost per qualified lead (factoring in conversion rates)
-- Budget allocation recommendations based on efficiency
+- **Cost per SQO ranking**: Rank ALL campaigns by cost-per-SQO (the true efficiency metric). Campaigns with $0 SQOs but significant spend are the worst performers. Compare cost/SQO across campaigns to identify the most and least efficient.
+- **Efficiency Tiers**: Classify campaigns into efficiency tiers: Tier 1 (cost/SQO < $500), Tier 2 ($500-$1500), Tier 3 (>$1500 or no SQOs). Calculate total spend in each tier.
+- **Optimal Budget Distribution**: Based on cost-per-SQO and conversion data, recommend how budget SHOULD be distributed vs how it IS distributed. Calculate the potential SQO uplift if budget were shifted from Tier 3 campaigns to Tier 1 campaigns. Provide specific dollar reallocation amounts.
+- **Diminishing Returns Analysis**: For top-performing campaigns, assess whether they show signs of saturation (high spend but declining efficiency). Recommend incremental budget caps.
 - Specific ads performance issues from RCA data
 
 ### 7. INBOUND REVENUE ATTRIBUTION
@@ -400,6 +426,25 @@ ${brandedR360.length > 0 ? brandedR360.map((s: any) =>
   `- ${s.name}: ${s.total} MQLs (${s.total > 0 ? Math.round((s.total / (brandedR360.reduce((sum: number, x: any) => sum + x.total, 0) || 1)) * 100) : 0}% of total), ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
 ).join('\n') : 'No branded/non-branded data'}` : ''}
 
+## CAMPAIGN-LEVEL EFFICIENCY & FUNNEL CONTRIBUTION (Google Ads Spend Matched to Funnel Outcomes)
+${includePOR ? `### POR Campaign Performance (Spend + Funnel Conversion)
+${campaignEffPOR.filter((c: any) => c.spend > 0).length > 0 ? campaignEffPOR.filter((c: any) => c.spend > 0).map((c: any) =>
+  `- ${c.name}: $${c.spend.toLocaleString()} spend | ${c.mql} MQLs, ${c.sql} SQLs, ${c.sal} SALs, ${c.sqo} SQOs | MQL→SQL ${c.mql_to_sql_pct}%, MQL→SQO ${c.mql_to_sqo_pct}% | Cost/MQL: $${c.cost_per_mql}, Cost/SQL: $${c.cost_per_sql}, Cost/SQO: $${c.cost_per_sqo > 0 ? c.cost_per_sqo : 'N/A (0 SQOs)'}`
+).join('\n') : 'No POR campaign spend data matched'}
+${campaignEffPOR.filter((c: any) => c.spend === 0 && c.mql > 0).length > 0 ? `\nPOR Campaigns with MQLs but NO matched spend (organic/untracked):
+${campaignEffPOR.filter((c: any) => c.spend === 0 && c.mql > 0).map((c: any) =>
+  `- ${c.name}: ${c.mql} MQLs, ${c.sql} SQLs, ${c.sqo} SQOs | MQL→SQO ${c.mql_to_sqo_pct}%`
+).join('\n')}` : ''}` : ''}
+
+${includeR360 ? `### R360 Campaign Performance (Spend + Funnel Conversion)
+${campaignEffR360.filter((c: any) => c.spend > 0).length > 0 ? campaignEffR360.filter((c: any) => c.spend > 0).map((c: any) =>
+  `- ${c.name}: $${c.spend.toLocaleString()} spend | ${c.mql} MQLs, ${c.sql} SQLs, ${c.sal} SALs, ${c.sqo} SQOs | MQL→SQL ${c.mql_to_sql_pct}%, MQL→SQO ${c.mql_to_sqo_pct}% | Cost/MQL: $${c.cost_per_mql}, Cost/SQL: $${c.cost_per_sql}, Cost/SQO: $${c.cost_per_sqo > 0 ? c.cost_per_sqo : 'N/A (0 SQOs)'}`
+).join('\n') : 'No R360 campaign spend data matched'}
+${campaignEffR360.filter((c: any) => c.spend === 0 && c.mql > 0).length > 0 ? `\nR360 Campaigns with MQLs but NO matched spend (organic/untracked):
+${campaignEffR360.filter((c: any) => c.spend === 0 && c.mql > 0).map((c: any) =>
+  `- ${c.name}: ${c.mql} MQLs, ${c.sql} SQLs, ${c.sqo} SQOs | MQL→SQO ${c.mql_to_sqo_pct}%`
+).join('\n')}` : ''}` : ''}
+
 ## GOOGLE ADS PERFORMANCE (Paid Inbound)
 ${includePOR ? `### POR Google Ads by Region
 ${googleAdsPOR.map((row: any) =>
@@ -482,6 +527,9 @@ ${topConvertingUtmR360.map((s: any) => `- ${s.name}: ${s.convRate}% MQL→SQL, $
 16. For Lead Volume section: break down MQL counts by region, by product, show pacing %, and compare to target for each
 17. For Google Ads: analyze each region separately with spend, CPA, CTR, conversion rate, and ROI assessment
 18. In Predictive Indicators: project Q1 lead volumes, conversion rates, and revenue impact by product and region based on current trends
+19. CAMPAIGN EFFICIENCY: When campaign-level spend data is available, you MUST analyze conversion variances BETWEEN campaigns (not just overall rates). Compare each campaign's MQL→SQL→SQO funnel individually. Rank by cost-per-SQO, NOT cost-per-MQL (cost-per-MQL rewards MQL factories that never convert).
+20. BUDGET OPTIMIZATION: Calculate each campaign's "SQO share" (its SQOs / total SQOs) vs "spend share" (its spend / total spend). Campaigns where SQO share > spend share are efficient. Campaigns where spend share >> SQO share are wasteful. Recommend specific dollar amounts to reallocate.
+21. Do NOT output "---" horizontal rules between sections.
 
 REMEMBER: Your output MUST exceed 7000 characters. Write in full detail for every section. Short responses will be rejected and regenerated.`;
 
