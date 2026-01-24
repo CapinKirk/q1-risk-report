@@ -484,7 +484,10 @@ function ReportContent() {
 
       <div className="header-bar">
         <div>
-          <h1>Q1 2026 Risk Analysis Report</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img src="/favicon.png" alt="RevOps" style={{ width: '36px', height: '36px', borderRadius: '6px' }} />
+            <h1 style={{ margin: 0 }}>Q1 2026 Risk Analysis Report</h1>
+          </div>
           <div className="meta">
             <span>Report Date: {period.as_of_date}</span>
             <span>Q1 Progress: {period.quarter_pct_complete.toFixed(1)}% ({period.days_elapsed}/{period.total_days} days)</span>
