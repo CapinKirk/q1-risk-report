@@ -2441,11 +2441,40 @@ async function getUtmBreakdown(filters: ReportFilters) {
         COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
       FROM por_raw GROUP BY utm_medium
     ),
-    -- POR by campaign
+    -- Campaign name lookups from Google Ads
+    por_campaign_names AS (
+      SELECT campaign_id, campaign_name
+      FROM (
+        SELECT campaign_id, campaign_name,
+               ROW_NUMBER() OVER (PARTITION BY campaign_id ORDER BY _DATA_DATE DESC) AS rn
+        FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_POR}.ads_Campaign_8275359090\`
+      )
+      WHERE rn = 1
+    ),
+    r360_campaign_names AS (
+      SELECT campaign_id, campaign_name
+      FROM (
+        SELECT campaign_id, campaign_name,
+               ROW_NUMBER() OVER (PARTITION BY campaign_id ORDER BY _DATA_DATE DESC) AS rn
+        FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_R360}.ads_Campaign_3799591491\`
+      )
+      WHERE rn = 1
+    ),
+    -- POR by campaign (with name lookup)
     por_by_campaign AS (
-      SELECT 'POR' AS product, 'campaign' AS dimension, utm_campaign AS value,
-        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
-      FROM por_raw WHERE utm_campaign != 'none' GROUP BY utm_campaign
+      SELECT 'POR' AS product, 'campaign' AS dimension,
+        COALESCE(c.campaign_name, p.utm_campaign) AS value,
+        SUM(p.mql_count) AS mql_count, SUM(p.sql_count) AS sql_count,
+        SUM(p.sal_count) AS sal_count, SUM(p.sqo_count) AS sqo_count
+      FROM (
+        SELECT utm_campaign,
+          COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+        FROM por_raw WHERE utm_campaign != 'none' GROUP BY utm_campaign
+      ) p
+      LEFT JOIN por_campaign_names c
+        ON SAFE_CAST(p.utm_campaign AS INT64) = c.campaign_id
+        OR LOWER(p.utm_campaign) = LOWER(c.campaign_name)
+      GROUP BY value
     ),
     -- POR by keyword
     por_by_keyword AS (
@@ -2465,11 +2494,21 @@ async function getUtmBreakdown(filters: ReportFilters) {
         COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
       FROM r360_raw GROUP BY utm_medium
     ),
-    -- R360 by campaign
+    -- R360 by campaign (with name lookup)
     r360_by_campaign AS (
-      SELECT 'R360' AS product, 'campaign' AS dimension, utm_campaign AS value,
-        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
-      FROM r360_raw WHERE utm_campaign != 'none' GROUP BY utm_campaign
+      SELECT 'R360' AS product, 'campaign' AS dimension,
+        COALESCE(c.campaign_name, r.utm_campaign) AS value,
+        SUM(r.mql_count) AS mql_count, SUM(r.sql_count) AS sql_count,
+        SUM(r.sal_count) AS sal_count, SUM(r.sqo_count) AS sqo_count
+      FROM (
+        SELECT utm_campaign,
+          COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+        FROM r360_raw WHERE utm_campaign != 'none' GROUP BY utm_campaign
+      ) r
+      LEFT JOIN r360_campaign_names c
+        ON SAFE_CAST(r.utm_campaign AS INT64) = c.campaign_id
+        OR LOWER(r.utm_campaign) = LOWER(c.campaign_name)
+      GROUP BY value
     ),
     -- R360 by keyword
     r360_by_keyword AS (
