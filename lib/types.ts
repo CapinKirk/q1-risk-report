@@ -427,6 +427,16 @@ export interface ReportData {
     POR: SQODetailRow[];
     R360: SQODetailRow[];
   };
+  // UTM breakdown for inbound AI analysis
+  utm_breakdown?: {
+    POR: { by_source: any[]; by_medium: any[]; by_campaign: any[]; by_keyword: any[]; by_branded: any[] };
+    R360: { by_source: any[]; by_medium: any[]; by_campaign: any[]; by_keyword: any[]; by_branded: any[] };
+  };
+  // MQL disqualification summary
+  mql_disqualification_summary?: {
+    POR: { reverted_pct: number; converted_pct: number; stalled_pct: number };
+    R360: { reverted_pct: number; converted_pct: number; stalled_pct: number };
+  };
 }
 
 // Executive Summary Counts
