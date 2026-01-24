@@ -23,7 +23,7 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
   const {
     period, funnel_by_source, funnel_by_category, source_attainment,
     google_ads, google_ads_rca, mql_details, sql_details, sal_details,
-    mql_disqualification_summary
+    mql_disqualification_summary, utm_breakdown
   } = reportData;
 
   // Determine which products are active based on filter context
@@ -133,41 +133,35 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
   const allInboundAttainment = [...inboundAttainmentPOR.map((r: any) => ({...r, product: 'POR'})), ...inboundAttainmentR360.map((r: any) => ({...r, product: 'R360'}))];
   const worstInboundGaps = allInboundAttainment.filter((r: any) => (r.gap || 0) < 0).sort((a: any, b: any) => (a.gap || 0) - (b.gap || 0));
 
-  // UTM Analysis - aggregate MQL data by UTM fields
-  const getUtmBreakdown = (mqls: any[], field: string) => {
-    const grouped: Record<string, { total: number; converted: number; stalled: number }> = {};
-    mqls.forEach((m: any) => {
-      const value = m[field] || 'Unknown';
-      if (!grouped[value]) grouped[value] = { total: 0, converted: 0, stalled: 0 };
-      grouped[value].total++;
-      if (m.converted_to_sql === 'Yes') grouped[value].converted++;
-      if (m.mql_status === 'STALLED') grouped[value].stalled++;
-    });
-    return Object.entries(grouped)
-      .map(([name, data]) => ({
-        name,
-        total: data.total,
-        converted: data.converted,
-        stalled: data.stalled,
-        convRate: data.total > 0 ? Math.round((data.converted / data.total) * 100) : 0,
-        stallRate: data.total > 0 ? Math.round((data.stalled / data.total) * 100) : 0,
-      }))
-      .filter(item => item.name && item.name !== 'Unknown' && item.name !== '')
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10);
-  };
+  // UTM Analysis - use pre-aggregated BigQuery data from utm_breakdown
+  // Structure: { POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] }, R360: {...} }
+  const utmData = utm_breakdown || { POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] }, R360: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] } };
 
-  // Get UTM breakdowns for POR and R360
-  const utmSourcePOR = getUtmBreakdown(mqlDetailsPOR, 'utm_source');
-  const utmSourceR360 = getUtmBreakdown(mqlDetailsR360, 'utm_source');
-  const utmMediumPOR = getUtmBreakdown(mqlDetailsPOR, 'utm_medium');
-  const utmMediumR360 = getUtmBreakdown(mqlDetailsR360, 'utm_medium');
-  const utmCampaignPOR = getUtmBreakdown(mqlDetailsPOR, 'utm_campaign');
-  const utmCampaignR360 = getUtmBreakdown(mqlDetailsR360, 'utm_campaign');
-  const utmChannelPOR = getUtmBreakdown(mqlDetailsPOR, 'utm_channel');
-  const utmChannelR360 = getUtmBreakdown(mqlDetailsR360, 'utm_channel');
-  const utmKeywordPOR = getUtmBreakdown(mqlDetailsPOR, 'utm_keyword');
-  const utmKeywordR360 = getUtmBreakdown(mqlDetailsR360, 'utm_keyword');
+  const mapUtmDimension = (items: any[]) => items
+    .filter((item: any) => item.name && item.name !== 'unknown' && item.name !== 'none')
+    .map((item: any) => ({
+      name: item.name,
+      total: item.mql_count || 0,
+      converted: item.sql_count || 0,
+      stalled: 0,
+      convRate: item.mql_to_sql_pct || 0,
+      stallRate: 0,
+      sqoCount: item.sqo_count || 0,
+      sqoRate: item.mql_to_sqo_pct || 0,
+    }))
+    .slice(0, 10);
+
+  // Get UTM breakdowns from BigQuery data
+  const utmSourcePOR = mapUtmDimension(includePOR ? (utmData.POR?.by_source || []) : []);
+  const utmSourceR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_source || []) : []);
+  const utmMediumPOR = mapUtmDimension(includePOR ? (utmData.POR?.by_medium || []) : []);
+  const utmMediumR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_medium || []) : []);
+  const utmCampaignPOR = mapUtmDimension(includePOR ? (utmData.POR?.by_campaign || []) : []);
+  const utmCampaignR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_campaign || []) : []);
+  const utmChannelPOR: any[] = []; // Channel derived from medium in BigQuery data
+  const utmChannelR360: any[] = [];
+  const utmKeywordPOR = mapUtmDimension(includePOR ? (utmData.POR?.by_keyword || []) : []);
+  const utmKeywordR360 = mapUtmDimension(includeR360 ? (utmData.R360?.by_keyword || []) : []);
 
   // Best/worst converting UTM sources (depends on UTM declarations above)
   const topConvertingUtmPOR = utmSourcePOR.filter(s => s.total >= 3).sort((a, b) => b.convRate - a.convRate).slice(0, 5);
@@ -337,48 +331,48 @@ ${includeR360 ? `### R360 MQL Status Breakdown
 ${includePOR ? `- POR: ${dqSummary.POR?.reverted_pct || 0}% reverted, ${dqSummary.POR?.converted_pct || 0}% converted, ${dqSummary.POR?.stalled_pct || 0}% stalled` : ''}
 ${includeR360 ? `- R360: ${dqSummary.R360?.reverted_pct || 0}% reverted, ${dqSummary.R360?.converted_pct || 0}% converted, ${dqSummary.R360?.stalled_pct || 0}% stalled` : ''}
 
-## UTM SOURCE ANALYSIS (Lead Origin Tracking)
+## UTM SOURCE ANALYSIS (Lead Origin Tracking from BigQuery MarketingFunnel)
 ${includePOR ? `### POR - By UTM Source (Top 10)
-${utmSourcePOR.length > 0 ? utmSourcePOR.map(s =>
-  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
+${utmSourcePOR.length > 0 ? utmSourcePOR.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
 ).join('\n') : 'No UTM source data'}` : ''}
 
 ${includeR360 ? `### R360 - By UTM Source (Top 10)
-${utmSourceR360.length > 0 ? utmSourceR360.map(s =>
-  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
+${utmSourceR360.length > 0 ? utmSourceR360.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
 ).join('\n') : 'No UTM source data'}` : ''}
 
-## UTM CHANNEL ANALYSIS
-${includePOR ? `### POR - By UTM Channel
-${utmChannelPOR.length > 0 ? utmChannelPOR.map(s =>
-  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
-).join('\n') : 'No UTM channel data'}` : ''}
+## UTM MEDIUM ANALYSIS (Traffic Channel Type)
+${includePOR ? `### POR - By UTM Medium
+${utmMediumPOR.length > 0 ? utmMediumPOR.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
+).join('\n') : 'No UTM medium data'}` : ''}
 
-${includeR360 ? `### R360 - By UTM Channel
-${utmChannelR360.length > 0 ? utmChannelR360.map(s =>
-  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
-).join('\n') : 'No UTM channel data'}` : ''}
+${includeR360 ? `### R360 - By UTM Medium
+${utmMediumR360.length > 0 ? utmMediumR360.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
+).join('\n') : 'No UTM medium data'}` : ''}
 
 ## UTM CAMPAIGN ANALYSIS
 ${includePOR ? `### POR - By UTM Campaign (Top 10)
-${utmCampaignPOR.length > 0 ? utmCampaignPOR.map(s =>
-  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
+${utmCampaignPOR.length > 0 ? utmCampaignPOR.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
 ).join('\n') : 'No UTM campaign data'}` : ''}
 
 ${includeR360 ? `### R360 - By UTM Campaign (Top 10)
-${utmCampaignR360.length > 0 ? utmCampaignR360.map(s =>
-  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
+${utmCampaignR360.length > 0 ? utmCampaignR360.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
 ).join('\n') : 'No UTM campaign data'}` : ''}
 
 ## UTM KEYWORD ANALYSIS
 ${includePOR ? `### POR - By UTM Keyword/Term (Top 10)
-${utmKeywordPOR.length > 0 ? utmKeywordPOR.map(s =>
-  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
+${utmKeywordPOR.length > 0 ? utmKeywordPOR.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
 ).join('\n') : 'No UTM keyword data'}` : ''}
 
 ${includeR360 ? `### R360 - By UTM Keyword/Term (Top 10)
-${utmKeywordR360.length > 0 ? utmKeywordR360.map(s =>
-  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% converted, ${s.stallRate}% stalled`
+${utmKeywordR360.length > 0 ? utmKeywordR360.map((s: any) =>
+  `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
 ).join('\n') : 'No UTM keyword data'}` : ''}
 
 ## GOOGLE ADS PERFORMANCE (Paid Inbound)
@@ -433,13 +427,13 @@ ${highCpaAds.map((r: any) => `- ${r.product} (${r.region}): CPA $${r.cpa_usd}, s
 ${lowCtrAds.map((r: any) => `- ${r.product} (${r.region}): CTR ${r.ctr_pct}%, ${r.clicks || 0} clicks, spend $${(r.ad_spend_usd || 0).toLocaleString()}`).join('\n') || 'All CTRs above threshold'}
 
 ${includePOR ? `### Top Converting UTM Sources (POR)
-${topConvertingUtmPOR.map(s => `- ${s.name}: ${s.convRate}% conversion, ${s.total} MQLs`).join('\n') || 'No UTM source data'}
+${topConvertingUtmPOR.map((s: any) => `- ${s.name}: ${s.convRate}% MQL→SQL, ${s.sqoRate || 0}% MQL→SQO, ${s.total} MQLs`).join('\n') || 'No UTM source data'}
 
 ### Worst Converting UTM Sources (POR)
-${worstConvertingUtmPOR.map(s => `- ${s.name}: ${s.convRate}% conversion, ${s.total} MQLs, ${s.stallRate}% stalled`).join('\n') || 'No UTM source data'}` : ''}
+${worstConvertingUtmPOR.map((s: any) => `- ${s.name}: ${s.convRate}% MQL→SQL, ${s.sqoRate || 0}% MQL→SQO, ${s.total} MQLs`).join('\n') || 'No UTM source data'}` : ''}
 
 ${includeR360 ? `### Top Converting UTM Sources (R360)
-${topConvertingUtmR360.map(s => `- ${s.name}: ${s.convRate}% conversion, ${s.total} MQLs`).join('\n') || 'No UTM source data'}` : ''}
+${topConvertingUtmR360.map((s: any) => `- ${s.name}: ${s.convRate}% MQL→SQL, ${s.sqoRate || 0}% MQL→SQO, ${s.total} MQLs`).join('\n') || 'No UTM source data'}` : ''}
 
 ### Period Context
 - Quarter ${quarterPctComplete}% complete (${daysElapsed} days elapsed, ${daysRemaining} remaining)

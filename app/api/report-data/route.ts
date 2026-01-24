@@ -2391,6 +2391,154 @@ async function getSQODetails(filters: ReportFilters) {
   }
 }
 
+// Query UTM source breakdown from InboundFunnel tables
+async function getUtmBreakdown(filters: ReportFilters) {
+  const { startDate, endDate } = filters;
+
+  // Query all UTM dimensions separately for each product
+  const query = `
+    WITH por_raw AS (
+      SELECT
+        CASE Division
+          WHEN 'US' THEN 'AMER' WHEN 'UK' THEN 'EMEA' WHEN 'AU' THEN 'APAC'
+          ELSE 'AMER'
+        END AS region,
+        COALESCE(NULLIF(UtmSourceBucket, ''), NULLIF(UtmSource, ''), 'Direct/Unknown') AS utm_source,
+        COALESCE(NULLIF(UtmMedium, ''), 'unknown') AS utm_medium,
+        COALESCE(NULLIF(UtmCampaign, ''), 'none') AS utm_campaign,
+        COALESCE(NULLIF(UtmTerm, ''), 'none') AS utm_keyword,
+        CASE WHEN SQL_DT IS NOT NULL THEN 1 ELSE 0 END AS has_sql,
+        CASE WHEN SAL_DT IS NOT NULL THEN 1 ELSE 0 END AS has_sal,
+        CASE WHEN SQO_DT IS NOT NULL THEN 1 ELSE 0 END AS has_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.MarketingFunnel.InboundFunnel\`
+      WHERE MQL_DT >= '${startDate}' AND MQL_DT <= '${endDate}'
+    ),
+    r360_raw AS (
+      SELECT
+        CASE Division
+          WHEN 'US' THEN 'AMER' WHEN 'UK' THEN 'EMEA' WHEN 'AU' THEN 'APAC'
+          ELSE 'AMER'
+        END AS region,
+        COALESCE(NULLIF(UtmSourceBucket, ''), NULLIF(UtmSource, ''), 'Direct/Unknown') AS utm_source,
+        COALESCE(NULLIF(UtmMedium, ''), 'unknown') AS utm_medium,
+        COALESCE(NULLIF(UtmCampaign, ''), 'none') AS utm_campaign,
+        COALESCE(NULLIF(UtmTerm, ''), 'none') AS utm_keyword,
+        CASE WHEN SQL_DT IS NOT NULL THEN 1 ELSE 0 END AS has_sql,
+        0 AS has_sal,
+        CASE WHEN SQO_DT IS NOT NULL THEN 1 ELSE 0 END AS has_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.MarketingFunnel.R360InboundFunnel\`
+      WHERE MQL_DT >= '${startDate}' AND MQL_DT <= '${endDate}'
+    ),
+    -- POR by source
+    por_by_source AS (
+      SELECT 'POR' AS product, 'source' AS dimension, utm_source AS value,
+        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+      FROM por_raw GROUP BY utm_source
+    ),
+    -- POR by medium
+    por_by_medium AS (
+      SELECT 'POR' AS product, 'medium' AS dimension, utm_medium AS value,
+        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+      FROM por_raw GROUP BY utm_medium
+    ),
+    -- POR by campaign
+    por_by_campaign AS (
+      SELECT 'POR' AS product, 'campaign' AS dimension, utm_campaign AS value,
+        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+      FROM por_raw WHERE utm_campaign != 'none' GROUP BY utm_campaign
+    ),
+    -- POR by keyword
+    por_by_keyword AS (
+      SELECT 'POR' AS product, 'keyword' AS dimension, utm_keyword AS value,
+        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+      FROM por_raw WHERE utm_keyword != 'none' GROUP BY utm_keyword
+    ),
+    -- R360 by source
+    r360_by_source AS (
+      SELECT 'R360' AS product, 'source' AS dimension, utm_source AS value,
+        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+      FROM r360_raw GROUP BY utm_source
+    ),
+    -- R360 by medium
+    r360_by_medium AS (
+      SELECT 'R360' AS product, 'medium' AS dimension, utm_medium AS value,
+        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+      FROM r360_raw GROUP BY utm_medium
+    ),
+    -- R360 by campaign
+    r360_by_campaign AS (
+      SELECT 'R360' AS product, 'campaign' AS dimension, utm_campaign AS value,
+        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+      FROM r360_raw WHERE utm_campaign != 'none' GROUP BY utm_campaign
+    ),
+    -- R360 by keyword
+    r360_by_keyword AS (
+      SELECT 'R360' AS product, 'keyword' AS dimension, utm_keyword AS value,
+        COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
+      FROM r360_raw WHERE utm_keyword != 'none' GROUP BY utm_keyword
+    )
+    SELECT * FROM por_by_source
+    UNION ALL SELECT * FROM por_by_medium
+    UNION ALL SELECT * FROM por_by_campaign
+    UNION ALL SELECT * FROM por_by_keyword
+    UNION ALL SELECT * FROM r360_by_source
+    UNION ALL SELECT * FROM r360_by_medium
+    UNION ALL SELECT * FROM r360_by_campaign
+    UNION ALL SELECT * FROM r360_by_keyword
+    ORDER BY product, dimension, mql_count DESC
+  `;
+
+  try {
+    const bigquery = getBigQuery();
+    const [rows] = await bigquery.query({ query });
+
+    const result: {
+      POR: { by_source: any[]; by_medium: any[]; by_campaign: any[]; by_keyword: any[] };
+      R360: { by_source: any[]; by_medium: any[]; by_campaign: any[]; by_keyword: any[] };
+    } = {
+      POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] },
+      R360: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] },
+    };
+
+    for (const row of rows) {
+      const mql = parseInt(row.mql_count) || 0;
+      const sql = parseInt(row.sql_count) || 0;
+      const sqo = parseInt(row.sqo_count) || 0;
+      const item = {
+        name: row.value,
+        mql_count: mql,
+        sql_count: sql,
+        sal_count: parseInt(row.sal_count) || 0,
+        sqo_count: sqo,
+        mql_to_sql_pct: mql > 0 ? Math.round((sql / mql) * 100) : 0,
+        mql_to_sqo_pct: mql > 0 ? Math.round((sqo / mql) * 100) : 0,
+      };
+      const product = row.product as 'POR' | 'R360';
+      const dimKey = `by_${row.dimension}` as keyof typeof result.POR;
+      if (result[product] && result[product][dimKey]) {
+        result[product][dimKey].push(item);
+      }
+    }
+
+    // Sort each array by mql_count desc and limit to top 15
+    for (const product of ['POR', 'R360'] as const) {
+      for (const dim of ['by_source', 'by_medium', 'by_campaign', 'by_keyword'] as const) {
+        result[product][dim] = result[product][dim]
+          .sort((a, b) => b.mql_count - a.mql_count)
+          .slice(0, 15);
+      }
+    }
+
+    return result;
+  } catch (error: any) {
+    console.error('UTM breakdown query error:', error.message);
+    return {
+      POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] },
+      R360: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [] },
+    };
+  }
+}
+
 // Query for Google Ads data
 async function getGoogleAds(filters: ReportFilters) {
   const query = `
@@ -2546,6 +2694,7 @@ export async function POST(request: Request) {
       renewalTargetsMap,
       ,  // sourceMixMap removed - source targets now from RevOpsReport directly
       fyTargetsMap,
+      utmBreakdownData,
     ] = await Promise.all([
       getRevOpsQTDData(filters),
       getRevenueActuals(filters),
@@ -2582,6 +2731,7 @@ export async function POST(request: Request) {
       getRenewalTargetsFromRawPlan(),
       Promise.resolve(null),  // Source mix no longer needed - targets from RevOpsReport directly
       getFYTargetsFromPlan(),
+      getUtmBreakdown(filters),
     ]);
 
     // Calculate period info
@@ -3379,6 +3529,55 @@ export async function POST(request: Request) {
       });
     }
 
+    // Add entries for categories that have targets but no actuals (e.g., STRATEGIC with 0 deals)
+    const funnelCategories = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
+    const existingPorKeys = new Set(funnelByCategory.POR.map((r: any) => `${r.region}-${r.category}`));
+    const existingR360Keys = new Set(funnelByCategory.R360.map((r: any) => `${r.region}-${r.category}`));
+
+    for (const [key, catTargets] of Array.from(categoryTargetMap.entries())) {
+      const [product, region, category] = key.split('-');
+      if (!funnelCategories.includes(category)) continue;
+      // Skip if no meaningful targets
+      if ((catTargets.q1_target_mql + catTargets.q1_target_sql + catTargets.q1_target_sqo) === 0) continue;
+
+      const rowKey = `${region}-${category}`;
+      const qtdTargetMql = Math.round(catTargets.q1_target_mql * qtdProrationFactor);
+      const qtdTargetSql = Math.round(catTargets.q1_target_sql * qtdProrationFactor);
+      const qtdTargetSal = Math.round(catTargets.q1_target_sal * qtdProrationFactor);
+      const qtdTargetSqo = Math.round(catTargets.q1_target_sqo * qtdProrationFactor);
+
+      if (product === 'POR' && !existingPorKeys.has(rowKey)) {
+        funnelByCategory.POR.push({
+          category,
+          region,
+          actual_mql: 0, q1_target_mql: Math.round(catTargets.q1_target_mql), qtd_target_mql: qtdTargetMql,
+          mql_pacing_pct: qtdTargetMql > 0 ? 0 : 100, mql_gap: -qtdTargetMql,
+          actual_sql: 0, q1_target_sql: Math.round(catTargets.q1_target_sql), qtd_target_sql: qtdTargetSql,
+          sql_pacing_pct: qtdTargetSql > 0 ? 0 : 100, sql_gap: -qtdTargetSql,
+          actual_sal: 0, q1_target_sal: Math.round(catTargets.q1_target_sal), qtd_target_sal: qtdTargetSal,
+          sal_pacing_pct: qtdTargetSal > 0 ? 0 : 100, sal_gap: -qtdTargetSal,
+          actual_sqo: 0, q1_target_sqo: Math.round(catTargets.q1_target_sqo), qtd_target_sqo: qtdTargetSqo,
+          sqo_pacing_pct: qtdTargetSqo > 0 ? 0 : 100, sqo_gap: -qtdTargetSqo,
+          weighted_tof_score: 0,
+        });
+      }
+      if (product === 'R360' && !existingR360Keys.has(rowKey)) {
+        funnelByCategory.R360.push({
+          category,
+          region,
+          actual_mql: 0, q1_target_mql: Math.round(catTargets.q1_target_mql), qtd_target_mql: qtdTargetMql,
+          mql_pacing_pct: qtdTargetMql > 0 ? 0 : 100, mql_gap: -qtdTargetMql,
+          actual_sql: 0, q1_target_sql: Math.round(catTargets.q1_target_sql), qtd_target_sql: qtdTargetSql,
+          sql_pacing_pct: qtdTargetSql > 0 ? 0 : 100, sql_gap: -qtdTargetSql,
+          actual_sal: 0, q1_target_sal: Math.round(catTargets.q1_target_sal), qtd_target_sal: qtdTargetSal,
+          sal_pacing_pct: qtdTargetSal > 0 ? 0 : 100, sal_gap: -qtdTargetSal,
+          actual_sqo: 0, q1_target_sqo: Math.round(catTargets.q1_target_sqo), qtd_target_sqo: qtdTargetSqo,
+          sqo_pacing_pct: qtdTargetSqo > 0 ? 0 : 100, sqo_gap: -qtdTargetSqo,
+          weighted_tof_score: 0,
+        });
+      }
+    }
+
     // Calculate MQL disqualification summary
     const calculateDQSummary = (mqls: any[]) => {
       const total = mqls.length;
@@ -3767,6 +3966,7 @@ export async function POST(request: Request) {
       wins_bright_spots: winsBrightSpots,
       top_risk_pockets: topRiskPockets,
       action_items: actionItems,
+      utm_breakdown: utmBreakdownData,
     };
 
     return NextResponse.json(response, {
