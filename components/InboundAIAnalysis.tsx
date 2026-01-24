@@ -402,6 +402,7 @@ function parseContent(markdown: string): ContentSection[] {
         const trimmed = rawLine.trim();
         if (!trimmed) { i++; continue; }
         if (isSectionHeader(trimmed) || isMetricItem(trimmed) || isActionItem(trimmed)) break;
+        if (/^-{2,}$/.test(trimmed)) { i++; continue; }
 
         const indent = rawLine.length - rawLine.replace(/^\s+/, '').length;
         const bulletMatch = trimmed.match(/^[-*•◦]\s*(.+)$/);
