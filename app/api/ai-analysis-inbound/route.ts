@@ -255,12 +255,20 @@ Using source attainment data:
 - Leading indicators: are trends improving or deteriorating?
 
 ### 9. PRIORITIZED RECOMMENDATIONS
-Provide 5-7 specific recommendations, each with:
-- Priority level (P1/P2/P3)
-- Product/region/channel it applies to
-- Expected impact (lead volume, conversion rate, or dollar amount)
-- Recommended owner (Marketing/Sales/SDR/Revenue Operations)
-- Timeframe (Immediate/This Week/This Month/This Quarter)
+Provide 5-7 specific recommendations. Each recommendation MUST be a single dense sentence that includes ALL of the following inline:
+- Priority prefix (P1/P2/P3)
+- The word "Recommend" followed by the specific action
+- The metric/data that justifies it (e.g., "to close the 41-MQL gap", "targeting a CPA reduction from $702 to <$300")
+- Expected quantified impact (e.g., "with expected savings of ~$8,000", "improving attainment by ~$2,000")
+- Owner and Timeframe at the end separated by semicolons
+
+FORMAT EACH RECOMMENDATION EXACTLY LIKE THIS (single line, no sub-bullets):
+"P1 – Recommend [specific action] to [address specific metric/gap from the data], targeting [quantified goal]; expected impact: [dollar/lead/conversion improvement]; Owner: [team]; Timeframe: [when]."
+
+EXAMPLE:
+"P1 – Recommend reallocating AMER Google Ads budget toward tighter keyword match types, targeting a CPA reduction from $702 to <$300, with expected savings of ~$8,000 this quarter; Owner: Marketing; Timeframe: Immediate."
+
+CRITICAL: Every recommendation must reference a SPECIFIC number from the data above (a CPA, a pacing %, a gap count, a dollar amount). Generic recommendations without data references will be rejected.
 
 ---
 
@@ -447,7 +455,7 @@ ${topConvertingUtmR360.map((s: any) => `- ${s.name}: ${s.convRate}% MQL→SQL, $
 6. Conversion thresholds: MQL→SQL 30%, SQL→SAL 50% (POR), SAL→SQO 60% (POR), SQL→SQO 50% (R360). Call out EVERY threshold breach with specific numbers.
 7. Ads thresholds: CPA above $200 = risk, CTR below 3% = risk. Quantify the dollar waste for each breach.
 8. Be DIRECT about failures - name specific channels, campaigns, UTM sources, and regions that are underperforming with exact numbers
-9. Every recommendation must specify: target product/region/channel, expected impact in leads/dollars, owner, and implementation timeline
+9. Every recommendation MUST be a single dense sentence with: the specific data point driving it, the quantified target, the expected dollar/lead impact, owner, and timeframe. Format: "P1 – Recommend [action] to [metric justification], targeting [goal]; expected impact: [quantified]; Owner: [team]; Timeframe: [when]." NO sub-bullets under recommendations.
 10. When UTM data shows no matches, analyze the available funnel and ads data instead
 11. ${includePOR && includeR360 ? 'Compare POR vs R360 inbound effectiveness explicitly with specific conversion rate and volume comparisons per region' : `Focus exclusively on ${includePOR ? 'POR' : 'R360'} inbound performance. Do NOT mention or reference ${includePOR ? 'R360' : 'POR'} - it is excluded from this analysis.`}
 12. Prioritize recommendations by lead-to-revenue impact potential

@@ -270,12 +270,20 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 - Risk-adjusted forecast considering win rates and pipeline age
 
 ### 9. PRIORITIZED RECOMMENDATIONS
-Provide 5-7 specific recommendations, each with:
-- Priority level (P1/P2/P3)
-- Segment/region/source it applies to
-- Expected dollar impact if addressed
-- Recommended owner (role, not name)
-- Timeframe for implementation
+Provide 5-7 specific recommendations. Each recommendation MUST be a single dense sentence that includes ALL of the following inline:
+- Priority prefix (P1/P2/P3)
+- The word "Recommend" followed by the specific action
+- The metric/data that justifies it (e.g., "to close the $128K EMEA gap", "given 42% attainment vs 75% target")
+- Expected quantified impact (e.g., "recovering ~$50K in bookings", "improving pacing by 15 points")
+- Owner and Timeframe at the end separated by semicolons
+
+FORMAT EACH RECOMMENDATION EXACTLY LIKE THIS (single line, no sub-bullets):
+"P1 – Recommend [specific action] to [address specific metric/gap from the data], targeting [quantified goal]; expected impact: [dollar/pipeline improvement]; Owner: [team]; Timeframe: [when]."
+
+EXAMPLE:
+"P1 – Recommend accelerating 12 EMEA pipeline deals past Proposal stage to close the -$128K attainment gap, targeting $80K in incremental bookings this quarter; Owner: Sales Leadership; Timeframe: Immediate."
+
+CRITICAL: Every recommendation must reference a SPECIFIC number from the data above (an attainment %, a dollar gap, a deal count, a conversion rate). Generic recommendations without data references will be rejected.
 
 ---
 
@@ -425,7 +433,7 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 7. NEVER say "underperforming channels not identified" or "insufficient data" - the Source Channel Attainment section has COMPLETE data
 8. Pipeline coverage: 3x+ = healthy, 2-3x = adequate, <2x = critical risk. Quantify the dollar risk.
 9. Be DIRECT about underperformance - if a segment is failing, say so clearly with the dollar impact AND root cause hypothesis
-10. Each recommendation must specify: target segment, expected dollar impact, responsible role, and implementation timeline
+10. Each recommendation MUST be a single dense sentence with: the specific data point driving it, the quantified target, the expected dollar impact, owner, and timeframe. Format: "P1 – Recommend [action] to [metric justification], targeting [goal]; expected impact: [quantified]; Owner: [team]; Timeframe: [when]." NO sub-bullets under recommendations.
 11. Prioritize recommendations by ROI potential (largest gap with quickest fix first)
 12. ${includePOR && includeR360 ? 'Compare products: explicitly note where R360 is trailing POR and why, with specific dollar and percentage comparisons' : `Focus exclusively on ${includePOR ? 'POR' : 'R360'} performance. Do NOT mention or reference ${includePOR ? 'R360' : 'POR'} in any way.`}
 13. YOUR RESPONSE MUST BE AT LEAST 7000 CHARACTERS LONG AND CONTAIN ALL 9 SECTION HEADERS. DO NOT STOP EARLY OR ABBREVIATE. AIM FOR 8000-10000 CHARACTERS.
