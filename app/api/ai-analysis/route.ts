@@ -604,15 +604,38 @@ CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Ev
 
 ---
 
-## FORMATTING RULES
-- NEVER write paragraph blobs. Every data point must be a bullet or sub-bullet.
-- Each section must use multi-level bullets: top-level "- " for main points, indented "  - " for supporting data.
-- Each top-level bullet should have a **bold label:** followed by the key insight, then 1-3 sub-bullets with supporting metrics.
-- Always include specific dollar amounts and percentages.
+## FORMATTING RULES (CRITICAL - APPLY TO ALL 10 SECTIONS)
+- NEVER write paragraph blobs or flat bullet lists. EVERY section MUST use multi-level bullets with sub-bullets.
+- **MANDATORY STRUCTURE FOR SECTIONS 2-9:**
+  - Top-level bullet: "- **Bold Label:** key insight or finding"
+  - Sub-bullets (REQUIRED): "  - supporting metric, data point, or implication" (indent with 2 spaces)
+  - Each top-level bullet MUST have 1-3 sub-bullets with specific data
+- Section 1 (Executive Summary): 3-4 complete sentences, no bullets
+- Section 10 (Recommendations): flat bullets starting with "- P[1-3] –"
+- **EXAMPLE FORMAT FOR SECTIONS 2-9 (USE THIS EXACT STRUCTURE):**
+
+### 6. PIPELINE RISK ASSESSMENT
+- **AMER Coverage Shortfall:** Only 1.9x coverage against 3x benchmark
+  - $430K of target unsupported by pipeline
+  - 72-day average age indicates stale deals
+- **Strategic Segment Critical:** 0.9x coverage makes -$33K gap unrecoverable
+  - Only $112K pipeline with declining velocity
+  - Recommend deprioritizing or writing off
+
+### 7. WIN/LOSS PATTERN ANALYSIS
+- **Pricing Objections (AMER):** $102,504 lost across 9 deals
+  - Single largest loss category at 45% of total losses
+  - Concentrated in New Logo segment
+- **Process Failures:** Timing and "Not Ready" combined $76,630
+  - Indicates nurture cadence issues
+  - 55% of losses are theoretically winnable
+
+- Always include specific dollar amounts and percentages in sub-bullets.
 - Rank items by dollar impact (largest first).
 - Be direct and honest - do not sugarcoat underperformance.
 - Frame suggestions as "Recommend..." not "Action:" or "Next step:".
-- Recommendations MUST each be on their own line starting with "- P[1-3] –".
+
+**REMINDER: Every bullet in sections 2-9 needs sub-bullets. If you write a flat bullet list without indented sub-bullets, the output is INVALID.**
 
 ## Filter Context
 ${filterDescription}
@@ -923,25 +946,37 @@ export async function POST(request: Request) {
 
     const systemMessage = `You are a senior Revenue Operations analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly bookings analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 10 sections: Executive Summary, Revenue Attainment Deep Dive, Channel Performance, Funnel Health & Velocity, Funnel Dropoff Analysis, Pipeline Risk, Win/Loss Patterns, Marketing & Channel Efficiency, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific dollar amounts, percentages, and gaps throughout. Be brutally honest about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 9000-12000 CHARACTERS. NEVER stop before completing all 10 sections.
 
-OUTPUT FORMAT (STRICT):
+OUTPUT FORMAT (STRICT - READ CAREFULLY):
 - Use ### for section headers (e.g., ### Executive Summary)
 - Use #### for sub-headers when breaking down by region (e.g., #### AMER)
-- EVERY section MUST use multi-level bullets:
-  - Top-level: "- **Bold Label:** key insight or finding"
-  - Sub-bullets: "  - supporting metric, data point, or implication"
-- NEVER write paragraph blobs. ALL content must be structured as bullets with sub-bullets.
-- Each top-level bullet should have 1-3 sub-bullets with supporting data.
-- For Recommendations section: each recommendation on its own line starting with "- P[1-3] –"
-- NEVER combine multiple recommendations into one paragraph or line.
-- Do NOT use numbered lists for sections (no "1.", "2." prefix on headers)
 
-EXAMPLE SECTION FORMAT:
-### Revenue Attainment Deep Dive
-- **POR AMER:** Expansion at 160% carrying the region (+$132K surplus)
-  - Renewal at 116% (+$45K) provides secondary strength
-  - Strategic at 0% (-$44K, 0.7x coverage) indicates total reliance on non-strategic motions
-- **R360 AMER:** Structurally behind at 39% New Logo attainment (-$65K gap)
-  - Pipeline coverage at 2.6x suggests win rate issues, not demand`;
+**CRITICAL MULTI-LEVEL BULLET REQUIREMENT:**
+- Section 1 (Executive Summary): 3-4 complete sentences in paragraph form
+- Sections 2-9: MUST use multi-level bullets with indented sub-bullets
+- Section 10 (Recommendations): Flat bullets starting with "- P[1-3] –"
+
+**FOR SECTIONS 2-9, EVERY BULLET MUST HAVE SUB-BULLETS:**
+- Top-level: "- **Bold Label:** key insight or finding"
+- Sub-bullets: "  - supporting metric" (REQUIRED - 1-3 per top-level bullet)
+- If you write a flat bullet without sub-bullets in sections 2-9, the output is REJECTED
+
+EXAMPLE FOR SECTIONS 2-9 (COPY THIS EXACT STRUCTURE):
+### 6. PIPELINE RISK ASSESSMENT
+- **AMER Coverage Shortfall:** Only 1.9x coverage against 3x healthy benchmark
+  - $430K of target unsupported by current pipeline
+  - Average deal age 72 days indicates staleness risk
+- **Strategic Segment Critical:** 0.9x coverage makes gap unrecoverable
+  - Only $112K pipeline available with declining velocity
+
+### 7. WIN/LOSS PATTERN ANALYSIS
+- **Pricing Objections (AMER):** $102,504 lost across 9 deals
+  - Single largest loss category at 45% of total
+  - Concentrated in New Logo segment
+- **Process Failures:** Timing and readiness issues total $76,630
+  - 55% of losses are theoretically winnable
+  - Indicates nurture cadence gaps
+
+Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists in sections 2-9.`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const insightResponse = await fetch(OPENAI_API_URL, {

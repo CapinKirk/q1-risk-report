@@ -302,15 +302,37 @@ CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Ev
 
 ---
 
-## FORMATTING RULES
-- NEVER write paragraph blobs. Every data point must be a bullet or sub-bullet.
-- Each section must use multi-level bullets: top-level "- " for main points, indented "  - " for supporting data.
-- Each top-level bullet should have a **bold label:** followed by the key insight, then 1-3 sub-bullets with supporting metrics.
-- Always include specific numbers and percentages.
+## FORMATTING RULES (CRITICAL - APPLY TO ALL 9 SECTIONS)
+- NEVER write paragraph blobs or flat bullet lists. EVERY section MUST use multi-level bullets with sub-bullets.
+- **MANDATORY STRUCTURE FOR SECTIONS 2-8:**
+  - Top-level bullet: "- **Bold Label:** key insight or finding"
+  - Sub-bullets (REQUIRED): "  - supporting metric, data point, or implication" (indent with 2 spaces)
+  - Each top-level bullet MUST have 1-3 sub-bullets with specific data
+- Section 1 (Executive Summary): 3-4 complete sentences, no bullets
+- Section 9 (Recommendations): flat bullets starting with "- P[1-3] –"
+- **EXAMPLE FORMAT FOR SECTIONS 2-8 (USE THIS EXACT STRUCTURE):**
+
+### 5. CHANNEL & CAMPAIGN EFFECTIVENESS
+- **Top UTM Sources:** Google generated 50 SQOs at 74% conversion
+  - Outperforms Organic at 54% conversion rate
+  - 35% higher efficiency per MQL
+- **Worst Campaign:** Search – US/Canada spent $4,956 for 0 SQOs
+  - 23% of total paid spend with 0% SQO share
+  - Complete funnel leakage at MQL→SQL
+
+### 6. GOOGLE ADS PERFORMANCE
+- **AMER CPA Risk:** $707 per acquisition vs $200 benchmark
+  - $9,000+ inefficient spend this quarter
+  - CTR healthy at 3.5%, issue is conversion quality
+- **Regional Efficiency Gap:** EMEA converts at $336 CPA, 52% more efficient
+  - Higher intent traffic despite lower volume
+
+- Always include specific dollar amounts and percentages in sub-bullets.
 - Rank items by impact (largest gap or worst performance first).
 - Be direct about underperformance - name specific channels/campaigns that are failing.
 - Frame suggestions as "Recommend..." not "Action:" or "Next step:".
-- Recommendations MUST each be on their own line starting with "- P[1-3] –".
+
+**REMINDER: Every bullet in sections 2-8 needs sub-bullets. If you write a flat bullet list without indented sub-bullets, the output is INVALID.**
 
 ${filterDescription}
 
@@ -576,27 +598,35 @@ export async function POST(request: Request) {
 
     const systemMessage = `You are a senior Inbound Marketing analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly inbound analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 9 sections: Executive Summary, Lead Volume & Pacing, Funnel Conversion, Funnel Velocity & Stall, Channel & Campaign Effectiveness, Google Ads Performance, Inbound Revenue Attribution, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific numbers, percentages, conversion rates, and dollar amounts throughout. Be direct about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 8000-10000 CHARACTERS. NEVER stop before completing all 9 sections.
 
-OUTPUT FORMAT (STRICT):
+OUTPUT FORMAT (STRICT - READ CAREFULLY):
 - Use ### for section headers (e.g., ### Executive Summary)
 - Use #### for sub-headers when breaking down by region (e.g., #### AMER)
-- EVERY section MUST use multi-level bullets:
-  - Top-level: "- **Bold Label:** key insight or finding"
-  - Sub-bullets: "  - supporting metric, data point, or implication"
-- NEVER write paragraph blobs. ALL content must be structured as bullets with sub-bullets.
-- Each top-level bullet should have 1-3 sub-bullets with supporting data.
-- For Recommendations section: each recommendation on its own line starting with "- P[1-3] –"
-- NEVER combine multiple recommendations into one paragraph or line.
-- Do NOT use numbered lists for sections (no "1.", "2." prefix on headers)
-- Do NOT output "---" horizontal rules between sections. Section headers provide separation.
 
-EXAMPLE SECTION FORMAT:
-### Lead Volume & Pacing Analysis
-- **POR AMER:** MQL pacing at 140% (137/98), exceeding plan by +39 leads
-  - SQL creation: 82/87 (94%), maintaining downstream volume
-  - SQO gap: only 12/36 (33%), indicating qualification bottleneck despite MQL surplus
-- **POR EMEA:** MQL healthy at 110% (33/30) but SQL conversion collapsing
-  - SQLs at 46% pacing (12/26), -14 SQL gap
-  - SQOs critically low at 18% pacing (2/11)`;
+**CRITICAL MULTI-LEVEL BULLET REQUIREMENT:**
+- Section 1 (Executive Summary): 3-4 complete sentences in paragraph form
+- Sections 2-8: MUST use multi-level bullets with indented sub-bullets
+- Section 9 (Recommendations): Flat bullets starting with "- P[1-3] –"
+
+**FOR SECTIONS 2-8, EVERY BULLET MUST HAVE SUB-BULLETS:**
+- Top-level: "- **Bold Label:** key insight or finding"
+- Sub-bullets: "  - supporting metric" (REQUIRED - 1-3 per top-level bullet)
+- If you write a flat bullet without sub-bullets in sections 2-8, the output is REJECTED
+
+EXAMPLE FOR SECTIONS 2-8 (COPY THIS EXACT STRUCTURE):
+### 5. CHANNEL & CAMPAIGN EFFECTIVENESS
+- **Top UTM Sources:** Google generated 50 SQOs at 74% conversion
+  - Outperforms Organic at 54% conversion rate
+  - 35% higher efficiency per MQL
+- **Worst Campaign:** Search – US/Canada spent $4,956 for 0 SQOs
+  - 23% of total paid spend with 0% SQO share
+  - Complete funnel leakage at MQL→SQL stage
+
+### 6. GOOGLE ADS PERFORMANCE
+- **AMER CPA Risk:** $707 per acquisition vs $200 benchmark
+  - $9,000+ inefficient spend this quarter
+  - CTR healthy at 3.5%, issue is conversion quality
+
+Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal rules. Do NOT write flat bullet lists in sections 2-8.`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const insightResponse = await fetch(OPENAI_API_URL, {
