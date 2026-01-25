@@ -438,11 +438,7 @@ Provide 5-7 specific recommendations. Each recommendation MUST be a single dense
 FORMAT EACH RECOMMENDATION AS A SEPARATE BULLET starting with "- P1 –":
 - P1 – Recommend [specific action] to [address specific metric/gap from the data], targeting [quantified goal]; expected impact: [dollar/lead/conversion improvement]; Owner: [team]; Timeframe: [when].
 
-EXAMPLE:
-- P1 – Recommend reallocating AMER Google Ads budget toward tighter keyword match types, targeting a CPA reduction from $702 to <$300, with expected savings of ~$8,000 this quarter; Owner: Marketing; Timeframe: Immediate.
-- P2 – Recommend launching APAC-specific top-of-funnel acquisition campaigns to close the 41-MQL gap, targeting 0.5 MQL/day; Owner: Marketing; Timeframe: This Month.
-
-CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Every recommendation must reference a SPECIFIC number from the data. Generic recommendations will be rejected. NEVER combine multiple recommendations into one paragraph.
+CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Every recommendation must reference a SPECIFIC number from the data provided above. Generic recommendations will be rejected. NEVER combine multiple recommendations into one paragraph. Use ONLY data from the context sections above - no invented numbers.
 
 ---
 
@@ -454,30 +450,10 @@ CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Ev
   - Each top-level bullet MUST have 1-3 sub-bullets with specific data
 - Section 1 (Executive Summary): 3-4 complete sentences, no bullets
 - Section 10 (Recommendations): flat bullets starting with "- P[1-3] –"
-- **EXAMPLE FORMAT FOR SECTIONS 2-9 (USE THIS EXACT STRUCTURE):**
-
-### 4. PAID FUNNEL CONVERSION ANALYSIS
-- **Paid vs Organic Quality:** Paid converts at 45% MQL→SQL vs Organic at 32%
-  - Paid MQL→SQO: 18% full-funnel efficiency
-  - Cost per SQO: $892 for paid traffic
-- **High-Leakage Campaign:** Search – US/Canada generates 45 MQLs but only 2 SQOs
-  - 96% funnel leakage indicates targeting issue
-  - $4,956 spend at $2,478 per SQO
-
-### 6. CHANNEL & CAMPAIGN EFFECTIVENESS
-- **Top UTM Sources:** Google generated 50 SQOs at 74% conversion
-  - Outperforms Organic at 54% conversion rate
-  - 35% higher efficiency per MQL
-- **Worst Campaign:** Search – US/Canada spent $4,956 for 0 SQOs
-  - 23% of total paid spend with 0% SQO share
-  - Complete funnel leakage at MQL→SQL
-
-### 6. GOOGLE ADS PERFORMANCE
-- **AMER CPA Risk:** $707 per acquisition vs $200 benchmark
-  - $9,000+ inefficient spend this quarter
-  - CTR healthy at 3.5%, issue is conversion quality
-- **Regional Efficiency Gap:** EMEA converts at $336 CPA, 52% more efficient
-  - Higher intent traffic despite lower volume
+- **STRUCTURE FOR SECTIONS 2-9 (multi-level bullets with sub-bullets):**
+  - Top-level bullet: "- **[Label from data]:** [key insight with specific metric]"
+  - Sub-bullets (REQUIRED): "  - [supporting metric or implication]" (indent with 2 spaces)
+  - EVERY top-level bullet MUST have 1-3 sub-bullets with specific data from the context above
 
 - Always include specific dollar amounts and percentages in sub-bullets.
 - Rank items by impact (largest gap or worst performance first).
@@ -817,26 +793,12 @@ OUTPUT FORMAT (STRICT - READ CAREFULLY):
 - Sub-bullets: "  - supporting metric" (REQUIRED - 1-3 per top-level bullet)
 - If you write a flat bullet without sub-bullets in sections 2-9, the output is REJECTED
 
-EXAMPLE FOR SECTIONS 2-9 (COPY THIS EXACT STRUCTURE):
-### 4. PAID FUNNEL CONVERSION ANALYSIS
-- **Paid vs Organic Quality:** Paid converts at 45% MQL→SQL vs Organic at 32%
-  - Paid MQL→SQO: 18% full-funnel efficiency
-  - Cost per SQO: $892 indicates moderate efficiency
-- **High-Leakage Campaign:** Search – US/Canada generates 45 MQLs but only 2 SQOs
-  - 96% funnel leakage indicates targeting issue
-  - $4,956 spend at $2,478 per SQO
+STRUCTURE FOR SECTIONS 2-9:
+- Top-level bullet: "- **[Label from data]:** [key insight with specific metric from context]"
+- Sub-bullets (REQUIRED): "  - [supporting metric]" (indent with 2 spaces, 1-3 per top-level)
+- Use ONLY data from the context provided - no invented numbers
 
-### 6. CHANNEL & CAMPAIGN EFFECTIVENESS
-- **Top UTM Sources:** Google generated 50 SQOs at 74% conversion
-  - Outperforms Organic at 54% conversion rate
-  - 35% higher efficiency per MQL
-
-### 7. GOOGLE ADS PERFORMANCE
-- **AMER CPA Risk:** $707 per acquisition vs $200 benchmark
-  - $9,000+ inefficient spend this quarter
-  - CTR healthy at 3.5%, issue is conversion quality
-
-Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal rules. Do NOT write flat bullet lists in sections 2-8.`;
+Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal rules. Do NOT write flat bullet lists in sections 2-9. All metrics must come from the data context provided.`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const insightResponse = await fetch(OPENAI_API_URL, {

@@ -596,11 +596,7 @@ Provide 5-7 specific recommendations. Each recommendation MUST be a single dense
 FORMAT EACH RECOMMENDATION AS A SEPARATE BULLET starting with "- P1 –":
 - P1 – Recommend [specific action] to [address specific metric/gap from the data], targeting [quantified goal]; expected impact: [dollar/pipeline improvement]; Owner: [team]; Timeframe: [when].
 
-EXAMPLE:
-- P1 – Recommend accelerating 12 EMEA pipeline deals past Proposal stage to close the -$128K attainment gap, targeting $80K in incremental bookings this quarter; Owner: Sales Leadership; Timeframe: Immediate.
-- P2 – Recommend reallocating senior AMER sales capacity to address the -$86,369 combined gap in AE-Sourced and Outbound; Owner: Sales Leadership; Timeframe: 30 days.
-
-CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Every recommendation must reference a SPECIFIC number from the data. Generic recommendations will be rejected. NEVER combine multiple recommendations into one paragraph.
+CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Every recommendation must reference a SPECIFIC number from the data provided above. Generic recommendations will be rejected. NEVER combine multiple recommendations into one paragraph. Use ONLY data from the context sections above - no invented numbers.
 
 ---
 
@@ -612,23 +608,10 @@ CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Ev
   - Each top-level bullet MUST have 1-3 sub-bullets with specific data
 - Section 1 (Executive Summary): 3-4 complete sentences, no bullets
 - Section 10 (Recommendations): flat bullets starting with "- P[1-3] –"
-- **EXAMPLE FORMAT FOR SECTIONS 2-9 (USE THIS EXACT STRUCTURE):**
-
-### 6. PIPELINE RISK ASSESSMENT
-- **AMER Coverage Shortfall:** Only 1.9x coverage against 3x benchmark
-  - $430K of target unsupported by pipeline
-  - 72-day average age indicates stale deals
-- **Strategic Segment Critical:** 0.9x coverage makes -$33K gap unrecoverable
-  - Only $112K pipeline with declining velocity
-  - Recommend deprioritizing or writing off
-
-### 7. WIN/LOSS PATTERN ANALYSIS
-- **Pricing Objections (AMER):** $102,504 lost across 9 deals
-  - Single largest loss category at 45% of total losses
-  - Concentrated in New Logo segment
-- **Process Failures:** Timing and "Not Ready" combined $76,630
-  - Indicates nurture cadence issues
-  - 55% of losses are theoretically winnable
+- **STRUCTURE FOR SECTIONS 2-9 (multi-level bullets with sub-bullets):**
+  - Top-level bullet: "- **[Label from data]:** [key insight with specific metric]"
+  - Sub-bullets (REQUIRED): "  - [supporting metric or implication]" (indent with 2 spaces)
+  - EVERY top-level bullet MUST have 1-3 sub-bullets with specific data from the context above
 
 - Always include specific dollar amounts and percentages in sub-bullets.
 - Rank items by dollar impact (largest first).
@@ -960,23 +943,12 @@ OUTPUT FORMAT (STRICT - READ CAREFULLY):
 - Sub-bullets: "  - supporting metric" (REQUIRED - 1-3 per top-level bullet)
 - If you write a flat bullet without sub-bullets in sections 2-9, the output is REJECTED
 
-EXAMPLE FOR SECTIONS 2-9 (COPY THIS EXACT STRUCTURE):
-### 6. PIPELINE RISK ASSESSMENT
-- **AMER Coverage Shortfall:** Only 1.9x coverage against 3x healthy benchmark
-  - $430K of target unsupported by current pipeline
-  - Average deal age 72 days indicates staleness risk
-- **Strategic Segment Critical:** 0.9x coverage makes gap unrecoverable
-  - Only $112K pipeline available with declining velocity
+STRUCTURE FOR SECTIONS 2-9:
+- Top-level bullet: "- **[Label from data]:** [key insight with specific metric from context]"
+- Sub-bullets (REQUIRED): "  - [supporting metric]" (indent with 2 spaces, 1-3 per top-level)
+- Use ONLY data from the context provided - no invented numbers
 
-### 7. WIN/LOSS PATTERN ANALYSIS
-- **Pricing Objections (AMER):** $102,504 lost across 9 deals
-  - Single largest loss category at 45% of total
-  - Concentrated in New Logo segment
-- **Process Failures:** Timing and readiness issues total $76,630
-  - 55% of losses are theoretically winnable
-  - Indicates nurture cadence gaps
-
-Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists in sections 2-9.`;
+Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists in sections 2-9. All metrics must come from the data context provided.`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const insightResponse = await fetch(OPENAI_API_URL, {
