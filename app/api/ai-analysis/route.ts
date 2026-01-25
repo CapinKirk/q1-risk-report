@@ -29,13 +29,55 @@ function normalizeAttainmentDetail(attainment_detail: any): any[] {
   return [...porData, ...r360Data];
 }
 
+// Aggregate dropoff reasons from funnel stage details
+function aggregateDropoffReasons(details: any[], statusField: string, lostStatuses: string[]): Record<string, { count: number; acv: number; byRegion: Record<string, number> }> {
+  const reasons: Record<string, { count: number; acv: number; byRegion: Record<string, number> }> = {};
+
+  for (const row of details) {
+    const status = row[statusField];
+    if (!lostStatuses.includes(status)) continue;
+
+    const reason = row.loss_reason && row.loss_reason !== 'N/A' && row.loss_reason !== 'No Reason Provided'
+      ? row.loss_reason
+      : status === 'REVERTED' ? 'Reverted/Disqualified'
+      : status === 'STALLED' ? 'Stalled (No Activity)'
+      : 'No Reason Provided';
+
+    if (!reasons[reason]) {
+      reasons[reason] = { count: 0, acv: 0, byRegion: {} };
+    }
+    reasons[reason].count += 1;
+    reasons[reason].acv += row.opportunity_acv || 0;
+    reasons[reason].byRegion[row.region] = (reasons[reason].byRegion[row.region] || 0) + 1;
+  }
+
+  return reasons;
+}
+
+// Format dropoff summary for prompt
+function formatDropoffSummary(reasons: Record<string, { count: number; acv: number; byRegion: Record<string, number> }>): string {
+  const sorted = Object.entries(reasons)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 8);
+
+  if (sorted.length === 0) return 'No dropoffs recorded';
+
+  return sorted.map(([reason, data]) => {
+    const regionBreakdown = Object.entries(data.byRegion)
+      .map(([r, c]) => `${r}:${c}`)
+      .join(', ');
+    return `- ${reason}: ${data.count} leads${data.acv > 0 ? `, $${data.acv.toLocaleString()} ACV lost` : ''} (${regionBreakdown})`;
+  }).join('\n');
+}
+
 // Build the analysis prompt based on report data
 function buildAnalysisPrompt(reportData: any, analysisType: string, filterContext?: FilterContext): string {
   const {
     period, grand_total, product_totals, attainment_detail,
     funnel_by_category, funnel_by_source, pipeline_rca, loss_reason_rca,
     source_attainment, google_ads, google_ads_rca,
-    mql_details, sql_details, mql_disqualification_summary, utm_breakdown
+    mql_details, sql_details, sal_details, sqo_details,
+    mql_disqualification_summary, utm_breakdown
   } = reportData;
 
   // Determine which products are active based on filter context
@@ -87,6 +129,53 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
 
   // Get MQL disqualification summary
   const dqSummary = mql_disqualification_summary || { POR: {}, R360: {} };
+
+  // Aggregate dropoff reasons for each funnel stage
+  const mqlDropoffs = {
+    POR: aggregateDropoffReasons(includePOR ? (mql_details?.POR || []) : [], 'mql_status', ['REVERTED', 'STALLED']),
+    R360: aggregateDropoffReasons(includeR360 ? (mql_details?.R360 || []) : [], 'mql_status', ['REVERTED', 'STALLED']),
+  };
+  const sqlDropoffs = {
+    POR: aggregateDropoffReasons(includePOR ? (sql_details?.POR || []) : [], 'sql_status', ['LOST', 'STALLED']),
+    R360: aggregateDropoffReasons(includeR360 ? (sql_details?.R360 || []) : [], 'sql_status', ['LOST', 'STALLED']),
+  };
+  const salDropoffs = {
+    POR: aggregateDropoffReasons(includePOR ? (sal_details?.POR || []) : [], 'sal_status', ['LOST', 'STALLED']),
+    R360: aggregateDropoffReasons(includeR360 ? (sal_details?.R360 || []) : [], 'sal_status', ['LOST', 'STALLED']),
+  };
+  const sqoDropoffs = {
+    POR: aggregateDropoffReasons(includePOR ? (sqo_details?.POR || []) : [], 'sqo_status', ['LOST', 'STALLED']),
+    R360: aggregateDropoffReasons(includeR360 ? (sqo_details?.R360 || []) : [], 'sqo_status', ['LOST', 'STALLED']),
+  };
+
+  // Calculate stage-level dropoff stats
+  const calcStageStats = (details: any[], statusField: string, convertedStatuses: string[], lostStatuses: string[]) => {
+    const total = details.length;
+    const converted = details.filter(d => convertedStatuses.includes(d[statusField])).length;
+    const lost = details.filter(d => lostStatuses.includes(d[statusField])).length;
+    const active = details.filter(d => d[statusField] === 'ACTIVE').length;
+    const lostAcv = details.filter(d => lostStatuses.includes(d[statusField])).reduce((sum, d) => sum + (d.opportunity_acv || 0), 0);
+    return { total, converted, lost, active, lostAcv, conversionRate: total > 0 ? Math.round((converted / total) * 100) : 0, lossRate: total > 0 ? Math.round((lost / total) * 100) : 0 };
+  };
+
+  const stageStats = {
+    mql: {
+      POR: calcStageStats(includePOR ? (mql_details?.POR || []) : [], 'mql_status', ['CONVERTED'], ['REVERTED', 'STALLED']),
+      R360: calcStageStats(includeR360 ? (mql_details?.R360 || []) : [], 'mql_status', ['CONVERTED'], ['REVERTED', 'STALLED']),
+    },
+    sql: {
+      POR: calcStageStats(includePOR ? (sql_details?.POR || []) : [], 'sql_status', ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON'], ['LOST', 'STALLED']),
+      R360: calcStageStats(includeR360 ? (sql_details?.R360 || []) : [], 'sql_status', ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON'], ['LOST', 'STALLED']),
+    },
+    sal: {
+      POR: calcStageStats(includePOR ? (sal_details?.POR || []) : [], 'sal_status', ['CONVERTED_SQO', 'WON'], ['LOST', 'STALLED']),
+      R360: calcStageStats(includeR360 ? (sal_details?.R360 || []) : [], 'sal_status', ['CONVERTED_SQO', 'WON'], ['LOST', 'STALLED']),
+    },
+    sqo: {
+      POR: calcStageStats(includePOR ? (sqo_details?.POR || []) : [], 'sqo_status', ['WON'], ['LOST', 'STALLED']),
+      R360: calcStageStats(includeR360 ? (sqo_details?.R360 || []) : [], 'sqo_status', ['WON'], ['LOST', 'STALLED']),
+    },
+  };
 
   // UTM Analysis - use pre-aggregated BigQuery data from utm_breakdown
   const emptyUtm = { by_source: [], by_medium: [], by_campaign: [], by_keyword: [], by_branded: [] };
@@ -267,19 +356,32 @@ Using the Source Channel Attainment AND UTM Source/Keyword/Branded data:
 - Funnel pacing vs plan: where is top-of-funnel vs bottom-of-funnel relative to targets
 - Lead quality indicators: MQL reversion rates, stall rates
 
-### 5. PIPELINE RISK ASSESSMENT
+### 5. FUNNEL DROPOFF ANALYSIS (NEW)
+For EACH funnel stage (MQL, SQL, SAL, SQO), analyze:
+- **Dropoff rate**: What % of leads are lost/stalled at each stage?
+- **Top dropoff reasons**: Rank by count and ACV impact (use the Funnel Stage Dropoff Summary data)
+- **Regional patterns**: Which regions have the highest dropoff rates at each stage?
+- **Stage-specific insights**:
+  - MQL: Focus on reversion/disqualification reasons (lead quality issues)
+  - SQL: Focus on why qualified leads fail to progress (sales capacity? qualification accuracy?)
+  - SAL: Focus on why accepted leads drop (deal qualification issues? pricing?)
+  - SQO: Focus on why pipeline deals are lost (competition? timing? budget?)
+- **Actionable patterns**: Identify systemic issues (e.g., "50% of SQL dropoffs are 'Unresponsive' - suggests follow-up cadence issues")
+- **ACV at risk**: Quantify the dollar impact of dropoffs at each stage
+
+### 6. PIPELINE RISK ASSESSMENT
 - Coverage adequacy by segment (need 3x for healthy, below 2x is critical)
 - Pipeline aging: segments with avg age >60 days (stale pipeline risk)
 - Pipeline quality: segments marked "AT RISK" or "CRITICAL"
 - Close probability: given current win rates, how much pipeline will actually close
 
-### 6. WIN/LOSS PATTERN ANALYSIS
+### 7. WIN/LOSS PATTERN ANALYSIS
 - Top loss reasons ranked by dollar impact
 - Winnable losses: losses due to process failures (unresponsive, timing) vs market (competition, pricing)
 - Loss rate trends by region and product
 - Loss concentration: are losses concentrated in specific segments or distributed
 
-### 7. MARKETING & CHANNEL EFFICIENCY
+### 8. MARKETING & CHANNEL EFFICIENCY
 - Google Ads ROI by region: CPA relative to average deal size
 - Spend efficiency: regions with highest/lowest conversion rates
 - UTM keyword effectiveness: top converting keywords by MQL→SQO rate
@@ -287,7 +389,7 @@ Using the Source Channel Attainment AND UTM Source/Keyword/Branded data:
 - Channel cost-effectiveness ranking
 - Recommendations for budget reallocation based on UTM and Ads data
 
-### 8. PREDICTIVE INDICATORS & FORECAST
+### 9. PREDICTIVE INDICATORS & FORECAST
 - Current daily run rate: $${Math.round(dailyRunRate).toLocaleString()}/day
 - Required daily rate to hit Q1 target: $${Math.round(requiredDailyRate).toLocaleString()}/day
 - Projected Q1 close (at current pace): $${Math.round(projectedQ1).toLocaleString()} (${projectedAttainment}% of target)
@@ -296,7 +398,7 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 - Pipeline sufficiency: is there enough pipeline to close the remaining gap?
 - Risk-adjusted forecast considering win rates and pipeline age
 
-### 9. PRIORITIZED RECOMMENDATIONS
+### 10. PRIORITIZED RECOMMENDATIONS
 Provide 5-7 specific recommendations. Each recommendation MUST be a single dense sentence that includes ALL of the following inline:
 - Priority prefix (P1/P2/P3)
 - The word "Recommend" followed by the specific action
@@ -413,6 +515,46 @@ ${includeR360 ? `### R360 MQL Status
 - Stalled (>30 days): ${dqSummary.R360?.stalled_count || 0} (${dqSummary.R360?.stalled_pct || 0}%)
 - Active: ${dqSummary.R360?.active_count || 0}` : ''}
 
+## Funnel Stage Dropoff Summary (USE THIS FOR DROPOFF ANALYSIS)
+${includePOR ? `### POR Funnel Stage Stats & Dropoff Reasons
+#### MQL Stage (Marketing Qualified Leads)
+- Total: ${stageStats.mql.POR.total}, Converted: ${stageStats.mql.POR.converted} (${stageStats.mql.POR.conversionRate}%), Lost/Reverted: ${stageStats.mql.POR.lost} (${stageStats.mql.POR.lossRate}%)
+**MQL Dropoff Reasons:**
+${formatDropoffSummary(mqlDropoffs.POR)}
+
+#### SQL Stage (Sales Qualified Leads)
+- Total: ${stageStats.sql.POR.total}, Converted: ${stageStats.sql.POR.converted} (${stageStats.sql.POR.conversionRate}%), Lost: ${stageStats.sql.POR.lost} (${stageStats.sql.POR.lossRate}%), ACV Lost: $${stageStats.sql.POR.lostAcv.toLocaleString()}
+**SQL Dropoff Reasons:**
+${formatDropoffSummary(sqlDropoffs.POR)}
+
+#### SAL Stage (Sales Accepted Leads - POR Only)
+- Total: ${stageStats.sal.POR.total}, Converted: ${stageStats.sal.POR.converted} (${stageStats.sal.POR.conversionRate}%), Lost: ${stageStats.sal.POR.lost} (${stageStats.sal.POR.lossRate}%), ACV Lost: $${stageStats.sal.POR.lostAcv.toLocaleString()}
+**SAL Dropoff Reasons:**
+${formatDropoffSummary(salDropoffs.POR)}
+
+#### SQO Stage (Sales Qualified Opportunities)
+- Total: ${stageStats.sqo.POR.total}, Won: ${stageStats.sqo.POR.converted} (${stageStats.sqo.POR.conversionRate}%), Lost: ${stageStats.sqo.POR.lost} (${stageStats.sqo.POR.lossRate}%), ACV Lost: $${stageStats.sqo.POR.lostAcv.toLocaleString()}
+**SQO Dropoff/Loss Reasons:**
+${formatDropoffSummary(sqoDropoffs.POR)}
+` : ''}
+
+${includeR360 ? `### R360 Funnel Stage Stats & Dropoff Reasons
+#### MQL Stage
+- Total: ${stageStats.mql.R360.total}, Converted: ${stageStats.mql.R360.converted} (${stageStats.mql.R360.conversionRate}%), Lost/Reverted: ${stageStats.mql.R360.lost} (${stageStats.mql.R360.lossRate}%)
+**MQL Dropoff Reasons:**
+${formatDropoffSummary(mqlDropoffs.R360)}
+
+#### SQL Stage
+- Total: ${stageStats.sql.R360.total}, Converted: ${stageStats.sql.R360.converted} (${stageStats.sql.R360.conversionRate}%), Lost: ${stageStats.sql.R360.lost} (${stageStats.sql.R360.lossRate}%), ACV Lost: $${stageStats.sql.R360.lostAcv.toLocaleString()}
+**SQL Dropoff Reasons:**
+${formatDropoffSummary(sqlDropoffs.R360)}
+
+#### SQO Stage
+- Total: ${stageStats.sqo.R360.total}, Won: ${stageStats.sqo.R360.converted} (${stageStats.sqo.R360.conversionRate}%), Lost: ${stageStats.sqo.R360.lost} (${stageStats.sqo.R360.lossRate}%), ACV Lost: $${stageStats.sqo.R360.lostAcv.toLocaleString()}
+**SQO Dropoff/Loss Reasons:**
+${formatDropoffSummary(sqoDropoffs.R360)}
+` : ''}
+
 ## Google Ads Performance
 ${includePOR ? `### POR Ads
 ${googleAdsData.POR.map((row: any) =>
@@ -487,7 +629,7 @@ ${includePOR ? `- POR projected: $${Math.round(porProjected).toLocaleString()} (
 ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()} (${r360Q1Target > 0 ? Math.round((r360Projected / r360Q1Target) * 100) : 0}% of target)` : ''}
 
 ## CRITICAL RULES
-1. PRODUCE ALL 9 SECTIONS - do not skip any section. Each section must be DETAILED and COMPREHENSIVE.
+1. PRODUCE ALL 10 SECTIONS - do not skip any section. Each section must be DETAILED and COMPREHENSIVE.
 2. Use SPECIFIC dollar amounts and percentages from the data above - never generalize. Every paragraph needs at least 2 data points.
 3. Reference the pre-computed insights above to ensure accuracy
 4. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
@@ -550,7 +692,7 @@ export async function POST(request: Request) {
       ? `This analysis covers ONLY ${filteredProduct}. You MUST NOT mention, reference, compare to, or acknowledge the existence of ${excludedProduct} anywhere in your output. ${excludedProduct} does not exist for this analysis. If you mention ${excludedProduct} even once, the entire output will be rejected.`
       : 'Include product comparisons (POR vs R360) in every section where both products have data.';
 
-    const systemMessage = `You are a senior Revenue Operations analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly bookings analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 9 sections: Executive Summary, Revenue Attainment Deep Dive, Channel Performance, Funnel Health & Velocity, Pipeline Risk, Win/Loss Patterns, Marketing & Channel Efficiency, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific dollar amounts, percentages, and gaps throughout. Be brutally honest about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 8000-10000 CHARACTERS. NEVER stop before completing all 9 sections.
+    const systemMessage = `You are a senior Revenue Operations analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly bookings analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 10 sections: Executive Summary, Revenue Attainment Deep Dive, Channel Performance, Funnel Health & Velocity, Funnel Dropoff Analysis, Pipeline Risk, Win/Loss Patterns, Marketing & Channel Efficiency, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific dollar amounts, percentages, and gaps throughout. Be brutally honest about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 9000-12000 CHARACTERS. NEVER stop before completing all 10 sections.
 
 OUTPUT FORMAT (STRICT):
 - Use ### for section headers (e.g., ### Executive Summary)
