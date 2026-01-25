@@ -29,9 +29,35 @@ function normalizeAttainmentDetail(attainment_detail: any): any[] {
   return [...porData, ...r360Data];
 }
 
-// Aggregate dropoff reasons from funnel stage details
-function aggregateDropoffReasons(details: any[], statusField: string, lostStatuses: string[]): Record<string, { count: number; acv: number; byRegion: Record<string, number> }> {
-  const reasons: Record<string, { count: number; acv: number; byRegion: Record<string, number> }> = {};
+// Classify source as Paid or Organic
+function classifySource(source: string): 'PAID' | 'ORGANIC' | 'OTHER' {
+  const s = (source || '').toUpperCase();
+  // Paid sources
+  if (s.includes('PAID') || s.includes('PPC') || s.includes('CPC') || s.includes('GOOGLE ADS') ||
+      s.includes('BING ADS') || s.includes('FACEBOOK ADS') || s.includes('LINKEDIN ADS') ||
+      s.includes('DISPLAY') || s.includes('RETARGETING') || s === 'INBOUND') {
+    return 'PAID';
+  }
+  // Organic sources
+  if (s.includes('ORGANIC') || s.includes('SEO') || s.includes('DIRECT') || s.includes('REFERRAL') ||
+      s.includes('SOCIAL') || s.includes('EMAIL') || s.includes('CONTENT') || s.includes('WEBINAR')) {
+    return 'ORGANIC';
+  }
+  // Other sources (Outbound, AE Sourced, etc.)
+  return 'OTHER';
+}
+
+// Enhanced dropoff aggregation with source breakdown
+interface DropoffData {
+  count: number;
+  acv: number;
+  byRegion: Record<string, number>;
+  bySource: Record<string, { count: number; acv: number }>;
+  bySourceType: { PAID: { count: number; acv: number }; ORGANIC: { count: number; acv: number }; OTHER: { count: number; acv: number } };
+}
+
+function aggregateDropoffReasons(details: any[], statusField: string, lostStatuses: string[]): Record<string, DropoffData> {
+  const reasons: Record<string, DropoffData> = {};
 
   for (const row of details) {
     const status = row[statusField];
@@ -43,19 +69,109 @@ function aggregateDropoffReasons(details: any[], statusField: string, lostStatus
       : status === 'STALLED' ? 'Stalled (No Activity)'
       : 'No Reason Provided';
 
+    const source = row.source || 'Unknown';
+    const sourceType = classifySource(source);
+    const acv = row.opportunity_acv || 0;
+
     if (!reasons[reason]) {
-      reasons[reason] = { count: 0, acv: 0, byRegion: {} };
+      reasons[reason] = {
+        count: 0,
+        acv: 0,
+        byRegion: {},
+        bySource: {},
+        bySourceType: { PAID: { count: 0, acv: 0 }, ORGANIC: { count: 0, acv: 0 }, OTHER: { count: 0, acv: 0 } }
+      };
     }
     reasons[reason].count += 1;
-    reasons[reason].acv += row.opportunity_acv || 0;
+    reasons[reason].acv += acv;
     reasons[reason].byRegion[row.region] = (reasons[reason].byRegion[row.region] || 0) + 1;
+
+    // Track by source
+    if (!reasons[reason].bySource[source]) {
+      reasons[reason].bySource[source] = { count: 0, acv: 0 };
+    }
+    reasons[reason].bySource[source].count += 1;
+    reasons[reason].bySource[source].acv += acv;
+
+    // Track by source type (Paid vs Organic)
+    reasons[reason].bySourceType[sourceType].count += 1;
+    reasons[reason].bySourceType[sourceType].acv += acv;
   }
 
   return reasons;
 }
 
-// Format dropoff summary for prompt
-function formatDropoffSummary(reasons: Record<string, { count: number; acv: number; byRegion: Record<string, number> }>): string {
+// Aggregate dropoffs by source channel
+function aggregateDropoffsBySource(details: any[], statusField: string, lostStatuses: string[], convertedStatuses: string[]): Record<string, { total: number; converted: number; lost: number; lostAcv: number; convRate: number; lossRate: number }> {
+  const sources: Record<string, { total: number; converted: number; lost: number; lostAcv: number }> = {};
+
+  for (const row of details) {
+    const source = row.source || 'Unknown';
+    const status = row[statusField];
+
+    if (!sources[source]) {
+      sources[source] = { total: 0, converted: 0, lost: 0, lostAcv: 0 };
+    }
+    sources[source].total += 1;
+
+    if (convertedStatuses.includes(status)) {
+      sources[source].converted += 1;
+    }
+    if (lostStatuses.includes(status)) {
+      sources[source].lost += 1;
+      sources[source].lostAcv += row.opportunity_acv || 0;
+    }
+  }
+
+  // Calculate rates
+  const result: Record<string, { total: number; converted: number; lost: number; lostAcv: number; convRate: number; lossRate: number }> = {};
+  for (const [source, data] of Object.entries(sources)) {
+    result[source] = {
+      ...data,
+      convRate: data.total > 0 ? Math.round((data.converted / data.total) * 100) : 0,
+      lossRate: data.total > 0 ? Math.round((data.lost / data.total) * 100) : 0,
+    };
+  }
+  return result;
+}
+
+// Aggregate by Paid vs Organic
+function aggregateBySourceType(details: any[], statusField: string, lostStatuses: string[], convertedStatuses: string[]): Record<string, { total: number; converted: number; lost: number; lostAcv: number; convRate: number; lossRate: number }> {
+  const types: Record<string, { total: number; converted: number; lost: number; lostAcv: number }> = {
+    PAID: { total: 0, converted: 0, lost: 0, lostAcv: 0 },
+    ORGANIC: { total: 0, converted: 0, lost: 0, lostAcv: 0 },
+    OTHER: { total: 0, converted: 0, lost: 0, lostAcv: 0 },
+  };
+
+  for (const row of details) {
+    const sourceType = classifySource(row.source || '');
+    const status = row[statusField];
+
+    types[sourceType].total += 1;
+
+    if (convertedStatuses.includes(status)) {
+      types[sourceType].converted += 1;
+    }
+    if (lostStatuses.includes(status)) {
+      types[sourceType].lost += 1;
+      types[sourceType].lostAcv += row.opportunity_acv || 0;
+    }
+  }
+
+  // Calculate rates
+  const result: Record<string, { total: number; converted: number; lost: number; lostAcv: number; convRate: number; lossRate: number }> = {};
+  for (const [type, data] of Object.entries(types)) {
+    result[type] = {
+      ...data,
+      convRate: data.total > 0 ? Math.round((data.converted / data.total) * 100) : 0,
+      lossRate: data.total > 0 ? Math.round((data.lost / data.total) * 100) : 0,
+    };
+  }
+  return result;
+}
+
+// Format dropoff summary for prompt (enhanced with source info)
+function formatDropoffSummary(reasons: Record<string, DropoffData>): string {
   const sorted = Object.entries(reasons)
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 8);
@@ -66,8 +182,23 @@ function formatDropoffSummary(reasons: Record<string, { count: number; acv: numb
     const regionBreakdown = Object.entries(data.byRegion)
       .map(([r, c]) => `${r}:${c}`)
       .join(', ');
-    return `- ${reason}: ${data.count} leads${data.acv > 0 ? `, $${data.acv.toLocaleString()} ACV lost` : ''} (${regionBreakdown})`;
+    const paidVsOrganic = `Paid:${data.bySourceType.PAID.count}, Organic:${data.bySourceType.ORGANIC.count}, Other:${data.bySourceType.OTHER.count}`;
+    return `- ${reason}: ${data.count} leads${data.acv > 0 ? `, $${data.acv.toLocaleString()} ACV lost` : ''} (${regionBreakdown}) [${paidVsOrganic}]`;
   }).join('\n');
+}
+
+// Format source-level dropoff summary
+function formatSourceDropoffSummary(sourceData: Record<string, { total: number; converted: number; lost: number; lostAcv: number; convRate: number; lossRate: number }>): string {
+  const sorted = Object.entries(sourceData)
+    .filter(([_, d]) => d.total >= 3) // Only sources with meaningful volume
+    .sort((a, b) => b[1].lossRate - a[1].lossRate) // Sort by loss rate (worst first)
+    .slice(0, 10);
+
+  if (sorted.length === 0) return 'Insufficient data';
+
+  return sorted.map(([source, data]) =>
+    `- ${source}: ${data.total} leads, ${data.convRate}% conv, ${data.lossRate}% loss${data.lostAcv > 0 ? `, $${data.lostAcv.toLocaleString()} ACV lost` : ''}`
+  ).join('\n');
 }
 
 // Build the analysis prompt based on report data
@@ -174,6 +305,50 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
     sqo: {
       POR: calcStageStats(includePOR ? (sqo_details?.POR || []) : [], 'sqo_status', ['WON'], ['LOST', 'STALLED']),
       R360: calcStageStats(includeR360 ? (sqo_details?.R360 || []) : [], 'sqo_status', ['WON'], ['LOST', 'STALLED']),
+    },
+  };
+
+  // Aggregate dropoffs by source channel for each stage
+  const sourceDropoffs = {
+    mql: {
+      POR: {
+        bySource: aggregateDropoffsBySource(includePOR ? (mql_details?.POR || []) : [], 'mql_status', ['REVERTED', 'STALLED'], ['CONVERTED']),
+        byType: aggregateBySourceType(includePOR ? (mql_details?.POR || []) : [], 'mql_status', ['REVERTED', 'STALLED'], ['CONVERTED']),
+      },
+      R360: {
+        bySource: aggregateDropoffsBySource(includeR360 ? (mql_details?.R360 || []) : [], 'mql_status', ['REVERTED', 'STALLED'], ['CONVERTED']),
+        byType: aggregateBySourceType(includeR360 ? (mql_details?.R360 || []) : [], 'mql_status', ['REVERTED', 'STALLED'], ['CONVERTED']),
+      },
+    },
+    sql: {
+      POR: {
+        bySource: aggregateDropoffsBySource(includePOR ? (sql_details?.POR || []) : [], 'sql_status', ['LOST', 'STALLED'], ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON']),
+        byType: aggregateBySourceType(includePOR ? (sql_details?.POR || []) : [], 'sql_status', ['LOST', 'STALLED'], ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON']),
+      },
+      R360: {
+        bySource: aggregateDropoffsBySource(includeR360 ? (sql_details?.R360 || []) : [], 'sql_status', ['LOST', 'STALLED'], ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON']),
+        byType: aggregateBySourceType(includeR360 ? (sql_details?.R360 || []) : [], 'sql_status', ['LOST', 'STALLED'], ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON']),
+      },
+    },
+    sal: {
+      POR: {
+        bySource: aggregateDropoffsBySource(includePOR ? (sal_details?.POR || []) : [], 'sal_status', ['LOST', 'STALLED'], ['CONVERTED_SQO', 'WON']),
+        byType: aggregateBySourceType(includePOR ? (sal_details?.POR || []) : [], 'sal_status', ['LOST', 'STALLED'], ['CONVERTED_SQO', 'WON']),
+      },
+      R360: {
+        bySource: aggregateDropoffsBySource(includeR360 ? (sal_details?.R360 || []) : [], 'sal_status', ['LOST', 'STALLED'], ['CONVERTED_SQO', 'WON']),
+        byType: aggregateBySourceType(includeR360 ? (sal_details?.R360 || []) : [], 'sal_status', ['LOST', 'STALLED'], ['CONVERTED_SQO', 'WON']),
+      },
+    },
+    sqo: {
+      POR: {
+        bySource: aggregateDropoffsBySource(includePOR ? (sqo_details?.POR || []) : [], 'sqo_status', ['LOST', 'STALLED'], ['WON']),
+        byType: aggregateBySourceType(includePOR ? (sqo_details?.POR || []) : [], 'sqo_status', ['LOST', 'STALLED'], ['WON']),
+      },
+      R360: {
+        bySource: aggregateDropoffsBySource(includeR360 ? (sqo_details?.R360 || []) : [], 'sqo_status', ['LOST', 'STALLED'], ['WON']),
+        byType: aggregateBySourceType(includeR360 ? (sqo_details?.R360 || []) : [], 'sqo_status', ['LOST', 'STALLED'], ['WON']),
+      },
     },
   };
 
@@ -356,18 +531,30 @@ Using the Source Channel Attainment AND UTM Source/Keyword/Branded data:
 - Funnel pacing vs plan: where is top-of-funnel vs bottom-of-funnel relative to targets
 - Lead quality indicators: MQL reversion rates, stall rates
 
-### 5. FUNNEL DROPOFF ANALYSIS (NEW)
-For EACH funnel stage (MQL, SQL, SAL, SQO), analyze:
-- **Dropoff rate**: What % of leads are lost/stalled at each stage?
-- **Top dropoff reasons**: Rank by count and ACV impact (use the Funnel Stage Dropoff Summary data)
-- **Regional patterns**: Which regions have the highest dropoff rates at each stage?
-- **Stage-specific insights**:
-  - MQL: Focus on reversion/disqualification reasons (lead quality issues)
-  - SQL: Focus on why qualified leads fail to progress (sales capacity? qualification accuracy?)
-  - SAL: Focus on why accepted leads drop (deal qualification issues? pricing?)
-  - SQO: Focus on why pipeline deals are lost (competition? timing? budget?)
-- **Actionable patterns**: Identify systemic issues (e.g., "50% of SQL dropoffs are 'Unresponsive' - suggests follow-up cadence issues")
-- **ACV at risk**: Quantify the dollar impact of dropoffs at each stage
+### 5. FUNNEL DROPOFF ANALYSIS BY SOURCE (CRITICAL FOR MARKETING INSIGHTS)
+For EACH funnel stage (MQL, SQL, SAL, SQO), analyze dropoffs by SOURCE CHANNEL:
+- **Paid vs Organic Performance**: Compare conversion and dropoff rates between paid (Inbound/PPC) vs organic sources
+  - Which channel type has higher quality leads (lower dropoff rate)?
+  - Where is paid spend being wasted (high dropoff after MQL)?
+- **Source-Level Dropoff Rates**: For each source (Inbound, Outbound, AE Sourced, etc.):
+  - Total leads, conversion rate, loss rate, ACV at risk
+  - Identify worst-performing sources by loss rate
+  - Identify best-performing sources for replication
+- **UTM Campaign/Keyword Dropoff Patterns**: Cross-reference with UTM data to identify:
+  - Which campaigns/keywords generate leads that DROP OFF vs CONVERT
+  - High-volume keywords with low conversion (wasted spend indicators)
+  - High-converting keywords that deserve more budget
+- **Top Dropoff Reasons by Source**: For each major source, what are the primary loss reasons?
+  - Are paid leads dropping due to "Not Qualified" (targeting issue)?
+  - Are organic leads dropping due to "Unresponsive" (nurture issue)?
+- **Stage-specific source insights**:
+  - MQL: Which sources have highest reversion rates? (lead quality signal)
+  - SQL: Which sources stall most at SQL? (qualification accuracy)
+  - SQO: Which sources lose most deals? (deal quality signal)
+- **Budget Reallocation Signal**: Based on source performance, recommend:
+  - Sources to invest MORE in (high conversion, low dropoff)
+  - Sources to REDUCE spend on (high dropoff, low conversion)
+  - Sources needing process improvement (decent volume but high dropoff)
 
 ### 6. PIPELINE RISK ASSESSMENT
 - Coverage adequacy by segment (need 3x for healthy, below 2x is critical)
@@ -521,21 +708,45 @@ ${includePOR ? `### POR Funnel Stage Stats & Dropoff Reasons
 - Total: ${stageStats.mql.POR.total}, Converted: ${stageStats.mql.POR.converted} (${stageStats.mql.POR.conversionRate}%), Lost/Reverted: ${stageStats.mql.POR.lost} (${stageStats.mql.POR.lossRate}%)
 **MQL Dropoff Reasons:**
 ${formatDropoffSummary(mqlDropoffs.POR)}
+**MQL Paid vs Organic:**
+- PAID: ${sourceDropoffs.mql.POR.byType.PAID?.total || 0} leads, ${sourceDropoffs.mql.POR.byType.PAID?.convRate || 0}% conv, ${sourceDropoffs.mql.POR.byType.PAID?.lossRate || 0}% loss
+- ORGANIC: ${sourceDropoffs.mql.POR.byType.ORGANIC?.total || 0} leads, ${sourceDropoffs.mql.POR.byType.ORGANIC?.convRate || 0}% conv, ${sourceDropoffs.mql.POR.byType.ORGANIC?.lossRate || 0}% loss
+- OTHER: ${sourceDropoffs.mql.POR.byType.OTHER?.total || 0} leads, ${sourceDropoffs.mql.POR.byType.OTHER?.convRate || 0}% conv, ${sourceDropoffs.mql.POR.byType.OTHER?.lossRate || 0}% loss
+**MQL by Source Channel (sorted by loss rate):**
+${formatSourceDropoffSummary(sourceDropoffs.mql.POR.bySource)}
 
 #### SQL Stage (Sales Qualified Leads)
 - Total: ${stageStats.sql.POR.total}, Converted: ${stageStats.sql.POR.converted} (${stageStats.sql.POR.conversionRate}%), Lost: ${stageStats.sql.POR.lost} (${stageStats.sql.POR.lossRate}%), ACV Lost: $${stageStats.sql.POR.lostAcv.toLocaleString()}
 **SQL Dropoff Reasons:**
 ${formatDropoffSummary(sqlDropoffs.POR)}
+**SQL Paid vs Organic:**
+- PAID: ${sourceDropoffs.sql.POR.byType.PAID?.total || 0} leads, ${sourceDropoffs.sql.POR.byType.PAID?.convRate || 0}% conv, ${sourceDropoffs.sql.POR.byType.PAID?.lossRate || 0}% loss, $${(sourceDropoffs.sql.POR.byType.PAID?.lostAcv || 0).toLocaleString()} lost
+- ORGANIC: ${sourceDropoffs.sql.POR.byType.ORGANIC?.total || 0} leads, ${sourceDropoffs.sql.POR.byType.ORGANIC?.convRate || 0}% conv, ${sourceDropoffs.sql.POR.byType.ORGANIC?.lossRate || 0}% loss, $${(sourceDropoffs.sql.POR.byType.ORGANIC?.lostAcv || 0).toLocaleString()} lost
+- OTHER: ${sourceDropoffs.sql.POR.byType.OTHER?.total || 0} leads, ${sourceDropoffs.sql.POR.byType.OTHER?.convRate || 0}% conv, ${sourceDropoffs.sql.POR.byType.OTHER?.lossRate || 0}% loss, $${(sourceDropoffs.sql.POR.byType.OTHER?.lostAcv || 0).toLocaleString()} lost
+**SQL by Source Channel (sorted by loss rate):**
+${formatSourceDropoffSummary(sourceDropoffs.sql.POR.bySource)}
 
 #### SAL Stage (Sales Accepted Leads - POR Only)
 - Total: ${stageStats.sal.POR.total}, Converted: ${stageStats.sal.POR.converted} (${stageStats.sal.POR.conversionRate}%), Lost: ${stageStats.sal.POR.lost} (${stageStats.sal.POR.lossRate}%), ACV Lost: $${stageStats.sal.POR.lostAcv.toLocaleString()}
 **SAL Dropoff Reasons:**
 ${formatDropoffSummary(salDropoffs.POR)}
+**SAL Paid vs Organic:**
+- PAID: ${sourceDropoffs.sal.POR.byType.PAID?.total || 0} leads, ${sourceDropoffs.sal.POR.byType.PAID?.convRate || 0}% conv, ${sourceDropoffs.sal.POR.byType.PAID?.lossRate || 0}% loss, $${(sourceDropoffs.sal.POR.byType.PAID?.lostAcv || 0).toLocaleString()} lost
+- ORGANIC: ${sourceDropoffs.sal.POR.byType.ORGANIC?.total || 0} leads, ${sourceDropoffs.sal.POR.byType.ORGANIC?.convRate || 0}% conv, ${sourceDropoffs.sal.POR.byType.ORGANIC?.lossRate || 0}% loss, $${(sourceDropoffs.sal.POR.byType.ORGANIC?.lostAcv || 0).toLocaleString()} lost
+- OTHER: ${sourceDropoffs.sal.POR.byType.OTHER?.total || 0} leads, ${sourceDropoffs.sal.POR.byType.OTHER?.convRate || 0}% conv, ${sourceDropoffs.sal.POR.byType.OTHER?.lossRate || 0}% loss, $${(sourceDropoffs.sal.POR.byType.OTHER?.lostAcv || 0).toLocaleString()} lost
+**SAL by Source Channel (sorted by loss rate):**
+${formatSourceDropoffSummary(sourceDropoffs.sal.POR.bySource)}
 
 #### SQO Stage (Sales Qualified Opportunities)
 - Total: ${stageStats.sqo.POR.total}, Won: ${stageStats.sqo.POR.converted} (${stageStats.sqo.POR.conversionRate}%), Lost: ${stageStats.sqo.POR.lost} (${stageStats.sqo.POR.lossRate}%), ACV Lost: $${stageStats.sqo.POR.lostAcv.toLocaleString()}
 **SQO Dropoff/Loss Reasons:**
 ${formatDropoffSummary(sqoDropoffs.POR)}
+**SQO Paid vs Organic:**
+- PAID: ${sourceDropoffs.sqo.POR.byType.PAID?.total || 0} opps, ${sourceDropoffs.sqo.POR.byType.PAID?.convRate || 0}% won, ${sourceDropoffs.sqo.POR.byType.PAID?.lossRate || 0}% lost, $${(sourceDropoffs.sqo.POR.byType.PAID?.lostAcv || 0).toLocaleString()} ACV lost
+- ORGANIC: ${sourceDropoffs.sqo.POR.byType.ORGANIC?.total || 0} opps, ${sourceDropoffs.sqo.POR.byType.ORGANIC?.convRate || 0}% won, ${sourceDropoffs.sqo.POR.byType.ORGANIC?.lossRate || 0}% lost, $${(sourceDropoffs.sqo.POR.byType.ORGANIC?.lostAcv || 0).toLocaleString()} ACV lost
+- OTHER: ${sourceDropoffs.sqo.POR.byType.OTHER?.total || 0} opps, ${sourceDropoffs.sqo.POR.byType.OTHER?.convRate || 0}% won, ${sourceDropoffs.sqo.POR.byType.OTHER?.lossRate || 0}% lost, $${(sourceDropoffs.sqo.POR.byType.OTHER?.lostAcv || 0).toLocaleString()} ACV lost
+**SQO by Source Channel (sorted by loss rate):**
+${formatSourceDropoffSummary(sourceDropoffs.sqo.POR.bySource)}
 ` : ''}
 
 ${includeR360 ? `### R360 Funnel Stage Stats & Dropoff Reasons
@@ -543,16 +754,34 @@ ${includeR360 ? `### R360 Funnel Stage Stats & Dropoff Reasons
 - Total: ${stageStats.mql.R360.total}, Converted: ${stageStats.mql.R360.converted} (${stageStats.mql.R360.conversionRate}%), Lost/Reverted: ${stageStats.mql.R360.lost} (${stageStats.mql.R360.lossRate}%)
 **MQL Dropoff Reasons:**
 ${formatDropoffSummary(mqlDropoffs.R360)}
+**MQL Paid vs Organic:**
+- PAID: ${sourceDropoffs.mql.R360.byType.PAID?.total || 0} leads, ${sourceDropoffs.mql.R360.byType.PAID?.convRate || 0}% conv, ${sourceDropoffs.mql.R360.byType.PAID?.lossRate || 0}% loss
+- ORGANIC: ${sourceDropoffs.mql.R360.byType.ORGANIC?.total || 0} leads, ${sourceDropoffs.mql.R360.byType.ORGANIC?.convRate || 0}% conv, ${sourceDropoffs.mql.R360.byType.ORGANIC?.lossRate || 0}% loss
+- OTHER: ${sourceDropoffs.mql.R360.byType.OTHER?.total || 0} leads, ${sourceDropoffs.mql.R360.byType.OTHER?.convRate || 0}% conv, ${sourceDropoffs.mql.R360.byType.OTHER?.lossRate || 0}% loss
+**MQL by Source Channel (sorted by loss rate):**
+${formatSourceDropoffSummary(sourceDropoffs.mql.R360.bySource)}
 
 #### SQL Stage
 - Total: ${stageStats.sql.R360.total}, Converted: ${stageStats.sql.R360.converted} (${stageStats.sql.R360.conversionRate}%), Lost: ${stageStats.sql.R360.lost} (${stageStats.sql.R360.lossRate}%), ACV Lost: $${stageStats.sql.R360.lostAcv.toLocaleString()}
 **SQL Dropoff Reasons:**
 ${formatDropoffSummary(sqlDropoffs.R360)}
+**SQL Paid vs Organic:**
+- PAID: ${sourceDropoffs.sql.R360.byType.PAID?.total || 0} leads, ${sourceDropoffs.sql.R360.byType.PAID?.convRate || 0}% conv, ${sourceDropoffs.sql.R360.byType.PAID?.lossRate || 0}% loss, $${(sourceDropoffs.sql.R360.byType.PAID?.lostAcv || 0).toLocaleString()} lost
+- ORGANIC: ${sourceDropoffs.sql.R360.byType.ORGANIC?.total || 0} leads, ${sourceDropoffs.sql.R360.byType.ORGANIC?.convRate || 0}% conv, ${sourceDropoffs.sql.R360.byType.ORGANIC?.lossRate || 0}% loss, $${(sourceDropoffs.sql.R360.byType.ORGANIC?.lostAcv || 0).toLocaleString()} lost
+- OTHER: ${sourceDropoffs.sql.R360.byType.OTHER?.total || 0} leads, ${sourceDropoffs.sql.R360.byType.OTHER?.convRate || 0}% conv, ${sourceDropoffs.sql.R360.byType.OTHER?.lossRate || 0}% loss, $${(sourceDropoffs.sql.R360.byType.OTHER?.lostAcv || 0).toLocaleString()} lost
+**SQL by Source Channel (sorted by loss rate):**
+${formatSourceDropoffSummary(sourceDropoffs.sql.R360.bySource)}
 
 #### SQO Stage
 - Total: ${stageStats.sqo.R360.total}, Won: ${stageStats.sqo.R360.converted} (${stageStats.sqo.R360.conversionRate}%), Lost: ${stageStats.sqo.R360.lost} (${stageStats.sqo.R360.lossRate}%), ACV Lost: $${stageStats.sqo.R360.lostAcv.toLocaleString()}
 **SQO Dropoff/Loss Reasons:**
 ${formatDropoffSummary(sqoDropoffs.R360)}
+**SQO Paid vs Organic:**
+- PAID: ${sourceDropoffs.sqo.R360.byType.PAID?.total || 0} opps, ${sourceDropoffs.sqo.R360.byType.PAID?.convRate || 0}% won, ${sourceDropoffs.sqo.R360.byType.PAID?.lossRate || 0}% lost, $${(sourceDropoffs.sqo.R360.byType.PAID?.lostAcv || 0).toLocaleString()} ACV lost
+- ORGANIC: ${sourceDropoffs.sqo.R360.byType.ORGANIC?.total || 0} opps, ${sourceDropoffs.sqo.R360.byType.ORGANIC?.convRate || 0}% won, ${sourceDropoffs.sqo.R360.byType.ORGANIC?.lossRate || 0}% lost, $${(sourceDropoffs.sqo.R360.byType.ORGANIC?.lostAcv || 0).toLocaleString()} ACV lost
+- OTHER: ${sourceDropoffs.sqo.R360.byType.OTHER?.total || 0} opps, ${sourceDropoffs.sqo.R360.byType.OTHER?.convRate || 0}% won, ${sourceDropoffs.sqo.R360.byType.OTHER?.lossRate || 0}% lost, $${(sourceDropoffs.sqo.R360.byType.OTHER?.lostAcv || 0).toLocaleString()} ACV lost
+**SQO by Source Channel (sorted by loss rate):**
+${formatSourceDropoffSummary(sourceDropoffs.sqo.R360.bySource)}
 ` : ''}
 
 ## Google Ads Performance
