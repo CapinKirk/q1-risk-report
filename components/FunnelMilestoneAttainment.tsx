@@ -695,6 +695,9 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     return null;
   }
 
+  // Check if only R360 is selected (R360 has no SAL stage)
+  const isR360Only = selectedProducts.length === 1 && selectedProducts[0] === 'R360';
+
   // Reusable table row renderer
   const renderStageColumns = (row: { mqlActual: number; mqlTarget: number; mqlPacingPct: number; sqlActual: number; sqlTarget: number; sqlPacingPct: number; salActual: number; salTarget: number; salPacingPct: number; sqoActual: number; sqoTarget: number; sqoPacingPct: number; tofScore: number }, isBold = false) => (
     <>
@@ -712,12 +715,20 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           {isBold ? <strong>{row.sqlPacingPct}%</strong> : `${row.sqlPacingPct}%`}
         </span>
       </td>
-      <td className="number-cell">{isBold ? <strong>{row.salActual.toLocaleString()}</strong> : row.salActual.toLocaleString()}</td>
-      <td className="number-cell target-cell">{isBold ? <strong>{row.salTarget.toLocaleString()}</strong> : row.salTarget.toLocaleString()}</td>
+      <td className="number-cell">
+        {isR360Only ? <span className="na-cell">—</span> : (isBold ? <strong>{row.salActual.toLocaleString()}</strong> : row.salActual.toLocaleString())}
+      </td>
+      <td className="number-cell target-cell">
+        {isR360Only ? <span className="na-cell">—</span> : (isBold ? <strong>{row.salTarget.toLocaleString()}</strong> : row.salTarget.toLocaleString())}
+      </td>
       <td className="pacing-cell">
-        <span className="rag-tile" style={{ backgroundColor: getRagColor(getRAG(row.salPacingPct)) }}>
-          {isBold ? <strong>{row.salPacingPct}%</strong> : `${row.salPacingPct}%`}
-        </span>
+        {isR360Only ? (
+          <span className="na-cell">N/A</span>
+        ) : (
+          <span className="rag-tile" style={{ backgroundColor: getRagColor(getRAG(row.salPacingPct)) }}>
+            {isBold ? <strong>{row.salPacingPct}%</strong> : `${row.salPacingPct}%`}
+          </span>
+        )}
       </td>
       <td className="number-cell">{isBold ? <strong>{row.sqoActual.toLocaleString()}</strong> : row.sqoActual.toLocaleString()}</td>
       <td className="number-cell target-cell">{isBold ? <strong>{row.sqoTarget.toLocaleString()}</strong> : row.sqoTarget.toLocaleString()}</td>
@@ -787,7 +798,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
               </th>
               <th colSpan={3}>EQL/MQL</th>
               <th colSpan={3}>SQL</th>
-              <th colSpan={3}>SAL</th>
+              <th colSpan={3} className={isR360Only ? 'na-header' : ''}>SAL{isR360Only && ' (N/A)'}</th>
               <th colSpan={3}>SQO</th>
               <th
                 rowSpan={2}
@@ -846,13 +857,20 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
 
   return (
     <section>
-      <h2>Full Funnel Pacing (EQL/MQL → SQO)</h2>
+      <h2>Full Funnel Pacing ({isR360Only ? 'MQL' : 'EQL/MQL'} → SQO)</h2>
       <p className="section-subtitle">
         <span className="lead-label mql">MQL</span> Marketing Qualified Lead (NEW LOGO)
+        {!isR360Only && (
+          <>
+            <span className="separator">|</span>
+            <span className="lead-label eql">EQL</span> Existing Qualified Lead (EXPANSION, MIGRATION)
+          </>
+        )}
         <span className="separator">|</span>
-        <span className="lead-label eql">EQL</span> Existing Qualified Lead (EXPANSION, MIGRATION)
-        <span className="separator">|</span>
-        <span className="tof-label">TOF Score</span> POR: 10% EQL/MQL + 20% SQL + 30% SAL + 40% SQO | R360: 14% MQL + 29% SQL + 57% SQO (no SAL)
+        <span className="tof-label">TOF Score</span> {isR360Only
+          ? '14% MQL + 29% SQL + 57% SQO (no SAL)'
+          : 'POR: 10% EQL/MQL + 20% SQL + 30% SAL + 40% SQO | R360: 14% MQL + 29% SQL + 57% SQO (no SAL)'
+        }
       </p>
 
       {/* Multi-Select Filters */}
@@ -1059,6 +1077,16 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         .source-badge.amer { background: var(--info-bg); color: var(--info-text); }
         .source-badge.emea { background: var(--success-bg); color: var(--success-text); }
         .source-badge.apac { background: var(--warning-bg); color: var(--warning-text); }
+
+        /* N/A styling for R360 SAL columns */
+        .na-cell {
+          color: var(--text-muted);
+          font-style: italic;
+          font-size: 0.6rem;
+        }
+        .na-header {
+          opacity: 0.5;
+        }
       `}</style>
     </section>
   );
