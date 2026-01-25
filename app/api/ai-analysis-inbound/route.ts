@@ -781,7 +781,7 @@ export async function POST(request: Request) {
 
 OUTPUT FORMAT (STRICT - READ CAREFULLY):
 - Use ### for section headers (e.g., ### Executive Summary)
-- Use #### for sub-headers when breaking down by region (e.g., #### AMER)
+- Do NOT use #### sub-headers - instead, include region names in bullet labels (e.g., "- **AMER MQL Gap:** ..." not "#### AMER" followed by bullets)
 
 **CRITICAL MULTI-LEVEL BULLET REQUIREMENT:**
 - Section 1 (Executive Summary): 3-4 complete sentences in paragraph form
