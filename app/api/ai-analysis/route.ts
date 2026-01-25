@@ -866,6 +866,7 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 ## CRITICAL RULES
 1. PRODUCE ALL 10 SECTIONS - do not skip any section. Each section must be DETAILED and COMPREHENSIVE.
 2. Use SPECIFIC dollar amounts and percentages from the data above - never generalize. Every paragraph needs at least 2 data points.
+3. ALL METRICS MUST BE EXPLICITLY QTD: Every attainment %, variance %, dollar amount, and count MUST be labeled as QTD. Examples: "QTD attainment: 56%", "$141K QTD actual", "QTD gap: -$110K", "12 QTD deals". NEVER show a metric without the QTD prefix/suffix - unlabeled metrics are confusing and will be rejected.
 3. Reference the pre-computed insights above to ensure accuracy
 4. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
 5. RAG status meanings: GREEN (>80%), YELLOW (50-80%), RED (<50%) - call these out explicitly for EVERY region/product combo
@@ -947,8 +948,9 @@ STRUCTURE FOR SECTIONS 2-9:
 - Top-level bullet: "- **[Label from data]:** [key insight with specific metric from context]"
 - Sub-bullets (REQUIRED): "  - [supporting metric]" (indent with 2 spaces, 1-3 per top-level)
 - Use ONLY data from the context provided - no invented numbers
+- ALL METRICS MUST INCLUDE "QTD" - e.g., "QTD attainment: 56%", "$141K QTD actual", "QTD gap: -$110K"
 
-Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists in sections 2-9. All metrics must come from the data context provided.`;
+Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists in sections 2-9. All metrics must come from the data context provided. Unlabeled metrics without "QTD" are rejected.`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const insightResponse = await fetch(OPENAI_API_URL, {

@@ -714,6 +714,7 @@ ${topConvertingUtmR360.map((s: any) => `- ${s.name}: ${s.convRate}% MQL→SQL, $
 ## CRITICAL RULES
 1. PRODUCE ALL 10 SECTIONS - do not skip any section. Each section must be DETAILED and COMPREHENSIVE.
 2. Use SPECIFIC numbers and percentages from the data - never generalize. Every paragraph needs at least 2 data points.
+3. ALL METRICS MUST BE EXPLICITLY QTD: Every attainment %, variance %, dollar amount, and count MUST be labeled as QTD. Examples: "QTD MQL pacing: 85%", "$12K QTD spend", "QTD gap: -41 MQLs", "15 QTD conversions". NEVER show a metric without the QTD prefix/suffix - unlabeled metrics are confusing and will be rejected.
 3. Reference the pre-computed insights above to ensure accuracy
 4. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
 5. R360 has NO SAL stage - flows directly from SQL to SQO. Explain this difference in funnel analysis.
@@ -797,8 +798,9 @@ STRUCTURE FOR SECTIONS 2-9:
 - Top-level bullet: "- **[Label from data]:** [key insight with specific metric from context]"
 - Sub-bullets (REQUIRED): "  - [supporting metric]" (indent with 2 spaces, 1-3 per top-level)
 - Use ONLY data from the context provided - no invented numbers
+- ALL METRICS MUST INCLUDE "QTD" - e.g., "QTD pacing: 85%", "$12K QTD spend", "QTD gap: -41 MQLs"
 
-Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal rules. Do NOT write flat bullet lists in sections 2-9. All metrics must come from the data context provided.`;
+Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal rules. Do NOT write flat bullet lists in sections 2-9. All metrics must come from the data context provided. Unlabeled metrics without "QTD" are rejected.`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const insightResponse = await fetch(OPENAI_API_URL, {
