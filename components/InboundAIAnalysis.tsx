@@ -132,9 +132,17 @@ function getFilterLabel(products: Product[], regions: Region[]): string {
   return `${productLabel} • ${regionLabel}`;
 }
 
+// Color-code attainment percentages based on value
+function colorCodeAttainment(match: string, pct: string): string {
+  const num = parseFloat(pct);
+  if (num >= 100) return `<span class="attainment-green">${match}</span>`;
+  if (num >= 70) return `<span class="attainment-yellow">${match}</span>`;
+  return `<span class="attainment-red">${match}</span>`;
+}
+
 // Format inline text with badges and highlighting
 function formatInline(text: string): string {
-  return text
+  let result = text
     // First strip all markdown formatting
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // [text](url) -> text
     .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')     // ***bold italic*** -> plain
@@ -146,6 +154,10 @@ function formatInline(text: string): string {
     // Product badges
     .replace(/\bPOR\b/g, '<span class="badge-por">POR</span>')
     .replace(/\bR360\b/g, '<span class="badge-r360">R360</span>')
+    // Region badges with flag emojis
+    .replace(/\bAMER\b/g, '<span class="badge-region badge-amer">\u{1F1FA}\u{1F1F8} AMER</span>')
+    .replace(/\bEMEA\b/g, '<span class="badge-region badge-emea">\u{1F1EC}\u{1F1E7} EMEA</span>')
+    .replace(/\bAPAC\b/g, '<span class="badge-region badge-apac">\u{1F1E6}\u{1F1FA} APAC</span>')
     // Risk levels
     .replace(/\bHIGH\b/gi, '<span class="risk-high">HIGH</span>')
     .replace(/\bMEDIUM\b/gi, '<span class="risk-medium">MEDIUM</span>')
@@ -153,13 +165,24 @@ function formatInline(text: string): string {
     // Funnel stages
     .replace(/\b(MQL|SQL|SAL|SQO|EQL)\b/g, '<span class="stage-badge">$1</span>')
     // CPA highlighting
-    .replace(/\$[\d,]+\.?\d*\s*\(target/gi, '<span class="text-red">$&</span>')
-    // Percentages with "attainment" or "behind"
-    .replace(/(\d+%)\s*(attainment|behind)/gi, '<span class="text-amber">$1</span> $2')
-    // Positive variances
-    .replace(/(\+\$?[\d,]+\.?\d*%?)/g, '<span class="text-green">$1</span>')
-    // Negative variances
-    .replace(/(-\$?[\d,]+\.?\d*%?)/g, '<span class="text-red">$1</span>');
+    .replace(/\$[\d,]+\.?\d*\s*\(target/gi, '<span class="text-red">$&</span>');
+
+  // Color-code attainment/pacing percentages based on value (>=100 green, 70-99 yellow, <70 red)
+  result = result.replace(/(\d+(?:\.\d+)?)\s*%\s*(QTD\s+)?(attainment|pacing|conversion)/gi, (match, pct) => colorCodeAttainment(match, pct));
+
+  // Also match standalone percentages that appear to be attainment (e.g., "45% attainment" or just "56%)" after "attainment:")
+  result = result.replace(/(attainment|pacing):\s*(\d+(?:\.\d+)?)\s*%/gi, (match, label, pct) => {
+    const num = parseFloat(pct);
+    const cssClass = num >= 100 ? 'attainment-green' : num >= 70 ? 'attainment-yellow' : 'attainment-red';
+    return `${label}: <span class="${cssClass}">${pct}%</span>`;
+  });
+
+  // Positive variances (not already in a span)
+  result = result.replace(/(?<!<span[^>]*>)(\+\$?[\d,]+\.?\d*%?)(?![^<]*<\/span>)/g, '<span class="text-green">$1</span>');
+  // Negative variances (not already in a span)
+  result = result.replace(/(?<!<span[^>]*>)(-\$?[\d,]+\.?\d*%?)(?![^<]*<\/span>)/g, '<span class="text-red">$1</span>');
+
+  return result;
 }
 
 // Detect section type from header text
@@ -763,10 +786,15 @@ function toHTMLExport(markdown: string, generatedAt: string | null): string {
 <style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:900px;margin:0 auto;padding:40px 20px;background:#fff;color:#1f2937;line-height:1.6;}
 strong{font-weight:600;}.badge-por{background:#22c55e;color:white;padding:2px 6px;border-radius:3px;font-size:12px;font-weight:600;}
 .badge-r360{background:#ef4444;color:white;padding:2px 6px;border-radius:3px;font-size:12px;font-weight:600;}
+.badge-region{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;color:white;}
+.badge-amer{background:#1e3a5f;border:1px solid #2563eb;}
+.badge-emea{background:#581c87;border:1px solid #7c3aed;}
+.badge-apac{background:#115e59;border:1px solid #14b8a6;}
 .stage-badge{background:#e0e7ff;color:#4338ca;padding:2px 6px;border-radius:3px;font-size:12px;font-weight:600;}
 .risk-high{background:#fef2f2;color:#dc2626;padding:2px 6px;border-radius:3px;font-weight:600;}
 .risk-medium{background:#fffbeb;color:#d97706;padding:2px 6px;border-radius:3px;font-weight:600;}
-.text-green{color:#16a34a;font-weight:600;}.text-red{color:#dc2626;font-weight:600;}.text-amber{color:#d97706;font-weight:600;}</style>
+.text-green{color:#16a34a;font-weight:600;}.text-red{color:#dc2626;font-weight:600;}.text-amber{color:#d97706;font-weight:600;}
+.attainment-green{color:#16a34a;font-weight:700;}.attainment-yellow{color:#d97706;font-weight:700;}.attainment-red{color:#dc2626;font-weight:700;}</style>
 </head><body>
 <div style="margin-bottom:24px;border-bottom:2px solid #e5e7eb;padding-bottom:16px;"><h1 style="font-size:24px;margin:0 0 4px;">Inbound Marketing Analysis</h1>
 <div style="color:#6b7280;font-size:13px;">Generated: ${generatedAt ? new Date(generatedAt).toLocaleString() : 'N/A'}</div></div>
@@ -1395,6 +1423,28 @@ export default function InboundAIAnalysis({ reportData, selectedProducts, select
           font-size: 0.75rem;
           font-weight: 600;
         }
+        .analysis-content :global(.badge-region) {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: white;
+        }
+        .analysis-content :global(.badge-amer) {
+          background: #1e3a5f;
+          border: 1px solid #2563eb;
+        }
+        .analysis-content :global(.badge-emea) {
+          background: #581c87;
+          border: 1px solid #7c3aed;
+        }
+        .analysis-content :global(.badge-apac) {
+          background: #115e59;
+          border: 1px solid #14b8a6;
+        }
         .analysis-content :global(.stage-badge) {
           display: inline-block;
           padding: 1px 6px;
@@ -1434,6 +1484,9 @@ export default function InboundAIAnalysis({ reportData, selectedProducts, select
         .analysis-content :global(.text-green) { color: #16a34a; font-weight: 600; }
         .analysis-content :global(.text-red) { color: #dc2626; font-weight: 600; }
         .analysis-content :global(.text-amber) { color: #d97706; font-weight: 600; }
+        .analysis-content :global(.attainment-green) { color: #16a34a; font-weight: 700; }
+        .analysis-content :global(.attainment-yellow) { color: #d97706; font-weight: 700; }
+        .analysis-content :global(.attainment-red) { color: #dc2626; font-weight: 700; }
         .analysis-content :global(strong) { font-weight: 600; color: var(--text-primary); }
         .analysis-content :global(code) {
           background: var(--bg-tertiary);
