@@ -683,17 +683,21 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
               background: var(--bg-secondary);
               border-radius: 4px;
               border: 1px solid #fecaca;
+              overflow: hidden;
             }
             .loss-count {
               font-size: 1rem;
               font-weight: 700;
               color: #dc2626;
               min-width: 24px;
+              flex-shrink: 0;
             }
             .loss-info {
               display: flex;
               flex-direction: column;
               gap: 2px;
+              min-width: 0;
+              overflow: hidden;
             }
             .loss-reason-text {
               font-size: 0.7rem;
