@@ -573,12 +573,14 @@ function ReportContent() {
       <AttainmentTable data={filteredData} />
       <SourceAttainment data={filteredData} />
 
-      {/* Renewals Overview Section */}
-      <RenewalsSection
-        products={selectedProducts}
-        regions={selectedRegions}
-        refreshKey={renewalsRefreshKey}
-      />
+      {/* Renewals Overview Section - Only show if RENEWAL category is included in filter */}
+      {(selectedCategories.length === 0 || selectedCategories.includes('RENEWAL')) && (
+        <RenewalsSection
+          products={selectedProducts}
+          regions={selectedRegions}
+          refreshKey={renewalsRefreshKey}
+        />
+      )}
 
       {/* Pipeline Milestone Attainment - MQL/SQL/SAL/SQO with Funnel Score */}
       {filteredData.funnel_by_category && (

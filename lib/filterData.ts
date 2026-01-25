@@ -80,6 +80,40 @@ function isAllSources(sources: Source[]): boolean {
 }
 
 /**
+ * Filter detail rows by source string (case-insensitive match)
+ * Detail rows have source as string, not Source type
+ */
+function filterDetailsBySource<T extends { source: string }>(
+  items: T[],
+  sources: Source[]
+): T[] {
+  if (sources.length === 0 || sources.length === 6) {
+    return items; // All sources selected
+  }
+  const sourcesLower = sources.map(s => s.toLowerCase());
+  return items.filter(item => {
+    const itemSource = (item.source || '').toLowerCase();
+    return sourcesLower.some(s => itemSource.includes(s.toLowerCase().replace(' sourced', '').replace(' ', '')));
+  });
+}
+
+/**
+ * Filter detail rows by category (for MQL which has category field)
+ */
+function filterDetailsByCategory<T extends { category?: string }>(
+  items: T[],
+  categories: Category[]
+): T[] {
+  if (categories.length === 0 || categories.length === 5) {
+    return items; // All categories selected
+  }
+  return items.filter(item => {
+    if (!item.category) return true; // Include items without category
+    return categories.includes(item.category as Category);
+  });
+}
+
+/**
  * Filter action items - include items with null region (product-wide) or matching region
  */
 function filterActionItems(items: ActionItem[], regions: Region[]): ActionItem[] {
@@ -356,18 +390,43 @@ export function filterReportData(
       R360: filterFunnelSourceRows(data.funnel_by_source.R360, includeR360),
     },
     // Funnel by source actuals for the Full Funnel Pacing "By Source" view
+    // Filter by product, region, AND source
     funnel_by_source_actuals: data.funnel_by_source_actuals ? {
       POR: includePOR
-        ? (allRegions ? data.funnel_by_source_actuals.POR || [] : filterByRegion(data.funnel_by_source_actuals.POR || [], regions))
+        ? (() => {
+            let items = data.funnel_by_source_actuals!.POR || [];
+            if (!allRegions) items = items.filter(item => regions.includes(item.region));
+            if (!allSources) items = items.filter(item => sources.includes(item.source as Source));
+            return items;
+          })()
         : [],
       R360: includeR360
-        ? (allRegions ? data.funnel_by_source_actuals.R360 || [] : filterByRegion(data.funnel_by_source_actuals.R360 || [], regions))
+        ? (() => {
+            let items = data.funnel_by_source_actuals!.R360 || [];
+            if (!allRegions) items = items.filter(item => regions.includes(item.region));
+            if (!allSources) items = items.filter(item => sources.includes(item.source as Source));
+            return items;
+          })()
         : [],
     } : undefined,
+    // Pipeline RCA - filter by product, region, AND category
     pipeline_rca: {
-      POR: filterProductRegion(data.pipeline_rca.POR, includePOR),
-      R360: filterProductRegion(data.pipeline_rca.R360, includeR360),
+      POR: includePOR
+        ? (() => {
+            let items = filterProductRegion(data.pipeline_rca.POR, true);
+            if (!allCategories) items = items.filter(item => categories.includes(item.category));
+            return items;
+          })()
+        : [],
+      R360: includeR360
+        ? (() => {
+            let items = filterProductRegion(data.pipeline_rca.R360, true);
+            if (!allCategories) items = items.filter(item => categories.includes(item.category));
+            return items;
+          })()
+        : [],
     },
+    // Loss reason RCA - filter by product and region only (no category field)
     loss_reason_rca: {
       POR: filterProductRegion(data.loss_reason_rca.POR, includePOR),
       R360: filterProductRegion(data.loss_reason_rca.R360, includeR360),
@@ -393,25 +452,41 @@ export function filterReportData(
       POR: filterDeals(data.pipeline_deals.POR || [], includePOR),
       R360: filterDeals(data.pipeline_deals.R360 || [], includeR360),
     } : undefined,
-    // MQL details (filter by product and region only)
+    // MQL details (filter by product, region, source, AND category)
     mql_details: data.mql_details ? {
-      POR: filterProductRegion(data.mql_details.POR || [], includePOR),
-      R360: filterProductRegion(data.mql_details.R360 || [], includeR360),
+      POR: includePOR
+        ? filterDetailsByCategory(filterDetailsBySource(filterProductRegion(data.mql_details.POR || [], true), sources), categories)
+        : [],
+      R360: includeR360
+        ? filterDetailsByCategory(filterDetailsBySource(filterProductRegion(data.mql_details.R360 || [], true), sources), categories)
+        : [],
     } : undefined,
-    // SQL details (filter by product and region only)
+    // SQL details (filter by product, region, AND source)
     sql_details: data.sql_details ? {
-      POR: filterProductRegion(data.sql_details.POR || [], includePOR),
-      R360: filterProductRegion(data.sql_details.R360 || [], includeR360),
+      POR: includePOR
+        ? filterDetailsBySource(filterProductRegion(data.sql_details.POR || [], true), sources)
+        : [],
+      R360: includeR360
+        ? filterDetailsBySource(filterProductRegion(data.sql_details.R360 || [], true), sources)
+        : [],
     } : undefined,
-    // SAL details (filter by product and region only)
+    // SAL details (filter by product, region, AND source)
     sal_details: data.sal_details ? {
-      POR: filterProductRegion(data.sal_details.POR || [], includePOR),
-      R360: filterProductRegion(data.sal_details.R360 || [], includeR360),
+      POR: includePOR
+        ? filterDetailsBySource(filterProductRegion(data.sal_details.POR || [], true), sources)
+        : [],
+      R360: includeR360
+        ? filterDetailsBySource(filterProductRegion(data.sal_details.R360 || [], true), sources)
+        : [],
     } : undefined,
-    // SQO details (filter by product and region only)
+    // SQO details (filter by product, region, AND source)
     sqo_details: data.sqo_details ? {
-      POR: filterProductRegion(data.sqo_details.POR || [], includePOR),
-      R360: filterProductRegion(data.sqo_details.R360 || [], includeR360),
+      POR: includePOR
+        ? filterDetailsBySource(filterProductRegion(data.sqo_details.POR || [], true), sources)
+        : [],
+      R360: includeR360
+        ? filterDetailsBySource(filterProductRegion(data.sqo_details.R360 || [], true), sources)
+        : [],
     } : undefined,
     // Filter insight sections
     wins_bright_spots: data.wins_bright_spots ? {
