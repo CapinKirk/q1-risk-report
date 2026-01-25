@@ -193,6 +193,122 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
   const worstConvertingUtmPOR = utmSourcePOR.filter(s => s.total >= 3).sort((a, b) => a.convRate - b.convRate).slice(0, 5);
   const topConvertingUtmR360 = utmSourceR360.filter(s => s.total >= 3).sort((a, b) => b.convRate - a.convRate).slice(0, 5);
 
+  // === PAID FUNNEL CONVERSION ANALYSIS ===
+  // Filter UTM data to paid sources only (cpc, paid, ppc, display, retargeting)
+  const isPaidSource = (name: string) => {
+    const n = (name || '').toLowerCase();
+    return n.includes('google') || n.includes('cpc') || n.includes('paid') || n.includes('ppc') ||
+           n.includes('display') || n.includes('bing') || n.includes('facebook') || n.includes('linkedin') ||
+           n.includes('retargeting') || n === 'inbound';
+  };
+
+  const isOrganicSource = (name: string) => {
+    const n = (name || '').toLowerCase();
+    return n.includes('organic') || n.includes('direct') || n.includes('referral') || n.includes('seo') ||
+           n.includes('social') || n.includes('email') || n.includes('content');
+  };
+
+  // Aggregate paid vs organic funnel metrics
+  const aggregateFunnelByType = (utmSources: any[], campaigns: any[]) => {
+    const paid = { mql: 0, sql: 0, sal: 0, sqo: 0, spend: 0 };
+    const organic = { mql: 0, sql: 0, sal: 0, sqo: 0, spend: 0 };
+
+    for (const s of utmSources) {
+      if (isPaidSource(s.name)) {
+        paid.mql += s.total || 0;
+        paid.sql += s.converted || 0;
+        paid.sqo += s.sqoCount || 0;
+      } else if (isOrganicSource(s.name)) {
+        organic.mql += s.total || 0;
+        organic.sql += s.converted || 0;
+        organic.sqo += s.sqoCount || 0;
+      }
+    }
+
+    // Add spend from campaigns
+    for (const c of campaigns) {
+      paid.spend += c.spend || 0;
+      paid.sal += c.sal || 0;
+    }
+
+    return {
+      paid: {
+        ...paid,
+        mqlToSql: paid.mql > 0 ? Math.round((paid.sql / paid.mql) * 100) : 0,
+        sqlToSqo: paid.sql > 0 ? Math.round((paid.sqo / paid.sql) * 100) : 0,
+        mqlToSqo: paid.mql > 0 ? Math.round((paid.sqo / paid.mql) * 100) : 0,
+        costPerMql: paid.mql > 0 ? Math.round(paid.spend / paid.mql) : 0,
+        costPerSql: paid.sql > 0 ? Math.round(paid.spend / paid.sql) : 0,
+        costPerSqo: paid.sqo > 0 ? Math.round(paid.spend / paid.sqo) : 0,
+      },
+      organic: {
+        ...organic,
+        mqlToSql: organic.mql > 0 ? Math.round((organic.sql / organic.mql) * 100) : 0,
+        sqlToSqo: organic.sql > 0 ? Math.round((organic.sqo / organic.sql) * 100) : 0,
+        mqlToSqo: organic.mql > 0 ? Math.round((organic.sqo / organic.mql) * 100) : 0,
+      },
+    };
+  };
+
+  const paidVsOrganicPOR = aggregateFunnelByType(utmSourcePOR, campaignEffPOR);
+  const paidVsOrganicR360 = aggregateFunnelByType(utmSourceR360, campaignEffR360);
+
+  // Campaign-level funnel breakdown (paid campaigns with full funnel data)
+  const getCampaignFunnelBreakdown = (campaigns: any[]) => {
+    return campaigns
+      .filter(c => c.mql >= 3) // Minimum volume threshold
+      .map(c => ({
+        name: c.name,
+        mql: c.mql,
+        sql: c.sql,
+        sal: c.sal,
+        sqo: c.sqo,
+        mqlToSql: c.mql > 0 ? Math.round((c.sql / c.mql) * 100) : 0,
+        sqlToSal: c.sql > 0 ? Math.round((c.sal / c.sql) * 100) : 0,
+        salToSqo: c.sal > 0 ? Math.round((c.sqo / c.sal) * 100) : 0,
+        sqlToSqo: c.sql > 0 ? Math.round((c.sqo / c.sql) * 100) : 0,
+        mqlToSqo: c.mql > 0 ? Math.round((c.sqo / c.mql) * 100) : 0,
+        spend: c.spend,
+        costPerSqo: c.sqo > 0 ? Math.round(c.spend / c.sqo) : c.spend > 0 ? Infinity : 0,
+        funnelLeakage: c.mql > 0 ? Math.round(((c.mql - c.sqo) / c.mql) * 100) : 0,
+      }))
+      .sort((a, b) => b.mql - a.mql); // Sort by volume
+  };
+
+  const campaignFunnelPOR = getCampaignFunnelBreakdown(campaignEffPOR);
+  const campaignFunnelR360 = getCampaignFunnelBreakdown(campaignEffR360);
+
+  // Keyword-level funnel performance
+  const getKeywordFunnelBreakdown = (keywords: any[]) => {
+    return keywords
+      .filter(k => k.total >= 2) // Minimum volume
+      .map(k => ({
+        name: k.name,
+        mql: k.total,
+        sql: k.converted,
+        sqo: k.sqoCount,
+        mqlToSql: k.convRate,
+        mqlToSqo: k.sqoRate,
+        funnelLeakage: k.total > 0 ? Math.round(((k.total - k.sqoCount) / k.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.mql - a.mql);
+  };
+
+  const keywordFunnelPOR = getKeywordFunnelBreakdown(utmKeywordPOR);
+  const keywordFunnelR360 = getKeywordFunnelBreakdown(utmKeywordR360);
+
+  // Identify high-leakage campaigns (lots of MQLs, few SQOs)
+  const highLeakageCampaigns = [...campaignFunnelPOR.map(c => ({...c, product: 'POR'})), ...campaignFunnelR360.map(c => ({...c, product: 'R360'}))]
+    .filter(c => c.funnelLeakage > 70 && c.mql >= 5)
+    .sort((a, b) => b.funnelLeakage - a.funnelLeakage)
+    .slice(0, 5);
+
+  // Identify high-efficiency campaigns (high MQL→SQO rate)
+  const highEfficiencyCampaigns = [...campaignFunnelPOR.map(c => ({...c, product: 'POR'})), ...campaignFunnelR360.map(c => ({...c, product: 'R360'}))]
+    .filter(c => c.mqlToSqo >= 30 && c.mql >= 3)
+    .sort((a, b) => b.mqlToSqo - a.mqlToSqo)
+    .slice(0, 5);
+
   // Ads efficiency (high CPA / low CTR)
   const highCpaAds = [...googleAdsPOR.map((r: any) => ({...r, product: 'POR'})), ...googleAdsR360.map((r: any) => ({...r, product: 'R360'}))]
     .filter((r: any) => r.cpa_usd && r.cpa_usd > 200)
@@ -240,14 +356,42 @@ Stage-by-stage breakdown:
 - Identify worst bottleneck by product/region with root cause
 - Compare conversion rates across UTM sources (which sources produce highest quality leads)
 
-### 4. FUNNEL VELOCITY & STALL ANALYSIS
+### 4. PAID FUNNEL CONVERSION ANALYSIS (CRITICAL FOR BUDGET DECISIONS)
+**Paid vs Organic Comparison** (use the Paid vs Organic Funnel Summary data):
+- Compare MQL→SQL conversion: Paid vs Organic - which produces higher quality leads?
+- Compare MQL→SQO conversion: Paid vs Organic - full-funnel efficiency
+- Cost efficiency: Cost per MQL, Cost per SQL, Cost per SQO for paid traffic
+- Identify if paid spend is generating quality leads or "MQL factories" that drop off
+
+**Campaign-Level Funnel Breakdown** (use Campaign Funnel Performance data):
+- For EACH campaign with spend, analyze conversion at every stage:
+  - MQL→SQL conversion rate
+  - SQL→SAL conversion rate (POR) or SQL→SQO (R360)
+  - SAL→SQO conversion rate (POR)
+  - Full funnel: MQL→SQO rate
+- Identify campaigns with HIGH funnel leakage (lots of MQLs, few SQOs)
+- Identify campaigns with HIGH efficiency (strong MQL→SQO despite lower volume)
+- Calculate where in the funnel each campaign loses leads (MQL→SQL vs SQL→SQO)
+
+**Keyword-Level Funnel Performance** (use Keyword Funnel Performance data):
+- Rank keywords by MQL→SQO conversion rate (quality signal)
+- Identify keywords generating MQLs that DON'T convert (wasted spend)
+- Identify keywords generating MQLs that DO convert (invest more)
+- Branded vs Non-Branded keyword funnel efficiency comparison
+
+**Budget Reallocation Signal**:
+- Based on funnel data, which campaigns/keywords deserve MORE budget?
+- Which campaigns/keywords should be PAUSED due to poor funnel conversion?
+- Quantify the SQO uplift if budget shifted from low-converting to high-converting campaigns
+
+### 5. FUNNEL VELOCITY & STALL ANALYSIS
 - Average days in each stage by product
 - Stall rates: % of leads stuck >30 days in a stage
 - MQL reversion/disqualification rates and causes
 - Stage-specific velocity issues (where are leads getting stuck?)
 - Impact of stalls on downstream pipeline creation
 
-### 5. CHANNEL & CAMPAIGN EFFECTIVENESS
+### 6. CHANNEL & CAMPAIGN EFFECTIVENESS
 Using UTM data and Campaign Efficiency data:
 - Rank UTM sources by MQL→SQL and MQL→SQO conversion rate
 - Identify top-performing campaigns with conversion rates and SQO output
@@ -258,7 +402,7 @@ Using UTM data and Campaign Efficiency data:
 - **UTM Keyword Analysis**: Rank keywords by volume and conversion efficiency. Identify high-intent keywords (high SQL/SQO conversion) vs low-intent keywords (high MQL, low conversion). Call out specific keyword opportunities.
 - **Branded vs Non-Branded Breakdown**: Compare branded keyword performance (brand name searches) vs non-branded (generic/competitor terms). Analyze: volume split, conversion rate differences, SQO efficiency, and what this implies about demand generation vs demand capture strategy. Quantify the gap.
 
-### 6. GOOGLE ADS PERFORMANCE, ROI & BUDGET OPTIMIZATION
+### 7. GOOGLE ADS PERFORMANCE, ROI & BUDGET OPTIMIZATION
 - Spend efficiency by product and region
 - CPA analysis: which regions are above $200 threshold (risk)
 - CTR analysis: which regions are below 3% threshold (risk)
@@ -268,7 +412,7 @@ Using UTM data and Campaign Efficiency data:
 - **Diminishing Returns Analysis**: For top-performing campaigns, assess whether they show signs of saturation (high spend but declining efficiency). Recommend incremental budget caps.
 - Specific ads performance issues from RCA data
 
-### 7. INBOUND REVENUE ATTRIBUTION
+### 8. INBOUND REVENUE ATTRIBUTION
 Using source attainment data:
 - Revenue generated from inbound channel by product/region
 - Attainment % vs target (RAG status)
@@ -276,14 +420,14 @@ Using source attainment data:
 - Correlation between lead quality and revenue outcomes
 - Inbound contribution to overall bookings targets
 
-### 8. PREDICTIVE INDICATORS & FORECAST
+### 9. PREDICTIVE INDICATORS & FORECAST
 - At current MQL rate, projected Q1 total MQLs vs target
 - At current conversion rates, projected SQLs and SQOs
 - Pipeline generation forecast from inbound
 - Risk-adjusted forecast considering stall rates and conversion trends
 - Leading indicators: are trends improving or deteriorating?
 
-### 9. PRIORITIZED RECOMMENDATIONS
+### 10. PRIORITIZED RECOMMENDATIONS
 Provide 5-7 specific recommendations. Each recommendation MUST be a single dense sentence that includes ALL of the following inline:
 - Priority prefix (P1/P2/P3)
 - The word "Recommend" followed by the specific action
@@ -302,17 +446,25 @@ CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Ev
 
 ---
 
-## FORMATTING RULES (CRITICAL - APPLY TO ALL 9 SECTIONS)
+## FORMATTING RULES (CRITICAL - APPLY TO ALL 10 SECTIONS)
 - NEVER write paragraph blobs or flat bullet lists. EVERY section MUST use multi-level bullets with sub-bullets.
-- **MANDATORY STRUCTURE FOR SECTIONS 2-8:**
+- **MANDATORY STRUCTURE FOR SECTIONS 2-9:**
   - Top-level bullet: "- **Bold Label:** key insight or finding"
   - Sub-bullets (REQUIRED): "  - supporting metric, data point, or implication" (indent with 2 spaces)
   - Each top-level bullet MUST have 1-3 sub-bullets with specific data
 - Section 1 (Executive Summary): 3-4 complete sentences, no bullets
-- Section 9 (Recommendations): flat bullets starting with "- P[1-3] –"
-- **EXAMPLE FORMAT FOR SECTIONS 2-8 (USE THIS EXACT STRUCTURE):**
+- Section 10 (Recommendations): flat bullets starting with "- P[1-3] –"
+- **EXAMPLE FORMAT FOR SECTIONS 2-9 (USE THIS EXACT STRUCTURE):**
 
-### 5. CHANNEL & CAMPAIGN EFFECTIVENESS
+### 4. PAID FUNNEL CONVERSION ANALYSIS
+- **Paid vs Organic Quality:** Paid converts at 45% MQL→SQL vs Organic at 32%
+  - Paid MQL→SQO: 18% full-funnel efficiency
+  - Cost per SQO: $892 for paid traffic
+- **High-Leakage Campaign:** Search – US/Canada generates 45 MQLs but only 2 SQOs
+  - 96% funnel leakage indicates targeting issue
+  - $4,956 spend at $2,478 per SQO
+
+### 6. CHANNEL & CAMPAIGN EFFECTIVENESS
 - **Top UTM Sources:** Google generated 50 SQOs at 74% conversion
   - Outperforms Organic at 54% conversion rate
   - 35% higher efficiency per MQL
@@ -332,7 +484,7 @@ CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Ev
 - Be direct about underperformance - name specific channels/campaigns that are failing.
 - Frame suggestions as "Recommend..." not "Action:" or "Next step:".
 
-**REMINDER: Every bullet in sections 2-8 needs sub-bullets. If you write a flat bullet list without indented sub-bullets, the output is INVALID.**
+**REMINDER: Every bullet in sections 2-9 needs sub-bullets. If you write a flat bullet list without indented sub-bullets, the output is INVALID.**
 
 ${filterDescription}
 
@@ -392,6 +544,59 @@ ${includeR360 ? `### R360 MQL Status Breakdown
 ### Overall MQL Disqualification Summary
 ${includePOR ? `- POR: ${dqSummary.POR?.reverted_pct || 0}% reverted, ${dqSummary.POR?.converted_pct || 0}% converted, ${dqSummary.POR?.stalled_pct || 0}% stalled` : ''}
 ${includeR360 ? `- R360: ${dqSummary.R360?.reverted_pct || 0}% reverted, ${dqSummary.R360?.converted_pct || 0}% converted, ${dqSummary.R360?.stalled_pct || 0}% stalled` : ''}
+
+## PAID vs ORGANIC FUNNEL SUMMARY (USE THIS FOR SECTION 4)
+${includePOR ? `### POR - Paid vs Organic Funnel Conversion
+**PAID Traffic:**
+- MQLs: ${paidVsOrganicPOR.paid.mql}, SQLs: ${paidVsOrganicPOR.paid.sql}, SQOs: ${paidVsOrganicPOR.paid.sqo}
+- MQL→SQL: ${paidVsOrganicPOR.paid.mqlToSql}%, SQL→SQO: ${paidVsOrganicPOR.paid.sqlToSqo}%, MQL→SQO: ${paidVsOrganicPOR.paid.mqlToSqo}%
+- Total Spend: $${paidVsOrganicPOR.paid.spend.toLocaleString()}
+- Cost per MQL: $${paidVsOrganicPOR.paid.costPerMql}, Cost per SQL: $${paidVsOrganicPOR.paid.costPerSql}, Cost per SQO: $${paidVsOrganicPOR.paid.costPerSqo}
+**ORGANIC Traffic:**
+- MQLs: ${paidVsOrganicPOR.organic.mql}, SQLs: ${paidVsOrganicPOR.organic.sql}, SQOs: ${paidVsOrganicPOR.organic.sqo}
+- MQL→SQL: ${paidVsOrganicPOR.organic.mqlToSql}%, SQL→SQO: ${paidVsOrganicPOR.organic.sqlToSqo}%, MQL→SQO: ${paidVsOrganicPOR.organic.mqlToSqo}%` : ''}
+
+${includeR360 ? `### R360 - Paid vs Organic Funnel Conversion
+**PAID Traffic:**
+- MQLs: ${paidVsOrganicR360.paid.mql}, SQLs: ${paidVsOrganicR360.paid.sql}, SQOs: ${paidVsOrganicR360.paid.sqo}
+- MQL→SQL: ${paidVsOrganicR360.paid.mqlToSql}%, SQL→SQO: ${paidVsOrganicR360.paid.sqlToSqo}%, MQL→SQO: ${paidVsOrganicR360.paid.mqlToSqo}%
+- Total Spend: $${paidVsOrganicR360.paid.spend.toLocaleString()}
+- Cost per MQL: $${paidVsOrganicR360.paid.costPerMql}, Cost per SQL: $${paidVsOrganicR360.paid.costPerSql}, Cost per SQO: $${paidVsOrganicR360.paid.costPerSqo}
+**ORGANIC Traffic:**
+- MQLs: ${paidVsOrganicR360.organic.mql}, SQLs: ${paidVsOrganicR360.organic.sql}, SQOs: ${paidVsOrganicR360.organic.sqo}
+- MQL→SQL: ${paidVsOrganicR360.organic.mqlToSql}%, SQL→SQO: ${paidVsOrganicR360.organic.sqlToSqo}%, MQL→SQO: ${paidVsOrganicR360.organic.mqlToSqo}%` : ''}
+
+## CAMPAIGN FUNNEL PERFORMANCE (USE THIS FOR SECTION 4)
+${includePOR ? `### POR - Campaign-Level Funnel Breakdown
+${campaignFunnelPOR.length > 0 ? campaignFunnelPOR.slice(0, 10).map((c: any) =>
+  `- ${c.name}: ${c.mql} MQLs → ${c.sql} SQLs (${c.mqlToSql}%) → ${c.sal} SALs (${c.sqlToSal}%) → ${c.sqo} SQOs (${c.salToSqo}%), Full funnel: ${c.mqlToSqo}% MQL→SQO, Leakage: ${c.funnelLeakage}%${c.spend > 0 ? `, Spend: $${c.spend.toLocaleString()}, Cost/SQO: $${c.costPerSqo === Infinity ? '∞ (no SQOs)' : c.costPerSqo}` : ''}`
+).join('\n') : 'No campaign funnel data'}` : ''}
+
+${includeR360 ? `### R360 - Campaign-Level Funnel Breakdown
+${campaignFunnelR360.length > 0 ? campaignFunnelR360.slice(0, 10).map((c: any) =>
+  `- ${c.name}: ${c.mql} MQLs → ${c.sql} SQLs (${c.mqlToSql}%) → ${c.sqo} SQOs (${c.sqlToSqo}%), Full funnel: ${c.mqlToSqo}% MQL→SQO, Leakage: ${c.funnelLeakage}%${c.spend > 0 ? `, Spend: $${c.spend.toLocaleString()}, Cost/SQO: $${c.costPerSqo === Infinity ? '∞ (no SQOs)' : c.costPerSqo}` : ''}`
+).join('\n') : 'No campaign funnel data'}` : ''}
+
+## HIGH-LEAKAGE CAMPAIGNS (Lots of MQLs, Few SQOs - Budget Risk)
+${highLeakageCampaigns.length > 0 ? highLeakageCampaigns.map((c: any) =>
+  `- ${c.product} ${c.name}: ${c.mql} MQLs but only ${c.sqo} SQOs, ${c.funnelLeakage}% leakage, MQL→SQO: ${c.mqlToSqo}%${c.spend > 0 ? `, Spend: $${c.spend.toLocaleString()}` : ''}`
+).join('\n') : 'No high-leakage campaigns identified'}
+
+## HIGH-EFFICIENCY CAMPAIGNS (Strong MQL→SQO Conversion - Investment Opportunities)
+${highEfficiencyCampaigns.length > 0 ? highEfficiencyCampaigns.map((c: any) =>
+  `- ${c.product} ${c.name}: ${c.mql} MQLs → ${c.sqo} SQOs, ${c.mqlToSqo}% MQL→SQO${c.spend > 0 ? `, Spend: $${c.spend.toLocaleString()}, Cost/SQO: $${c.costPerSqo}` : ''}`
+).join('\n') : 'No high-efficiency campaigns identified'}
+
+## KEYWORD FUNNEL PERFORMANCE
+${includePOR ? `### POR - Keyword-Level Funnel
+${keywordFunnelPOR.length > 0 ? keywordFunnelPOR.slice(0, 10).map((k: any) =>
+  `- ${k.name}: ${k.mql} MQLs → ${k.sql} SQLs (${k.mqlToSql}%) → ${k.sqo} SQOs (${k.mqlToSqo}% MQL→SQO), Leakage: ${k.funnelLeakage}%`
+).join('\n') : 'No keyword funnel data'}` : ''}
+
+${includeR360 ? `### R360 - Keyword-Level Funnel
+${keywordFunnelR360.length > 0 ? keywordFunnelR360.slice(0, 10).map((k: any) =>
+  `- ${k.name}: ${k.mql} MQLs → ${k.sql} SQLs (${k.mqlToSql}%) → ${k.sqo} SQOs (${k.mqlToSqo}% MQL→SQO), Leakage: ${k.funnelLeakage}%`
+).join('\n') : 'No keyword funnel data'}` : ''}
 
 ## UTM SOURCE ANALYSIS (Lead Origin Tracking from BigQuery MarketingFunnel)
 ${includePOR ? `### POR - By UTM Source (Top 10)
@@ -531,7 +736,7 @@ ${topConvertingUtmR360.map((s: any) => `- ${s.name}: ${s.convRate}% MQL→SQL, $
 - Quarter ${quarterPctComplete}% complete (${daysElapsed} days elapsed, ${daysRemaining} remaining)
 
 ## CRITICAL RULES
-1. PRODUCE ALL 9 SECTIONS - do not skip any section. Each section must be DETAILED and COMPREHENSIVE.
+1. PRODUCE ALL 10 SECTIONS - do not skip any section. Each section must be DETAILED and COMPREHENSIVE.
 2. Use SPECIFIC numbers and percentages from the data - never generalize. Every paragraph needs at least 2 data points.
 3. Reference the pre-computed insights above to ensure accuracy
 4. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
@@ -596,7 +801,7 @@ export async function POST(request: Request) {
       ? `This analysis covers ONLY ${filteredProduct}. You MUST NOT mention, reference, compare to, or acknowledge the existence of ${excludedProduct} anywhere in your output. ${excludedProduct} does not exist for this analysis. If you mention ${excludedProduct} even once, the entire output will be rejected.`
       : 'Include product comparisons (POR vs R360) in every section where both products have data.';
 
-    const systemMessage = `You are a senior Inbound Marketing analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly inbound analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 9 sections: Executive Summary, Lead Volume & Pacing, Funnel Conversion, Funnel Velocity & Stall, Channel & Campaign Effectiveness, Google Ads Performance, Inbound Revenue Attribution, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific numbers, percentages, conversion rates, and dollar amounts throughout. Be direct about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 8000-10000 CHARACTERS. NEVER stop before completing all 9 sections.
+    const systemMessage = `You are a senior Inbound Marketing analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly inbound analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 10 sections: Executive Summary, Lead Volume & Pacing, Funnel Conversion, Paid Funnel Conversion Analysis, Funnel Velocity & Stall, Channel & Campaign Effectiveness, Google Ads Performance, Inbound Revenue Attribution, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific numbers, percentages, conversion rates, and dollar amounts throughout. Be direct about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 9000-12000 CHARACTERS. NEVER stop before completing all 10 sections.
 
 OUTPUT FORMAT (STRICT - READ CAREFULLY):
 - Use ### for section headers (e.g., ### Executive Summary)
@@ -604,24 +809,29 @@ OUTPUT FORMAT (STRICT - READ CAREFULLY):
 
 **CRITICAL MULTI-LEVEL BULLET REQUIREMENT:**
 - Section 1 (Executive Summary): 3-4 complete sentences in paragraph form
-- Sections 2-8: MUST use multi-level bullets with indented sub-bullets
-- Section 9 (Recommendations): Flat bullets starting with "- P[1-3] –"
+- Sections 2-9: MUST use multi-level bullets with indented sub-bullets
+- Section 10 (Recommendations): Flat bullets starting with "- P[1-3] –"
 
-**FOR SECTIONS 2-8, EVERY BULLET MUST HAVE SUB-BULLETS:**
+**FOR SECTIONS 2-9, EVERY BULLET MUST HAVE SUB-BULLETS:**
 - Top-level: "- **Bold Label:** key insight or finding"
 - Sub-bullets: "  - supporting metric" (REQUIRED - 1-3 per top-level bullet)
-- If you write a flat bullet without sub-bullets in sections 2-8, the output is REJECTED
+- If you write a flat bullet without sub-bullets in sections 2-9, the output is REJECTED
 
-EXAMPLE FOR SECTIONS 2-8 (COPY THIS EXACT STRUCTURE):
-### 5. CHANNEL & CAMPAIGN EFFECTIVENESS
+EXAMPLE FOR SECTIONS 2-9 (COPY THIS EXACT STRUCTURE):
+### 4. PAID FUNNEL CONVERSION ANALYSIS
+- **Paid vs Organic Quality:** Paid converts at 45% MQL→SQL vs Organic at 32%
+  - Paid MQL→SQO: 18% full-funnel efficiency
+  - Cost per SQO: $892 indicates moderate efficiency
+- **High-Leakage Campaign:** Search – US/Canada generates 45 MQLs but only 2 SQOs
+  - 96% funnel leakage indicates targeting issue
+  - $4,956 spend at $2,478 per SQO
+
+### 6. CHANNEL & CAMPAIGN EFFECTIVENESS
 - **Top UTM Sources:** Google generated 50 SQOs at 74% conversion
   - Outperforms Organic at 54% conversion rate
   - 35% higher efficiency per MQL
-- **Worst Campaign:** Search – US/Canada spent $4,956 for 0 SQOs
-  - 23% of total paid spend with 0% SQO share
-  - Complete funnel leakage at MQL→SQL stage
 
-### 6. GOOGLE ADS PERFORMANCE
+### 7. GOOGLE ADS PERFORMANCE
 - **AMER CPA Risk:** $707 per acquisition vs $200 benchmark
   - $9,000+ inefficient spend this quarter
   - CTR healthy at 3.5%, issue is conversion quality
