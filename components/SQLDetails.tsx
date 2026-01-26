@@ -736,12 +736,12 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
           padding: 12px;
           background: var(--danger-bg);
           border-radius: 8px;
-          border: 1px solid #fecaca;
+          border: 1px solid var(--danger-border, #fecaca);
         }
         .loss-summary h4 {
           margin: 0 0 10px 0;
           font-size: 0.8rem;
-          color: #991b1b;
+          color: var(--danger-text, #ef4444);
         }
         .loss-reasons-grid {
           display: grid;
@@ -753,14 +753,14 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
           align-items: center;
           gap: 8px;
           padding: 6px 10px;
-          background: var(--bg-secondary);
+          background: var(--bg-tertiary);
           border-radius: 4px;
-          border: 1px solid #fecaca;
+          border: 1px solid var(--danger-border, #fecaca);
         }
         .loss-count {
           font-size: 1rem;
           font-weight: 700;
-          color: #dc2626;
+          color: var(--danger-text, #ef4444);
         }
         .loss-reason-text {
           font-size: 0.7rem;
