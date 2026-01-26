@@ -877,29 +877,32 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal
     }
 
     // Post-process to fix recommendation bold formatting
-    // AI sometimes outputs *P1 – ...* (italic) instead of **P1 – ...** (bold)
-    rawAnalysis = rawAnalysis
-      // Fix patterns like "*P1 – ..." at start of line that end with "*" or ".*"
-      .replace(/^(\s*-\s*)\*P([123])\s*[–-]/gm, '$1**P$2 –')
-      // Fix closing single asterisk before newline (when line starts with **P)
-      .replace(/\*\*P([123])[^*]+[^*]\*$/gm, (match) => {
-        // If it ends with single *, replace with **
-        if (match.endsWith('*') && !match.endsWith('**')) {
-          return match.slice(0, -1) + '**';
+    // AI sometimes outputs *P1 – ...* (italic) or P1 – ... (no formatting) instead of **P1 – ...**
+    const lines = rawAnalysis.split('\n');
+    const fixedLines = lines.map(line => {
+      // Check if this is a recommendation line (P1/P2/P3 with Owner/Timeframe/expected impact)
+      if (/^\s*-?\s*\*?P[123]\s*[–-]/.test(line) && /Owner:|Timeframe:|expected impact/i.test(line)) {
+        // Extract prefix (whitespace and optional dash)
+        const prefixMatch = line.match(/^(\s*-?\s*)/);
+        const prefix = prefixMatch ? prefixMatch[1] : '';
+
+        // Remove prefix and any asterisks, clean up the content
+        let content = line
+          .replace(/^(\s*-?\s*)/, '')  // Remove prefix
+          .replace(/^\*+/, '')          // Remove leading asterisks
+          .replace(/\*+$/, '')          // Remove trailing asterisks
+          .trim();
+
+        // Ensure it ends with a period
+        if (!content.endsWith('.')) {
+          content += '.';
         }
-        return match;
-      })
-      // Comprehensive fix: find lines with *P1/P2/P3 and ensure double asterisks
-      .replace(/^(\s*-\s*)\*(P[123]\s*[–-][^*]+)\*$/gm, '$1**$2**')
-      // Fix any remaining *P1, *P2, *P3 at line start
-      .replace(/^(\s*-\s*)\*(P[123])/gm, '$1**$2')
-      // Ensure lines starting with **P end with **
-      .replace(/^(\s*-\s*\*\*P[123][^*]+[^*])\*?$/gm, (match) => {
-        if (!match.endsWith('**')) {
-          return match.replace(/\*?$/, '**');
-        }
-        return match;
-      });
+
+        return `${prefix}**${content}**`;
+      }
+      return line;
+    });
+    rawAnalysis = fixedLines.join('\n');
 
     return NextResponse.json({
       success: true,
