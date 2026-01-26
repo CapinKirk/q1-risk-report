@@ -192,11 +192,9 @@ function AnalysisContent() {
         selectedRegions={selectedRegions}
         selectedProducts={selectedProducts}
         selectedCategories={selectedCategories}
-        selectedSources={selectedGlobalSources}
         onRegionChange={setSelectedRegions}
         onProductChange={setSelectedProducts}
         onCategoryChange={setSelectedCategories}
-        onSourceChange={setSelectedGlobalSources}
       />
 
       <DateRangePicker onAnalyze={handleAnalyze} isLoading={isLoading} />

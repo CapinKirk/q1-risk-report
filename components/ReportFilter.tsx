@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Region, Product, Category, Source } from '@/lib/types';
+import { Region, Product, Category, Source } from '@/lib/types';  // Source still needed for buildFilterURL
 import { buildFilterURL } from '@/lib/filterData';
 import { REGION_CONFIG } from './RegionBadge';
 
@@ -9,101 +9,80 @@ interface ReportFilterProps {
   selectedRegions: Region[];
   selectedProducts: Product[];
   selectedCategories: Category[];
-  selectedSources: Source[];
   onRegionChange: (regions: Region[]) => void;
   onProductChange: (products: Product[]) => void;
   onCategoryChange: (categories: Category[]) => void;
-  onSourceChange: (sources: Source[]) => void;
 }
 
 const ALL_REGIONS: Region[] = ['AMER', 'EMEA', 'APAC'];
 const ALL_PRODUCTS: Product[] = ['POR', 'R360'];
 const ALL_CATEGORIES: Category[] = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION', 'RENEWAL'];
-const ALL_SOURCES: Source[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];
 
 export default function ReportFilter({
   selectedRegions,
   selectedProducts,
   selectedCategories,
-  selectedSources,
   onRegionChange,
   onProductChange,
   onCategoryChange,
-  onSourceChange,
 }: ReportFilterProps) {
   const router = useRouter();
 
   const isAllRegions = selectedRegions.length === 3 || selectedRegions.length === 0;
   const isAllProducts = selectedProducts.length === 2 || selectedProducts.length === 0;
   const isAllCategories = selectedCategories.length === 5 || selectedCategories.length === 0;
-  const isAllSources = selectedSources.length === 6 || selectedSources.length === 0;
 
-  // Update URL with all filters
-  const updateURL = (regions: Region[], products: Product[], categories: Category[], sources: Source[]) => {
-    router.push(buildFilterURL(regions, products, categories, sources), { scroll: false });
+  // Update URL with all filters (sources always set to all)
+  const ALL_SOURCES: Source[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];
+  const updateURL = (regions: Region[], products: Product[], categories: Category[]) => {
+    router.push(buildFilterURL(regions, products, categories, ALL_SOURCES), { scroll: false });
   };
 
   // Product filter handlers
   const handleAllProductsClick = () => {
     onProductChange(ALL_PRODUCTS);
-    updateURL(selectedRegions, ALL_PRODUCTS, selectedCategories, selectedSources);
+    updateURL(selectedRegions, ALL_PRODUCTS, selectedCategories);
   };
 
   const handleProductClick = (product: Product) => {
     if (selectedProducts.length === 1 && selectedProducts[0] === product) {
       onProductChange(ALL_PRODUCTS);
-      updateURL(selectedRegions, ALL_PRODUCTS, selectedCategories, selectedSources);
+      updateURL(selectedRegions, ALL_PRODUCTS, selectedCategories);
     } else {
       onProductChange([product]);
-      updateURL(selectedRegions, [product], selectedCategories, selectedSources);
+      updateURL(selectedRegions, [product], selectedCategories);
     }
   };
 
   // Region filter handlers
   const handleAllRegionsClick = () => {
     onRegionChange(ALL_REGIONS);
-    updateURL(ALL_REGIONS, selectedProducts, selectedCategories, selectedSources);
+    updateURL(ALL_REGIONS, selectedProducts, selectedCategories);
   };
 
   const handleRegionClick = (region: Region) => {
     if (selectedRegions.length === 1 && selectedRegions[0] === region) {
       onRegionChange(ALL_REGIONS);
-      updateURL(ALL_REGIONS, selectedProducts, selectedCategories, selectedSources);
+      updateURL(ALL_REGIONS, selectedProducts, selectedCategories);
     } else {
       onRegionChange([region]);
-      updateURL([region], selectedProducts, selectedCategories, selectedSources);
+      updateURL([region], selectedProducts, selectedCategories);
     }
   };
 
   // Category filter handlers
   const handleAllCategoriesClick = () => {
     onCategoryChange(ALL_CATEGORIES);
-    updateURL(selectedRegions, selectedProducts, ALL_CATEGORIES, selectedSources);
+    updateURL(selectedRegions, selectedProducts, ALL_CATEGORIES);
   };
 
   const handleCategoryClick = (category: Category) => {
     if (selectedCategories.length === 1 && selectedCategories[0] === category) {
       onCategoryChange(ALL_CATEGORIES);
-      updateURL(selectedRegions, selectedProducts, ALL_CATEGORIES, selectedSources);
+      updateURL(selectedRegions, selectedProducts, ALL_CATEGORIES);
     } else {
       onCategoryChange([category]);
-      updateURL(selectedRegions, selectedProducts, [category], selectedSources);
-    }
-  };
-
-  // Source filter handlers
-  const handleAllSourcesClick = () => {
-    onSourceChange(ALL_SOURCES);
-    updateURL(selectedRegions, selectedProducts, selectedCategories, ALL_SOURCES);
-  };
-
-  const handleSourceClick = (source: Source) => {
-    if (selectedSources.length === 1 && selectedSources[0] === source) {
-      onSourceChange(ALL_SOURCES);
-      updateURL(selectedRegions, selectedProducts, selectedCategories, ALL_SOURCES);
-    } else {
-      onSourceChange([source]);
-      updateURL(selectedRegions, selectedProducts, selectedCategories, [source]);
+      updateURL(selectedRegions, selectedProducts, [category]);
     }
   };
 
@@ -175,27 +154,6 @@ export default function ReportFilter({
         ))}
       </div>
 
-      {/* Source Filter */}
-      <div className="filter-bar" data-testid="source-filter">
-        <span className="filter-label">Source:</span>
-        <button
-          className={`filter-btn ${isAllSources ? 'active' : ''}`}
-          onClick={handleAllSourcesClick}
-          data-testid="source-all"
-        >
-          All Sources
-        </button>
-        {ALL_SOURCES.map(source => (
-          <button
-            key={source}
-            className={`filter-btn ${!isAllSources && selectedSources.includes(source) ? 'active' : ''}`}
-            onClick={() => handleSourceClick(source)}
-            data-testid={`source-${source.toLowerCase().replace(/\s+/g, '-')}`}
-          >
-            {source}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

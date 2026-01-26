@@ -548,11 +548,9 @@ function ReportContent() {
         selectedRegions={selectedRegions}
         selectedProducts={selectedProducts}
         selectedCategories={selectedCategories}
-        selectedSources={selectedSources}
         onRegionChange={setSelectedRegions}
         onProductChange={setSelectedProducts}
         onCategoryChange={setSelectedCategories}
-        onSourceChange={setSelectedSources}
       />
 
       {/* Executive KPI Overview Cards */}
