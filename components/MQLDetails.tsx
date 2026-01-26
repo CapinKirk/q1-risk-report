@@ -8,6 +8,9 @@ import RegionBadge from './RegionBadge';
 
 const ITEMS_PER_PAGE = 25;
 
+type SourceType = 'INBOUND' | 'OUTBOUND' | 'AE SOURCED' | 'AM SOURCED' | 'TRADESHOW' | 'EXPANSION' | 'ORGANIC' | 'PAID';
+const ALL_SOURCES: SourceType[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'EXPANSION', 'ORGANIC', 'PAID'];
+
 interface MQLDetailsProps {
   mqlDetails: {
     POR: MQLDetailRow[];
@@ -20,6 +23,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
   const [selectedRegion, setSelectedRegion] = useState<Region | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedLeadTypes, setSelectedLeadTypes] = useState<LeadType[]>(['MQL', 'EQL']); // Both enabled by default
+  const [selectedSources, setSelectedSources] = useState<SourceType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -60,6 +64,14 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
       allMQLs = allMQLs.filter(m => m.mql_status === selectedStatus);
     }
 
+    // Apply source filter (multi-select)
+    if (selectedSources.length > 0) {
+      allMQLs = allMQLs.filter(m => {
+        const sourceUpper = (m.source || 'INBOUND').toUpperCase();
+        return selectedSources.some(s => sourceUpper.includes(s));
+      });
+    }
+
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -72,7 +84,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
     }
 
     return allMQLs;
-  }, [mqlDetails, selectedProduct, selectedRegion, selectedStatus, selectedLeadTypes, searchTerm]);
+  }, [mqlDetails, selectedProduct, selectedRegion, selectedStatus, selectedLeadTypes, selectedSources, searchTerm]);
 
   // Sorting
   const { sortedData, handleSort, getSortDirection } = useSortableTable(
@@ -225,6 +237,27 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
             <option value="REVERTED">Reverted/DQ</option>
             <option value="STALLED">Stalled (30d+)</option>
           </select>
+        </div>
+        <div className="filter-group source-filter">
+          <label>Source:</label>
+          <div className="source-pills">
+            {ALL_SOURCES.map((src) => (
+              <button
+                key={src}
+                className={`source-pill ${selectedSources.includes(src) ? 'active' : ''}`}
+                onClick={() => {
+                  setCurrentPage(1);
+                  setSelectedSources(prev =>
+                    prev.includes(src)
+                      ? prev.filter(s => s !== src)
+                      : [...prev, src]
+                  );
+                }}
+              >
+                {src}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="filter-group search">
           <label>Search:</label>
@@ -504,6 +537,36 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         }
         .filter-group.search input {
           width: 180px;
+        }
+        .filter-group.source-filter {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .source-pills {
+          display: flex;
+          gap: 3px;
+          flex-wrap: wrap;
+        }
+        .source-pill {
+          font-size: 0.6rem;
+          padding: 2px 6px;
+          border: 1px solid var(--border-primary);
+          border-radius: 10px;
+          background: var(--bg-secondary);
+          color: var(--text-tertiary);
+          cursor: pointer;
+          transition: all 0.15s;
+          font-weight: 500;
+        }
+        .source-pill:hover {
+          background: var(--bg-hover);
+          border-color: #3b82f6;
+        }
+        .source-pill.active {
+          background: #3b82f6;
+          color: white;
+          border-color: #3b82f6;
         }
         .mql-table-container {
           overflow-x: auto;

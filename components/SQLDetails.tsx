@@ -8,6 +8,9 @@ import RegionBadge from './RegionBadge';
 
 const ITEMS_PER_PAGE = 25;
 
+type SourceType = 'INBOUND' | 'OUTBOUND' | 'AE SOURCED' | 'AM SOURCED' | 'TRADESHOW' | 'EXPANSION' | 'ORGANIC' | 'PAID';
+const ALL_SOURCES: SourceType[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'EXPANSION', 'ORGANIC', 'PAID'];
+
 interface SQLDetailsProps {
   sqlDetails: {
     POR: SQLDetailRow[];
@@ -19,6 +22,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | 'ALL'>('ALL');
   const [selectedRegion, setSelectedRegion] = useState<Region | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [selectedSources, setSelectedSources] = useState<SourceType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -43,6 +47,14 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
       allSQLs = allSQLs.filter(s => s.sql_status === selectedStatus);
     }
 
+    // Apply source filter (multi-select)
+    if (selectedSources.length > 0) {
+      allSQLs = allSQLs.filter(s => {
+        const sourceUpper = (s.source || 'INBOUND').toUpperCase();
+        return selectedSources.some(src => sourceUpper.includes(src));
+      });
+    }
+
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -56,7 +68,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
     }
 
     return allSQLs;
-  }, [sqlDetails, selectedProduct, selectedRegion, selectedStatus, searchTerm]);
+  }, [sqlDetails, selectedProduct, selectedRegion, selectedStatus, selectedSources, searchTerm]);
 
   // Setup sorting
   const { sortedData, handleSort, getSortDirection } = useSortableTable(
@@ -202,6 +214,27 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
             <option value="LOST">Lost</option>
             <option value="STALLED">Stalled</option>
           </select>
+        </div>
+        <div className="filter-group source-filter">
+          <label>Source:</label>
+          <div className="source-pills">
+            {ALL_SOURCES.map((src) => (
+              <button
+                key={src}
+                className={`source-pill ${selectedSources.includes(src) ? 'active' : ''}`}
+                onClick={() => {
+                  setCurrentPage(1);
+                  setSelectedSources(prev =>
+                    prev.includes(src)
+                      ? prev.filter(s => s !== src)
+                      : [...prev, src]
+                  );
+                }}
+              >
+                {src}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="filter-group search">
           <label>Search:</label>
@@ -477,6 +510,36 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
         }
         .filter-group.search input {
           width: 220px;
+        }
+        .filter-group.source-filter {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .source-pills {
+          display: flex;
+          gap: 3px;
+          flex-wrap: wrap;
+        }
+        .source-pill {
+          font-size: 0.6rem;
+          padding: 2px 6px;
+          border: 1px solid var(--border-primary);
+          border-radius: 10px;
+          background: var(--bg-secondary);
+          color: var(--text-tertiary);
+          cursor: pointer;
+          transition: all 0.15s;
+          font-weight: 500;
+        }
+        .source-pill:hover {
+          background: var(--bg-hover);
+          border-color: #3b82f6;
+        }
+        .source-pill.active {
+          background: #3b82f6;
+          color: white;
+          border-color: #3b82f6;
         }
         .sql-table-container {
           overflow-x: auto;
