@@ -1620,13 +1620,13 @@ async function getSQLDetails(filters: ReportFilters) {
         CAST(ob.CaptureDate AS STRING) AS sql_date,
         CAST(NULL AS STRING) AS mql_date,
         0 AS days_mql_to_sql,
-        CASE WHEN ob.SAL = 'true' THEN 'Yes' ELSE 'No' END AS converted_to_sal,
-        CASE WHEN ob.SQO = 'true' THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        CASE WHEN ob.SAL IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
+        CASE WHEN ob.SQO IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
         CASE WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
-          WHEN ob.Won = 'true' THEN 'WON'
-          WHEN ob.SQO = 'true' THEN 'CONVERTED_SQO'
-          WHEN ob.SAL = 'true' THEN 'CONVERTED_SAL'
+          WHEN ob.Won IS NOT NULL THEN 'WON'
+          WHEN ob.SQO IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN ob.SAL IS NOT NULL THEN 'CONVERTED_SAL'
           WHEN DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
@@ -1639,7 +1639,7 @@ async function getSQLDetails(filters: ReportFilters) {
         ROW_NUMBER() OVER (PARTITION BY COALESCE(ob.OpportunityID, ob.Company) ORDER BY ob.CaptureDate DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.OutboundFunnel\` ob
       WHERE ob.Division IN ('US', 'UK', 'AU')
-        AND ob.SQL = 'true'
+        AND ob.SQL IS NOT NULL
         AND ob.CaptureDate >= '${filters.startDate}'
         AND ob.CaptureDate <= '${filters.endDate}'
         ${regionClause.replace(/Division/g, 'ob.Division')}
@@ -2088,11 +2088,11 @@ async function getSALDetails(filters: ReportFilters) {
         CAST(NULL AS STRING) AS sql_date,
         CAST(NULL AS STRING) AS mql_date,
         0 AS days_sql_to_sal,
-        CASE WHEN ob.SQO = 'true' THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        CASE WHEN ob.SQO IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
         CASE WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
-          WHEN ob.Won = 'true' THEN 'WON'
-          WHEN ob.SQO = 'true' THEN 'CONVERTED_SQO'
+          WHEN ob.Won IS NOT NULL THEN 'WON'
+          WHEN ob.SQO IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sal_status,
@@ -2110,7 +2110,7 @@ async function getSALDetails(filters: ReportFilters) {
         ROW_NUMBER() OVER (PARTITION BY COALESCE(ob.OpportunityID, ob.Company) ORDER BY ob.CaptureDate DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.OutboundFunnel\` ob
       WHERE ob.Division IN ('US', 'UK', 'AU')
-        AND ob.SAL = 'true'
+        AND ob.SAL IS NOT NULL
         AND ob.CaptureDate >= '${filters.startDate}'
         AND ob.CaptureDate <= '${filters.endDate}'
         ${regionClause.replace(/f\.Division/g, 'ob.Division')}
@@ -2378,7 +2378,7 @@ async function getSQODetails(filters: ReportFilters) {
         0 AS days_sal_to_sqo,
         DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) AS days_total_cycle,
         CASE
-          WHEN ob.Won = 'true' THEN 'WON'
+          WHEN ob.Won IS NOT NULL THEN 'WON'
           WHEN DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) > 60 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
@@ -2396,7 +2396,7 @@ async function getSQODetails(filters: ReportFilters) {
         ROW_NUMBER() OVER (PARTITION BY COALESCE(ob.OpportunityID, ob.Company) ORDER BY ob.CaptureDate DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.OutboundFunnel\` ob
       WHERE ob.Division IN ('US', 'UK', 'AU')
-        AND ob.SQO = 'true'
+        AND ob.SQO IS NOT NULL
         AND ob.CaptureDate >= '${filters.startDate}'
         AND ob.CaptureDate <= '${filters.endDate}'
         ${regionClause.replace(/f\.Division/g, 'ob.Division')}
