@@ -84,9 +84,10 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
       deals = deals.filter(d => d.product === productFilter);
     }
 
-    // Filter by source
+    // Filter by source (case-insensitive to handle data inconsistencies)
     if (sourceFilter !== 'ALL') {
-      deals = deals.filter(d => d.source === sourceFilter);
+      const normalizedFilter = sourceFilter.toUpperCase();
+      deals = deals.filter(d => d.source?.toUpperCase() === normalizedFilter);
     }
 
     // Filter by deal type
