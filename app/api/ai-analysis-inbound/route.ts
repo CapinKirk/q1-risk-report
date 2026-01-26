@@ -333,10 +333,12 @@ ${includeR360 ? '**R360 NOTE**: R360 does NOT have a SAL stage. R360 flows direc
 
 ## REQUIRED OUTPUT SECTIONS
 
-### 1. EXECUTIVE SUMMARY (3-4 sentences)
-- Overall inbound health: on-track, at-risk, or failing
-- Lead volume pacing vs plan (MQL generation rate)
-- Biggest single inbound risk with dollar impact
+### 1. EXECUTIVE SUMMARY (4 bullet points - NOT a paragraph)
+FORMAT: Use 4 SHORT bullet points, one per line:
+- **Overall Status**: Inbound is [on-track/at-risk/behind] with [X]% QTD pacing ([GREEN/YELLOW/RED])
+- **Key Numbers**: [X] QTD MQLs vs [Y] target, [X]% MQL→SQO conversion
+- **Biggest Risk**: [Channel/Campaign] at [X]% efficiency ([COLOR])
+- **Action Needed**: [One sentence on priority action]
 ${includePOR && includeR360 ? '- Product divergence summary (POR vs R360 inbound performance)' : `- Regional performance summary for ${includePOR ? 'POR' : 'R360'} inbound`}
 
 ### 2. LEAD VOLUME & PACING ANALYSIS
@@ -461,7 +463,7 @@ VALIDATION: Count the asterisks. There must be exactly 2 at the start (after "- 
   - Top-level bullet: "- **Bold Label:** key insight or finding"
   - Sub-bullets (REQUIRED): "  - supporting metric, data point, or implication" (indent with 2 spaces)
   - Each top-level bullet MUST have 1-3 sub-bullets with specific data
-- Section 1 (Executive Summary): 3-4 complete sentences, no bullets
+- Section 1 (Executive Summary): 4 SHORT bullet points (Overall Status, Key Numbers, Biggest Risk, Action Needed) - NOT a paragraph
 - Section 10 (Recommendations): BOLD flat bullets starting with "- **P[1-3] – Recommend..." and ending with "**"
 - **STRUCTURE FOR SECTIONS 2-9 (multi-level bullets with sub-bullets):**
   - Top-level bullet: "- **[Label from data]:** [key insight with specific metric]"
@@ -802,9 +804,9 @@ OUTPUT FORMAT (STRICT - READ CAREFULLY):
 - Do NOT use #### sub-headers - instead, include region names in bullet labels (e.g., "- **AMER MQL Gap:** ..." not "#### AMER" followed by bullets)
 
 **CRITICAL MULTI-LEVEL BULLET REQUIREMENT:**
-- Section 1 (Executive Summary): 3-4 complete sentences in paragraph form
+- Section 1 (Executive Summary): 4 SHORT bullet points (Overall Status, Key Numbers, Biggest Risk, Action Needed)
 - Sections 2-9: MUST use multi-level bullets with indented sub-bullets
-- Section 10 (Recommendations): Flat bullets starting with "- P[1-3] –"
+- Section 10 (Recommendations): BOLD flat bullets starting with "- **P[1-3] –"
 
 **FOR SECTIONS 2-9, EVERY BULLET MUST HAVE SUB-BULLETS:**
 - Top-level: "- **Bold Label:** key insight or finding"

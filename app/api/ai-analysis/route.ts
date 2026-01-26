@@ -641,7 +641,11 @@ VALIDATION: Count the asterisks. There must be exactly 2 at the start (after "- 
   - Top-level bullet: "- **Bold Label:** key insight or finding"
   - Sub-bullets (REQUIRED): "  - supporting metric, data point, or implication" (indent with 2 spaces)
   - Each top-level bullet MUST have 1-3 sub-bullets with specific data
-- Section 1 (Executive Summary): 3-4 complete sentences, no bullets
+- Section 1 (Executive Summary): Use 4 SHORT bullet points, one per line:
+  - **Overall Status**: [Product Region] is [on-track/at-risk/behind] with [X]% QTD attainment ([GREEN/YELLOW/RED])
+  - **Key Numbers**: $X QTD actual vs $Y QTD target, QTD gap: $Z
+  - **Biggest Risk**: [Segment] at [X]% QTD attainment ([COLOR])
+  - **Action Needed**: [One sentence on priority action]
 - Section 10 (Recommendations): BOLD flat bullets starting with "- **P[1-3] – Recommend..." and ending with "**"
 - **STRUCTURE FOR SECTIONS 2-9 (multi-level bullets with sub-bullets):**
   - Top-level bullet: "- **[Label from data]:** [key insight with specific metric]"
@@ -966,7 +970,7 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 5. **USE PRE-COMPUTED TOTALS FOR EXECUTIVE SUMMARY**: When a region filter is applied (e.g., AMER only), the Executive Summary MUST use values from "PRE-COMPUTED PRODUCT-REGION TOTALS" section. For example, for "R360 AMER" filter, use "R360 AMER Total" values ONLY - do NOT use general "R360 Performance" values which include all regions. The Executive Summary QTD Actual, QTD Target, and Attainment MUST match the filtered product-region total EXACTLY.
 6. **DO NOT MIX FILTERED AND UNFILTERED DATA**: When analyzing a specific region (e.g., AMER), NEVER cite numbers from unfiltered "Product Performance" sections. Only use data from the PRE-COMPUTED PRODUCT-REGION TOTALS and the Regional Segment Detail sections that match the filter.
 7. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
-8. RAG status meanings: GREEN (>80%), YELLOW (50-80%), RED (<50%) - call these out explicitly for EVERY region/product combo
+8. COLOR CODING: Use simple color words only: GREEN (>=100% attainment), YELLOW (70-99%), RED (<70%). Write "(GREEN)" or "(YELLOW)" or "(RED)" after each attainment %. NEVER write "HIGH>RED" or "MEDIUM>YELLOW" - just the color word.
 9. For channel analysis: ALWAYS rank by dollar gap, ALWAYS identify RED channels by name, explain WHY each channel is underperforming
 10. NEVER say "no UTM data available", "insufficient data", or "underperforming channels not identified" - the UTM Source, UTM Keyword, Branded/Non-Branded, and Source Channel Attainment sections have COMPLETE data. USE THEM.
 11. Pipeline coverage: 3x+ = healthy, 2-3x = adequate, <2x = critical risk. Quantify the dollar risk.
@@ -1039,9 +1043,9 @@ OUTPUT FORMAT (STRICT - READ CAREFULLY):
 - Do NOT use #### sub-headers - instead, include region names in bullet labels (e.g., "- **AMER Coverage Risk:** ..." not "#### AMER" followed by bullets)
 
 **CRITICAL MULTI-LEVEL BULLET REQUIREMENT:**
-- Section 1 (Executive Summary): 3-4 complete sentences in paragraph form
+- Section 1 (Executive Summary): 4 SHORT bullet points (Overall Status, Key Numbers, Biggest Risk, Action Needed)
 - Sections 2-9: MUST use multi-level bullets with indented sub-bullets
-- Section 10 (Recommendations): Flat bullets starting with "- P[1-3] –"
+- Section 10 (Recommendations): BOLD flat bullets starting with "- **P[1-3] –"
 
 **FOR SECTIONS 2-9, EVERY BULLET MUST HAVE SUB-BULLETS:**
 - Top-level: "- **Bold Label:** key insight or finding"
