@@ -9,8 +9,8 @@ import RegionBadge from './RegionBadge';
 
 const ITEMS_PER_PAGE = 25;
 
-type SourceType = 'INBOUND' | 'OUTBOUND' | 'AE SOURCED' | 'AM SOURCED' | 'TRADESHOW' | 'EXPANSION' | 'ORGANIC' | 'PAID';
-const ALL_SOURCES: SourceType[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'EXPANSION', 'ORGANIC', 'PAID'];
+type SourceType = 'INBOUND' | 'OUTBOUND' | 'AE SOURCED' | 'AM SOURCED' | 'TRADESHOW' | 'PARTNERSHIPS';
+const ALL_SOURCES: SourceType[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];
 
 interface SQODetailsProps {
   sqoDetails: {
