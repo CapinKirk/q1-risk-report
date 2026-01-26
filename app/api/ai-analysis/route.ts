@@ -1106,27 +1106,22 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
 
     // Post-process to fix AI output issues
 
-    // Fix 1: RAG status format - aggressively replace ALL variations
-    // The AI sometimes outputs: HIGH">RED, HIGH>RED, severity: HIGH">RED, (HIGH">RED), etc.
+    // Fix 1: RAG status format - VERY aggressively replace ALL variations
+    // The AI outputs: HIGH">RED, HIGH>RED, (HIGH">RED), MEDIUM">YELLOW, etc.
+    // Strategy: Replace the ENTIRE "HIGH...RED" pattern with just "RED"
     rawAnalysis = rawAnalysis
-      // Pattern with any chars between (up to 5 to be safe)
-      .replace(/HIGH[^A-Za-z]{0,5}RED/gi, 'RED')
-      .replace(/MEDIUM[^A-Za-z]{0,5}YELLOW/gi, 'YELLOW')
-      .replace(/LOW[^A-Za-z]{0,5}GREEN/gi, 'GREEN')
-      // Cleanup: severity: RED -> just RED in parentheses
-      .replace(/severity:\s*RED/gi, 'RED')
-      .replace(/severity:\s*YELLOW/gi, 'YELLOW')
-      .replace(/severity:\s*GREEN/gi, 'GREEN')
-      // Final cleanup: any remaining broken patterns
-      .replace(/\(severity:\s*(RED|YELLOW|GREEN)\)/gi, '($1)')
-      .replace(/\(\s*(RED|YELLOW|GREEN)\s*,/gi, '($1,');
-
-    // Additional cleanup pass for any lingering issues
-    rawAnalysis = rawAnalysis
-      .replace(/HIGH["'`"">]+/gi, '')
-      .replace(/["'`"">]+RED/gi, 'RED')
-      .replace(/["'`"">]+YELLOW/gi, 'YELLOW')
-      .replace(/["'`"">]+GREEN/gi, 'GREEN');
+      // Most aggressive: match HIGH followed by ANY non-letter chars then RED/YELLOW/GREEN
+      .replace(/HIGH[^A-Za-z]*RED/gi, 'RED')
+      .replace(/MEDIUM[^A-Za-z]*YELLOW/gi, 'YELLOW')
+      .replace(/LOW[^A-Za-z]*GREEN/gi, 'GREEN')
+      // Handle edge cases with quotes/brackets around the color
+      .replace(/\(HIGH[^)]*RED[^)]*\)/gi, '(RED)')
+      .replace(/\(MEDIUM[^)]*YELLOW[^)]*\)/gi, '(YELLOW)')
+      .replace(/\(LOW[^)]*GREEN[^)]*\)/gi, '(GREEN)')
+      // Cleanup stray patterns
+      .replace(/severity:\s*(RED|YELLOW|GREEN)/gi, '$1')
+      .replace(/HIGH["'`"">»]+/gi, '')
+      .replace(/["'`"">»]+(RED|YELLOW|GREEN)/gi, '$1');
 
     // Fix 2: Remove "no data available" mentions for filtered regions
     // More aggressive patterns to catch all variations
@@ -1143,67 +1138,49 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
       .replace(/No (QTD )?data available\.?/gi, '')
       .replace(/\n\n\n+/g, '\n\n');
 
-    // Fix 3: Recommendation bold formatting - handle ** on its own line
-    // First, collapse ** that's alone on a line with the content
-    rawAnalysis = rawAnalysis.replace(/\*\*\s*\n(P[123])/g, '**$1');
-    rawAnalysis = rawAnalysis.replace(/(Timeframe:[^*\n]+\.?)\s*\n\*\*/g, '$1**');
+    // Fix 3: Recommendation bold formatting
+    // Problem: AI outputs ** on its own line, wrapping all recs in one bold block
+    // Solution: Remove standalone ** lines, then wrap each P1/P2/P3 line individually
 
-    // Find the recommendations section and reformat it
-    const recSectionMatch = rawAnalysis.match(/((?:10\.|PRIORITIZED RECOMMENDATIONS)[^\n]*\n)([\s\S]*?)(?=\n###|\n##|$)/i);
-    if (recSectionMatch) {
-      const header = recSectionMatch[1];
-      let content = recSectionMatch[2];
+    // Step 1: Remove ALL standalone ** lines (lines that are just ** with optional whitespace)
+    rawAnalysis = rawAnalysis.replace(/^\s*\*\*\s*$/gm, '');
 
-      // Check if this contains recommendations
-      if ((content.includes('P1') || content.includes('P2') || content.includes('P3')) &&
-          (content.includes('Owner:') || content.includes('Timeframe:'))) {
+    // Step 2: Remove ** that appears at the end of content lines (like "...Timeframe: Q1.**")
+    rawAnalysis = rawAnalysis.replace(/\*\*$/gm, '');
 
-        // Remove all asterisks first
-        content = content.replace(/\*/g, '');
+    // Step 3: Remove ** that appears at the start of content lines
+    rawAnalysis = rawAnalysis.replace(/^\*\*/gm, '');
 
-        // Split by P1/P2/P3 markers
-        const recs = content.split(/(?=P[123]\s*[–-])/).filter((r: string) => r.trim());
+    // Step 4: Clean up any remaining stray asterisks around recommendations
+    rawAnalysis = rawAnalysis.replace(/\*\*(P[123]\s*[–-])/g, '$1');
+    rawAnalysis = rawAnalysis.replace(/(Timeframe:[^.\n]*\.?)\*\*/g, '$1');
 
-        // Format each recommendation
-        const formattedRecs = recs.map((rec: string) => {
-          let cleaned = rec
-            .replace(/^[\s\-–]+/, '')  // Remove leading whitespace/dashes
-            .replace(/[\s\-–]+$/, '')  // Remove trailing whitespace/dashes
-            .trim();
-          if (!cleaned) return '';
-          if (!cleaned.endsWith('.')) cleaned += '.';
-          return `**${cleaned}**`;
-        }).filter((r: string) => r).join('\n');
-
-        // Replace the section
-        rawAnalysis = rawAnalysis.replace(recSectionMatch[0], header + formattedRecs);
-      }
-    }
-
-    // Fix 4: Handle any remaining individual recommendation lines
+    // Step 5: Now wrap each P1/P2/P3 recommendation line properly
     const lines = rawAnalysis.split('\n');
     const fixedLines = lines.map(line => {
-      // Skip lines that are just **
-      if (line.trim() === '**' || line.trim() === '') return null;
+      const trimmed = line.trim();
 
-      const hasP123 = line.includes('P1') || line.includes('P2') || line.includes('P3');
-      const hasMarkers = line.includes('Owner:') || line.includes('Timeframe:') ||
-                         line.toLowerCase().includes('expected impact');
+      // Skip empty lines
+      if (!trimmed) return line;
 
-      // Skip if already properly formatted
-      if (line.match(/^\*\*P[123]/) && line.endsWith('**')) {
-        return line;
-      }
+      // Check if this is a recommendation line (has P1/P2/P3 and Owner/Timeframe/expected impact)
+      const isRecLine = /^P[123]\s*[–-]/.test(trimmed) &&
+                        (trimmed.includes('Owner:') || trimmed.includes('Timeframe:') ||
+                         trimmed.toLowerCase().includes('expected impact'));
 
-      if (hasP123 && hasMarkers) {
-        let content = line.replace(/\*/g, '').trim();
-        content = content.replace(/^[\s\-–]+/, '').replace(/[\s\-–]+$/, '');
-        content = content.replace(/\.+$/, '') + '.';
+      if (isRecLine) {
+        // Remove any existing asterisks and rewrap properly
+        let content = trimmed.replace(/\*/g, '').trim();
+        if (!content.endsWith('.')) content += '.';
         return `**${content}**`;
       }
+
       return line;
-    }).filter((line): line is string => line !== null);
+    });
     rawAnalysis = fixedLines.join('\n');
+
+    // Step 6: Clean up multiple blank lines
+    rawAnalysis = rawAnalysis.replace(/\n{3,}/g, '\n\n');
 
     return NextResponse.json({
       success: true,
