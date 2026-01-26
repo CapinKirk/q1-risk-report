@@ -435,24 +435,23 @@ Provide 5-7 specific recommendations. Each recommendation MUST be a single dense
 - Expected quantified impact (e.g., "with expected savings of ~$8,000", "improving attainment by ~$2,000")
 - Owner and Timeframe at the end separated by semicolons
 
-FORMAT EACH RECOMMENDATION AS A BOLD BULLET - THIS IS MANDATORY:
+FORMAT EACH RECOMMENDATION - CRITICAL BOLD FORMATTING:
 
-CORRECT FORMAT (use this EXACTLY):
-- **P1 – Recommend pausing Search campaigns to address $4,955 QTD spend with 0 SQOs; expected impact: ~$5K savings; Owner: Paid Media; Timeframe: Immediate.**
-- **P2 – Recommend scaling branded keywords to expand 69% MQL→SQO efficiency; expected impact: +15 SQOs; Owner: Growth Marketing; Timeframe: Q1.**
+Each recommendation MUST be formatted EXACTLY like this (copy this pattern):
+- **P1 – Recommend [action]; expected impact: [impact]; Owner: [owner]; Timeframe: [time].**
 
-WRONG FORMAT (DO NOT USE - single asterisks make italic, not bold):
-- *P1 – Recommend...*  ← WRONG! This is italic, not bold
-- P1 – Recommend...    ← WRONG! No formatting at all
+Character-by-character: dash SPACE asterisk asterisk P 1 SPACE ... period asterisk asterisk
 
-EVERY recommendation line MUST:
-1. Start with "- **P" (dash, space, double-asterisk, P)
-2. End with ".**" (period, double-asterisk)
-3. Use DOUBLE asterisks (**) not single asterisks (*)
-4. Reference SPECIFIC numbers from the data
-5. Be on its own line
+EXAMPLES OF CORRECT OUTPUT:
+- **P1 – Recommend pausing Search campaigns; expected impact: ~$5K savings; Owner: Paid Media; Timeframe: Immediate.**
+- **P2 – Recommend scaling branded keywords; expected impact: +15 SQOs; Owner: Growth Marketing; Timeframe: Q1.**
 
-If you output *P1* with single asterisks, the formatting is BROKEN. Always use **P1** with DOUBLE asterisks.
+DO NOT OUTPUT ANY OF THESE WRONG FORMATS:
+- *P1 – ...* (WRONG - single asterisks = italic)
+- *P1 – ...** (WRONG - mismatched asterisks)
+- P1 – ... (WRONG - no formatting)
+
+VALIDATION: Count the asterisks. There must be exactly 2 at the start (after "- ") and exactly 2 at the end (before newline).
 
 ---
 
@@ -748,7 +747,8 @@ ${topConvertingUtmR360.map((s: any) => `- ${s.name}: ${s.convRate}% MQL→SQL, $
 20. CAMPAIGN EFFICIENCY: When campaign-level spend data is available, you MUST analyze conversion variances BETWEEN campaigns (not just overall rates). Compare each campaign's MQL→SQL→SQO funnel individually. Rank by cost-per-SQO, NOT cost-per-MQL.
 21. BUDGET OPTIMIZATION: Identify campaigns where spend share >> SQO share as wasteful. Recommend specific dollar amounts to reallocate.
 22. Do NOT output "---" horizontal rules between sections.
-23. **QUARTER PROGRESS**: Use EXACTLY ${quarterPctComplete}% as the quarter progress benchmark - do NOT change this number.
+23. **DO NOT MENTION QUARTER PROGRESS**: NEVER compare attainment/pacing to quarter progress percentage. NEVER say "at X% quarter progress" or "vs Y% benchmark". Only show QTD attainment or pacing (actual/target). The quarter progress is ${quarterPctComplete}% but do NOT include this in your analysis output.
+24. **ATTAINMENT COLOR CODING**: >=100% = GREEN, 70-99% = YELLOW, <70% = RED. Apply this color coding to every attainment percentage mentioned.
 
 REMEMBER: Your output MUST exceed 7000 characters. Write in full detail for every section. Short responses will be rejected and regenerated.`;
 

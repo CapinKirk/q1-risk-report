@@ -615,24 +615,23 @@ Provide 5-7 specific recommendations. Each recommendation MUST be a single dense
 - Expected quantified impact (e.g., "recovering ~$50K in bookings", "improving pacing by 15 points")
 - Owner and Timeframe at the end separated by semicolons
 
-FORMAT EACH RECOMMENDATION AS A BOLD BULLET - THIS IS MANDATORY:
+FORMAT EACH RECOMMENDATION - CRITICAL BOLD FORMATTING:
 
-CORRECT FORMAT (use this EXACTLY):
-- **P1 – Recommend reallocating AE Sourced focus to close the $58K gap at 28% attainment; expected impact: ~$30K incremental bookings; Owner: Sales Leadership; Timeframe: Q1.**
-- **P2 – Recommend scaling high-intent branded keywords with 100% MQL→SQO conversion; expected impact: +$25K pipeline; Owner: Marketing; Timeframe: Immediate.**
+Each recommendation MUST be formatted EXACTLY like this (copy this pattern):
+- **P1 – Recommend [action]; expected impact: [impact]; Owner: [owner]; Timeframe: [time].**
 
-WRONG FORMAT (DO NOT USE - single asterisks make italic, not bold):
-- *P1 – Recommend...*  ← WRONG! This is italic, not bold
-- P1 – Recommend...    ← WRONG! No formatting at all
+Character-by-character: dash SPACE asterisk asterisk P 1 SPACE ... period asterisk asterisk
 
-EVERY recommendation line MUST:
-1. Start with "- **P" (dash, space, double-asterisk, P)
-2. End with ".**" (period, double-asterisk)
-3. Use DOUBLE asterisks (**) not single asterisks (*)
-4. Reference SPECIFIC numbers from the data
-5. Be on its own line
+EXAMPLES OF CORRECT OUTPUT:
+- **P1 – Recommend reallocating AE focus to close $58K gap; expected impact: ~$30K bookings; Owner: Sales Leadership; Timeframe: Q1.**
+- **P2 – Recommend scaling branded keywords; expected impact: +$25K pipeline; Owner: Marketing; Timeframe: Immediate.**
 
-If you output *P1* with single asterisks, the formatting is BROKEN. Always use **P1** with DOUBLE asterisks.
+DO NOT OUTPUT ANY OF THESE WRONG FORMATS:
+- *P1 – ...* (WRONG - single asterisks = italic)
+- *P1 – ...** (WRONG - mismatched asterisks)
+- P1 – ... (WRONG - no formatting)
+
+VALIDATION: Count the asterisks. There must be exactly 2 at the start (after "- ") and exactly 2 at the end (before newline).
 
 ---
 
@@ -656,12 +655,13 @@ If you output *P1* with single asterisks, the formatting is BROKEN. Always use *
 
 ## METRIC FORMATTING RULES (CRITICAL)
 - **EVERY metric MUST include both actual and target values** for context. Format as: "$X QTD actual vs $Y QTD target" or "X% QTD attainment"
-- **Always include QTD attainment percentage** after dollar amounts: "$141K QTD actual vs $252K QTD target (56% QTD attainment)"
+- **Always include QTD attainment percentage** after dollar amounts: "$97K QTD actual vs $215K QTD target (45% QTD attainment)"
 - **Always include QTD gap** when showing variance: "QTD gap: -$110K" or "QTD gap: +$15K"
 - **For pipeline metrics**: Include coverage ratio: "2.5x QTD coverage" with health indicator
 - **For funnel metrics**: Show actual/target with pacing: "45 QTD MQLs vs 83 QTD target (54% QTD pacing)"
-- **RAG status format**: Always show as "RAG HIGH">RED" or "RAG MEDIUM">YELLOW" or "RAG LOW">GREEN"
-- **Attainment thresholds**: <70% = RED/HIGH risk, 70-99% = YELLOW/MEDIUM risk, >=100% = GREEN/LOW risk
+- **RAG status format**: Use simple "RED", "YELLOW", or "GREEN" labels only. Do NOT use complex formats like "RAG HIGH>RED".
+- **Attainment COLOR CODING**: >=100% = GREEN, 70-99% = YELLOW, <70% = RED. Color code every attainment percentage.
+- **NEVER compare attainment to quarter progress %** - ONLY show QTD attainment (actual vs QTD target). Do NOT say "at 28% quarter progress" or "vs 27.8% benchmark". Just show the attainment %.
 - **NEVER show a metric without its QTD target or attainment context** - readers must know if the number is good or bad
 
 **REMINDER: Every bullet in sections 2-9 needs sub-bullets. If you write a flat bullet list without indented sub-bullets, the output is INVALID.**
@@ -981,7 +981,7 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 20. In Win/Loss Patterns, analyze EACH loss reason category with dollar amounts and suggest specific countermeasures
 21. In Predictive Indicators, provide SPECIFIC projected Q1 close amounts by category and region based on current run rates
 22. Do NOT output "---" horizontal rules between sections. Section headers provide separation.
-23. **QUARTER PROGRESS**: Use EXACTLY ${period?.quarter_pct_complete || 0}% as the quarter progress benchmark - do NOT change this number.
+23. **DO NOT MENTION QUARTER PROGRESS**: NEVER compare attainment to quarter progress percentage. NEVER say "at X% quarter progress" or "vs Y% benchmark". Only show QTD attainment (actual/target). The quarter progress is ${period?.quarter_pct_complete || 0}% but do NOT include this in your analysis output.
 
 REMEMBER: Your output MUST exceed 7000 characters. Write in full detail for every section. Short responses will be rejected and regenerated.`;
 
