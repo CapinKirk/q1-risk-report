@@ -717,14 +717,14 @@ ${includeR360 && activeRegions.includes('APAC') ? `### R360 APAC Total
 - QTD Gap: $${r360ApacTotal.gap.toLocaleString()}
 - Pipeline Coverage: ${r360ApacTotal.coverage}x` : ''}
 
-${includePOR ? `## POR Performance
+${includePOR && activeRegions.length === 3 ? `## POR Performance (All Regions)
 - Q1 Target: $${(porTotal.total_q1_target || 0).toLocaleString()}
 - QTD Actual: $${(porTotal.total_qtd_acv || 0).toLocaleString()}
 - Attainment: ${porTotal.total_qtd_attainment_pct || 0}%
 - Pipeline Coverage: ${porTotal.total_pipeline_coverage_x || 0}x
 - Lost Deals: ${porTotal.total_lost_deals || 0} worth $${(porTotal.total_lost_acv || 0).toLocaleString()}` : ''}
 
-${includeR360 ? `## R360 Performance
+${includeR360 && activeRegions.length === 3 ? `## R360 Performance (All Regions)
 - Q1 Target: $${(r360Total.total_q1_target || 0).toLocaleString()}
 - QTD Actual: $${(r360Total.total_qtd_acv || 0).toLocaleString()}
 - Attainment: ${r360Total.total_qtd_attainment_pct || 0}%
@@ -949,7 +949,8 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 2. **ZERO TOLERANCE FOR FABRICATED NUMBERS**: You MUST use ONLY the exact numbers provided in the data sections above. NEVER calculate, derive, estimate, or round numbers yourself. If you output a number that differs from what's in the data context, the ENTIRE response will be rejected.
 3. **NEVER CALCULATE QTD TARGETS**: The QTD Target values are PRE-COMPUTED and provided directly. DO NOT derive QTD targets by multiplying Q1 targets by quarter percentage. Use ONLY the "QTD Target" values shown in each data row. This is CRITICAL - calculating your own QTD targets will produce WRONG numbers.
 4. ALL METRICS MUST BE EXPLICITLY QTD: Every attainment %, variance %, dollar amount, and count MUST be labeled as QTD. Examples: "QTD attainment: 56%", "$141K QTD actual", "QTD gap: -$110K", "12 QTD deals". NEVER show a metric without the QTD prefix/suffix.
-6. **USE PRE-COMPUTED TOTALS**: For product-region totals (e.g., "R360 AMER total"), use the values from "PRE-COMPUTED PRODUCT-REGION TOTALS" section EXACTLY. Do NOT add up segment rows yourself. Do NOT calculate totals by summing.
+5. **USE PRE-COMPUTED TOTALS FOR EXECUTIVE SUMMARY**: When a region filter is applied (e.g., AMER only), the Executive Summary MUST use values from "PRE-COMPUTED PRODUCT-REGION TOTALS" section. For example, for "R360 AMER" filter, use "R360 AMER Total" values ONLY - do NOT use general "R360 Performance" values which include all regions. The Executive Summary QTD Actual, QTD Target, and Attainment MUST match the filtered product-region total EXACTLY.
+6. **DO NOT MIX FILTERED AND UNFILTERED DATA**: When analyzing a specific region (e.g., AMER), NEVER cite numbers from unfiltered "Product Performance" sections. Only use data from the PRE-COMPUTED PRODUCT-REGION TOTALS and the Regional Segment Detail sections that match the filter.
 7. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
 8. RAG status meanings: GREEN (>80%), YELLOW (50-80%), RED (<50%) - call these out explicitly for EVERY region/product combo
 9. For channel analysis: ALWAYS rank by dollar gap, ALWAYS identify RED channels by name, explain WHY each channel is underperforming
