@@ -1599,10 +1599,54 @@ async function getSQLDetails(filters: ReportFilters) {
         AND CAST(f.SQL_DT AS DATE) >= '${filters.startDate}'
         AND CAST(f.SQL_DT AS DATE) <= '${filters.endDate}'
         ${regionClause.replace(/Division/g, 'f.Division')}
+    ),
+    -- OUTBOUND funnel records that have reached SQL stage
+    outbound_sqls AS (
+      SELECT
+        'POR' AS product,
+        CASE ob.Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        COALESCE(ob.OpportunityID, CAST(ob.CaptureDate AS STRING)) AS record_id,
+        CASE
+          WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', ob.OpportunityID)
+          ELSE 'https://por.my.salesforce.com/'
+        END AS salesforce_url,
+        COALESCE(ob.Company, 'Unknown') AS company_name,
+        'N/A' AS email,
+        'OUTBOUND' AS source,
+        CAST(ob.CaptureDate AS STRING) AS sql_date,
+        CAST(NULL AS STRING) AS mql_date,
+        0 AS days_mql_to_sql,
+        CASE WHEN ob.SAL = 'true' THEN 'Yes' ELSE 'No' END AS converted_to_sal,
+        CASE WHEN ob.SQO = 'true' THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        CASE WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        CASE
+          WHEN ob.Won = 'true' THEN 'WON'
+          WHEN ob.SQO = 'true' THEN 'CONVERTED_SQO'
+          WHEN ob.SAL = 'true' THEN 'CONVERTED_SAL'
+          WHEN DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) > 45 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sql_status,
+        ob.OpportunityID AS opportunity_id,
+        ob.OpportunityName AS opportunity_name,
+        CAST(NULL AS STRING) AS opportunity_stage,
+        ob.WonACV AS opportunity_acv,
+        'N/A' AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) AS days_in_stage,
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(ob.OpportunityID, ob.Company) ORDER BY ob.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.OutboundFunnel\` ob
+      WHERE ob.Division IN ('US', 'UK', 'AU')
+        AND ob.SQL = 'true'
+        AND ob.CaptureDate >= '${filters.startDate}'
+        AND ob.CaptureDate <= '${filters.endDate}'
+        ${regionClause.replace(/Division/g, 'ob.Division')}
     )
-    SELECT * EXCEPT(rn)
-    FROM ranked_sqls
-    WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM ranked_sqls WHERE rn = 1
+    UNION ALL
+    SELECT * EXCEPT(rn) FROM outbound_sqls WHERE rn = 1
     ORDER BY sql_date DESC
   `;
 

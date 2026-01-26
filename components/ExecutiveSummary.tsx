@@ -32,14 +32,6 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
   const hasPOR = attainment_detail.POR.length > 0;
   const hasR360 = attainment_detail.R360.length > 0;
 
-  // Calculate hits and misses
-  const allAttainment = [
-    ...attainment_detail.POR.map(a => ({ ...a, product: 'POR' as const })),
-    ...attainment_detail.R360.map(a => ({ ...a, product: 'R360' as const }))
-  ];
-  const hits = allAttainment.filter(a => a.rag_status === 'GREEN');
-  const misses = allAttainment.filter(a => a.rag_status === 'RED' || a.rag_status === 'YELLOW');
-
   const qtdAtt = grand_total.total_qtd_attainment_pct || 0;
   const cov = grand_total.total_pipeline_coverage_x || 0;
 
@@ -273,12 +265,6 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
                     : <span style={{ color: getAttainmentColor(r360?.total_win_rate_pct), fontWeight: 600 }}>{formatPercent(r360?.total_win_rate_pct)}</span>}
               </td>
             )}
-          </tr>
-          <tr>
-            <td>Hits / Misses</td>
-            <td className="right" colSpan={1 + (hasPOR ? 1 : 0) + (hasR360 ? 1 : 0)}>
-              <strong>{hits.length}</strong> on track / <strong>{misses.length}</strong> need attention
-            </td>
           </tr>
         </tbody>
       </table>
