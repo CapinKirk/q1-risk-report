@@ -652,108 +652,6 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
   }, [categoryData, selectedProducts, selectedRegions, selectedCategories, availableProducts]);
 
   // Calculate totals
-  const categoryTotals = useMemo(() => {
-    const total = aggregatedData.reduce((acc, row) => ({
-      mqlActual: acc.mqlActual + row.mqlActual,
-      mqlTarget: acc.mqlTarget + row.mqlTarget,
-      sqlActual: acc.sqlActual + row.sqlActual,
-      sqlTarget: acc.sqlTarget + row.sqlTarget,
-      salActual: acc.salActual + row.salActual,
-      salTarget: acc.salTarget + row.salTarget,
-      sqoActual: acc.sqoActual + row.sqoActual,
-      sqoTarget: acc.sqoTarget + row.sqoTarget,
-    }), {
-      mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
-      salActual: 0, salTarget: 0, sqoActual: 0, sqoTarget: 0,
-    });
-
-    const mqlPacingPct = total.mqlTarget > 0 ? Math.round((total.mqlActual / total.mqlTarget) * 100) : 100;
-    const sqlPacingPct = total.sqlTarget > 0 ? Math.round((total.sqlActual / total.sqlTarget) * 100) : 100;
-    const salPacingPct = total.salTarget > 0 ? Math.round((total.salActual / total.salTarget) * 100) : 100;
-    const sqoPacingPct = total.sqoTarget > 0 ? Math.round((total.sqoActual / total.sqoTarget) * 100) : 100;
-
-    // Use R360 weights if R360 is the only EFFECTIVE product (selected AND available)
-    const effectiveProducts = selectedProducts.filter(p => availableProducts.includes(p));
-    const effectiveProduct: Product = effectiveProducts.length === 1 && effectiveProducts[0] === 'R360' ? 'R360' : 'POR';
-    return {
-      ...total,
-      mqlPacingPct,
-      sqlPacingPct,
-      salPacingPct,
-      sqoPacingPct,
-      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
-        { mql: total.mqlTarget, sql: total.sqlTarget, sal: total.salTarget, sqo: total.sqoTarget }),
-    };
-  }, [aggregatedData, selectedProducts, availableProducts]);
-
-  const sourceTotals = useMemo(() => {
-    const total = sourceAggregatedData.reduce((acc, row) => ({
-      mqlActual: acc.mqlActual + row.mqlActual,
-      mqlTarget: acc.mqlTarget + row.mqlTarget,
-      sqlActual: acc.sqlActual + row.sqlActual,
-      sqlTarget: acc.sqlTarget + row.sqlTarget,
-      salActual: acc.salActual + row.salActual,
-      salTarget: acc.salTarget + row.salTarget,
-      sqoActual: acc.sqoActual + row.sqoActual,
-      sqoTarget: acc.sqoTarget + row.sqoTarget,
-    }), {
-      mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
-      salActual: 0, salTarget: 0, sqoActual: 0, sqoTarget: 0,
-    });
-
-    const mqlPacingPct = total.mqlTarget > 0 ? Math.round((total.mqlActual / total.mqlTarget) * 100) : 100;
-    const sqlPacingPct = total.sqlTarget > 0 ? Math.round((total.sqlActual / total.sqlTarget) * 100) : 100;
-    const salPacingPct = total.salTarget > 0 ? Math.round((total.salActual / total.salTarget) * 100) : 100;
-    const sqoPacingPct = total.sqoTarget > 0 ? Math.round((total.sqoActual / total.sqoTarget) * 100) : 100;
-
-    // Use R360 weights if R360 is the only EFFECTIVE product (selected AND available)
-    const effectiveProducts = selectedProducts.filter(p => availableProducts.includes(p));
-    const effectiveProduct: Product = effectiveProducts.length === 1 && effectiveProducts[0] === 'R360' ? 'R360' : 'POR';
-    return {
-      ...total,
-      mqlPacingPct,
-      sqlPacingPct,
-      salPacingPct,
-      sqoPacingPct,
-      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
-        { mql: total.mqlTarget, sql: total.sqlTarget, sal: total.salTarget, sqo: total.sqoTarget }),
-    };
-  }, [sourceAggregatedData, selectedProducts, availableProducts]);
-
-  const regionTotals = useMemo(() => {
-    const total = regionAggregatedData.reduce((acc, row) => ({
-      mqlActual: acc.mqlActual + row.mqlActual,
-      mqlTarget: acc.mqlTarget + row.mqlTarget,
-      sqlActual: acc.sqlActual + row.sqlActual,
-      sqlTarget: acc.sqlTarget + row.sqlTarget,
-      salActual: acc.salActual + row.salActual,
-      salTarget: acc.salTarget + row.salTarget,
-      sqoActual: acc.sqoActual + row.sqoActual,
-      sqoTarget: acc.sqoTarget + row.sqoTarget,
-    }), {
-      mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
-      salActual: 0, salTarget: 0, sqoActual: 0, sqoTarget: 0,
-    });
-
-    const mqlPacingPct = total.mqlTarget > 0 ? Math.round((total.mqlActual / total.mqlTarget) * 100) : 100;
-    const sqlPacingPct = total.sqlTarget > 0 ? Math.round((total.sqlActual / total.sqlTarget) * 100) : 100;
-    const salPacingPct = total.salTarget > 0 ? Math.round((total.salActual / total.salTarget) * 100) : 100;
-    const sqoPacingPct = total.sqoTarget > 0 ? Math.round((total.sqoActual / total.sqoTarget) * 100) : 100;
-
-    // Use R360 weights if R360 is the only EFFECTIVE product (selected AND available)
-    const effectiveProducts = selectedProducts.filter(p => availableProducts.includes(p));
-    const effectiveProduct: Product = effectiveProducts.length === 1 && effectiveProducts[0] === 'R360' ? 'R360' : 'POR';
-    return {
-      ...total,
-      mqlPacingPct,
-      sqlPacingPct,
-      salPacingPct,
-      sqoPacingPct,
-      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
-        { mql: total.mqlTarget, sql: total.sqlTarget, sal: total.salTarget, sqo: total.sqoTarget }),
-    };
-  }, [regionAggregatedData, selectedProducts, availableProducts]);
-
   if (categoryData.length === 0 && unifiedData.length === 0) {
     return null;
   }
@@ -834,7 +732,6 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
 
   const renderTable = (
     data: Array<{ label: string; mqlActual: number; mqlTarget: number; mqlPacingPct: number; sqlActual: number; sqlTarget: number; sqlPacingPct: number; salActual: number; salTarget: number; salPacingPct: number; sqoActual: number; sqoTarget: number; sqoPacingPct: number; tofScore: number; category?: Category; leadStageLabel?: 'MQL' | 'EQL' }>,
-    totals: typeof categoryTotals,
     labelHeader: string,
     showLeadBadge = false,
     sortConfig: SortConfig | null = null,
@@ -909,12 +806,6 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
               </tr>
             ))}
           </tbody>
-          <tfoot>
-            <tr className="totals-row">
-              <td className="label-cell"><strong>TOTAL</strong></td>
-              {renderStageColumns(totals, true)}
-            </tr>
-          </tfoot>
         </table>
       </div>
     );
@@ -964,7 +855,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
             selected={selectedCategories}
             onChange={setSelectedCategories}
           />
-          {renderTable(aggregatedData, categoryTotals, 'Category', true, categorySortConfig, setCategorySortConfig)}
+          {renderTable(aggregatedData, 'Category', true, categorySortConfig, setCategorySortConfig)}
         </div>
 
         {availableSources.length > 0 && (
@@ -976,13 +867,13 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
               selected={selectedSources}
               onChange={setSelectedSources}
             />
-            {renderTable(sourceAggregatedData, sourceTotals, 'Source', false, sourceSortConfig, setSourceSortConfig)}
+            {renderTable(sourceAggregatedData, 'Source', false, sourceSortConfig, setSourceSortConfig)}
           </div>
         )}
 
         <div className="table-section">
           <h3 className="table-title">By Region</h3>
-          {renderTable(regionAggregatedData, regionTotals, 'Region', false, regionSortConfig, setRegionSortConfig)}
+          {renderTable(regionAggregatedData, 'Region', false, regionSortConfig, setRegionSortConfig)}
         </div>
       </div>
 
