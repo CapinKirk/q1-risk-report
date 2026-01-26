@@ -713,27 +713,28 @@ ${topConvertingUtmR360.map((s: any) => `- ${s.name}: ${s.convRate}% MQL→SQL, $
 
 ## CRITICAL RULES
 1. PRODUCE ALL 10 SECTIONS - do not skip any section. Each section must be DETAILED and COMPREHENSIVE.
-2. Use SPECIFIC numbers and percentages from the data - never generalize. Every paragraph needs at least 2 data points.
-3. ALL METRICS MUST BE EXPLICITLY QTD: Every attainment %, variance %, dollar amount, and count MUST be labeled as QTD. Examples: "QTD MQL pacing: 85%", "$12K QTD spend", "QTD gap: -41 MQLs", "15 QTD conversions". NEVER show a metric without the QTD prefix/suffix - unlabeled metrics are confusing and will be rejected.
-3. Reference the pre-computed insights above to ensure accuracy
-4. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
-5. R360 has NO SAL stage - flows directly from SQL to SQO. Explain this difference in funnel analysis.
-6. Conversion thresholds: MQL→SQL 30%, SQL→SAL 50% (POR), SAL→SQO 60% (POR), SQL→SQO 50% (R360). Call out EVERY threshold breach with specific numbers.
-7. Ads thresholds: CPA above $200 = risk, CTR below 3% = risk. Quantify the dollar waste for each breach.
-8. Be DIRECT about failures - name specific channels, campaigns, UTM sources, and regions that are underperforming with exact numbers
-9. Every recommendation MUST be a single dense sentence with: the specific data point driving it, the quantified target, the expected dollar/lead impact, owner, and timeframe. Format: "P1 – Recommend [action] to [metric justification], targeting [goal]; expected impact: [quantified]; Owner: [team]; Timeframe: [when]." NO sub-bullets under recommendations.
-10. When UTM data shows no matches, analyze the available funnel and ads data instead
-11. ${includePOR && includeR360 ? 'Compare POR vs R360 inbound effectiveness explicitly with specific conversion rate and volume comparisons per region' : `Focus exclusively on ${includePOR ? 'POR' : 'R360'} inbound performance. Do NOT mention or reference ${includePOR ? 'R360' : 'POR'} - it is excluded from this analysis.`}
-12. Prioritize recommendations by lead-to-revenue impact potential
-13. YOUR RESPONSE MUST BE AT LEAST 7000 CHARACTERS LONG AND CONTAIN ALL 9 SECTION HEADERS. DO NOT STOP EARLY OR ABBREVIATE. AIM FOR 8000-10000 CHARACTERS.
-14. Each section must have at least 5 specific data-backed observations. Never produce a section with fewer than 4 bullet points.
-15. Include regional breakdowns (AMER/EMEA/APAC) in EVERY section where data is available - do not aggregate away regional detail
-16. For Lead Volume section: break down MQL counts by region, by product, show pacing %, and compare to target for each
-17. For Google Ads: analyze each region separately with spend, CPA, CTR, conversion rate, and ROI assessment
-18. In Predictive Indicators: project Q1 lead volumes, conversion rates, and revenue impact by product and region based on current trends
-19. CAMPAIGN EFFICIENCY: When campaign-level spend data is available, you MUST analyze conversion variances BETWEEN campaigns (not just overall rates). Compare each campaign's MQL→SQL→SQO funnel individually. Rank by cost-per-SQO, NOT cost-per-MQL (cost-per-MQL rewards MQL factories that never convert).
-20. BUDGET OPTIMIZATION: Calculate each campaign's "SQO share" (its SQOs / total SQOs) vs "spend share" (its spend / total spend). Campaigns where SQO share > spend share are efficient. Campaigns where spend share >> SQO share are wasteful. Recommend specific dollar amounts to reallocate.
-21. Do NOT output "---" horizontal rules between sections.
+2. **ZERO TOLERANCE FOR FABRICATED NUMBERS**: You MUST use ONLY the exact numbers provided in the data sections above. NEVER calculate, derive, estimate, or round numbers yourself. If you output a number that differs from what's in the data context, the ENTIRE response will be rejected.
+3. ALL METRICS MUST BE EXPLICITLY QTD: Every attainment %, variance %, dollar amount, and count MUST be labeled as QTD. Examples: "QTD MQL pacing: 85%", "$12K QTD spend", "QTD gap: -41 MQLs", "15 QTD conversions". NEVER show a metric without the QTD prefix/suffix.
+4. Reference the pre-computed insights above to ensure accuracy - use those numbers EXACTLY
+5. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
+6. R360 has NO SAL stage - flows directly from SQL to SQO. Explain this difference in funnel analysis.
+7. Conversion thresholds: MQL→SQL 30%, SQL→SAL 50% (POR), SAL→SQO 60% (POR), SQL→SQO 50% (R360). Call out EVERY threshold breach with specific numbers.
+8. Ads thresholds: CPA above $200 = risk, CTR below 3% = risk. Quantify the dollar waste for each breach.
+9. Be DIRECT about failures - name specific channels, campaigns, UTM sources, and regions that are underperforming with exact numbers
+10. Every recommendation MUST be a single dense sentence with: the specific data point driving it, the quantified target, the expected dollar/lead impact, owner, and timeframe. Format: "P1 – Recommend [action] to [metric justification], targeting [goal]; expected impact: [quantified]; Owner: [team]; Timeframe: [when]." NO sub-bullets under recommendations.
+11. When UTM data shows no matches, analyze the available funnel and ads data instead
+12. ${includePOR && includeR360 ? 'Compare POR vs R360 inbound effectiveness explicitly with specific conversion rate and volume comparisons per region' : `Focus exclusively on ${includePOR ? 'POR' : 'R360'} inbound performance. Do NOT mention or reference ${includePOR ? 'R360' : 'POR'} - it is excluded from this analysis.`}
+13. Prioritize recommendations by lead-to-revenue impact potential
+14. YOUR RESPONSE MUST BE AT LEAST 7000 CHARACTERS LONG AND CONTAIN ALL 10 SECTION HEADERS. DO NOT STOP EARLY OR ABBREVIATE. AIM FOR 8000-10000 CHARACTERS.
+15. Each section must have at least 5 specific data-backed observations. Never produce a section with fewer than 4 bullet points.
+16. Include regional breakdowns (AMER/EMEA/APAC) in EVERY section where data is available - do not aggregate away regional detail
+17. For Lead Volume section: break down MQL counts by region, by product, show pacing %, and compare to target for each
+18. For Google Ads: analyze each region separately with spend, CPA, CTR, conversion rate, and ROI assessment
+19. In Predictive Indicators: project Q1 lead volumes, conversion rates, and revenue impact by product and region based on current trends
+20. CAMPAIGN EFFICIENCY: When campaign-level spend data is available, you MUST analyze conversion variances BETWEEN campaigns (not just overall rates). Compare each campaign's MQL→SQL→SQO funnel individually. Rank by cost-per-SQO, NOT cost-per-MQL.
+21. BUDGET OPTIMIZATION: Identify campaigns where spend share >> SQO share as wasteful. Recommend specific dollar amounts to reallocate.
+22. Do NOT output "---" horizontal rules between sections.
+23. **QUARTER PROGRESS**: Use EXACTLY ${quarterPctComplete}% as the quarter progress benchmark - do NOT change this number.
 
 REMEMBER: Your output MUST exceed 7000 characters. Write in full detail for every section. Short responses will be rejected and regenerated.`;
 
@@ -779,6 +780,8 @@ export async function POST(request: Request) {
       : 'Include product comparisons (POR vs R360) in every section where both products have data.';
 
     const systemMessage = `You are a senior Inbound Marketing analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly inbound analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 10 sections: Executive Summary, Lead Volume & Pacing, Funnel Conversion, Paid Funnel Conversion Analysis, Funnel Velocity & Stall, Channel & Campaign Effectiveness, Google Ads Performance, Inbound Revenue Attribution, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific numbers, percentages, conversion rates, and dollar amounts throughout. Be direct about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 9000-12000 CHARACTERS. NEVER stop before completing all 10 sections.
+
+**CRITICAL DATA ACCURACY RULE**: You MUST use ONLY the EXACT numbers provided in the data sections. NEVER calculate, derive, estimate, round, or modify any number yourself. For totals and aggregates, find them in the data and copy them EXACTLY. Fabricating or miscalculating numbers will cause the ENTIRE output to be rejected.
 
 OUTPUT FORMAT (STRICT - READ CAREFULLY):
 - Use ### for section headers (e.g., ### Executive Summary)
