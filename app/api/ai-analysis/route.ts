@@ -615,17 +615,24 @@ Provide 5-7 specific recommendations. Each recommendation MUST be a single dense
 - Expected quantified impact (e.g., "recovering ~$50K in bookings", "improving pacing by 15 points")
 - Owner and Timeframe at the end separated by semicolons
 
-FORMAT EACH RECOMMENDATION AS A BOLD BULLET using double asterisks:
-- **P1 – Recommend [specific action] to [address specific metric/gap from the data], targeting [quantified goal]; expected impact: [dollar/pipeline improvement]; Owner: [team]; Timeframe: [when].**
+FORMAT EACH RECOMMENDATION AS A BOLD BULLET - THIS IS MANDATORY:
 
-CRITICAL:
-1. Each recommendation MUST be wrapped in double asterisks (**...**) for bold formatting
-2. Each recommendation MUST start on its own line with "- **P[1-3] – Recommend"
-3. Every recommendation must reference a SPECIFIC number from the data provided above
-4. Generic recommendations will be rejected
-5. NEVER combine multiple recommendations into one paragraph
-6. Use ONLY data from the context sections above - no invented numbers
-7. NEVER use single asterisks (*...*) for italics - always use double asterisks (**...**) for bold
+CORRECT FORMAT (use this EXACTLY):
+- **P1 – Recommend reallocating AE Sourced focus to close the $58K gap at 28% attainment; expected impact: ~$30K incremental bookings; Owner: Sales Leadership; Timeframe: Q1.**
+- **P2 – Recommend scaling high-intent branded keywords with 100% MQL→SQO conversion; expected impact: +$25K pipeline; Owner: Marketing; Timeframe: Immediate.**
+
+WRONG FORMAT (DO NOT USE - single asterisks make italic, not bold):
+- *P1 – Recommend...*  ← WRONG! This is italic, not bold
+- P1 – Recommend...    ← WRONG! No formatting at all
+
+EVERY recommendation line MUST:
+1. Start with "- **P" (dash, space, double-asterisk, P)
+2. End with ".**" (period, double-asterisk)
+3. Use DOUBLE asterisks (**) not single asterisks (*)
+4. Reference SPECIFIC numbers from the data
+5. Be on its own line
+
+If you output *P1* with single asterisks, the formatting is BROKEN. Always use **P1** with DOUBLE asterisks.
 
 ---
 
