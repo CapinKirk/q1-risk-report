@@ -457,23 +457,23 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
 
     if (activeRegions.includes('AMER')) {
       const amerDetail = amerAttainment.map((row: any) =>
-        `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
+        `- ${row.product} ${row.category}: QTD Actual $${(row.qtd_acv || 0).toLocaleString()}, QTD Target $${(row.qtd_target || 0).toLocaleString()}, ${row.qtd_attainment_pct}% attainment, Gap $${(row.qtd_gap || 0).toLocaleString()}, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
       ).join('\n') || 'No AMER data';
-      sections.push(`## AMER Segment Detail\n${amerDetail}`);
+      sections.push(`## AMER Segment Detail (USE THESE QTD VALUES)\n${amerDetail}`);
     }
 
     if (activeRegions.includes('EMEA')) {
       const emeaDetail = emeaAttainment.map((row: any) =>
-        `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
+        `- ${row.product} ${row.category}: QTD Actual $${(row.qtd_acv || 0).toLocaleString()}, QTD Target $${(row.qtd_target || 0).toLocaleString()}, ${row.qtd_attainment_pct}% attainment, Gap $${(row.qtd_gap || 0).toLocaleString()}, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
       ).join('\n') || 'No EMEA data';
-      sections.push(`## EMEA Segment Detail\n${emeaDetail}`);
+      sections.push(`## EMEA Segment Detail (USE THESE QTD VALUES)\n${emeaDetail}`);
     }
 
     if (activeRegions.includes('APAC')) {
       const apacDetail = apacAttainment.map((row: any) =>
-        `- ${row.product} ${row.category}: ${row.qtd_attainment_pct}% attainment, $${(row.qtd_gap || 0).toLocaleString()} gap, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
+        `- ${row.product} ${row.category}: QTD Actual $${(row.qtd_acv || 0).toLocaleString()}, QTD Target $${(row.qtd_target || 0).toLocaleString()}, ${row.qtd_attainment_pct}% attainment, Gap $${(row.qtd_gap || 0).toLocaleString()}, ${row.pipeline_coverage_x}x coverage, RAG: ${row.rag_status}`
       ).join('\n') || 'No APAC data';
-      sections.push(`## APAC Segment Detail\n${apacDetail}`);
+      sections.push(`## APAC Segment Detail (USE THESE QTD VALUES)\n${apacDetail}`);
     }
 
     return sections.join('\n\n');
@@ -946,26 +946,27 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 
 ## CRITICAL RULES
 1. PRODUCE ALL 10 SECTIONS - do not skip any section. Each section must be DETAILED and COMPREHENSIVE.
-2. **ZERO TOLERANCE FOR FABRICATED NUMBERS**: You MUST use ONLY the exact numbers provided in the "PRE-COMPUTED PRODUCT-REGION TOTALS" and data sections above. NEVER calculate, derive, estimate, or round numbers yourself. If you output a number that differs from what's in the data context, the ENTIRE response will be rejected.
-3. ALL METRICS MUST BE EXPLICITLY QTD: Every attainment %, variance %, dollar amount, and count MUST be labeled as QTD. Examples: "QTD attainment: 56%", "$141K QTD actual", "QTD gap: -$110K", "12 QTD deals". NEVER show a metric without the QTD prefix/suffix.
-4. **USE PRE-COMPUTED TOTALS**: For product-region totals (e.g., "R360 AMER total"), use the values from "PRE-COMPUTED PRODUCT-REGION TOTALS" section EXACTLY. Do NOT add up segment rows yourself.
-5. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
-6. RAG status meanings: GREEN (>80%), YELLOW (50-80%), RED (<50%) - call these out explicitly for EVERY region/product combo
-7. For channel analysis: ALWAYS rank by dollar gap, ALWAYS identify RED channels by name, explain WHY each channel is underperforming
-8. NEVER say "no UTM data available", "insufficient data", or "underperforming channels not identified" - the UTM Source, UTM Keyword, Branded/Non-Branded, and Source Channel Attainment sections have COMPLETE data. USE THEM.
-9. Pipeline coverage: 3x+ = healthy, 2-3x = adequate, <2x = critical risk. Quantify the dollar risk.
-10. Be DIRECT about underperformance - if a segment is failing, say so clearly with the dollar impact AND root cause hypothesis
-11. Each recommendation MUST be a single dense sentence with: the specific data point driving it, the quantified target, the expected dollar impact, owner, and timeframe. Format: "P1 – Recommend [action] to [metric justification], targeting [goal]; expected impact: [quantified]; Owner: [team]; Timeframe: [when]." NO sub-bullets under recommendations.
-12. Prioritize recommendations by ROI potential (largest gap with quickest fix first)
-13. ${includePOR && includeR360 ? 'Compare products: explicitly note where R360 is trailing POR and why, with specific dollar and percentage comparisons' : `Focus exclusively on ${includePOR ? 'POR' : 'R360'} performance. Do NOT mention or reference ${includePOR ? 'R360' : 'POR'} in any way.`}
-14. YOUR RESPONSE MUST BE AT LEAST 7000 CHARACTERS LONG AND CONTAIN ALL 10 SECTION HEADERS. DO NOT STOP EARLY OR ABBREVIATE. AIM FOR 8000-10000 CHARACTERS.
-15. Each section must have at least 5 specific data-backed observations with dollar amounts. Never produce a section with fewer than 4 bullet points.
-16. For EVERY underperforming segment, include: current value, target value, gap amount, percentage shortfall, and trend direction
-17. Include regional breakdowns (AMER/EMEA/APAC) in EVERY section where data is available - do not aggregate away regional detail
-18. In Win/Loss Patterns, analyze EACH loss reason category with dollar amounts and suggest specific countermeasures
-19. In Predictive Indicators, provide SPECIFIC projected Q1 close amounts by category and region based on current run rates
-20. Do NOT output "---" horizontal rules between sections. Section headers provide separation.
-21. **QUARTER PROGRESS**: Use EXACTLY ${period?.quarter_pct_complete || 0}% as the quarter progress benchmark - do NOT change this number.
+2. **ZERO TOLERANCE FOR FABRICATED NUMBERS**: You MUST use ONLY the exact numbers provided in the data sections above. NEVER calculate, derive, estimate, or round numbers yourself. If you output a number that differs from what's in the data context, the ENTIRE response will be rejected.
+3. **NEVER CALCULATE QTD TARGETS**: The QTD Target values are PRE-COMPUTED and provided directly. DO NOT derive QTD targets by multiplying Q1 targets by quarter percentage. Use ONLY the "QTD Target" values shown in each data row. This is CRITICAL - calculating your own QTD targets will produce WRONG numbers.
+4. ALL METRICS MUST BE EXPLICITLY QTD: Every attainment %, variance %, dollar amount, and count MUST be labeled as QTD. Examples: "QTD attainment: 56%", "$141K QTD actual", "QTD gap: -$110K", "12 QTD deals". NEVER show a metric without the QTD prefix/suffix.
+6. **USE PRE-COMPUTED TOTALS**: For product-region totals (e.g., "R360 AMER total"), use the values from "PRE-COMPUTED PRODUCT-REGION TOTALS" section EXACTLY. Do NOT add up segment rows yourself. Do NOT calculate totals by summing.
+7. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
+8. RAG status meanings: GREEN (>80%), YELLOW (50-80%), RED (<50%) - call these out explicitly for EVERY region/product combo
+9. For channel analysis: ALWAYS rank by dollar gap, ALWAYS identify RED channels by name, explain WHY each channel is underperforming
+10. NEVER say "no UTM data available", "insufficient data", or "underperforming channels not identified" - the UTM Source, UTM Keyword, Branded/Non-Branded, and Source Channel Attainment sections have COMPLETE data. USE THEM.
+11. Pipeline coverage: 3x+ = healthy, 2-3x = adequate, <2x = critical risk. Quantify the dollar risk.
+12. Be DIRECT about underperformance - if a segment is failing, say so clearly with the dollar impact AND root cause hypothesis
+13. Each recommendation MUST be a single dense sentence with: the specific data point driving it, the quantified target, the expected dollar impact, owner, and timeframe. Format: "P1 – Recommend [action] to [metric justification], targeting [goal]; expected impact: [quantified]; Owner: [team]; Timeframe: [when]." NO sub-bullets under recommendations.
+14. Prioritize recommendations by ROI potential (largest gap with quickest fix first)
+15. ${includePOR && includeR360 ? 'Compare products: explicitly note where R360 is trailing POR and why, with specific dollar and percentage comparisons' : `Focus exclusively on ${includePOR ? 'POR' : 'R360'} performance. Do NOT mention or reference ${includePOR ? 'R360' : 'POR'} in any way.`}
+16. YOUR RESPONSE MUST BE AT LEAST 7000 CHARACTERS LONG AND CONTAIN ALL 10 SECTION HEADERS. DO NOT STOP EARLY OR ABBREVIATE. AIM FOR 8000-10000 CHARACTERS.
+17. Each section must have at least 5 specific data-backed observations with dollar amounts. Never produce a section with fewer than 4 bullet points.
+18. For EVERY underperforming segment, include: current value, target value, gap amount, percentage shortfall, and trend direction
+19. Include regional breakdowns (AMER/EMEA/APAC) in EVERY section where data is available - do not aggregate away regional detail
+20. In Win/Loss Patterns, analyze EACH loss reason category with dollar amounts and suggest specific countermeasures
+21. In Predictive Indicators, provide SPECIFIC projected Q1 close amounts by category and region based on current run rates
+22. Do NOT output "---" horizontal rules between sections. Section headers provide separation.
+23. **QUARTER PROGRESS**: Use EXACTLY ${period?.quarter_pct_complete || 0}% as the quarter progress benchmark - do NOT change this number.
 
 REMEMBER: Your output MUST exceed 7000 characters. Write in full detail for every section. Short responses will be rejected and regenerated.`;
 
@@ -1012,7 +1013,11 @@ export async function POST(request: Request) {
 
     const systemMessage = `You are a senior Revenue Operations analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly bookings analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 10 sections: Executive Summary, Revenue Attainment Deep Dive, Channel Performance, Funnel Health & Velocity, Funnel Dropoff Analysis, Pipeline Risk, Win/Loss Patterns, Marketing & Channel Efficiency, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific dollar amounts, percentages, and gaps throughout. Be brutally honest about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 9000-12000 CHARACTERS. NEVER stop before completing all 10 sections.
 
-**CRITICAL DATA ACCURACY RULE**: You MUST use ONLY the EXACT numbers provided in the "PRE-COMPUTED PRODUCT-REGION TOTALS" section and other data sections. NEVER calculate, derive, estimate, round, or modify any number yourself. If you need a total for a product-region combination (e.g., "R360 AMER total"), find it in "PRE-COMPUTED PRODUCT-REGION TOTALS" and copy it EXACTLY. Fabricating or miscalculating numbers will cause the ENTIRE output to be rejected.
+**CRITICAL DATA ACCURACY RULES**:
+1. You MUST use ONLY the EXACT numbers provided in the data sections. NEVER calculate, derive, estimate, round, or modify any number yourself.
+2. **DO NOT CALCULATE QTD TARGETS** - all QTD targets are pre-computed. NEVER multiply Q1 targets by quarter percentage to derive QTD values. Use the QTD values shown directly in each data row.
+3. For product-region totals (e.g., "R360 AMER total"), find them in "PRE-COMPUTED PRODUCT-REGION TOTALS" and copy EXACTLY.
+4. Fabricating or miscalculating numbers will cause the ENTIRE output to be rejected.
 
 OUTPUT FORMAT (STRICT - READ CAREFULLY):
 - Use ### for section headers (e.g., ### Executive Summary)
