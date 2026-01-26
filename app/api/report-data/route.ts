@@ -2022,10 +2022,60 @@ async function getSALDetails(filters: ReportFilters) {
         AND CAST(o.CreatedDate AS DATE) >= '${filters.startDate}'
         AND CAST(o.CreatedDate AS DATE) <= '${filters.endDate}'
         ${regionClause.replace(/f\.Division/g, 'o.Division')}
+    ),
+    -- OUTBOUND funnel records that have reached SAL stage
+    outbound_sals AS (
+      SELECT
+        'POR' AS product,
+        CASE ob.Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        COALESCE(ob.OpportunityID, CAST(ob.CaptureDate AS STRING)) AS record_id,
+        CASE
+          WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', ob.OpportunityID)
+          ELSE 'https://por.my.salesforce.com/'
+        END AS salesforce_url,
+        COALESCE(ob.Company, 'Unknown') AS company_name,
+        'N/A' AS email,
+        'OUTBOUND' AS source,
+        CAST(ob.CaptureDate AS STRING) AS sal_date,
+        CAST(NULL AS STRING) AS sql_date,
+        CAST(NULL AS STRING) AS mql_date,
+        0 AS days_sql_to_sal,
+        CASE WHEN ob.SQO = 'true' THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        CASE WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        CASE
+          WHEN ob.Won = 'true' THEN 'WON'
+          WHEN ob.SQO = 'true' THEN 'CONVERTED_SQO'
+          WHEN DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) > 45 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sal_status,
+        ob.OpportunityID AS opportunity_id,
+        ob.OpportunityName AS opportunity_name,
+        CAST(NULL AS STRING) AS opportunity_stage,
+        ob.WonACV AS opportunity_acv,
+        'N/A' AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) AS days_in_stage,
+        CASE
+          WHEN ob.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN ob.Type = 'Migration' THEN 'MIGRATION'
+          ELSE 'NEW LOGO'
+        END AS category,
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(ob.OpportunityID, ob.Company) ORDER BY ob.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.OutboundFunnel\` ob
+      WHERE ob.Division IN ('US', 'UK', 'AU')
+        AND ob.SAL = 'true'
+        AND ob.CaptureDate >= '${filters.startDate}'
+        AND ob.CaptureDate <= '${filters.endDate}'
+        ${regionClause.replace(/f\.Division/g, 'ob.Division')}
     )
     SELECT * EXCEPT(rn) FROM ranked_sals WHERE rn = 1
     UNION ALL
     SELECT * EXCEPT(rn) FROM expansion_migration_sals WHERE rn = 1
+    UNION ALL
+    SELECT * EXCEPT(rn) FROM outbound_sals WHERE rn = 1
     ORDER BY sal_date DESC
   `;
 
@@ -2211,10 +2261,107 @@ async function getSQODetails(filters: ReportFilters) {
         AND CAST(f.SQO_DT AS DATE) >= '${filters.startDate}'
         AND CAST(f.SQO_DT AS DATE) <= '${filters.endDate}'
         ${regionClause}
+    ),
+    -- EXPANSION and MIGRATION opportunities at SQO stage (Proposal+)
+    expansion_migration_sqos AS (
+      SELECT
+        'POR' AS product,
+        CASE o.Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        o.Id AS record_id,
+        CONCAT('https://por.my.salesforce.com/', o.Id) AS salesforce_url,
+        COALESCE(o.AccountName, 'Unknown') AS company_name,
+        'N/A' AS email,
+        UPPER(COALESCE(NULLIF(COALESCE(o.SDRSource, o.POR_SDRSource), ''), 'EXPANSION')) AS source,
+        CAST(o.CreatedDate AS STRING) AS sqo_date,
+        CAST(NULL AS STRING) AS sal_date,
+        CAST(NULL AS STRING) AS sql_date,
+        CAST(NULL AS STRING) AS mql_date,
+        0 AS days_sal_to_sqo,
+        DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) AS days_total_cycle,
+        CASE
+          WHEN o.Won THEN 'WON'
+          WHEN o.IsClosed AND NOT o.Won THEN 'LOST'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) > 60 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sqo_status,
+        o.Id AS opportunity_id,
+        o.OpportunityName AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        o.ACV AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) AS days_in_stage,
+        CASE
+          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN o.Type = 'Migration' THEN 'MIGRATION'
+        END AS category,
+        ROW_NUMBER() OVER (PARTITION BY o.Id ORDER BY o.CreatedDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+      WHERE o.por_record__c = true
+        AND o.Division IN ('US', 'UK', 'AU')
+        AND o.Type IN ('Existing Business', 'Migration')
+        AND o.ACV > 0
+        -- SQO stage = Proposal stage or beyond OR Won
+        AND (o.StageName IN ('Proposal', 'Negotiation', 'Closed Won', 'Closed Lost') OR o.Won OR o.IsClosed)
+        AND CAST(o.CreatedDate AS DATE) >= '${filters.startDate}'
+        AND CAST(o.CreatedDate AS DATE) <= '${filters.endDate}'
+        ${regionClause.replace(/f\.Division/g, 'o.Division')}
+    ),
+    -- OUTBOUND funnel records that have reached SQO stage
+    outbound_sqos AS (
+      SELECT
+        'POR' AS product,
+        CASE ob.Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        COALESCE(ob.OpportunityID, CAST(ob.CaptureDate AS STRING)) AS record_id,
+        CASE
+          WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', ob.OpportunityID)
+          ELSE 'https://por.my.salesforce.com/'
+        END AS salesforce_url,
+        COALESCE(ob.Company, 'Unknown') AS company_name,
+        'N/A' AS email,
+        'OUTBOUND' AS source,
+        CAST(ob.CaptureDate AS STRING) AS sqo_date,
+        CAST(NULL AS STRING) AS sal_date,
+        CAST(NULL AS STRING) AS sql_date,
+        CAST(NULL AS STRING) AS mql_date,
+        0 AS days_sal_to_sqo,
+        DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) AS days_total_cycle,
+        CASE
+          WHEN ob.Won = 'true' THEN 'WON'
+          WHEN DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) > 60 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sqo_status,
+        ob.OpportunityID AS opportunity_id,
+        ob.OpportunityName AS opportunity_name,
+        CAST(NULL AS STRING) AS opportunity_stage,
+        ob.WonACV AS opportunity_acv,
+        'N/A' AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) AS days_in_stage,
+        CASE
+          WHEN ob.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN ob.Type = 'Migration' THEN 'MIGRATION'
+          ELSE 'NEW LOGO'
+        END AS category,
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(ob.OpportunityID, ob.Company) ORDER BY ob.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.OutboundFunnel\` ob
+      WHERE ob.Division IN ('US', 'UK', 'AU')
+        AND ob.SQO = 'true'
+        AND ob.CaptureDate >= '${filters.startDate}'
+        AND ob.CaptureDate <= '${filters.endDate}'
+        ${regionClause.replace(/f\.Division/g, 'ob.Division')}
     )
-    SELECT * EXCEPT(rn)
-    FROM ranked_sqos
-    WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM ranked_sqos WHERE rn = 1
+    UNION ALL
+    SELECT * EXCEPT(rn) FROM expansion_migration_sqos WHERE rn = 1
+    UNION ALL
+    SELECT * EXCEPT(rn) FROM outbound_sqos WHERE rn = 1
     ORDER BY sqo_date DESC
   `;
 
