@@ -615,10 +615,17 @@ Provide 5-7 specific recommendations. Each recommendation MUST be a single dense
 - Expected quantified impact (e.g., "recovering ~$50K in bookings", "improving pacing by 15 points")
 - Owner and Timeframe at the end separated by semicolons
 
-FORMAT EACH RECOMMENDATION AS A SEPARATE BULLET starting with "- P1 –":
-- P1 – Recommend [specific action] to [address specific metric/gap from the data], targeting [quantified goal]; expected impact: [dollar/pipeline improvement]; Owner: [team]; Timeframe: [when].
+FORMAT EACH RECOMMENDATION AS A BOLD BULLET using double asterisks:
+- **P1 – Recommend [specific action] to [address specific metric/gap from the data], targeting [quantified goal]; expected impact: [dollar/pipeline improvement]; Owner: [team]; Timeframe: [when].**
 
-CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Every recommendation must reference a SPECIFIC number from the data provided above. Generic recommendations will be rejected. NEVER combine multiple recommendations into one paragraph. Use ONLY data from the context sections above - no invented numbers.
+CRITICAL:
+1. Each recommendation MUST be wrapped in double asterisks (**...**) for bold formatting
+2. Each recommendation MUST start on its own line with "- **P[1-3] – Recommend"
+3. Every recommendation must reference a SPECIFIC number from the data provided above
+4. Generic recommendations will be rejected
+5. NEVER combine multiple recommendations into one paragraph
+6. Use ONLY data from the context sections above - no invented numbers
+7. NEVER use single asterisks (*...*) for italics - always use double asterisks (**...**) for bold
 
 ---
 
@@ -629,7 +636,7 @@ CRITICAL: Each recommendation MUST start on its own line with "- P[1-3] –". Ev
   - Sub-bullets (REQUIRED): "  - supporting metric, data point, or implication" (indent with 2 spaces)
   - Each top-level bullet MUST have 1-3 sub-bullets with specific data
 - Section 1 (Executive Summary): 3-4 complete sentences, no bullets
-- Section 10 (Recommendations): flat bullets starting with "- P[1-3] –"
+- Section 10 (Recommendations): BOLD flat bullets starting with "- **P[1-3] – Recommend..." and ending with "**"
 - **STRUCTURE FOR SECTIONS 2-9 (multi-level bullets with sub-bullets):**
   - Top-level bullet: "- **[Label from data]:** [key insight with specific metric]"
   - Sub-bullets (REQUIRED): "  - [supporting metric or implication]" (indent with 2 spaces)
