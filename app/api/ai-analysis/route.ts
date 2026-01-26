@@ -1121,8 +1121,8 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
         }
 
         // Split by P1/P2/P3 markers and format each
-        const recs = content.split(/(?=P[123]\s*[–-])/).filter(r => r.trim());
-        return recs.map(rec => {
+        const recs = content.split(/(?=P[123]\s*[–-])/).filter((r: string) => r.trim());
+        return recs.map((rec: string) => {
           let cleaned = rec
             .replace(/^-\s*/, '')      // Remove leading dash
             .replace(/\s*-\s*$/, '')   // Remove trailing dash
@@ -1131,7 +1131,7 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
           if (!cleaned) return '';
           if (!cleaned.endsWith('.')) cleaned += '.';
           return `**${cleaned}**`;
-        }).filter(r => r).join('\n');
+        }).filter((r: string) => r).join('\n');
       }
     );
 
