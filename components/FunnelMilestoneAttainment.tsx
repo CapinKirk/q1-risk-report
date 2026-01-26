@@ -37,16 +37,50 @@ function getRagColor(rag: RAGStatus): string {
 
 /**
  * TOF Score: Weighted attainment across funnel stages
- * POR: EQL/MQL=10%, SQL=20%, SAL=30%, SQO=40%
- * R360: EQL/MQL=14.3%, SQL=28.6%, SQO=57.1% (no SAL stage, weights redistributed)
+ * Base weights - POR: EQL/MQL=10%, SQL=20%, SAL=30%, SQO=40%
+ * R360: EQL/MQL=14.3%, SQL=28.6%, SQO=57.1% (no SAL stage)
+ *
+ * IMPORTANT: Stages with 0 targets are EXCLUDED from the calculation
+ * and their weights are redistributed proportionally to other stages.
  */
-function calculateTOFScore(mql: number, sql: number, sal: number, sqo: number, product: Product = 'POR'): number {
-  if (product === 'R360') {
-    // R360 has no SAL stage - redistribute weights (10:20:40 → 14.3:28.6:57.1)
-    return Math.round((mql * 0.143) + (sql * 0.286) + (sqo * 0.571));
+function calculateTOFScore(
+  mqlPct: number, sqlPct: number, salPct: number, sqoPct: number,
+  product: Product = 'POR',
+  targets?: { mql: number; sql: number; sal: number; sqo: number }
+): number {
+  // Base weights
+  let mqlWeight = product === 'R360' ? 0.143 : 0.10;
+  let sqlWeight = product === 'R360' ? 0.286 : 0.20;
+  let salWeight = product === 'R360' ? 0 : 0.30;  // R360 has no SAL
+  let sqoWeight = product === 'R360' ? 0.571 : 0.40;
+
+  // If targets are provided, exclude stages with 0 targets
+  if (targets) {
+    const activeStages: { pct: number; weight: number }[] = [];
+
+    if (targets.mql > 0) activeStages.push({ pct: mqlPct, weight: mqlWeight });
+    if (targets.sql > 0) activeStages.push({ pct: sqlPct, weight: sqlWeight });
+    if (targets.sal > 0 && product !== 'R360') activeStages.push({ pct: salPct, weight: salWeight });
+    if (targets.sqo > 0) activeStages.push({ pct: sqoPct, weight: sqoWeight });
+
+    // If no stages have targets, return 0
+    if (activeStages.length === 0) return 0;
+
+    // Redistribute weights proportionally among active stages
+    const totalActiveWeight = activeStages.reduce((sum, s) => sum + s.weight, 0);
+    const score = activeStages.reduce((sum, s) => {
+      const normalizedWeight = s.weight / totalActiveWeight;
+      return sum + (s.pct * normalizedWeight);
+    }, 0);
+
+    return Math.round(score);
   }
-  // POR has all 4 stages
-  return Math.round((mql * 0.10) + (sql * 0.20) + (sal * 0.30) + (sqo * 0.40));
+
+  // Fallback: use original calculation (for backward compatibility)
+  if (product === 'R360') {
+    return Math.round((mqlPct * 0.143) + (sqlPct * 0.286) + (sqoPct * 0.571));
+  }
+  return Math.round((mqlPct * 0.10) + (sqlPct * 0.20) + (salPct * 0.30) + (sqoPct * 0.40));
 }
 
 function getLeadStageLabel(category: Category): 'MQL' | 'EQL' {
@@ -337,7 +371,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
             sqoActual: row.actual_sqo,
             sqoTarget: qtdTargetSqo,
             sqoPacingPct,
-            tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, product),
+            tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, product,
+              { mql: qtdTargetMql, sql: qtdTargetSql, sal: qtdTargetSal, sqo: qtdTargetSqo }),
           });
         });
       };
@@ -363,6 +398,11 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         const salPacingPct = (row.qtd_target_sal || 0) > 0 ? Math.round(((row.actual_sal || 0) / (row.qtd_target_sal || 1)) * 100) : 100;
         const sqoPacingPct = (row.qtd_target_sqo || 0) > 0 ? Math.round(((row.actual_sqo || 0) / (row.qtd_target_sqo || 1)) * 100) : 100;
 
+        const qtdTargetMql = row.qtd_target_mql || 0;
+        const qtdTargetSql = row.qtd_target_sql || 0;
+        const qtdTargetSal = row.qtd_target_sal || 0;
+        const qtdTargetSqo = row.qtd_target_sqo || 0;
+
         rows.push({
           id: `${product}-${row.region}-${row.category}`,
           product,
@@ -371,18 +411,19 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           source: 'ALL',
           leadStageLabel: getLeadStageLabel(row.category),
           mqlActual: row.actual_mql || 0,
-          mqlTarget: row.qtd_target_mql || 0,
+          mqlTarget: qtdTargetMql,
           mqlPacingPct,
           sqlActual: row.actual_sql || 0,
-          sqlTarget: row.qtd_target_sql || 0,
+          sqlTarget: qtdTargetSql,
           sqlPacingPct,
           salActual: row.actual_sal || 0,
-          salTarget: row.qtd_target_sal || 0,
+          salTarget: qtdTargetSal,
           salPacingPct,
           sqoActual: row.actual_sqo || 0,
-          sqoTarget: row.qtd_target_sqo || 0,
+          sqoTarget: qtdTargetSqo,
           sqoPacingPct,
-          tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, product),
+          tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, product,
+            { mql: qtdTargetMql, sql: qtdTargetSql, sal: qtdTargetSal, sqo: qtdTargetSqo }),
         });
       });
     };
@@ -458,7 +499,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         sqlPacingPct,
         salPacingPct,
         sqoPacingPct,
-        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
+        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
+          { mql: data.mqlTarget, sql: data.sqlTarget, sal: data.salTarget, sqo: data.sqoTarget }),
       });
     });
 
@@ -532,7 +574,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         sqlPacingPct,
         salPacingPct,
         sqoPacingPct,
-        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
+        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
+          { mql: data.mqlTarget, sql: data.sqlTarget, sal: data.salTarget, sqo: data.sqoTarget }),
       });
     });
 
@@ -600,7 +643,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         sqlPacingPct,
         salPacingPct,
         sqoPacingPct,
-        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
+        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
+          { mql: data.mqlTarget, sql: data.sqlTarget, sal: data.salTarget, sqo: data.sqoTarget }),
       });
     });
 
@@ -637,7 +681,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       sqlPacingPct,
       salPacingPct,
       sqoPacingPct,
-      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
+      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
+        { mql: total.mqlTarget, sql: total.sqlTarget, sal: total.salTarget, sqo: total.sqoTarget }),
     };
   }, [aggregatedData, selectedProducts, availableProducts]);
 
@@ -670,7 +715,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       sqlPacingPct,
       salPacingPct,
       sqoPacingPct,
-      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
+      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
+        { mql: total.mqlTarget, sql: total.sqlTarget, sal: total.salTarget, sqo: total.sqoTarget }),
     };
   }, [sourceAggregatedData, selectedProducts, availableProducts]);
 
@@ -703,7 +749,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       sqlPacingPct,
       salPacingPct,
       sqoPacingPct,
-      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct),
+      tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
+        { mql: total.mqlTarget, sql: total.sqlTarget, sal: total.salTarget, sqo: total.sqoTarget }),
     };
   }, [regionAggregatedData, selectedProducts, availableProducts]);
 
