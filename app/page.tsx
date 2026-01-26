@@ -349,6 +349,7 @@ function ReportContent() {
   // Track if initial load is complete
   const initialLoadComplete = useRef(false);
   const fetchInProgress = useRef(false);
+  const [urlParamsLoaded, setUrlParamsLoaded] = useState(false);
 
   // Load and parse data - fallback to static JSON
   const rawData = reportDataJson as ReportData;
@@ -420,13 +421,19 @@ function ReportContent() {
     setSelectedProducts(products);
     setSelectedCategories(categories);
     setSelectedSources(sources);
+    setUrlParamsLoaded(true);
   }, [searchParams]);
 
   // Fetch live data when product/region filters change
   useEffect(() => {
+    // Wait for URL params to be parsed before applying any filters
+    if (!urlParamsLoaded) {
+      return;
+    }
+
     // For initial load, start with static data but also fetch live
     if (!initialLoadComplete.current) {
-      // First load - immediately show static data
+      // First load - immediately show static data with correct filters from URL
       if (rawData) {
         const filtered = filterReportData(rawData, selectedRegions, selectedProducts, selectedCategories, selectedSources);
         setFilteredData(filtered);
@@ -470,7 +477,7 @@ function ReportContent() {
         setFilteredData(filtered);
       }
     }
-  }, [selectedRegions, selectedProducts, selectedCategories, selectedSources, rawData, useLiveData, fetchLiveData, startDate, endDate]);
+  }, [urlParamsLoaded, selectedRegions, selectedProducts, selectedCategories, selectedSources, rawData, useLiveData, fetchLiveData, startDate, endDate]);
 
   if (!filteredData) {
     return <div className="loading">Loading report data...</div>;

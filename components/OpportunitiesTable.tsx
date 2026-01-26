@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { ReportData, DealDetail, Region, Category, Product, Source } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatters';
+import RegionBadge from './RegionBadge';
 
 interface OpportunitiesTableProps {
   data: ReportData;
@@ -337,7 +338,7 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
                       {deal.product}
                     </span>
                   </td>
-                  <td>{deal.region}</td>
+                  <td><RegionBadge region={deal.region} /></td>
                   <td className="category">{deal.category}</td>
                   <td className="right acv">{formatCurrency(deal.acv)}</td>
                   <td className="owner-name" title={deal.owner_name || '-'}>
@@ -585,13 +586,13 @@ export default function OpportunitiesTable({ data, selectedRegions }: Opportunit
         }
 
         .product-badge.por {
-          background: #dbeafe;
-          color: #1e40af;
+          background: linear-gradient(135deg, #22c55e, #16a34a);
+          color: white;
         }
 
         .product-badge.r360 {
-          background: var(--warning-bg);
-          color: #92400e;
+          background: linear-gradient(135deg, #ef4444, #dc2626);
+          color: white;
         }
 
         .category {

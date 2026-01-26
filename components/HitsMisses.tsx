@@ -5,6 +5,7 @@ import { ReportData, AttainmentRow } from '@/lib/types';
 import { formatCurrency, formatPercent, formatCoverage, getRAGClass, getAttainmentColor, getRAGBadgeColor } from '@/lib/formatters';
 import { useSortableTable } from '@/lib/useSortableTable';
 import SortableHeader from './SortableHeader';
+import RegionBadge from './RegionBadge';
 
 interface HitsMissesProps {
   data: ReportData;
@@ -55,8 +56,20 @@ function HitsTable({ hits }: { hits: AttainmentWithProduct[] }) {
           <tbody>
             {sortedData.map((h, idx) => (
               <tr key={`hit-${idx}`} className="hit-row">
-                <td>{h.product}</td>
-                <td>{h.region}</td>
+                <td>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: h.product === 'POR' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                    color: '#ffffff',
+                  }}>
+                    {h.product}
+                  </span>
+                </td>
+                <td><RegionBadge region={h.region} /></td>
                 <td>{h.category}</td>
                 <td className="right" style={{ color: getAttainmentColor(h.qtd_attainment_pct), fontWeight: 700 }}>
                   {formatPercent(h.qtd_attainment_pct)}
@@ -128,8 +141,20 @@ function MissesTable({
 
               return (
                 <tr key={`miss-${idx}`} className={rowClass}>
-                  <td>{m.product}</td>
-                  <td>{m.region}</td>
+                  <td>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      background: m.product === 'POR' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                      color: '#ffffff',
+                    }}>
+                      {m.product}
+                    </span>
+                  </td>
+                  <td><RegionBadge region={m.region} /></td>
                   <td>{m.category}</td>
                   <td className="right" style={{ color: getAttainmentColor(m.qtd_attainment_pct), fontWeight: 700 }}>
                     {formatPercent(m.qtd_attainment_pct)}

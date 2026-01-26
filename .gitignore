@@ -64,3 +64,4 @@ archive/debug_queries/*.sql
 # Temporary files
 *.tmp
 *.temp
+.env*.local

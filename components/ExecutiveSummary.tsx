@@ -5,6 +5,7 @@ import { ReportData, AttainmentRow } from '@/lib/types';
 import { formatCurrency, formatPercent, formatCoverage, getGapColor, getAttainmentColor } from '@/lib/formatters';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
+import RegionBadge from './RegionBadge';
 
 interface ExecutiveSummaryProps {
   data: ReportData;
@@ -374,8 +375,20 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
 
                   return (
                     <tr key={`${row.product}-${row.region}-${idx}`}>
-                      <td>{row.product}</td>
-                      <td>{row.region}</td>
+                      <td>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          background: row.product === 'POR' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                          color: '#ffffff',
+                        }}>
+                          {row.product}
+                        </span>
+                      </td>
+                      <td><RegionBadge region={row.region} /></td>
                       <td className="right">{formatCurrency(row.fy_target)}</td>
                       <td className="right">{formatCurrency(row.q1_target)}</td>
                       <td className="right">{formatCurrency(row.qtd_target)}</td>

@@ -5,6 +5,7 @@ import { ReportData, LossReasonRow } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatters';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
+import RegionBadge from './RegionBadge';
 
 const ITEMS_PER_PAGE = 15;
 
@@ -23,22 +24,31 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
   const totalLostAcv = (porLost?.total_lost_acv || 0) + (r360Lost?.total_lost_acv || 0);
   const totalAvg = totalLostDeals > 0 ? totalLostAcv / totalLostDeals : 0;
 
-  // Product table data structure
+  // Check which products have data in the filtered dataset
+  const hasPORData = attainment_detail.POR && attainment_detail.POR.length > 0;
+  const hasR360Data = attainment_detail.R360 && attainment_detail.R360.length > 0;
+
+  // Product table data structure - only include products with data
   type ProductRow = { product: string; deals: number; acv: number; avg: number };
-  const productData: ProductRow[] = [
-    {
+  const productData: ProductRow[] = [];
+
+  if (hasPORData) {
+    productData.push({
       product: 'POR',
       deals: porLost?.total_lost_deals || 0,
       acv: porLost?.total_lost_acv || 0,
       avg: (porLost?.total_lost_deals || 0) > 0 ? (porLost?.total_lost_acv || 0) / (porLost?.total_lost_deals || 1) : 0
-    },
-    {
+    });
+  }
+
+  if (hasR360Data) {
+    productData.push({
       product: 'R360',
       deals: r360Lost?.total_lost_deals || 0,
       acv: r360Lost?.total_lost_acv || 0,
       avg: (r360Lost?.total_lost_deals || 0) > 0 ? (r360Lost?.total_lost_acv || 0) / (r360Lost?.total_lost_deals || 1) : 0
-    }
-  ];
+    });
+  }
 
   const productTable = useSortableTable<ProductRow>(
     productData,
@@ -186,7 +196,19 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
           <tbody>
             {productTable.sortedData.map((row) => (
               <tr key={row.product}>
-                <td>{row.product}</td>
+                <td>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: row.product === 'POR' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                    color: '#ffffff',
+                  }}>
+                    {row.product}
+                  </span>
+                </td>
                 <td className="right">{Math.round(row.deals)}</td>
                 <td className="right red">{formatCurrency(row.acv)}</td>
                 <td className="right">{formatCurrency(row.avg)}</td>
@@ -214,34 +236,42 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
                 sortDirection={regionTable.getSortDirection('region')}
                 onSort={regionTable.handleSort}
               />
-              <SortableHeader
-                label="POR Deals"
-                column="por_deals"
-                sortDirection={regionTable.getSortDirection('por_deals')}
-                onSort={regionTable.handleSort}
-                className="right"
-              />
-              <SortableHeader
-                label="POR ACV"
-                column="por_acv"
-                sortDirection={regionTable.getSortDirection('por_acv')}
-                onSort={regionTable.handleSort}
-                className="right"
-              />
-              <SortableHeader
-                label="R360 Deals"
-                column="r360_deals"
-                sortDirection={regionTable.getSortDirection('r360_deals')}
-                onSort={regionTable.handleSort}
-                className="right"
-              />
-              <SortableHeader
-                label="R360 ACV"
-                column="r360_acv"
-                sortDirection={regionTable.getSortDirection('r360_acv')}
-                onSort={regionTable.handleSort}
-                className="right"
-              />
+              {hasPORData && (
+                <>
+                  <SortableHeader
+                    label="POR Deals"
+                    column="por_deals"
+                    sortDirection={regionTable.getSortDirection('por_deals')}
+                    onSort={regionTable.handleSort}
+                    className="right"
+                  />
+                  <SortableHeader
+                    label="POR ACV"
+                    column="por_acv"
+                    sortDirection={regionTable.getSortDirection('por_acv')}
+                    onSort={regionTable.handleSort}
+                    className="right"
+                  />
+                </>
+              )}
+              {hasR360Data && (
+                <>
+                  <SortableHeader
+                    label="R360 Deals"
+                    column="r360_deals"
+                    sortDirection={regionTable.getSortDirection('r360_deals')}
+                    onSort={regionTable.handleSort}
+                    className="right"
+                  />
+                  <SortableHeader
+                    label="R360 ACV"
+                    column="r360_acv"
+                    sortDirection={regionTable.getSortDirection('r360_acv')}
+                    onSort={regionTable.handleSort}
+                    className="right"
+                  />
+                </>
+              )}
               <SortableHeader
                 label="Total ACV"
                 column="total_acv"
@@ -254,11 +284,19 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
           <tbody>
             {regionTable.sortedData.map((row) => (
               <tr key={row.region}>
-                <td>{row.region}</td>
-                <td className="right">{Math.round(row.por_deals)}</td>
-                <td className="right">{formatCurrency(row.por_acv)}</td>
-                <td className="right">{Math.round(row.r360_deals)}</td>
-                <td className="right">{formatCurrency(row.r360_acv)}</td>
+                <td><RegionBadge region={row.region} /></td>
+                {hasPORData && (
+                  <>
+                    <td className="right">{Math.round(row.por_deals)}</td>
+                    <td className="right">{formatCurrency(row.por_acv)}</td>
+                  </>
+                )}
+                {hasR360Data && (
+                  <>
+                    <td className="right">{Math.round(row.r360_deals)}</td>
+                    <td className="right">{formatCurrency(row.r360_acv)}</td>
+                  </>
+                )}
                 <td className="right red"><strong>{formatCurrency(row.total_acv)}</strong></td>
               </tr>
             ))}
@@ -321,8 +359,20 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
 
               return (
                 <tr key={`loss-${idx}`}>
-                  <td>{row.product}</td>
-                  <td>{row.region}</td>
+                  <td>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      background: row.product === 'POR' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                      color: '#ffffff',
+                    }}>
+                      {row.product}
+                    </span>
+                  </td>
+                  <td><RegionBadge region={row.region} /></td>
                   <td title={row.loss_reason || 'Unknown'}>{reason}</td>
                   <td className="right">{Math.round(row.deal_count || 0)}</td>
                   <td className="right red">{formatCurrency(row.lost_acv)}</td>

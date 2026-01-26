@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { MQLDetailRow, Product, Region, LeadType } from '@/lib/types';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
+import RegionBadge from './RegionBadge';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -326,7 +327,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
                       {mql.product}
                     </span>
                   </td>
-                  <td>{mql.region}</td>
+                  <td><RegionBadge region={mql.region} /></td>
                   <td className="company-cell" title={mql.company_name}>
                     {mql.company_name.length > 25 ? mql.company_name.substring(0, 25) + '...' : mql.company_name}
                   </td>
@@ -571,10 +572,10 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
           color: white;
         }
         .product-badge.por {
-          background-color: #3b82f6;
+          background: linear-gradient(135deg, #22c55e, #16a34a);
         }
         .product-badge.r360 {
-          background-color: #8b5cf6;
+          background: linear-gradient(135deg, #ef4444, #dc2626);
         }
         .company-cell,
         .email-cell {

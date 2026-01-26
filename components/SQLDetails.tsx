@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { SQLDetailRow, Product, Region } from '@/lib/types';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
+import RegionBadge from './RegionBadge';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -296,7 +297,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
                         {sql.product}
                       </span>
                     </td>
-                    <td>{sql.region}</td>
+                    <td><RegionBadge region={sql.region} /></td>
                     <td className="company-cell" title={sql.company_name}>
                       {sql.company_name.length > 25 ? sql.company_name.substring(0, 25) + '...' : sql.company_name}
                     </td>
@@ -512,10 +513,10 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
           color: white;
         }
         .product-badge.por {
-          background-color: #3b82f6;
+          background: linear-gradient(135deg, #22c55e, #16a34a);
         }
         .product-badge.r360 {
-          background-color: #8b5cf6;
+          background: linear-gradient(135deg, #ef4444, #dc2626);
         }
         .company-cell {
           max-width: 150px;

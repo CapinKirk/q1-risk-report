@@ -12,6 +12,7 @@ import {
 import { formatCurrency, formatPercent } from '@/lib/formatters';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
+import RegionBadge from './RegionBadge';
 
 interface RenewalsSectionProps {
   products: Product[];
@@ -19,10 +20,10 @@ interface RenewalsSectionProps {
   refreshKey?: number; // Increment to force re-fetch
 }
 
-// Product colors
+// Product colors - POR = Green, R360 = Red (consistent across all tables)
 const PRODUCT_COLORS: Record<Product, { bg: string; border: string; text: string }> = {
-  POR: { bg: '#eff6ff', border: '#3b82f6', text: '#1d4ed8' },
-  R360: { bg: '#f0fdf4', border: '#22c55e', text: '#15803d' },
+  POR: { bg: '#dcfce7', border: '#16a34a', text: '#166534' },   // Green
+  R360: { bg: '#fef2f2', border: '#dc2626', text: '#dc2626' },  // Red
 };
 
 // RAG colors
@@ -600,7 +601,7 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
                       {opp.product}
                     </span>
                   </td>
-                  <td>{opp.region}</td>
+                  <td><RegionBadge region={opp.region} /></td>
                   <td className="money">{formatCurrency(opp.acv)}</td>
                   <td className="money">{formatCurrency(opp.uplift_amount)}</td>
                   <td>{opp.stage || '-'}</td>

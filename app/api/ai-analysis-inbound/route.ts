@@ -95,13 +95,22 @@ function buildInboundAnalysisPrompt(reportData: any, filterContext?: FilterConte
   const calcConversionRate = (numerator: number, denominator: number) =>
     denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
 
-  // MQL status breakdown
+  // MQL status breakdown - MUTUALLY EXCLUSIVE categories that sum to 100%
   const getMqlStatusBreakdown = (mqls: any[]) => {
+    const total = mqls.length;
+    // Converted to SQL (success path - these are no longer MQLs)
     const converted = mqls.filter(m => m.converted_to_sql === 'Yes').length;
-    const reverted = mqls.filter(m => m.was_reverted).length;
-    const stalled = mqls.filter(m => m.mql_status === 'STALLED').length;
-    const active = mqls.filter(m => m.mql_status === 'ACTIVE').length;
-    return { total: mqls.length, converted, reverted, stalled, active };
+    // Reverted/disqualified (failure path - removed from funnel)
+    const reverted = mqls.filter(m => m.was_reverted && m.converted_to_sql !== 'Yes').length;
+    // Stalled but not yet converted or reverted (at risk)
+    const stalled = mqls.filter(m => m.mql_status === 'STALLED' && m.converted_to_sql !== 'Yes' && !m.was_reverted).length;
+    // Still in progress - not converted, not reverted, not stalled (healthy pipeline)
+    const inProgress = mqls.filter(m =>
+      m.converted_to_sql !== 'Yes' &&
+      !m.was_reverted &&
+      m.mql_status !== 'STALLED'
+    ).length;
+    return { total, converted, reverted, stalled, inProgress };
   };
 
   const porMqlStatus = getMqlStatusBreakdown(inboundMqlPOR);
@@ -516,20 +525,22 @@ ${inboundAttainmentR360.map((row: any) =>
 ).join('\n') || 'No R360 inbound attainment data'}` : ''}
 
 ## MQL QUALITY ANALYSIS
-${includePOR ? `### POR MQL Status Breakdown
+${includePOR ? `### POR MQL Status Breakdown (MUTUALLY EXCLUSIVE - sums to 100%)
 - Total Inbound MQLs: ${porMqlStatus.total}
-- Converted to SQL: ${porMqlStatus.converted} (${calcConversionRate(porMqlStatus.converted, porMqlStatus.total)}%)
-- Reverted/Disqualified: ${porMqlStatus.reverted} (${calcConversionRate(porMqlStatus.reverted, porMqlStatus.total)}%)
-- Stalled (>30 days): ${porMqlStatus.stalled} (${calcConversionRate(porMqlStatus.stalled, porMqlStatus.total)}%)
-- Active: ${porMqlStatus.active}
+- Converted to SQL (success): ${porMqlStatus.converted} (${calcConversionRate(porMqlStatus.converted, porMqlStatus.total)}%)
+- Reverted/Disqualified (lost): ${porMqlStatus.reverted} (${calcConversionRate(porMqlStatus.reverted, porMqlStatus.total)}%)
+- Stalled >30 days (at risk): ${porMqlStatus.stalled} (${calcConversionRate(porMqlStatus.stalled, porMqlStatus.total)}%)
+- In Progress (healthy pipeline): ${porMqlStatus.inProgress} (${calcConversionRate(porMqlStatus.inProgress, porMqlStatus.total)}%)
+- MATH CHECK: ${porMqlStatus.converted} + ${porMqlStatus.reverted} + ${porMqlStatus.stalled} + ${porMqlStatus.inProgress} = ${porMqlStatus.converted + porMqlStatus.reverted + porMqlStatus.stalled + porMqlStatus.inProgress} (should equal ${porMqlStatus.total})
 - Average Days in MQL Stage: ${avgDaysInStage(inboundMqlPOR)}` : ''}
 
-${includeR360 ? `### R360 MQL Status Breakdown
+${includeR360 ? `### R360 MQL Status Breakdown (MUTUALLY EXCLUSIVE - sums to 100%)
 - Total Inbound MQLs: ${r360MqlStatus.total}
-- Converted to SQL: ${r360MqlStatus.converted} (${calcConversionRate(r360MqlStatus.converted, r360MqlStatus.total)}%)
-- Reverted/Disqualified: ${r360MqlStatus.reverted} (${calcConversionRate(r360MqlStatus.reverted, r360MqlStatus.total)}%)
-- Stalled (>30 days): ${r360MqlStatus.stalled} (${calcConversionRate(r360MqlStatus.stalled, r360MqlStatus.total)}%)
-- Active: ${r360MqlStatus.active}
+- Converted to SQL (success): ${r360MqlStatus.converted} (${calcConversionRate(r360MqlStatus.converted, r360MqlStatus.total)}%)
+- Reverted/Disqualified (lost): ${r360MqlStatus.reverted} (${calcConversionRate(r360MqlStatus.reverted, r360MqlStatus.total)}%)
+- Stalled >30 days (at risk): ${r360MqlStatus.stalled} (${calcConversionRate(r360MqlStatus.stalled, r360MqlStatus.total)}%)
+- In Progress (healthy pipeline): ${r360MqlStatus.inProgress} (${calcConversionRate(r360MqlStatus.inProgress, r360MqlStatus.total)}%)
+- MATH CHECK: ${r360MqlStatus.converted} + ${r360MqlStatus.reverted} + ${r360MqlStatus.stalled} + ${r360MqlStatus.inProgress} = ${r360MqlStatus.converted + r360MqlStatus.reverted + r360MqlStatus.stalled + r360MqlStatus.inProgress} (should equal ${r360MqlStatus.total})
 - Average Days in MQL Stage: ${avgDaysInStage(inboundMqlR360)}` : ''}
 
 ### Overall MQL Disqualification Summary
@@ -751,6 +762,8 @@ ${topConvertingUtmR360.map((s: any) => `- ${s.name}: ${s.convRate}% MQL→SQL, $
 22. Do NOT output "---" horizontal rules between sections.
 23. **DO NOT MENTION QUARTER PROGRESS**: NEVER compare attainment/pacing to quarter progress percentage. NEVER say "at X% quarter progress" or "vs Y% benchmark". Only show QTD attainment or pacing (actual/target). The quarter progress is ${quarterPctComplete}% but do NOT include this in your analysis output.
 24. **ATTAINMENT COLOR CODING**: >=100% = GREEN, 70-99% = YELLOW, <70% = RED. Apply this color coding to every attainment percentage mentioned.
+25. **FUNNEL MATH CONSISTENCY (CRITICAL)**: MQL status categories are MUTUALLY EXCLUSIVE and must sum to 100%. The categories are: Converted (success), Reverted (lost), Stalled (at risk), and In Progress (healthy pipeline). If X% converted and Y% are reverted/stalled, then the remaining % are "in progress" (still being worked). Do NOT say "0% loss" if leads are still in progress - those aren't lost, they're active. Do NOT make contradictory statements like "60% conversion and 0% stalled" if other leads exist - explain where the remaining % are (in progress).
+26. **LEAD STATUS DEFINITIONS**: "Converted" = moved to SQL stage (success). "Reverted" = disqualified/removed from funnel (loss). "Stalled" = stuck >30 days without progress (at risk). "In Progress" = actively being worked, not yet converted (healthy). When discussing funnel health, distinguish between true losses (reverted) and leads still in the pipeline (in progress or stalled).
 
 REMEMBER: Your output MUST exceed 7000 characters. Write in full detail for every section. Short responses will be rejected and regenerated.`;
 

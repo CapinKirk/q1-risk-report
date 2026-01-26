@@ -4,6 +4,7 @@ import { ReportData, PipelineRCARow } from '@/lib/types';
 import { formatCurrency, formatCoverage } from '@/lib/formatters';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
+import RegionBadge from './RegionBadge';
 
 interface PipelineCoverageProps {
   data: ReportData;
@@ -139,8 +140,20 @@ export default function PipelineCoverage({ data }: PipelineCoverageProps) {
 
               return (
                 <tr key={`pipeline-${idx}`}>
-                  <td>{p.region}</td>
-                  <td>{p.product}</td>
+                  <td><RegionBadge region={p.region} /></td>
+                  <td>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      background: p.product === 'POR' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                      color: '#ffffff',
+                    }}>
+                      {p.product}
+                    </span>
+                  </td>
                   <td>{p.category}</td>
                   <td className="right">{formatCurrency(p.pipeline_acv)}</td>
                   <td className={`${getCoverageClass(coverage)} right`}>{formatCoverage(coverage)}</td>

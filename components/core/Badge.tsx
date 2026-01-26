@@ -19,10 +19,16 @@ const REGION_CONFIG: Record<string, BadgeConfig> = {
   APAC: { icon: '🇦🇺', bg: '#115e59', text: '#ffffff', border: '#14b8a6' },
 };
 
-// Product configurations
+// Product configurations - POR = Green, R360 = Red (consistent across all tables)
 const PRODUCT_CONFIG: Record<string, BadgeConfig> = {
-  POR: { bg: '#0369a1', text: '#ffffff', border: '#0284c7' },
-  R360: { bg: '#7c3aed', text: '#ffffff', border: '#8b5cf6' },
+  POR: { bg: '#059669', text: '#ffffff', border: '#10b981' },   // Green
+  R360: { bg: '#dc2626', text: '#ffffff', border: '#ef4444' },  // Red
+};
+
+// Product tile colors (lighter variants for backgrounds)
+export const PRODUCT_TILE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  POR: { bg: '#dcfce7', border: '#16a34a', text: '#166534' },   // Light green
+  R360: { bg: '#fef2f2', border: '#dc2626', text: '#dc2626' },  // Light red
 };
 
 // Category configurations

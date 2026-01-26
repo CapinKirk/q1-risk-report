@@ -793,19 +793,19 @@ ${funnelBySourceData.R360.map((row: any) =>
 ).join('\n') || 'No R360 source data'}` : ''}
 
 ## MQL Disqualification/Reversion Summary
-${includePOR ? `### POR MQL Status
+${includePOR ? `### POR MQL Status (MUTUALLY EXCLUSIVE - sums to 100%)
 - Total MQLs: ${dqSummary.POR?.total_mqls || 0}
-- Reverted/Disqualified: ${dqSummary.POR?.reverted_count || 0} (${dqSummary.POR?.reverted_pct || 0}%)
-- Converted to SQL: ${dqSummary.POR?.converted_count || 0} (${dqSummary.POR?.converted_pct || 0}%)
-- Stalled (>30 days): ${dqSummary.POR?.stalled_count || 0} (${dqSummary.POR?.stalled_pct || 0}%)
-- Active: ${dqSummary.POR?.active_count || 0}` : ''}
+- Converted to SQL (success): ${dqSummary.POR?.converted_count || 0} (${dqSummary.POR?.converted_pct || 0}%)
+- Reverted/Disqualified (lost): ${dqSummary.POR?.reverted_count || 0} (${dqSummary.POR?.reverted_pct || 0}%)
+- Stalled >30 days (at risk): ${dqSummary.POR?.stalled_count || 0} (${dqSummary.POR?.stalled_pct || 0}%)
+- In Progress (healthy pipeline): ${dqSummary.POR?.in_progress_count || dqSummary.POR?.active_count || 0} (${dqSummary.POR?.in_progress_pct || dqSummary.POR?.active_pct || 0}%)` : ''}
 
-${includeR360 ? `### R360 MQL Status
+${includeR360 ? `### R360 MQL Status (MUTUALLY EXCLUSIVE - sums to 100%)
 - Total MQLs: ${dqSummary.R360?.total_mqls || 0}
-- Reverted/Disqualified: ${dqSummary.R360?.reverted_count || 0} (${dqSummary.R360?.reverted_pct || 0}%)
-- Converted to SQL: ${dqSummary.R360?.converted_count || 0} (${dqSummary.R360?.converted_pct || 0}%)
-- Stalled (>30 days): ${dqSummary.R360?.stalled_count || 0} (${dqSummary.R360?.stalled_pct || 0}%)
-- Active: ${dqSummary.R360?.active_count || 0}` : ''}
+- Converted to SQL (success): ${dqSummary.R360?.converted_count || 0} (${dqSummary.R360?.converted_pct || 0}%)
+- Reverted/Disqualified (lost): ${dqSummary.R360?.reverted_count || 0} (${dqSummary.R360?.reverted_pct || 0}%)
+- Stalled >30 days (at risk): ${dqSummary.R360?.stalled_count || 0} (${dqSummary.R360?.stalled_pct || 0}%)
+- In Progress (healthy pipeline): ${dqSummary.R360?.in_progress_count || dqSummary.R360?.active_count || 0} (${dqSummary.R360?.in_progress_pct || dqSummary.R360?.active_pct || 0}%)` : ''}
 
 ## Funnel Stage Dropoff Summary (USE THIS FOR DROPOFF ANALYSIS)
 ${includePOR ? `### POR Funnel Stage Stats & Dropoff Reasons
@@ -986,6 +986,8 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 21. In Predictive Indicators, provide SPECIFIC projected Q1 close amounts by category and region based on current run rates
 22. Do NOT output "---" horizontal rules between sections. Section headers provide separation.
 23. **DO NOT MENTION QUARTER PROGRESS**: NEVER compare attainment to quarter progress percentage. NEVER say "at X% quarter progress" or "vs Y% benchmark". Only show QTD attainment (actual/target). The quarter progress is ${period?.quarter_pct_complete || 0}% but do NOT include this in your analysis output.
+24. **FUNNEL MATH CONSISTENCY (CRITICAL)**: MQL/SQL status categories are MUTUALLY EXCLUSIVE and must sum to 100%. Categories: Converted (success), Reverted (lost), Stalled (at risk), In Progress (healthy pipeline). If X% converted and Y% are reverted/stalled, the remaining % are "in progress" (still being worked, NOT lost). Do NOT make contradictory statements like "60% conversion and 0% loss" if other leads exist - explain where the remaining % are (in progress).
+25. **LEAD STATUS DEFINITIONS**: "Converted" = moved to next stage (success). "Reverted" = disqualified/removed from funnel (loss). "Stalled" = stuck >30 days without progress (at risk). "In Progress" = actively being worked, not yet converted (healthy pipeline, NOT lost). When discussing funnel health, distinguish between true losses (reverted) and leads still in pipeline (in progress or stalled).
 
 REMEMBER: Your output MUST exceed 7000 characters. Write in full detail for every section. Short responses will be rejected and regenerated.`;
 

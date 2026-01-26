@@ -7,6 +7,7 @@ import type {
   Product,
   Region,
 } from '@/lib/types';
+import RegionBadge from './RegionBadge';
 
 interface TrendComparisonTableProps {
   type: 'revenue' | 'funnel';
@@ -127,8 +128,20 @@ export default function TrendComparisonTable({
           <tbody>
             {revenueData.map((row, index) => (
               <tr key={`${row.product}-${row.region}-${row.category}-${index}`}>
-                <td className="product-cell">{getProductLabel(row.product)}</td>
-                <td className="region-cell">{row.region}</td>
+                <td className="product-cell">
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: row.product === 'POR' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                    color: '#ffffff',
+                  }}>
+                    {row.product}
+                  </span>
+                </td>
+                <td className="region-cell"><RegionBadge region={row.region} /></td>
                 <td className="category-cell">{row.category}</td>
                 <MetricCell metric={row.acv} format="currency" />
                 <MetricCell metric={row.deals} format="number" />
@@ -203,8 +216,20 @@ export default function TrendComparisonTable({
           <tbody>
             {funnelData.map((row, index) => (
               <tr key={`${row.product}-${row.region}-${index}`}>
-                <td className="product-cell">{getProductLabel(row.product)}</td>
-                <td className="region-cell">{row.region}</td>
+                <td className="product-cell">
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: row.product === 'POR' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                    color: '#ffffff',
+                  }}>
+                    {row.product}
+                  </span>
+                </td>
+                <td className="region-cell"><RegionBadge region={row.region} /></td>
                 <MetricCell metric={row.mql} format="number" />
                 <MetricCell metric={row.sql} format="number" />
                 <MetricCell metric={row.sal} format="number" />

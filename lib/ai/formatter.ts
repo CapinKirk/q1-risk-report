@@ -16,55 +16,40 @@ interface FormatResult {
 }
 
 const FORMAT_PROMPTS: Record<OutputFormat, string> = {
-  display: `You are a formatting assistant. Reformat the raw analysis into clean markdown with proper hierarchy.
+  display: `You are a formatting assistant. Your ONLY job is to reformat the user's raw analysis text into clean markdown. PRESERVE ALL CONTENT from the input - do not summarize, shorten, remove, or invent any data. Every number, percentage, dollar amount, and observation from the input MUST appear in your output. NEVER output placeholder text.
 
-HEADER HIERARCHY (NO BULLETS ON HEADERS):
-### 📈 EXECUTIVE SUMMARY
-[paragraph text, no bullets]
+FORMAT RULES:
+1. Each major section from the input becomes a ### header with an appropriate emoji
+2. Sub-sections or regional breakdowns become #### headers
+3. Use "-" for top-level bullet points
+4. Use "◦" with 2-space indent for nested sub-items
+5. Bold key labels: **Status:**, **Gap:**, **Risk:**, etc.
+6. Executive Summary should be paragraph text, not bullets
+7. HEADERS (### and ####) must NOT have bullet prefixes
 
-### 🌎 REGIONAL ANALYSIS
-
-#### 🇺🇸 AMER
-- **Status:** 🟡 YELLOW at 89%
-- **Gap:** 🔴 -$97,210
-- **Key Risks:**
-  ◦ First risk item here
-  ◦ Second risk item here
-- **Root Cause:** Description here
-- **Actions:**
-  ◦ First action item
-  ◦ Second action item
-
-#### 🇬🇧 EMEA
-[same structure]
-
-#### 🇦🇺 APAC
-[same structure]
-
-### ⚠️ RISK ASSESSMENT
-- **Q1 Outlook:** 🟡 MEDIUM risk
-- **$ at Risk:** 🔴 -$250,000
-- **Top Priorities:**
-  ◦ Priority 1
-  ◦ Priority 2
-  ◦ Priority 3
-
-CRITICAL RULES:
-1. HEADERS (###, ####) must NOT have bullets - they stand alone on their own line
-2. Use "-" for top-level bullets under a header
-3. Use "◦" (open circle) with 2-space indent for nested sub-items
-4. Executive Summary should be paragraph text, NOT bullets
-5. Region names (AMER, EMEA, APAC) are #### headers, NOT bulleted items
-
-COLOR CODING:
-- Attainment >=100%: 🟢 (green)
-- Attainment 80-99%: 🟡 (yellow)
-- Attainment <80%: 🔴 (red)
-- Negative gaps: 🔴 prefix
-- Positive gaps: 🟢 prefix
+COLOR CODING (add emoji prefixes based on values in the text):
+- Attainment >=100%: prefix with 🟢
+- Attainment 80-99%: prefix with 🟡
+- Attainment <80%: prefix with 🔴
+- Negative gaps/shortfalls: prefix with 🔴
+- Positive surplus: prefix with 🟢
 - HIGH risk: 🔴, MEDIUM risk: 🟡, LOW risk: 🟢
 
-Output the reformatted markdown only, no explanations.`,
+SECTION EMOJIS (use these for ### headers based on content):
+- Executive/Summary: 📈
+- Lead/Volume/MQL: 📊
+- Funnel/Conversion: 🔄
+- Velocity/Stall: ⏱️
+- Channel/Campaign: 📣
+- Google Ads: 💰
+- Revenue/Attribution: 💵
+- Pipeline/Risk: ⚠️
+- Win/Loss: 📉
+- Predictive/Forecast: 🔮
+- Recommendations/Actions: ✅
+- Regional headers (AMER/EMEA/APAC): use 🇺🇸/🇬🇧/🇦🇺
+
+CRITICAL: Output ONLY the reformatted markdown from the input text. Never invent data or use placeholder values. If the input has 9 sections, output 9 sections. Preserve ALL detail.`,
 
   html: `You are a formatting assistant. Convert the raw analysis into semantic HTML.
 
@@ -182,7 +167,7 @@ export async function formatAnalysis(
         }
       ],
       temperature: 0.1, // Very low temperature for consistent formatting
-      max_tokens: 2000,
+      max_tokens: 4096,
     }),
   });
 

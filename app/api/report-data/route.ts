@@ -2441,7 +2441,7 @@ async function getUtmBreakdown(filters: ReportFilters) {
         COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
       FROM por_raw GROUP BY utm_medium
     ),
-    -- Campaign name lookups from Google Ads
+    -- Campaign name + spend lookups from Google Ads
     por_campaign_names AS (
       SELECT campaign_id, campaign_name
       FROM (
@@ -2450,6 +2450,17 @@ async function getUtmBreakdown(filters: ReportFilters) {
         FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_POR}.ads_Campaign_8275359090\`
       )
       WHERE rn = 1
+    ),
+    por_campaign_spend AS (
+      SELECT s.campaign_id,
+        ROUND(SUM(s.metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
+        SUM(s.metrics_clicks) AS clicks,
+        SUM(s.metrics_impressions) AS impressions,
+        SUM(s.metrics_conversions) AS conversions
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_POR}.ads_CampaignBasicStats_8275359090\` s
+      WHERE s.segments_date >= '${startDate}' AND s.segments_date <= '${endDate}'
+        AND s.segments_ad_network_type = 'SEARCH'
+      GROUP BY s.campaign_id
     ),
     r360_campaign_names AS (
       SELECT campaign_id, campaign_name
@@ -2460,12 +2471,27 @@ async function getUtmBreakdown(filters: ReportFilters) {
       )
       WHERE rn = 1
     ),
-    -- POR by campaign (with name lookup)
+    r360_campaign_spend AS (
+      SELECT s.campaign_id,
+        ROUND(SUM(s.metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd,
+        SUM(s.metrics_clicks) AS clicks,
+        SUM(s.metrics_impressions) AS impressions,
+        SUM(s.metrics_conversions) AS conversions
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_R360}.ads_CampaignBasicStats_3799591491\` s
+      WHERE s.segments_date >= '${startDate}' AND s.segments_date <= '${endDate}'
+        AND s.segments_ad_network_type = 'SEARCH'
+      GROUP BY s.campaign_id
+    ),
+    -- POR by campaign (with name + spend lookup)
     por_by_campaign AS (
       SELECT 'POR' AS product, 'campaign' AS dimension,
         COALESCE(c.campaign_name, p.utm_campaign) AS value,
         SUM(p.mql_count) AS mql_count, SUM(p.sql_count) AS sql_count,
-        SUM(p.sal_count) AS sal_count, SUM(p.sqo_count) AS sqo_count
+        SUM(p.sal_count) AS sal_count, SUM(p.sqo_count) AS sqo_count,
+        MAX(sp.ad_spend_usd) AS ad_spend_usd,
+        MAX(sp.clicks) AS clicks,
+        MAX(sp.impressions) AS impressions,
+        MAX(sp.conversions) AS conversions
       FROM (
         SELECT utm_campaign,
           COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
@@ -2474,6 +2500,7 @@ async function getUtmBreakdown(filters: ReportFilters) {
       LEFT JOIN por_campaign_names c
         ON SAFE_CAST(p.utm_campaign AS INT64) = c.campaign_id
         OR LOWER(p.utm_campaign) = LOWER(c.campaign_name)
+      LEFT JOIN por_campaign_spend sp ON c.campaign_id = sp.campaign_id
       GROUP BY value
     ),
     -- POR by keyword
@@ -2494,12 +2521,16 @@ async function getUtmBreakdown(filters: ReportFilters) {
         COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
       FROM r360_raw GROUP BY utm_medium
     ),
-    -- R360 by campaign (with name lookup)
+    -- R360 by campaign (with name + spend lookup)
     r360_by_campaign AS (
       SELECT 'R360' AS product, 'campaign' AS dimension,
         COALESCE(c.campaign_name, r.utm_campaign) AS value,
         SUM(r.mql_count) AS mql_count, SUM(r.sql_count) AS sql_count,
-        SUM(r.sal_count) AS sal_count, SUM(r.sqo_count) AS sqo_count
+        SUM(r.sal_count) AS sal_count, SUM(r.sqo_count) AS sqo_count,
+        MAX(sp.ad_spend_usd) AS ad_spend_usd,
+        MAX(sp.clicks) AS clicks,
+        MAX(sp.impressions) AS impressions,
+        MAX(sp.conversions) AS conversions
       FROM (
         SELECT utm_campaign,
           COUNT(*) AS mql_count, SUM(has_sql) AS sql_count, SUM(has_sal) AS sal_count, SUM(has_sqo) AS sqo_count
@@ -2508,6 +2539,7 @@ async function getUtmBreakdown(filters: ReportFilters) {
       LEFT JOIN r360_campaign_names c
         ON SAFE_CAST(r.utm_campaign AS INT64) = c.campaign_id
         OR LOWER(r.utm_campaign) = LOWER(c.campaign_name)
+      LEFT JOIN r360_campaign_spend sp ON c.campaign_id = sp.campaign_id
       GROUP BY value
     ),
     -- R360 by keyword
@@ -2542,16 +2574,33 @@ async function getUtmBreakdown(filters: ReportFilters) {
       FROM r360_raw
       GROUP BY value
     )
-    SELECT * FROM por_by_source
-    UNION ALL SELECT * FROM por_by_medium
+    SELECT product, dimension, value, mql_count, sql_count, sal_count, sqo_count,
+      CAST(NULL AS FLOAT64) AS ad_spend_usd, CAST(NULL AS INT64) AS clicks,
+      CAST(NULL AS INT64) AS impressions, CAST(NULL AS INT64) AS conversions
+    FROM por_by_source
+    UNION ALL SELECT product, dimension, value, mql_count, sql_count, sal_count, sqo_count,
+      CAST(NULL AS FLOAT64), CAST(NULL AS INT64), CAST(NULL AS INT64), CAST(NULL AS INT64)
+    FROM por_by_medium
     UNION ALL SELECT * FROM por_by_campaign
-    UNION ALL SELECT * FROM por_by_keyword
-    UNION ALL SELECT * FROM por_by_branded
-    UNION ALL SELECT * FROM r360_by_source
-    UNION ALL SELECT * FROM r360_by_medium
+    UNION ALL SELECT product, dimension, value, mql_count, sql_count, sal_count, sqo_count,
+      CAST(NULL AS FLOAT64), CAST(NULL AS INT64), CAST(NULL AS INT64), CAST(NULL AS INT64)
+    FROM por_by_keyword
+    UNION ALL SELECT product, dimension, value, mql_count, sql_count, sal_count, sqo_count,
+      CAST(NULL AS FLOAT64), CAST(NULL AS INT64), CAST(NULL AS INT64), CAST(NULL AS INT64)
+    FROM por_by_branded
+    UNION ALL SELECT product, dimension, value, mql_count, sql_count, sal_count, sqo_count,
+      CAST(NULL AS FLOAT64), CAST(NULL AS INT64), CAST(NULL AS INT64), CAST(NULL AS INT64)
+    FROM r360_by_source
+    UNION ALL SELECT product, dimension, value, mql_count, sql_count, sal_count, sqo_count,
+      CAST(NULL AS FLOAT64), CAST(NULL AS INT64), CAST(NULL AS INT64), CAST(NULL AS INT64)
+    FROM r360_by_medium
     UNION ALL SELECT * FROM r360_by_campaign
-    UNION ALL SELECT * FROM r360_by_keyword
-    UNION ALL SELECT * FROM r360_by_branded
+    UNION ALL SELECT product, dimension, value, mql_count, sql_count, sal_count, sqo_count,
+      CAST(NULL AS FLOAT64), CAST(NULL AS INT64), CAST(NULL AS INT64), CAST(NULL AS INT64)
+    FROM r360_by_keyword
+    UNION ALL SELECT product, dimension, value, mql_count, sql_count, sal_count, sqo_count,
+      CAST(NULL AS FLOAT64), CAST(NULL AS INT64), CAST(NULL AS INT64), CAST(NULL AS INT64)
+    FROM r360_by_branded
     ORDER BY product, dimension, mql_count DESC
   `;
 
@@ -2571,7 +2620,8 @@ async function getUtmBreakdown(filters: ReportFilters) {
       const mql = parseInt(row.mql_count) || 0;
       const sql = parseInt(row.sql_count) || 0;
       const sqo = parseInt(row.sqo_count) || 0;
-      const item = {
+      const spend = parseFloat(row.ad_spend_usd) || 0;
+      const item: any = {
         name: row.value,
         mql_count: mql,
         sql_count: sql,
@@ -2580,6 +2630,16 @@ async function getUtmBreakdown(filters: ReportFilters) {
         mql_to_sql_pct: mql > 0 ? Math.round((sql / mql) * 100) : 0,
         mql_to_sqo_pct: mql > 0 ? Math.round((sqo / mql) * 100) : 0,
       };
+      // Add spend metrics for campaign dimension
+      if (row.dimension === 'campaign' && spend > 0) {
+        item.ad_spend_usd = spend;
+        item.clicks = parseInt(row.clicks) || 0;
+        item.impressions = parseInt(row.impressions) || 0;
+        item.conversions = parseInt(row.conversions) || 0;
+        item.cost_per_mql = mql > 0 ? Math.round((spend / mql) * 100) / 100 : 0;
+        item.cost_per_sql = sql > 0 ? Math.round((spend / sql) * 100) / 100 : 0;
+        item.cost_per_sqo = sqo > 0 ? Math.round((spend / sqo) * 100) / 100 : 0;
+      }
       const product = row.product as 'POR' | 'R360';
       const dimKey = `by_${row.dimension}` as keyof typeof result.POR;
       if (result[product] && result[product][dimKey]) {
@@ -3645,13 +3705,32 @@ export async function POST(request: Request) {
       }
     }
 
-    // Calculate MQL disqualification summary
+    // Calculate MQL disqualification summary - MUTUALLY EXCLUSIVE categories that sum to 100%
     const calculateDQSummary = (mqls: any[]) => {
       const total = mqls.length;
-      const reverted = mqls.filter((m: any) => m.mql_status === 'REVERTED' || m.was_reverted).length;
-      const converted = mqls.filter((m: any) => m.mql_status === 'CONVERTED' || m.converted_to_sql === 'Yes').length;
-      const stalled = mqls.filter((m: any) => m.mql_status === 'STALLED').length;
-      const active = mqls.filter((m: any) => m.mql_status === 'ACTIVE').length;
+      // Converted to SQL (success - these leads progressed)
+      const converted = mqls.filter((m: any) =>
+        m.mql_status === 'CONVERTED' || m.converted_to_sql === 'Yes'
+      ).length;
+      // Reverted/disqualified (lost - these leads were removed from funnel)
+      const reverted = mqls.filter((m: any) =>
+        (m.mql_status === 'REVERTED' || m.was_reverted) &&
+        m.mql_status !== 'CONVERTED' && m.converted_to_sql !== 'Yes'
+      ).length;
+      // Stalled but not converted or reverted (at risk - stuck in stage)
+      const stalled = mqls.filter((m: any) =>
+        m.mql_status === 'STALLED' &&
+        m.converted_to_sql !== 'Yes' &&
+        !m.was_reverted
+      ).length;
+      // In progress - not yet converted, reverted, or stalled (healthy pipeline)
+      const inProgress = mqls.filter((m: any) =>
+        m.converted_to_sql !== 'Yes' &&
+        m.mql_status !== 'CONVERTED' &&
+        m.mql_status !== 'REVERTED' &&
+        !m.was_reverted &&
+        m.mql_status !== 'STALLED'
+      ).length;
       return {
         total_mqls: total,
         reverted_count: reverted,
@@ -3660,8 +3739,11 @@ export async function POST(request: Request) {
         converted_pct: total > 0 ? Math.round((converted / total) * 100) : 0,
         stalled_count: stalled,
         stalled_pct: total > 0 ? Math.round((stalled / total) * 100) : 0,
-        active_count: active,
-        active_pct: total > 0 ? Math.round((active / total) * 100) : 0,
+        in_progress_count: inProgress,
+        in_progress_pct: total > 0 ? Math.round((inProgress / total) * 100) : 0,
+        // Keep active_count for backward compatibility but mark as deprecated
+        active_count: inProgress,
+        active_pct: total > 0 ? Math.round((inProgress / total) * 100) : 0,
       };
     };
 

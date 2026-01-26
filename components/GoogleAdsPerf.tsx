@@ -4,6 +4,7 @@ import { ReportData, GoogleAdsRegionalData, GoogleAdsData, GoogleAdsRCA, Region 
 import { formatCurrency, formatNumber, formatPercentDecimal } from '@/lib/formatters';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
+import RegionBadge from './RegionBadge';
 
 interface GoogleAdsPerfProps {
   data: ReportData;
@@ -257,7 +258,24 @@ export default function GoogleAdsPerf({ data }: GoogleAdsPerfProps) {
             {sortedData.map((row, index) => (
               <tr key={`${row.product}-${row.region || 'total'}-${index}`} className={row.isSubRow ? 'sub-row' : ''}>
                 <td style={row.isSubRow ? { paddingLeft: '20px', fontSize: '0.9em' } : {}}>
-                  {row.region ? `↳ ${row.region}` : row.product}
+                  {row.region ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>↳</span>
+                      <RegionBadge region={row.region as Region} />
+                    </span>
+                  ) : (
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      background: row.product === 'POR' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                      color: '#ffffff',
+                    }}>
+                      {row.product}
+                    </span>
+                  )}
                 </td>
                 <td className="right">{formatNumber(row.impressions)}</td>
                 <td className="right">{formatNumber(row.clicks)}</td>

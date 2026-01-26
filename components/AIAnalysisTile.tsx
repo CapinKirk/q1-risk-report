@@ -18,10 +18,10 @@ interface TileState {
   generatedAt: string | null;
 }
 
-// Product colors
+// Product colors - POR = Green, R360 = Red (consistent across all tables)
 const PRODUCT_COLORS = {
-  POR: { bg: '#eff6ff', border: '#3b82f6', text: '#1d4ed8' },
-  R360: { bg: '#f0fdf4', border: '#22c55e', text: '#15803d' },
+  POR: { bg: '#dcfce7', border: '#16a34a', text: '#166534' },   // Green
+  R360: { bg: '#fef2f2', border: '#dc2626', text: '#dc2626' },  // Red
 };
 
 // Region colors

@@ -6,6 +6,7 @@ import { formatCurrency, formatPercent, formatCoverage, getRAGClass, getGapColor
 import { useSortableTable } from '@/lib/useSortableTable';
 import SortableHeader from './SortableHeader';
 import DealListModal from './DealListModal';
+import RegionBadge from './RegionBadge';
 
 interface AttainmentTableProps {
   data: ReportData;
@@ -97,7 +98,7 @@ function ProductAttainmentTable({
 
               return (
                 <tr key={`${row.region}-${row.category}-${idx}`}>
-                  <td>{row.region}</td>
+                  <td><RegionBadge region={row.region} /></td>
                   <td>{row.category}</td>
                   <td className="right">{formatCurrency(fyTarget)}</td>
                   <td className="right">{formatCurrency(row.q1_target)}</td>

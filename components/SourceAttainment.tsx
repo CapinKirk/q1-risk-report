@@ -5,6 +5,7 @@ import { ReportData, Product, SourceAttainmentRow, FunnelByCategoryRow, FunnelBy
 import { formatCurrency, formatPercent, getRAGClass, getGapColor, getPctClass, getAttainmentColor, getRAGBadgeColor } from '@/lib/formatters';
 import { useSortableTable } from '@/lib/useSortableTable';
 import SortableHeader from './SortableHeader';
+import RegionBadge from './RegionBadge';
 
 interface SourceAttainmentProps {
   data: ReportData;
@@ -61,7 +62,7 @@ function SourceACVTable({ product, rows, period }: { product: Product; rows: Sou
 
               return (
                 <tr key={`${row.region}-${row.source}-${idx}`}>
-                  <td>{row.region}</td>
+                  <td><RegionBadge region={row.region} /></td>
                   <td>{row.source}</td>
                   <td className="right">{formatCurrency(row.q1_target)}</td>
                   <td className="right">{formatCurrency(row.qtd_target)}</td>
@@ -148,7 +149,7 @@ function FunnelByCategoryTable({ product, rows }: { product: Product; rows: Funn
                   {stageIdx === 0 && (
                     <>
                       <td rowSpan={stages.length}><strong>{category}</strong></td>
-                      <td rowSpan={stages.length}>{row.region}</td>
+                      <td rowSpan={stages.length}><RegionBadge region={row.region} /></td>
                       <td rowSpan={stages.length} className="right">
                         <span className="rag-tile" style={{ backgroundColor: getAttainmentColor(row.weighted_tof_score), padding: '4px 10px' }}>
                           {formatPercent(row.weighted_tof_score)}
@@ -177,21 +178,31 @@ function FunnelByCategoryTable({ product, rows }: { product: Product; rows: Funn
 export default function SourceAttainment({ data }: SourceAttainmentProps) {
   const { period, source_attainment, funnel_by_category, funnel_by_source } = data;
 
+  // Check which products have data
+  const hasPORData = source_attainment.POR && source_attainment.POR.length > 0;
+  const hasR360Data = source_attainment.R360 && source_attainment.R360.length > 0;
+  const hasPORFunnel = funnel_by_category.POR && funnel_by_category.POR.length > 0;
+  const hasR360Funnel = funnel_by_category.R360 && funnel_by_category.R360.length > 0;
+
   return (
     <section>
       <h2>3. Source Attainment by Channel</h2>
 
-      {/* Source ACV Tables */}
-      <SourceACVTable product="POR" rows={source_attainment.POR} period={period} />
-      <SourceACVTable product="R360" rows={source_attainment.R360} period={period} />
+      {/* Source ACV Tables - only show if data exists */}
+      {hasPORData && <SourceACVTable product="POR" rows={source_attainment.POR} period={period} />}
+      {hasR360Data && <SourceACVTable product="R360" rows={source_attainment.R360} period={period} />}
 
-      {/* Funnel by Category */}
-      <h3>Full Funnel Attainment by Category (EQL/MQL → SQO)</h3>
-      <p style={{ fontSize: '10px', color: '#666', margin: '3px 0' }}>
-        EQL for EXPANSION/MIGRATION, MQL for NEW LOGO/STRATEGIC | TOF Score: POR (10% MQL + 20% SQL + 30% SAL + 40% SQO) | R360 (14% MQL + 29% SQL + 57% SQO - no SAL)
-      </p>
-      <FunnelByCategoryTable product="POR" rows={funnel_by_category.POR} />
-      <FunnelByCategoryTable product="R360" rows={funnel_by_category.R360} />
+      {/* Funnel by Category - only show if at least one product has data */}
+      {(hasPORFunnel || hasR360Funnel) && (
+        <>
+          <h3>Full Funnel Attainment by Category (EQL/MQL → SQO)</h3>
+          <p style={{ fontSize: '10px', color: '#666', margin: '3px 0' }}>
+            EQL for EXPANSION/MIGRATION, MQL for NEW LOGO/STRATEGIC | TOF Score: POR (10% MQL + 20% SQL + 30% SAL + 40% SQO) | R360 (14% MQL + 29% SQL + 57% SQO - no SAL)
+          </p>
+          {hasPORFunnel && <FunnelByCategoryTable product="POR" rows={funnel_by_category.POR} />}
+          {hasR360Funnel && <FunnelByCategoryTable product="R360" rows={funnel_by_category.R360} />}
+        </>
+      )}
     </section>
   );
 }
