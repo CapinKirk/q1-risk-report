@@ -1105,28 +1105,23 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
     }
 
     // Post-process to fix recommendation bold formatting
-    // AI sometimes outputs *P1 – ...* (italic) or P1 – ... (no formatting) instead of **P1 – ...**
+    // AI outputs various broken formats - normalize all to **P1 – content.**
     const lines = rawAnalysis.split('\n');
     const fixedLines = lines.map(line => {
-      // Check if this is a recommendation line (P1/P2/P3 with Owner/Timeframe/expected impact)
-      if (/^\s*-?\s*\*?P[123]\s*[–-]/.test(line) && /Owner:|Timeframe:|expected impact/i.test(line)) {
-        // Extract prefix (whitespace and optional dash)
-        const prefixMatch = line.match(/^(\s*-?\s*)/);
-        const prefix = prefixMatch ? prefixMatch[1] : '';
+      // Check if line contains P1, P2, or P3 AND has recommendation markers
+      const hasP123 = line.includes('P1') || line.includes('P2') || line.includes('P3');
+      const hasMarkers = line.includes('Owner:') || line.includes('Timeframe:') ||
+                         line.toLowerCase().includes('expected impact');
 
-        // Remove prefix and any asterisks, clean up the content
-        let content = line
-          .replace(/^(\s*-?\s*)/, '')  // Remove prefix
-          .replace(/^\*+/, '')          // Remove leading asterisks
-          .replace(/\*+$/, '')          // Remove trailing asterisks
-          .trim();
+      if (hasP123 && hasMarkers) {
+        // Strip ALL asterisks from the line
+        let content = line.replace(/\*/g, '').trim();
 
-        // Ensure it ends with a period
-        if (!content.endsWith('.')) {
-          content += '.';
-        }
+        // Ensure proper ending
+        content = content.replace(/\.+$/, '') + '.';
 
-        return `${prefix}**${content}**`;
+        // Wrap in bold
+        return `**${content}**`;
       }
       return line;
     });
