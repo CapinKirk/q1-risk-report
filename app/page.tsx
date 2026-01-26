@@ -635,6 +635,7 @@ function ReportContent() {
         reportData={filteredData}
         selectedProducts={selectedProducts}
         selectedRegions={selectedRegions}
+        selectedCategories={selectedCategories}
       />
 
       {/* Marketing/Inbound Funnel AI Analysis */}
@@ -642,6 +643,7 @@ function ReportContent() {
         reportData={filteredData}
         selectedProducts={selectedProducts}
         selectedRegions={selectedRegions}
+        selectedCategories={selectedCategories}
       />
 
       <footer className="footer">

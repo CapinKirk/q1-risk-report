@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ReportData, Product, Region, AttainmentRow, ProductTotal } from '@/lib/types';
+import { ReportData, Product, Region, Category, AttainmentRow, ProductTotal } from '@/lib/types';
 
 interface AIAnalysisProps {
   reportData: ReportData | null;
   selectedProducts: Product[];
   selectedRegions: Region[];
+  selectedCategories: Category[];
 }
 
 interface AnalysisState {
@@ -842,17 +843,25 @@ ${html.join('\n')}
 }
 
 // Get display label for current filter selection
-function getFilterLabel(products: Product[], regions: Region[]): string {
+function getFilterLabel(products: Product[], regions: Region[], categories: Category[]): string {
   const productLabel = products.length === 0 || products.length === 2
     ? 'All Products'
     : products[0];
   const regionLabel = regions.length === 0 || regions.length === 3
     ? 'All Regions'
     : regions.join(', ');
-  return `${productLabel} \u2022 ${regionLabel}`;
+  const categoryLabel = categories.length === 0 || categories.length === 5
+    ? null  // Don't show "All Categories" - only show when filtered
+    : categories.join(', ');
+
+  let label = `${productLabel} \u2022 ${regionLabel}`;
+  if (categoryLabel) {
+    label += ` \u2022 ${categoryLabel}`;
+  }
+  return label;
 }
 
-export default function AIAnalysis({ reportData, selectedProducts, selectedRegions }: AIAnalysisProps) {
+export default function AIAnalysis({ reportData, selectedProducts, selectedRegions, selectedCategories }: AIAnalysisProps) {
   const [state, setState] = useState<AnalysisState>({
     loading: false,
     analysis: null,
@@ -912,7 +921,7 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
     setState({ loading: false, analysis: null, error: null, generatedAt: null });
   };
 
-  const filterLabel = getFilterLabel(selectedProducts, selectedRegions);
+  const filterLabel = getFilterLabel(selectedProducts, selectedRegions, selectedCategories);
 
   const parsedSections = useMemo(() => {
     if (!state.analysis) return null;
