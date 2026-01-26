@@ -1601,6 +1601,7 @@ async function getSQLDetails(filters: ReportFilters) {
         ${regionClause.replace(/Division/g, 'f.Division')}
     ),
     -- Non-inbound funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from NewLogoFunnel
+    -- JOIN to OpportunityViewTable to get accurate ACV (funnel WonACV is often NULL)
     non_inbound_sqls AS (
       SELECT
         'POR' AS product,
@@ -1626,7 +1627,10 @@ async function getSQLDetails(filters: ReportFilters) {
         CASE WHEN nl.SAL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
         CASE WHEN nl.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
         CASE WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        -- Use OpportunityViewTable Won status if available
         CASE
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
           WHEN nl.Won_DT IS NOT NULL THEN 'WON'
           WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN nl.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
@@ -1634,13 +1638,17 @@ async function getSQLDetails(filters: ReportFilters) {
           ELSE 'ACTIVE'
         END AS sql_status,
         nl.OpportunityID AS opportunity_id,
-        nl.OpportunityName AS opportunity_name,
-        CAST(NULL AS STRING) AS opportunity_stage,
-        nl.WonACV AS opportunity_acv,
-        'N/A' AS loss_reason,
+        COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        -- Use OpportunityViewTable ACV if available, fall back to funnel WonACV
+        COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) AS days_in_stage,
         ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SQL_DT DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
+      -- JOIN to get accurate ACV from OpportunityViewTable
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON nl.OpportunityID = o.Id
       WHERE nl.Division IN ('US', 'UK', 'AU')
         AND nl.SQL_DT IS NOT NULL
         AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
@@ -1812,6 +1820,7 @@ async function getSQLDetails(filters: ReportFilters) {
         ${r360RegionClause.replace(/Region/g, 'f.Region')}
     ),
     -- Non-inbound R360 funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from R360NewLogoFunnel
+    -- JOIN to OpportunityViewTable to get accurate ACV (funnel WonACV is often NULL)
     non_inbound_r360_sqls AS (
       SELECT
         'R360' AS product,
@@ -1833,20 +1842,27 @@ async function getSQLDetails(filters: ReportFilters) {
         'No' AS converted_to_sal,
         CASE WHEN nl.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
         CASE WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        -- Use OpportunityViewTable Won status if available
         CASE
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
           WHEN nl.Won_DT IS NOT NULL THEN 'WON'
           WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
         nl.OpportunityID AS opportunity_id,
-        nl.OpportunityName AS opportunity_name,
-        CAST(NULL AS STRING) AS opportunity_stage,
-        nl.WonACV AS opportunity_acv,
-        'N/A' AS loss_reason,
+        COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        -- Use OpportunityViewTable ACV if available, fall back to funnel WonACV
+        COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) AS days_in_stage,
         ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.OpportunityName) ORDER BY nl.SQL_DT DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360NewLogoFunnel\` nl
+      -- JOIN to get accurate ACV from OpportunityViewTable
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON nl.OpportunityID = o.Id
       WHERE nl.Region IS NOT NULL
         AND nl.SQL_DT IS NOT NULL
         AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
@@ -2116,6 +2132,7 @@ async function getSALDetails(filters: ReportFilters) {
         ${regionClause.replace(/f\.Division/g, 'o.Division')}
     ),
     -- Non-inbound funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from NewLogoFunnel
+    -- JOIN to OpportunityViewTable to get accurate ACV (funnel WonACV is often NULL)
     non_inbound_sals AS (
       SELECT
         'POR' AS product,
@@ -2141,21 +2158,28 @@ async function getSALDetails(filters: ReportFilters) {
         END AS days_sql_to_sal,
         CASE WHEN nl.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
         CASE WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        -- Use OpportunityViewTable Won status if available
         CASE
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
           WHEN nl.Won_DT IS NOT NULL THEN 'WON'
           WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SAL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sal_status,
         nl.OpportunityID AS opportunity_id,
-        nl.OpportunityName AS opportunity_name,
-        CAST(NULL AS STRING) AS opportunity_stage,
-        nl.WonACV AS opportunity_acv,
-        'N/A' AS loss_reason,
+        COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        -- Use OpportunityViewTable ACV if available, fall back to funnel WonACV
+        COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(nl.SAL_DT AS DATE), DAY) AS days_in_stage,
         'NEW LOGO' AS category,
         ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SAL_DT DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
+      -- JOIN to get accurate ACV from OpportunityViewTable
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON nl.OpportunityID = o.Id
       WHERE nl.Division IN ('US', 'UK', 'AU')
         AND nl.SAL_DT IS NOT NULL
         AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
@@ -2403,6 +2427,7 @@ async function getSQODetails(filters: ReportFilters) {
         ${regionClause.replace(/f\.Division/g, 'o.Division')}
     ),
     -- Non-inbound funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from NewLogoFunnel
+    -- JOIN to OpportunityViewTable to get accurate ACV (funnel WonACV is often NULL)
     non_inbound_sqos AS (
       SELECT
         'POR' AS product,
@@ -2431,20 +2456,27 @@ async function getSQODetails(filters: ReportFilters) {
           THEN DATE_DIFF(CAST(nl.SQO_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
           ELSE DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY)
         END AS days_total_cycle,
+        -- Use OpportunityViewTable Won status if available, fall back to funnel Won_DT
         CASE
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
           WHEN nl.Won_DT IS NOT NULL THEN 'WON'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
         nl.OpportunityID AS opportunity_id,
-        nl.OpportunityName AS opportunity_name,
-        CAST(NULL AS STRING) AS opportunity_stage,
-        nl.WonACV AS opportunity_acv,
-        'N/A' AS loss_reason,
+        COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        -- Use OpportunityViewTable ACV if available, fall back to funnel WonACV
+        COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) AS days_in_stage,
         'NEW LOGO' AS category,
         ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SQO_DT DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
+      -- JOIN to get accurate ACV from OpportunityViewTable
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON nl.OpportunityID = o.Id
       WHERE nl.Division IN ('US', 'UK', 'AU')
         AND nl.SQO_DT IS NOT NULL
         AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
@@ -2617,6 +2649,7 @@ async function getSQODetails(filters: ReportFilters) {
         ${r360RegionClause}
     ),
     -- Non-inbound R360 funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from R360NewLogoFunnel
+    -- JOIN to OpportunityViewTable to get accurate ACV (funnel WonACV is often NULL)
     non_inbound_r360_sqos AS (
       SELECT
         'R360' AS product,
@@ -2638,20 +2671,27 @@ async function getSQODetails(filters: ReportFilters) {
           THEN DATE_DIFF(CAST(nl.SQO_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
           ELSE DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY)
         END AS days_total_cycle,
+        -- Use OpportunityViewTable Won status if available, fall back to funnel Won_DT
         CASE
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
           WHEN nl.Won_DT IS NOT NULL THEN 'WON'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
         nl.OpportunityID AS opportunity_id,
-        nl.OpportunityName AS opportunity_name,
-        CAST(NULL AS STRING) AS opportunity_stage,
-        nl.WonACV AS opportunity_acv,
-        'N/A' AS loss_reason,
+        COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        -- Use OpportunityViewTable ACV if available, fall back to funnel WonACV
+        COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) AS days_in_stage,
         'NEW LOGO' AS category,
         ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.OpportunityName) ORDER BY nl.SQO_DT DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360NewLogoFunnel\` nl
+      -- JOIN to get accurate ACV from OpportunityViewTable
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON nl.OpportunityID = o.Id
       WHERE nl.Region IS NOT NULL
         AND nl.SQO_DT IS NOT NULL
         AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
