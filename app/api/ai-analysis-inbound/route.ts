@@ -761,7 +761,7 @@ ${topConvertingUtmR360.map((s: any) => `- ${s.name}: ${s.convRate}% MQL→SQL, $
 21. BUDGET OPTIMIZATION: Identify campaigns where spend share >> SQO share as wasteful. Recommend specific dollar amounts to reallocate.
 22. Do NOT output "---" horizontal rules between sections.
 23. **DO NOT MENTION QUARTER PROGRESS**: NEVER compare attainment/pacing to quarter progress percentage. NEVER say "at X% quarter progress" or "vs Y% benchmark". Only show QTD attainment or pacing (actual/target). The quarter progress is ${quarterPctComplete}% but do NOT include this in your analysis output.
-24. **ATTAINMENT COLOR CODING**: >=100% = GREEN, 70-99% = YELLOW, <70% = RED. Apply this color coding to every attainment percentage mentioned.
+24. **ATTAINMENT COLOR CODING**: Use ONLY these exact formats: (RED), (YELLOW), (GREEN). Rules: >=100% = (GREEN), 70-99% = (YELLOW), <70% = (RED). FORBIDDEN FORMATS: "HIGH">RED", "MEDIUM">YELLOW", "HIGH>RED". ONLY use color in parentheses like "(RED)".
 25. **FUNNEL MATH CONSISTENCY (CRITICAL)**: MQL status categories are MUTUALLY EXCLUSIVE and must sum to 100%. The categories are: Converted (success), Reverted (lost), Stalled (at risk), and In Progress (healthy pipeline). If X% converted and Y% are reverted/stalled, then the remaining % are "in progress" (still being worked). Do NOT say "0% loss" if leads are still in progress - those aren't lost, they're active. Do NOT make contradictory statements like "60% conversion and 0% stalled" if other leads exist - explain where the remaining % are (in progress).
 26. **LEAD STATUS DEFINITIONS**: "Converted" = moved to SQL stage (success). "Reverted" = disqualified/removed from funnel (loss). "Stalled" = stuck >30 days without progress (at risk). "In Progress" = actively being worked, not yet converted (healthy). When discussing funnel health, distinguish between true losses (reverted) and leads still in the pipeline (in progress or stalled).
 
@@ -879,14 +879,16 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal
     // Post-process to fix AI output issues
 
     // Fix 1: RAG status format - replace HIGH">RED, MEDIUM">YELLOW, etc. with just the color
-    // Handle various quote characters (straight, curly, unicode)
+    // Pattern is typically: HIGH">RED or MEDIUM">YELLOW with various quote chars
     rawAnalysis = rawAnalysis
-      .replace(/HIGH.?>.?RED/gi, 'RED')
-      .replace(/MEDIUM.?>.?YELLOW/gi, 'YELLOW')
-      .replace(/LOW.?>.?GREEN/gi, 'GREEN')
-      .replace(/HIGH["'"">]+RED/gi, 'RED')
-      .replace(/MEDIUM["'"">]+YELLOW/gi, 'YELLOW')
-      .replace(/LOW["'"">]+GREEN/gi, 'GREEN');
+      // Most common pattern: HIGH">RED (quote + greater-than + color)
+      .replace(/HIGH["""""''>]+RED/gi, 'RED')
+      .replace(/MEDIUM["""""''>]+YELLOW/gi, 'YELLOW')
+      .replace(/LOW["""""''>]+GREEN/gi, 'GREEN')
+      // Catch with 1-3 chars between (quotes, brackets, etc)
+      .replace(/HIGH.{1,3}RED/gi, 'RED')
+      .replace(/MEDIUM.{1,3}YELLOW/gi, 'YELLOW')
+      .replace(/LOW.{1,3}GREEN/gi, 'GREEN');
 
     // Fix 2: Remove "no data available" mentions for filtered regions
     rawAnalysis = rawAnalysis

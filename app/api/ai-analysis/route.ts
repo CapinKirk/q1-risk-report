@@ -970,7 +970,7 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 5. **USE PRE-COMPUTED TOTALS FOR EXECUTIVE SUMMARY**: When a region filter is applied (e.g., AMER only), the Executive Summary MUST use values from "PRE-COMPUTED PRODUCT-REGION TOTALS" section. For example, for "R360 AMER" filter, use "R360 AMER Total" values ONLY - do NOT use general "R360 Performance" values which include all regions. The Executive Summary QTD Actual, QTD Target, and Attainment MUST match the filtered product-region total EXACTLY.
 6. **DO NOT MIX FILTERED AND UNFILTERED DATA**: When analyzing a specific region (e.g., AMER), NEVER cite numbers from unfiltered "Product Performance" sections. Only use data from the PRE-COMPUTED PRODUCT-REGION TOTALS and the Regional Segment Detail sections that match the filter.
 7. Frame ALL actions as "Recommend:" not "Action:" or "Next step:" or "Consider:"
-8. COLOR CODING: Use simple color words only: GREEN (>=100% attainment), YELLOW (70-99%), RED (<70%). Write "(GREEN)" or "(YELLOW)" or "(RED)" after each attainment %. NEVER write "HIGH>RED" or "MEDIUM>YELLOW" - just the color word.
+8. COLOR CODING: Use ONLY these exact color words in parentheses: (RED), (YELLOW), (GREEN). Rules: >=100% = (GREEN), 70-99% = (YELLOW), <70% = (RED). FORBIDDEN FORMATS that will be rejected: "HIGH">RED", "MEDIUM">YELLOW", "HIGH>RED", "MEDIUM>YELLOW", "RAG: RED". ONLY write the color in parentheses like "(RED)".
 9. For channel analysis: ALWAYS rank by dollar gap, ALWAYS identify RED channels by name, explain WHY each channel is underperforming
 10. NEVER say "no UTM data available", "insufficient data", or "underperforming channels not identified" - the UTM Source, UTM Keyword, Branded/Non-Branded, and Source Channel Attainment sections have COMPLETE data. USE THEM.
 11. Pipeline coverage: 3x+ = healthy, 2-3x = adequate, <2x = critical risk. Quantify the dollar risk.
@@ -1107,14 +1107,16 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
     // Post-process to fix AI output issues
 
     // Fix 1: RAG status format - replace HIGH">RED, MEDIUM">YELLOW, etc. with just the color
-    // Handle various quote characters (straight, curly, unicode)
+    // Pattern is typically: HIGH">RED or MEDIUM">YELLOW with various quote chars
     rawAnalysis = rawAnalysis
-      .replace(/HIGH.?>.?RED/gi, 'RED')
-      .replace(/MEDIUM.?>.?YELLOW/gi, 'YELLOW')
-      .replace(/LOW.?>.?GREEN/gi, 'GREEN')
-      .replace(/HIGH["'"">]+RED/gi, 'RED')
-      .replace(/MEDIUM["'"">]+YELLOW/gi, 'YELLOW')
-      .replace(/LOW["'"">]+GREEN/gi, 'GREEN');
+      // Most common pattern: HIGH">RED (quote + greater-than + color)
+      .replace(/HIGH["""""''>]+RED/gi, 'RED')
+      .replace(/MEDIUM["""""''>]+YELLOW/gi, 'YELLOW')
+      .replace(/LOW["""""''>]+GREEN/gi, 'GREEN')
+      // Catch with 1-3 chars between (quotes, brackets, etc)
+      .replace(/HIGH.{1,3}RED/gi, 'RED')
+      .replace(/MEDIUM.{1,3}YELLOW/gi, 'YELLOW')
+      .replace(/LOW.{1,3}GREEN/gi, 'GREEN');
 
     // Fix 2: Remove "no data available" mentions for filtered regions
     rawAnalysis = rawAnalysis
