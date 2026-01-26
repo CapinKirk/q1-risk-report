@@ -1821,7 +1821,7 @@ async function getSQLDetails(filters: ReportFilters) {
           WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
           ELSE 'https://por.my.salesforce.com/'
         END AS salesforce_url,
-        COALESCE(nl.Company, 'Unknown') AS company_name,
+        COALESCE(nl.OpportunityName, 'Unknown') AS company_name,
         'N/A' AS email,
         UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
         CAST(nl.SQL_DT AS STRING) AS sql_date,
@@ -1845,7 +1845,7 @@ async function getSQLDetails(filters: ReportFilters) {
         nl.WonACV AS opportunity_acv,
         'N/A' AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) AS days_in_stage,
-        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SQL_DT DESC) AS rn
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.OpportunityName) ORDER BY nl.SQL_DT DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360NewLogoFunnel\` nl
       WHERE nl.Region IS NOT NULL
         AND nl.SQL_DT IS NOT NULL
@@ -1864,11 +1864,12 @@ async function getSQLDetails(filters: ReportFilters) {
     const shouldFetchPOR = filters.products.length === 0 || filters.products.includes('POR');
     const shouldFetchR360 = filters.products.length === 0 || filters.products.includes('R360');
 
-    const [porRows, r360Rows] = await Promise.all([
-      shouldFetchPOR ? getBigQuery().query({ query: porQuery }).then(r => r[0]) : Promise.resolve([]),
-      shouldFetchR360 ? getBigQuery().query({ query: r360Query }).then(r => r[0]) : Promise.resolve([]),
+    const [[porRows], [r360Rows]] = await Promise.all([
+      shouldFetchPOR ? getBigQuery().query({ query: porQuery }) : Promise.resolve([[]]),
+      shouldFetchR360 ? getBigQuery().query({ query: r360Query }) : Promise.resolve([[]]),
     ]);
 
+    console.log(`SQL Details: POR=${porRows?.length || 0}, R360=${r360Rows?.length || 0}`);
     return {
       POR: porRows as any[],
       R360: r360Rows as any[],
@@ -2625,7 +2626,7 @@ async function getSQODetails(filters: ReportFilters) {
           WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
           ELSE 'https://por.my.salesforce.com/'
         END AS salesforce_url,
-        COALESCE(nl.Company, 'Unknown') AS company_name,
+        COALESCE(nl.OpportunityName, 'Unknown') AS company_name,
         'N/A' AS email,
         UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
         CAST(nl.SQO_DT AS STRING) AS sqo_date,
@@ -2649,7 +2650,7 @@ async function getSQODetails(filters: ReportFilters) {
         'N/A' AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) AS days_in_stage,
         'NEW LOGO' AS category,
-        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SQO_DT DESC) AS rn
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.OpportunityName) ORDER BY nl.SQO_DT DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360NewLogoFunnel\` nl
       WHERE nl.Region IS NOT NULL
         AND nl.SQO_DT IS NOT NULL
