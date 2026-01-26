@@ -877,23 +877,32 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal
     }
 
     // Post-process to fix AI output issues
+    // Apply cleanup TWICE to catch nested patterns
 
-    // Fix 1: RAG status format - VERY aggressively replace ALL variations
-    // The AI outputs: HIGH">RED, HIGH>RED, (HIGH">RED), MEDIUM">YELLOW, etc.
-    // Strategy: Replace the ENTIRE "HIGH...RED" pattern with just "RED"
-    rawAnalysis = rawAnalysis
-      // Most aggressive: match HIGH followed by ANY non-letter chars then RED/YELLOW/GREEN
-      .replace(/HIGH[^A-Za-z]*RED/gi, 'RED')
-      .replace(/MEDIUM[^A-Za-z]*YELLOW/gi, 'YELLOW')
-      .replace(/LOW[^A-Za-z]*GREEN/gi, 'GREEN')
-      // Handle edge cases with quotes/brackets around the color
-      .replace(/\(HIGH[^)]*RED[^)]*\)/gi, '(RED)')
-      .replace(/\(MEDIUM[^)]*YELLOW[^)]*\)/gi, '(YELLOW)')
-      .replace(/\(LOW[^)]*GREEN[^)]*\)/gi, '(GREEN)')
-      // Cleanup stray patterns
-      .replace(/severity:\s*(RED|YELLOW|GREEN)/gi, '$1')
-      .replace(/HIGH["'`"">»]+/gi, '')
-      .replace(/["'`"">»]+(RED|YELLOW|GREEN)/gi, '$1');
+    for (let pass = 0; pass < 2; pass++) {
+      // Fix 1: RAG status format - VERY aggressively replace ALL variations
+      // The AI outputs: HIGH">RED, HIGH>RED, (HIGH">RED), MEDIUM">YELLOW, etc.
+      rawAnalysis = rawAnalysis
+        // Exact patterns seen in production - handle first
+        .replace(/\(HIGH">RED\)/gi, '(RED)')
+        .replace(/\(MEDIUM">YELLOW\)/gi, '(YELLOW)')
+        .replace(/\(LOW">GREEN\)/gi, '(GREEN)')
+        .replace(/HIGH">RED/gi, 'RED')
+        .replace(/MEDIUM">YELLOW/gi, 'YELLOW')
+        .replace(/LOW">GREEN/gi, 'GREEN')
+        // Most aggressive: match HIGH/MEDIUM/LOW followed by ANY non-letter chars then color
+        .replace(/HIGH[^A-Za-z\n]*RED/gi, 'RED')
+        .replace(/MEDIUM[^A-Za-z\n]*YELLOW/gi, 'YELLOW')
+        .replace(/LOW[^A-Za-z\n]*GREEN/gi, 'GREEN')
+        // Handle edge cases with quotes/brackets around the color
+        .replace(/\(HIGH[^)\n]*RED[^)\n]*\)/gi, '(RED)')
+        .replace(/\(MEDIUM[^)\n]*YELLOW[^)\n]*\)/gi, '(YELLOW)')
+        .replace(/\(LOW[^)\n]*GREEN[^)\n]*\)/gi, '(GREEN)')
+        // Cleanup stray patterns
+        .replace(/severity:\s*(RED|YELLOW|GREEN)/gi, '$1')
+        .replace(/HIGH["'`"">»]+/gi, '')
+        .replace(/["'`"">»]+(RED|YELLOW|GREEN)/gi, '$1');
+    }
 
     // Fix 2: Remove "no data available" mentions for filtered regions
     // More aggressive patterns to catch all variations
@@ -910,9 +919,20 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal
       .replace(/No (QTD )?data available\.?/gi, '')
       .replace(/\n\n\n+/g, '\n\n');
 
-    // Fix 3: Recommendation bold formatting
-    // Problem: AI outputs ** on its own line, wrapping all recs in one bold block
-    // Solution: Remove standalone ** lines, then wrap each P1/P2/P3 line individually
+    // Fix 3: Remove ALL orphan ** markers
+    // Problem: AI outputs ** without matching pairs, like "QTD MQLs: **38/86"
+
+    // Remove ** followed by numbers (orphan bold markers before stats)
+    rawAnalysis = rawAnalysis.replace(/\*\*(\d)/g, '$1');
+
+    // Remove ** followed by $ (orphan bold markers before currency)
+    rawAnalysis = rawAnalysis.replace(/\*\*\$/g, '$');
+
+    // Remove ** followed by word characters (orphan at start of words)
+    rawAnalysis = rawAnalysis.replace(/\*\*([A-Za-z])/g, '$1');
+
+    // Remove ** at end of lines without matching start
+    rawAnalysis = rawAnalysis.replace(/([^*])\*\*$/gm, '$1');
 
     // Step 1: Remove ALL standalone ** lines (lines that are just ** with optional whitespace)
     rawAnalysis = rawAnalysis.replace(/^\s*\*\*\s*$/gm, '');
@@ -922,6 +942,9 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal
 
     // Step 3: Remove ** that appears at the start of content lines
     rawAnalysis = rawAnalysis.replace(/^\*\*/gm, '');
+
+    // Step 3b: Remove any remaining standalone ** in the middle of text
+    rawAnalysis = rawAnalysis.replace(/\s\*\*\s/g, ' ');
 
     // Step 4: Clean up any remaining stray asterisks around recommendations
     rawAnalysis = rawAnalysis.replace(/\*\*(P[123]\s*[–-])/g, '$1');
