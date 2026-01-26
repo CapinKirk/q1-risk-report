@@ -876,38 +876,51 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal
       rawAnalysis = 'No analysis generated';
     }
 
-    // Post-process to fix recommendation bold formatting
-    // AI outputs various broken formats - normalize all to **P1 – content.**
+    // Post-process to fix AI output issues
 
-    // Step 1: Handle "single bold block" format where AI wraps all recs in one **block**
-    // Pattern: **-\nP1...\nP2...**  or  **\n- P1...\n- P2...**
-    rawAnalysis = rawAnalysis.replace(
-      /\*\*-?\s*\n([\s\S]*?)\*\*/g,
-      (match, content) => {
-        // Check if this block contains recommendations
-        if (!content.includes('P1') && !content.includes('P2') && !content.includes('P3')) {
-          return match; // Not a recommendations block, leave as-is
-        }
-        if (!content.includes('Owner:') && !content.includes('Timeframe:')) {
-          return match; // Not a recommendations block
-        }
+    // Fix 1: RAG status format - replace HIGH">RED with (RED), MEDIUM">YELLOW with (YELLOW), etc.
+    rawAnalysis = rawAnalysis
+      .replace(/HIGH"?>RED/g, 'RED')
+      .replace(/MEDIUM"?>YELLOW/g, 'YELLOW')
+      .replace(/LOW"?>GREEN/g, 'GREEN')
+      .replace(/HIGH">RED/g, 'RED')
+      .replace(/MEDIUM">YELLOW/g, 'YELLOW')
+      .replace(/LOW">GREEN/g, 'GREEN');
 
-        // Split by P1/P2/P3 markers and format each
+    // Fix 2: Recommendation bold formatting
+    // Find the recommendations section and reformat it
+    const recSectionMatch = rawAnalysis.match(/((?:10\.|PRIORITIZED RECOMMENDATIONS)[^\n]*\n)([\s\S]*?)(?=\n###|\n##|$)/i);
+    if (recSectionMatch) {
+      const header = recSectionMatch[1];
+      let content = recSectionMatch[2];
+
+      // Check if this contains recommendations
+      if ((content.includes('P1') || content.includes('P2') || content.includes('P3')) &&
+          (content.includes('Owner:') || content.includes('Timeframe:'))) {
+
+        // Remove all asterisks first
+        content = content.replace(/\*/g, '');
+
+        // Split by P1/P2/P3 markers
         const recs = content.split(/(?=P[123]\s*[–-])/).filter((r: string) => r.trim());
-        return recs.map((rec: string) => {
+
+        // Format each recommendation
+        const formattedRecs = recs.map((rec: string) => {
           let cleaned = rec
-            .replace(/^-\s*/, '')      // Remove leading dash
-            .replace(/\s*-\s*$/, '')   // Remove trailing dash
-            .replace(/\*/g, '')        // Remove any asterisks
+            .replace(/^[\s\-–]+/, '')  // Remove leading whitespace/dashes
+            .replace(/[\s\-–]+$/, '')  // Remove trailing whitespace/dashes
             .trim();
           if (!cleaned) return '';
           if (!cleaned.endsWith('.')) cleaned += '.';
           return `**${cleaned}**`;
         }).filter((r: string) => r).join('\n');
-      }
-    );
 
-    // Step 2: Handle individual lines that still need fixing
+        // Replace the section
+        rawAnalysis = rawAnalysis.replace(recSectionMatch[0], header + formattedRecs);
+      }
+    }
+
+    // Fix 3: Handle any remaining individual recommendation lines
     const lines = rawAnalysis.split('\n');
     const fixedLines = lines.map(line => {
       const hasP123 = line.includes('P1') || line.includes('P2') || line.includes('P3');
@@ -915,12 +928,13 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal
                          line.toLowerCase().includes('expected impact');
 
       // Skip if already properly formatted
-      if (line.startsWith('**P') && line.endsWith('**')) {
+      if (line.match(/^\*\*P[123]/) && line.endsWith('**')) {
         return line;
       }
 
       if (hasP123 && hasMarkers) {
         let content = line.replace(/\*/g, '').trim();
+        content = content.replace(/^[\s\-–]+/, '').replace(/[\s\-–]+$/, '');
         content = content.replace(/\.+$/, '') + '.';
         return `**${content}**`;
       }
