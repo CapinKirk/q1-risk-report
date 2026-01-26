@@ -1104,7 +1104,30 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
       rawAnalysis = 'No analysis generated';
     }
 
-    // GPT-5.2 now outputs structured markdown directly — no formatter needed
+    // Post-process to fix recommendation bold formatting
+    // AI sometimes outputs *P1 – ...* (italic) instead of **P1 – ...** (bold)
+    rawAnalysis = rawAnalysis
+      // Fix patterns like "*P1 – ..." at start of line that end with "*" or ".*"
+      .replace(/^(\s*-\s*)\*P([123])\s*[–-]/gm, '$1**P$2 –')
+      // Fix closing single asterisk before newline (when line starts with **P)
+      .replace(/\*\*P([123])[^*]+[^*]\*$/gm, (match) => {
+        // If it ends with single *, replace with **
+        if (match.endsWith('*') && !match.endsWith('**')) {
+          return match.slice(0, -1) + '**';
+        }
+        return match;
+      })
+      // Comprehensive fix: find lines with *P1/P2/P3 and ensure double asterisks
+      .replace(/^(\s*-\s*)\*(P[123]\s*[–-][^*]+)\*$/gm, '$1**$2**')
+      // Fix any remaining *P1, *P2, *P3 at line start
+      .replace(/^(\s*-\s*)\*(P[123])/gm, '$1**$2')
+      // Ensure lines starting with **P end with **
+      .replace(/^(\s*-\s*\*\*P[123][^*]+[^*])\*?$/gm, (match) => {
+        if (!match.endsWith('**')) {
+          return match.replace(/\*?$/, '**');
+        }
+        return match;
+      });
 
     return NextResponse.json({
       success: true,
