@@ -878,27 +878,42 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal
 
     // Post-process to fix AI output issues
 
-    // Fix 1: RAG status format - replace HIGH">RED, MEDIUM">YELLOW, etc. with just the color
-    // Pattern is typically: HIGH">RED or MEDIUM">YELLOW with various quote chars
+    // Fix 1: RAG status format - aggressively replace ALL variations
+    // The AI sometimes outputs: HIGH">RED, HIGH>RED, severity: HIGH">RED, (HIGH">RED), etc.
     rawAnalysis = rawAnalysis
-      // Most common pattern: HIGH">RED (quote + greater-than + color)
-      .replace(/HIGH["""""''>]+RED/gi, 'RED')
-      .replace(/MEDIUM["""""''>]+YELLOW/gi, 'YELLOW')
-      .replace(/LOW["""""''>]+GREEN/gi, 'GREEN')
-      // Catch with 1-3 chars between (quotes, brackets, etc)
-      .replace(/HIGH.{1,3}RED/gi, 'RED')
-      .replace(/MEDIUM.{1,3}YELLOW/gi, 'YELLOW')
-      .replace(/LOW.{1,3}GREEN/gi, 'GREEN');
+      // Pattern with any chars between (up to 5 to be safe)
+      .replace(/HIGH[^A-Za-z]{0,5}RED/gi, 'RED')
+      .replace(/MEDIUM[^A-Za-z]{0,5}YELLOW/gi, 'YELLOW')
+      .replace(/LOW[^A-Za-z]{0,5}GREEN/gi, 'GREEN')
+      // Cleanup: severity: RED -> just RED in parentheses
+      .replace(/severity:\s*RED/gi, 'RED')
+      .replace(/severity:\s*YELLOW/gi, 'YELLOW')
+      .replace(/severity:\s*GREEN/gi, 'GREEN')
+      // Final cleanup: any remaining broken patterns
+      .replace(/\(severity:\s*(RED|YELLOW|GREEN)\)/gi, '($1)')
+      .replace(/\(\s*(RED|YELLOW|GREEN)\s*,/gi, '($1,');
+
+    // Additional cleanup pass for any lingering issues
+    rawAnalysis = rawAnalysis
+      .replace(/HIGH["'`"">]+/gi, '')
+      .replace(/["'`"">]+RED/gi, 'RED')
+      .replace(/["'`"">]+YELLOW/gi, 'YELLOW')
+      .replace(/["'`"">]+GREEN/gi, 'GREEN');
 
     // Fix 2: Remove "no data available" mentions for filtered regions
+    // More aggressive patterns to catch all variations
     rawAnalysis = rawAnalysis
-      .replace(/🇬🇧\s*EMEA[^.]*no\s*(QTD\s*)?(data|inbound)[^.]*\./gi, '')
-      .replace(/🇦🇺\s*APAC[^.]*no\s*(QTD\s*)?(data|inbound)[^.]*\./gi, '')
-      .replace(/EMEA\/APAC[^.]*no\s*(QTD\s*)?(data|inbound)[^.]*\./gi, '')
-      .replace(/No\s*(QTD\s*)?(data|inbound)\s*(available\s*)?(for|in)\s*🇬🇧[^.]*\./gi, '')
-      .replace(/No\s*(QTD\s*)?(data|inbound)\s*(available\s*)?(for|in)\s*🇦🇺[^.]*\./gi, '')
-      .replace(/:\s*No data available\.?/gi, ': Excluded by filter.')
-      .replace(/No data available/gi, 'Excluded by current filter');
+      // Remove entire lines/sentences mentioning no data for regions
+      .replace(/[^\n]*EMEA[^.\n]*no\s*(QTD\s*)?(data|inbound|volume)[^.\n]*\.[^\n]*/gi, '')
+      .replace(/[^\n]*APAC[^.\n]*no\s*(QTD\s*)?(data|inbound|volume)[^.\n]*\.[^\n]*/gi, '')
+      .replace(/[^\n]*no\s*(QTD\s*)?(data|inbound)[^.\n]*EMEA[^.\n]*\.[^\n]*/gi, '')
+      .replace(/[^\n]*no\s*(QTD\s*)?(data|inbound)[^.\n]*APAC[^.\n]*\.[^\n]*/gi, '')
+      // Remove bullet points about no data
+      .replace(/[-•]\s*[^\n]*no\s*(QTD\s*)?(data|inbound|volume)[^.\n]*\.\s*\n?/gi, '')
+      // Generic cleanup
+      .replace(/:\s*No (QTD )?data available\.?/gi, '')
+      .replace(/No (QTD )?data available\.?/gi, '')
+      .replace(/\n\n\n+/g, '\n\n');
 
     // Fix 3: Recommendation bold formatting - handle ** on its own line
     // First, collapse ** that's alone on a line with the content
