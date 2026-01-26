@@ -878,21 +878,50 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal
 
     // Post-process to fix recommendation bold formatting
     // AI outputs various broken formats - normalize all to **P1 – content.**
+
+    // Step 1: Handle "single bold block" format where AI wraps all recs in one **block**
+    // Pattern: **-\nP1...\nP2...**  or  **\n- P1...\n- P2...**
+    rawAnalysis = rawAnalysis.replace(
+      /\*\*-?\s*\n([\s\S]*?)\*\*/g,
+      (match, content) => {
+        // Check if this block contains recommendations
+        if (!content.includes('P1') && !content.includes('P2') && !content.includes('P3')) {
+          return match; // Not a recommendations block, leave as-is
+        }
+        if (!content.includes('Owner:') && !content.includes('Timeframe:')) {
+          return match; // Not a recommendations block
+        }
+
+        // Split by P1/P2/P3 markers and format each
+        const recs = content.split(/(?=P[123]\s*[–-])/).filter(r => r.trim());
+        return recs.map(rec => {
+          let cleaned = rec
+            .replace(/^-\s*/, '')      // Remove leading dash
+            .replace(/\s*-\s*$/, '')   // Remove trailing dash
+            .replace(/\*/g, '')        // Remove any asterisks
+            .trim();
+          if (!cleaned) return '';
+          if (!cleaned.endsWith('.')) cleaned += '.';
+          return `**${cleaned}**`;
+        }).filter(r => r).join('\n');
+      }
+    );
+
+    // Step 2: Handle individual lines that still need fixing
     const lines = rawAnalysis.split('\n');
     const fixedLines = lines.map(line => {
-      // Check if line contains P1, P2, or P3 AND has recommendation markers
       const hasP123 = line.includes('P1') || line.includes('P2') || line.includes('P3');
       const hasMarkers = line.includes('Owner:') || line.includes('Timeframe:') ||
                          line.toLowerCase().includes('expected impact');
 
+      // Skip if already properly formatted
+      if (line.startsWith('**P') && line.endsWith('**')) {
+        return line;
+      }
+
       if (hasP123 && hasMarkers) {
-        // Strip ALL asterisks from the line
         let content = line.replace(/\*/g, '').trim();
-
-        // Ensure proper ending
         content = content.replace(/\.+$/, '') + '.';
-
-        // Wrap in bold
         return `**${content}**`;
       }
       return line;
