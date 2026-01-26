@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { Region, Product, Category, Source } from '@/lib/types';
 import { buildFilterURL } from '@/lib/filterData';
+import { REGION_CONFIG } from './RegionBadge';
 
 interface ReportFilterProps {
   selectedRegions: Region[];
@@ -138,7 +139,7 @@ export default function ReportFilter({
           onClick={handleAllRegionsClick}
           data-testid="region-all"
         >
-          All Regions
+          🌐 All Regions
         </button>
         {ALL_REGIONS.map(region => (
           <button
@@ -147,7 +148,7 @@ export default function ReportFilter({
             onClick={() => handleRegionClick(region)}
             data-testid={`region-${region.toLowerCase()}`}
           >
-            {region}
+            {REGION_CONFIG[region]?.flag} {region}
           </button>
         ))}
       </div>
