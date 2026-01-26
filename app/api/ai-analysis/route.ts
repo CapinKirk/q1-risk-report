@@ -1106,16 +1106,31 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
 
     // Post-process to fix AI output issues
 
-    // Fix 1: RAG status format - replace HIGH">RED with (RED), MEDIUM">YELLOW with (YELLOW), etc.
+    // Fix 1: RAG status format - replace HIGH">RED, MEDIUM">YELLOW, etc. with just the color
+    // Handle various quote characters (straight, curly, unicode)
     rawAnalysis = rawAnalysis
-      .replace(/HIGH"?>RED/g, 'RED')
-      .replace(/MEDIUM"?>YELLOW/g, 'YELLOW')
-      .replace(/LOW"?>GREEN/g, 'GREEN')
-      .replace(/HIGH">RED/g, 'RED')
-      .replace(/MEDIUM">YELLOW/g, 'YELLOW')
-      .replace(/LOW">GREEN/g, 'GREEN');
+      .replace(/HIGH.?>.?RED/gi, 'RED')
+      .replace(/MEDIUM.?>.?YELLOW/gi, 'YELLOW')
+      .replace(/LOW.?>.?GREEN/gi, 'GREEN')
+      .replace(/HIGH["'"">]+RED/gi, 'RED')
+      .replace(/MEDIUM["'"">]+YELLOW/gi, 'YELLOW')
+      .replace(/LOW["'"">]+GREEN/gi, 'GREEN');
 
-    // Fix 2: Recommendation bold formatting
+    // Fix 2: Remove "no data available" mentions for filtered regions
+    rawAnalysis = rawAnalysis
+      .replace(/🇬🇧\s*EMEA[^.]*no\s*(QTD\s*)?(data|inbound)[^.]*\./gi, '')
+      .replace(/🇦🇺\s*APAC[^.]*no\s*(QTD\s*)?(data|inbound)[^.]*\./gi, '')
+      .replace(/EMEA\/APAC[^.]*no\s*(QTD\s*)?(data|inbound)[^.]*\./gi, '')
+      .replace(/No\s*(QTD\s*)?(data|inbound)\s*(available\s*)?(for|in)\s*🇬🇧[^.]*\./gi, '')
+      .replace(/No\s*(QTD\s*)?(data|inbound)\s*(available\s*)?(for|in)\s*🇦🇺[^.]*\./gi, '')
+      .replace(/:\s*No data available\.?/gi, ': Excluded by filter.')
+      .replace(/No data available/gi, 'Excluded by current filter');
+
+    // Fix 3: Recommendation bold formatting - handle ** on its own line
+    // First, collapse ** that's alone on a line with the content
+    rawAnalysis = rawAnalysis.replace(/\*\*\s*\n(P[123])/g, '**$1');
+    rawAnalysis = rawAnalysis.replace(/(Timeframe:[^*\n]+\.?)\s*\n\*\*/g, '$1**');
+
     // Find the recommendations section and reformat it
     const recSectionMatch = rawAnalysis.match(/((?:10\.|PRIORITIZED RECOMMENDATIONS)[^\n]*\n)([\s\S]*?)(?=\n###|\n##|$)/i);
     if (recSectionMatch) {
@@ -1148,9 +1163,12 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
       }
     }
 
-    // Fix 3: Handle any remaining individual recommendation lines
+    // Fix 4: Handle any remaining individual recommendation lines
     const lines = rawAnalysis.split('\n');
     const fixedLines = lines.map(line => {
+      // Skip lines that are just **
+      if (line.trim() === '**' || line.trim() === '') return null;
+
       const hasP123 = line.includes('P1') || line.includes('P2') || line.includes('P3');
       const hasMarkers = line.includes('Owner:') || line.includes('Timeframe:') ||
                          line.toLowerCase().includes('expected impact');
@@ -1167,7 +1185,7 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
         return `**${content}**`;
       }
       return line;
-    });
+    }).filter((line): line is string => line !== null);
     rawAnalysis = fixedLines.join('\n');
 
     return NextResponse.json({
