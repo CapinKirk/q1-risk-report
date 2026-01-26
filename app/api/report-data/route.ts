@@ -1548,6 +1548,13 @@ async function getSQLDetails(filters: ReportFilters) {
         COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) AS days_in_stage,
+        -- Category derived from opportunity Type (InboundFunnel is always New Business)
+        CASE
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Existing Business' THEN 'EXPANSION'
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Migration' THEN 'MIGRATION'
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Strategic' THEN 'STRATEGIC'
+          ELSE 'NEW LOGO'
+        END AS category,
         -- Deduplicate by email to match summary COUNT(DISTINCT email)
         ROW_NUMBER() OVER (
           PARTITION BY COALESCE(f.LeadEmail, f.ContactEmail)
@@ -1644,6 +1651,13 @@ async function getSQLDetails(filters: ReportFilters) {
         COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) AS days_in_stage,
+        -- Category from opportunity Type
+        CASE
+          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN o.Type = 'Migration' THEN 'MIGRATION'
+          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
+          ELSE 'NEW LOGO'
+        END AS category,
         ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SQL_DT DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
       -- JOIN to get accurate ACV from OpportunityViewTable
@@ -1769,6 +1783,13 @@ async function getSQLDetails(filters: ReportFilters) {
         COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) AS days_in_stage,
+        -- Category derived from opportunity Type
+        CASE
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Existing Business' THEN 'EXPANSION'
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Migration' THEN 'MIGRATION'
+          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Strategic' THEN 'STRATEGIC'
+          ELSE 'NEW LOGO'
+        END AS category,
         -- Deduplicate by email to match summary COUNT(DISTINCT email)
         ROW_NUMBER() OVER (
           PARTITION BY f.Email
@@ -1858,6 +1879,13 @@ async function getSQLDetails(filters: ReportFilters) {
         COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) AS days_in_stage,
+        -- Category from opportunity Type
+        CASE
+          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN o.Type = 'Migration' THEN 'MIGRATION'
+          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
+          ELSE 'NEW LOGO'
+        END AS category,
         ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.OpportunityName) ORDER BY nl.SQL_DT DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360NewLogoFunnel\` nl
       -- JOIN to get accurate ACV from OpportunityViewTable

@@ -11,6 +11,9 @@ const ITEMS_PER_PAGE = 25;
 type SourceType = 'INBOUND' | 'OUTBOUND' | 'AE SOURCED' | 'AM SOURCED' | 'TRADESHOW' | 'PARTNERSHIPS';
 const ALL_SOURCES: SourceType[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];
 
+type Category = 'NEW LOGO' | 'STRATEGIC' | 'EXPANSION' | 'MIGRATION';
+const ALL_CATEGORIES: Category[] = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
+
 interface SQLDetailsProps {
   sqlDetails: {
     POR: SQLDetailRow[];
@@ -23,6 +26,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
   const [selectedRegion, setSelectedRegion] = useState<Region | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedSources, setSelectedSources] = useState<SourceType[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -55,6 +59,11 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
       });
     }
 
+    // Apply category filter (multi-select)
+    if (selectedCategories.length > 0) {
+      allSQLs = allSQLs.filter(s => selectedCategories.includes((s.category || 'NEW LOGO') as Category));
+    }
+
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -68,7 +77,7 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
     }
 
     return allSQLs;
-  }, [sqlDetails, selectedProduct, selectedRegion, selectedStatus, selectedSources, searchTerm]);
+  }, [sqlDetails, selectedProduct, selectedRegion, selectedStatus, selectedSources, selectedCategories, searchTerm]);
 
   // Setup sorting
   const { sortedData, handleSort, getSortDirection } = useSortableTable(
@@ -232,6 +241,27 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
                 }}
               >
                 {src}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="filter-group category-filter">
+          <label>Opp Type:</label>
+          <div className="category-pills">
+            {ALL_CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                className={`category-pill ${selectedCategories.includes(cat) ? 'active' : ''}`}
+                onClick={() => {
+                  setCurrentPage(1);
+                  setSelectedCategories(prev =>
+                    prev.includes(cat)
+                      ? prev.filter(c => c !== cat)
+                      : [...prev, cat]
+                  );
+                }}
+              >
+                {cat}
               </button>
             ))}
           </div>
@@ -540,6 +570,36 @@ export default function SQLDetails({ sqlDetails }: SQLDetailsProps) {
           background: #3b82f6;
           color: white;
           border-color: #3b82f6;
+        }
+        .filter-group.category-filter {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .category-pills {
+          display: flex;
+          gap: 3px;
+          flex-wrap: wrap;
+        }
+        .category-pill {
+          font-size: 0.6rem;
+          padding: 2px 6px;
+          border: 1px solid var(--border-primary);
+          border-radius: 10px;
+          background: var(--bg-secondary);
+          color: var(--text-tertiary);
+          cursor: pointer;
+          transition: all 0.15s;
+          font-weight: 500;
+        }
+        .category-pill:hover {
+          background: var(--bg-hover);
+          border-color: #8b5cf6;
+        }
+        .category-pill.active {
+          background: #8b5cf6;
+          color: white;
+          border-color: #8b5cf6;
         }
         .sql-table-container {
           overflow-x: auto;
