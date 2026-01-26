@@ -877,104 +877,103 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal
     }
 
     // Post-process to fix AI output issues
-    // Apply cleanup TWICE to catch nested patterns
+    // NUCLEAR cleanup - apply 3 passes to catch all variations
 
-    for (let pass = 0; pass < 2; pass++) {
-      // Fix 1: RAG status format - VERY aggressively replace ALL variations
+    for (let pass = 0; pass < 3; pass++) {
+      // Fix 1: RAG status format - NUCLEAR replacement
       // The AI outputs: HIGH">RED, HIGH>RED, (HIGH">RED), MEDIUM">YELLOW, etc.
+      // with various quote characters: ", ', `, ", ", », >, etc.
+
+      // FIRST: Direct string replacements for EXACT patterns seen in production
       rawAnalysis = rawAnalysis
-        // Exact patterns seen in production - handle first
-        .replace(/\(HIGH">RED\)/gi, '(RED)')
-        .replace(/\(MEDIUM">YELLOW\)/gi, '(YELLOW)')
-        .replace(/\(LOW">GREEN\)/gi, '(GREEN)')
-        .replace(/HIGH">RED/gi, 'RED')
-        .replace(/MEDIUM">YELLOW/gi, 'YELLOW')
-        .replace(/LOW">GREEN/gi, 'GREEN')
-        // Most aggressive: match HIGH/MEDIUM/LOW followed by ANY non-letter chars then color
-        .replace(/HIGH[^A-Za-z\n]*RED/gi, 'RED')
-        .replace(/MEDIUM[^A-Za-z\n]*YELLOW/gi, 'YELLOW')
-        .replace(/LOW[^A-Za-z\n]*GREEN/gi, 'GREEN')
-        // Handle edge cases with quotes/brackets around the color
-        .replace(/\(HIGH[^)\n]*RED[^)\n]*\)/gi, '(RED)')
-        .replace(/\(MEDIUM[^)\n]*YELLOW[^)\n]*\)/gi, '(YELLOW)')
-        .replace(/\(LOW[^)\n]*GREEN[^)\n]*\)/gi, '(GREEN)')
-        // Cleanup stray patterns
-        .replace(/severity:\s*(RED|YELLOW|GREEN)/gi, '$1')
-        .replace(/HIGH["'`"">»]+/gi, '')
-        .replace(/["'`"">»]+(RED|YELLOW|GREEN)/gi, '$1');
+        .split('HIGH">RED').join('RED')
+        .split('MEDIUM">YELLOW').join('YELLOW')
+        .split('LOW">GREEN').join('GREEN')
+        .split('HIGH">red').join('RED')
+        .split('MEDIUM">yellow').join('YELLOW')
+        .split('LOW">green').join('GREEN')
+        .split('(HIGH">RED)').join('(RED)')
+        .split('(MEDIUM">YELLOW)').join('(YELLOW)')
+        .split('(LOW">GREEN)').join('(GREEN)');
+
+      // SECOND: Regex patterns for variations
+      rawAnalysis = rawAnalysis
+        // Match HIGH/MEDIUM/LOW followed by ANY combo of quotes/symbols then color
+        .replace(/HIGH\s*["'`"">»>\-:=\s]+\s*RED/gi, 'RED')
+        .replace(/MEDIUM\s*["'`"">»>\-:=\s]+\s*YELLOW/gi, 'YELLOW')
+        .replace(/LOW\s*["'`"">»>\-:=\s]+\s*GREEN/gi, 'GREEN')
+        // Handle with parentheses
+        .replace(/\(\s*HIGH\s*["'`"">»>\-:=\s]+\s*RED\s*\)/gi, '(RED)')
+        .replace(/\(\s*MEDIUM\s*["'`"">»>\-:=\s]+\s*YELLOW\s*\)/gi, '(YELLOW)')
+        .replace(/\(\s*LOW\s*["'`"">»>\-:=\s]+\s*GREEN\s*\)/gi, '(GREEN)')
+        // Most aggressive: any non-letter chars between severity and color
+        .replace(/HIGH[^A-Za-z\n]{1,10}RED/gi, 'RED')
+        .replace(/MEDIUM[^A-Za-z\n]{1,15}YELLOW/gi, 'YELLOW')
+        .replace(/LOW[^A-Za-z\n]{1,10}GREEN/gi, 'GREEN')
+        // Cleanup orphan severity words followed by quotes
+        .replace(/\b(HIGH|MEDIUM|LOW)\s*["'`"">»>]+\s*(?=[(\[])/gi, '')
+        .replace(/severity:\s*(RED|YELLOW|GREEN)/gi, '$1');
     }
 
     // Fix 2: Remove "no data available" mentions for filtered regions
-    // More aggressive patterns to catch all variations
     rawAnalysis = rawAnalysis
-      // Remove entire lines/sentences mentioning no data for regions
       .replace(/[^\n]*EMEA[^.\n]*no\s*(QTD\s*)?(data|inbound|volume)[^.\n]*\.[^\n]*/gi, '')
       .replace(/[^\n]*APAC[^.\n]*no\s*(QTD\s*)?(data|inbound|volume)[^.\n]*\.[^\n]*/gi, '')
       .replace(/[^\n]*no\s*(QTD\s*)?(data|inbound)[^.\n]*EMEA[^.\n]*\.[^\n]*/gi, '')
       .replace(/[^\n]*no\s*(QTD\s*)?(data|inbound)[^.\n]*APAC[^.\n]*\.[^\n]*/gi, '')
-      // Remove bullet points about no data
       .replace(/[-•]\s*[^\n]*no\s*(QTD\s*)?(data|inbound|volume)[^.\n]*\.\s*\n?/gi, '')
-      // Generic cleanup
       .replace(/:\s*No (QTD )?data available\.?/gi, '')
       .replace(/No (QTD )?data available\.?/gi, '')
       .replace(/\n\n\n+/g, '\n\n');
 
-    // Fix 3: Remove ALL orphan ** markers
-    // Problem: AI outputs ** without matching pairs, like "QTD MQLs: **38/86"
+    // Fix 3: NUCLEAR ** removal - multiple passes
+    for (let pass = 0; pass < 3; pass++) {
+      // Remove ** in all problematic positions
+      rawAnalysis = rawAnalysis
+        // ** before numbers, currency, words
+        .replace(/\*\*(\d)/g, '$1')
+        .replace(/\*\*\$/g, '$')
+        .replace(/\*\*([A-Za-z])/g, '$1')
+        // ** at line boundaries
+        .replace(/([^*])\*\*$/gm, '$1')
+        .replace(/^\s*\*\*\s*$/gm, '')
+        .replace(/\*\*$/gm, '')
+        .replace(/^\*\*/gm, '')
+        // ** surrounded by whitespace
+        .replace(/\s\*\*\s/g, ' ')
+        .replace(/\s\*\*$/g, '')
+        .replace(/^\*\*\s/g, '')
+        // ** after punctuation
+        .replace(/([.,:;!?])\*\*/g, '$1')
+        // Just "**" anywhere
+        .replace(/(?<!\*)\*\*(?!\*)/g, '');
+    }
 
-    // Remove ** followed by numbers (orphan bold markers before stats)
-    rawAnalysis = rawAnalysis.replace(/\*\*(\d)/g, '$1');
-
-    // Remove ** followed by $ (orphan bold markers before currency)
-    rawAnalysis = rawAnalysis.replace(/\*\*\$/g, '$');
-
-    // Remove ** followed by word characters (orphan at start of words)
-    rawAnalysis = rawAnalysis.replace(/\*\*([A-Za-z])/g, '$1');
-
-    // Remove ** at end of lines without matching start
-    rawAnalysis = rawAnalysis.replace(/([^*])\*\*$/gm, '$1');
-
-    // Step 1: Remove ALL standalone ** lines (lines that are just ** with optional whitespace)
-    rawAnalysis = rawAnalysis.replace(/^\s*\*\*\s*$/gm, '');
-
-    // Step 2: Remove ** that appears at the end of content lines (like "...Timeframe: Q1.**")
-    rawAnalysis = rawAnalysis.replace(/\*\*$/gm, '');
-
-    // Step 3: Remove ** that appears at the start of content lines
-    rawAnalysis = rawAnalysis.replace(/^\*\*/gm, '');
-
-    // Step 3b: Remove any remaining standalone ** in the middle of text
-    rawAnalysis = rawAnalysis.replace(/\s\*\*\s/g, ' ');
-
-    // Step 4: Clean up any remaining stray asterisks around recommendations
+    // Step 4: Clean up stray asterisks around recommendations
     rawAnalysis = rawAnalysis.replace(/\*\*(P[123]\s*[–-])/g, '$1');
     rawAnalysis = rawAnalysis.replace(/(Timeframe:[^.\n]*\.?)\*\*/g, '$1');
 
-    // Step 5: Now wrap each P1/P2/P3 recommendation line properly
+    // Step 5: Properly format P1/P2/P3 recommendation lines
     const lines = rawAnalysis.split('\n');
     const fixedLines = lines.map(line => {
       const trimmed = line.trim();
-
-      // Skip empty lines
       if (!trimmed) return line;
 
-      // Check if this is a recommendation line (has P1/P2/P3 and Owner/Timeframe/expected impact)
-      const isRecLine = /^P[123]\s*[–-]/.test(trimmed) &&
+      const isRecLine = /^-?\s*\*?\*?P[123]\s*[–-]/.test(trimmed) &&
                         (trimmed.includes('Owner:') || trimmed.includes('Timeframe:') ||
                          trimmed.toLowerCase().includes('expected impact'));
 
       if (isRecLine) {
-        // Remove any existing asterisks and rewrap properly
-        let content = trimmed.replace(/\*/g, '').trim();
+        let content = trimmed.replace(/\*/g, '').replace(/^-\s*/, '').trim();
         if (!content.endsWith('.')) content += '.';
-        return `**${content}**`;
+        return `- **${content}**`;
       }
 
       return line;
     });
     rawAnalysis = fixedLines.join('\n');
 
-    // Step 6: Clean up multiple blank lines
+    // Step 6: Final cleanup
     rawAnalysis = rawAnalysis.replace(/\n{3,}/g, '\n\n');
 
     return NextResponse.json({
