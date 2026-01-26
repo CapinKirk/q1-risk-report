@@ -1600,53 +1600,57 @@ async function getSQLDetails(filters: ReportFilters) {
         AND CAST(f.SQL_DT AS DATE) <= '${filters.endDate}'
         ${regionClause.replace(/Division/g, 'f.Division')}
     ),
-    -- OUTBOUND funnel records that have reached SQL stage
-    outbound_sqls AS (
+    -- Non-inbound funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from NewLogoFunnel
+    non_inbound_sqls AS (
       SELECT
         'POR' AS product,
-        CASE ob.Division
+        CASE nl.Division
           WHEN 'US' THEN 'AMER'
           WHEN 'UK' THEN 'EMEA'
           WHEN 'AU' THEN 'APAC'
         END AS region,
-        COALESCE(ob.OpportunityID, CAST(ob.CaptureDate AS STRING)) AS record_id,
+        COALESCE(nl.OpportunityID, CAST(nl.SQL_DT AS STRING)) AS record_id,
         CASE
-          WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', ob.OpportunityID)
+          WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
           ELSE 'https://por.my.salesforce.com/'
         END AS salesforce_url,
-        COALESCE(ob.Company, 'Unknown') AS company_name,
+        COALESCE(nl.Company, 'Unknown') AS company_name,
         'N/A' AS email,
-        'OUTBOUND' AS source,
-        CAST(ob.CaptureDate AS STRING) AS sql_date,
-        CAST(NULL AS STRING) AS mql_date,
-        0 AS days_mql_to_sql,
-        CASE WHEN ob.SAL IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
-        CASE WHEN ob.SQO IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        CASE WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
+        CAST(nl.SQL_DT AS STRING) AS sql_date,
+        CAST(nl.MQL_DT AS STRING) AS mql_date,
+        CASE WHEN nl.MQL_DT IS NOT NULL AND nl.SQL_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(nl.SQL_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
+          ELSE 0
+        END AS days_mql_to_sql,
+        CASE WHEN nl.SAL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
+        CASE WHEN nl.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        CASE WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
-          WHEN ob.Won IS NOT NULL THEN 'WON'
-          WHEN ob.SQO IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN ob.SAL IS NOT NULL THEN 'CONVERTED_SAL'
-          WHEN DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) > 45 THEN 'STALLED'
+          WHEN nl.Won_DT IS NOT NULL THEN 'WON'
+          WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN nl.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
-        ob.OpportunityID AS opportunity_id,
-        ob.OpportunityName AS opportunity_name,
+        nl.OpportunityID AS opportunity_id,
+        nl.OpportunityName AS opportunity_name,
         CAST(NULL AS STRING) AS opportunity_stage,
-        ob.WonACV AS opportunity_acv,
+        nl.WonACV AS opportunity_acv,
         'N/A' AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) AS days_in_stage,
-        ROW_NUMBER() OVER (PARTITION BY COALESCE(ob.OpportunityID, ob.Company) ORDER BY ob.CaptureDate DESC) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.OutboundFunnel\` ob
-      WHERE ob.Division IN ('US', 'UK', 'AU')
-        AND ob.SQL IS NOT NULL
-        AND ob.CaptureDate >= '${filters.startDate}'
-        AND ob.CaptureDate <= '${filters.endDate}'
-        ${regionClause.replace(/Division/g, 'ob.Division')}
+        DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) AS days_in_stage,
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SQL_DT DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
+      WHERE nl.Division IN ('US', 'UK', 'AU')
+        AND nl.SQL_DT IS NOT NULL
+        AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
+        AND CAST(nl.SQL_DT AS DATE) >= '${filters.startDate}'
+        AND CAST(nl.SQL_DT AS DATE) <= '${filters.endDate}'
+        ${regionClause.replace(/Division/g, 'nl.Division')}
     )
     SELECT * EXCEPT(rn) FROM ranked_sqls WHERE rn = 1
     UNION ALL
-    SELECT * EXCEPT(rn) FROM outbound_sqls WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM non_inbound_sqls WHERE rn = 1
     ORDER BY sql_date DESC
   `;
 
@@ -1806,10 +1810,53 @@ async function getSQLDetails(filters: ReportFilters) {
         AND CAST(f.SQL_DT AS DATE) >= '${filters.startDate}'
         AND CAST(f.SQL_DT AS DATE) <= '${filters.endDate}'
         ${r360RegionClause.replace(/Region/g, 'f.Region')}
+    ),
+    -- Non-inbound R360 funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from R360NewLogoFunnel
+    non_inbound_r360_sqls AS (
+      SELECT
+        'R360' AS product,
+        nl.Region AS region,
+        COALESCE(nl.OpportunityID, CAST(nl.SQL_DT AS STRING)) AS record_id,
+        CASE
+          WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
+          ELSE 'https://por.my.salesforce.com/'
+        END AS salesforce_url,
+        COALESCE(nl.Company, 'Unknown') AS company_name,
+        'N/A' AS email,
+        UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
+        CAST(nl.SQL_DT AS STRING) AS sql_date,
+        CAST(nl.MQL_DT AS STRING) AS mql_date,
+        CASE WHEN nl.MQL_DT IS NOT NULL AND nl.SQL_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(nl.SQL_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
+          ELSE 0
+        END AS days_mql_to_sql,
+        'No' AS converted_to_sal,
+        CASE WHEN nl.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        CASE WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        CASE
+          WHEN nl.Won_DT IS NOT NULL THEN 'WON'
+          WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sql_status,
+        nl.OpportunityID AS opportunity_id,
+        nl.OpportunityName AS opportunity_name,
+        CAST(NULL AS STRING) AS opportunity_stage,
+        nl.WonACV AS opportunity_acv,
+        'N/A' AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) AS days_in_stage,
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SQL_DT DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360NewLogoFunnel\` nl
+      WHERE nl.Region IS NOT NULL
+        AND nl.SQL_DT IS NOT NULL
+        AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
+        AND CAST(nl.SQL_DT AS DATE) >= '${filters.startDate}'
+        AND CAST(nl.SQL_DT AS DATE) <= '${filters.endDate}'
+        ${r360RegionClause.replace(/Region/g, 'nl.Region')}
     )
-    SELECT * EXCEPT(rn)
-    FROM ranked_sqls
-    WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM ranked_sqls WHERE rn = 1
+    UNION ALL
+    SELECT * EXCEPT(rn) FROM non_inbound_r360_sqls WHERE rn = 1
     ORDER BY sql_date DESC
   `;
 
@@ -2067,59 +2114,59 @@ async function getSALDetails(filters: ReportFilters) {
         AND CAST(o.CreatedDate AS DATE) <= '${filters.endDate}'
         ${regionClause.replace(/f\.Division/g, 'o.Division')}
     ),
-    -- OUTBOUND funnel records that have reached SAL stage
-    outbound_sals AS (
+    -- Non-inbound funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from NewLogoFunnel
+    non_inbound_sals AS (
       SELECT
         'POR' AS product,
-        CASE ob.Division
+        CASE nl.Division
           WHEN 'US' THEN 'AMER'
           WHEN 'UK' THEN 'EMEA'
           WHEN 'AU' THEN 'APAC'
         END AS region,
-        COALESCE(ob.OpportunityID, CAST(ob.CaptureDate AS STRING)) AS record_id,
+        COALESCE(nl.OpportunityID, CAST(nl.SAL_DT AS STRING)) AS record_id,
         CASE
-          WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', ob.OpportunityID)
+          WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
           ELSE 'https://por.my.salesforce.com/'
         END AS salesforce_url,
-        COALESCE(ob.Company, 'Unknown') AS company_name,
+        COALESCE(nl.Company, 'Unknown') AS company_name,
         'N/A' AS email,
-        'OUTBOUND' AS source,
-        CAST(ob.CaptureDate AS STRING) AS sal_date,
-        CAST(NULL AS STRING) AS sql_date,
-        CAST(NULL AS STRING) AS mql_date,
-        0 AS days_sql_to_sal,
-        CASE WHEN ob.SQO IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        CASE WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
+        CAST(nl.SAL_DT AS STRING) AS sal_date,
+        CAST(nl.SQL_DT AS STRING) AS sql_date,
+        CAST(nl.MQL_DT AS STRING) AS mql_date,
+        CASE WHEN nl.SQL_DT IS NOT NULL AND nl.SAL_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(nl.SAL_DT AS DATE), CAST(nl.SQL_DT AS DATE), DAY)
+          ELSE 0
+        END AS days_sql_to_sal,
+        CASE WHEN nl.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        CASE WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
-          WHEN ob.Won IS NOT NULL THEN 'WON'
-          WHEN ob.SQO IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) > 45 THEN 'STALLED'
+          WHEN nl.Won_DT IS NOT NULL THEN 'WON'
+          WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SAL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sal_status,
-        ob.OpportunityID AS opportunity_id,
-        ob.OpportunityName AS opportunity_name,
+        nl.OpportunityID AS opportunity_id,
+        nl.OpportunityName AS opportunity_name,
         CAST(NULL AS STRING) AS opportunity_stage,
-        ob.WonACV AS opportunity_acv,
+        nl.WonACV AS opportunity_acv,
         'N/A' AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) AS days_in_stage,
-        CASE
-          WHEN ob.Type = 'Existing Business' THEN 'EXPANSION'
-          WHEN ob.Type = 'Migration' THEN 'MIGRATION'
-          ELSE 'NEW LOGO'
-        END AS category,
-        ROW_NUMBER() OVER (PARTITION BY COALESCE(ob.OpportunityID, ob.Company) ORDER BY ob.CaptureDate DESC) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.OutboundFunnel\` ob
-      WHERE ob.Division IN ('US', 'UK', 'AU')
-        AND ob.SAL IS NOT NULL
-        AND ob.CaptureDate >= '${filters.startDate}'
-        AND ob.CaptureDate <= '${filters.endDate}'
-        ${regionClause.replace(/f\.Division/g, 'ob.Division')}
+        DATE_DIFF(CURRENT_DATE(), CAST(nl.SAL_DT AS DATE), DAY) AS days_in_stage,
+        'NEW LOGO' AS category,
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SAL_DT DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
+      WHERE nl.Division IN ('US', 'UK', 'AU')
+        AND nl.SAL_DT IS NOT NULL
+        AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
+        AND CAST(nl.SAL_DT AS DATE) >= '${filters.startDate}'
+        AND CAST(nl.SAL_DT AS DATE) <= '${filters.endDate}'
+        ${regionClause.replace(/f\.Division/g, 'nl.Division')}
     )
     SELECT * EXCEPT(rn) FROM ranked_sals WHERE rn = 1
     UNION ALL
     SELECT * EXCEPT(rn) FROM expansion_migration_sals WHERE rn = 1
     UNION ALL
-    SELECT * EXCEPT(rn) FROM outbound_sals WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM non_inbound_sals WHERE rn = 1
     ORDER BY sal_date DESC
   `;
 
@@ -2354,58 +2401,61 @@ async function getSQODetails(filters: ReportFilters) {
         AND CAST(o.CreatedDate AS DATE) <= '${filters.endDate}'
         ${regionClause.replace(/f\.Division/g, 'o.Division')}
     ),
-    -- OUTBOUND funnel records that have reached SQO stage
-    outbound_sqos AS (
+    -- Non-inbound funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from NewLogoFunnel
+    non_inbound_sqos AS (
       SELECT
         'POR' AS product,
-        CASE ob.Division
+        CASE nl.Division
           WHEN 'US' THEN 'AMER'
           WHEN 'UK' THEN 'EMEA'
           WHEN 'AU' THEN 'APAC'
         END AS region,
-        COALESCE(ob.OpportunityID, CAST(ob.CaptureDate AS STRING)) AS record_id,
+        COALESCE(nl.OpportunityID, CAST(nl.SQO_DT AS STRING)) AS record_id,
         CASE
-          WHEN ob.OpportunityID IS NOT NULL AND ob.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', ob.OpportunityID)
+          WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
           ELSE 'https://por.my.salesforce.com/'
         END AS salesforce_url,
-        COALESCE(ob.Company, 'Unknown') AS company_name,
+        COALESCE(nl.Company, 'Unknown') AS company_name,
         'N/A' AS email,
-        'OUTBOUND' AS source,
-        CAST(ob.CaptureDate AS STRING) AS sqo_date,
-        CAST(NULL AS STRING) AS sal_date,
-        CAST(NULL AS STRING) AS sql_date,
-        CAST(NULL AS STRING) AS mql_date,
-        0 AS days_sal_to_sqo,
-        DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) AS days_total_cycle,
+        UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
+        CAST(nl.SQO_DT AS STRING) AS sqo_date,
+        CAST(nl.SAL_DT AS STRING) AS sal_date,
+        CAST(nl.SQL_DT AS STRING) AS sql_date,
+        CAST(nl.MQL_DT AS STRING) AS mql_date,
+        CASE WHEN nl.SAL_DT IS NOT NULL AND nl.SQO_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(nl.SQO_DT AS DATE), CAST(nl.SAL_DT AS DATE), DAY)
+          ELSE 0
+        END AS days_sal_to_sqo,
+        CASE WHEN nl.MQL_DT IS NOT NULL AND nl.SQO_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(nl.SQO_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
+          ELSE DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY)
+        END AS days_total_cycle,
         CASE
-          WHEN ob.Won IS NOT NULL THEN 'WON'
-          WHEN DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) > 60 THEN 'STALLED'
+          WHEN nl.Won_DT IS NOT NULL THEN 'WON'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
-        ob.OpportunityID AS opportunity_id,
-        ob.OpportunityName AS opportunity_name,
+        nl.OpportunityID AS opportunity_id,
+        nl.OpportunityName AS opportunity_name,
         CAST(NULL AS STRING) AS opportunity_stage,
-        ob.WonACV AS opportunity_acv,
+        nl.WonACV AS opportunity_acv,
         'N/A' AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), ob.CaptureDate, DAY) AS days_in_stage,
-        CASE
-          WHEN ob.Type = 'Existing Business' THEN 'EXPANSION'
-          WHEN ob.Type = 'Migration' THEN 'MIGRATION'
-          ELSE 'NEW LOGO'
-        END AS category,
-        ROW_NUMBER() OVER (PARTITION BY COALESCE(ob.OpportunityID, ob.Company) ORDER BY ob.CaptureDate DESC) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.OutboundFunnel\` ob
-      WHERE ob.Division IN ('US', 'UK', 'AU')
-        AND ob.SQO IS NOT NULL
-        AND ob.CaptureDate >= '${filters.startDate}'
-        AND ob.CaptureDate <= '${filters.endDate}'
-        ${regionClause.replace(/f\.Division/g, 'ob.Division')}
+        DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) AS days_in_stage,
+        'NEW LOGO' AS category,
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SQO_DT DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
+      WHERE nl.Division IN ('US', 'UK', 'AU')
+        AND nl.SQO_DT IS NOT NULL
+        AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
+        AND CAST(nl.SQO_DT AS DATE) >= '${filters.startDate}'
+        AND CAST(nl.SQO_DT AS DATE) <= '${filters.endDate}'
+        ${regionClause.replace(/f\.Division/g, 'nl.Division')}
     )
     SELECT * EXCEPT(rn) FROM ranked_sqos WHERE rn = 1
     UNION ALL
     SELECT * EXCEPT(rn) FROM expansion_migration_sqos WHERE rn = 1
     UNION ALL
-    SELECT * EXCEPT(rn) FROM outbound_sqos WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM non_inbound_sqos WHERE rn = 1
     ORDER BY sqo_date DESC
   `;
 
@@ -2564,10 +2614,53 @@ async function getSQODetails(filters: ReportFilters) {
         AND CAST(f.SQO_DT AS DATE) >= '${filters.startDate}'
         AND CAST(f.SQO_DT AS DATE) <= '${filters.endDate}'
         ${r360RegionClause}
+    ),
+    -- Non-inbound R360 funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from R360NewLogoFunnel
+    non_inbound_r360_sqos AS (
+      SELECT
+        'R360' AS product,
+        nl.Region AS region,
+        COALESCE(nl.OpportunityID, CAST(nl.SQO_DT AS STRING)) AS record_id,
+        CASE
+          WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
+          ELSE 'https://por.my.salesforce.com/'
+        END AS salesforce_url,
+        COALESCE(nl.Company, 'Unknown') AS company_name,
+        'N/A' AS email,
+        UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
+        CAST(nl.SQO_DT AS STRING) AS sqo_date,
+        CAST(NULL AS STRING) AS sal_date,
+        CAST(nl.SQL_DT AS STRING) AS sql_date,
+        CAST(nl.MQL_DT AS STRING) AS mql_date,
+        0 AS days_sal_to_sqo,
+        CASE WHEN nl.MQL_DT IS NOT NULL AND nl.SQO_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(nl.SQO_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
+          ELSE DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY)
+        END AS days_total_cycle,
+        CASE
+          WHEN nl.Won_DT IS NOT NULL THEN 'WON'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sqo_status,
+        nl.OpportunityID AS opportunity_id,
+        nl.OpportunityName AS opportunity_name,
+        CAST(NULL AS STRING) AS opportunity_stage,
+        nl.WonACV AS opportunity_acv,
+        'N/A' AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) AS days_in_stage,
+        'NEW LOGO' AS category,
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SQO_DT DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360NewLogoFunnel\` nl
+      WHERE nl.Region IS NOT NULL
+        AND nl.SQO_DT IS NOT NULL
+        AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
+        AND CAST(nl.SQO_DT AS DATE) >= '${filters.startDate}'
+        AND CAST(nl.SQO_DT AS DATE) <= '${filters.endDate}'
+        ${r360RegionClause.replace(/f\.Region/g, 'nl.Region')}
     )
-    SELECT * EXCEPT(rn)
-    FROM ranked_sqos
-    WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM ranked_sqos WHERE rn = 1
+    UNION ALL
+    SELECT * EXCEPT(rn) FROM non_inbound_r360_sqos WHERE rn = 1
     ORDER BY sqo_date DESC
   `;
 
