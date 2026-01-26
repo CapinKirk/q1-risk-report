@@ -17,12 +17,16 @@ interface SALDetailsProps {
 }
 
 type Category = 'NEW LOGO' | 'STRATEGIC' | 'EXPANSION' | 'MIGRATION';
+type SourceType = 'INBOUND' | 'OUTBOUND' | 'AE SOURCED' | 'AM SOURCED' | 'TRADESHOW' | 'EXPANSION';
+
+const ALL_SOURCES: SourceType[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'EXPANSION'];
 
 export default function SALDetails({ salDetails }: SALDetailsProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | 'ALL'>('ALL');
   const [selectedRegion, setSelectedRegion] = useState<Region | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
+  const [selectedSources, setSelectedSources] = useState<SourceType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -52,6 +56,14 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
       allSALs = allSALs.filter(s => selectedCategories.includes(s.category as Category));
     }
 
+    // Apply source filter (multi-select)
+    if (selectedSources.length > 0) {
+      allSALs = allSALs.filter(s => {
+        const sourceUpper = (s.source || 'INBOUND').toUpperCase();
+        return selectedSources.includes(sourceUpper as SourceType);
+      });
+    }
+
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -64,7 +76,7 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
     }
 
     return allSALs;
-  }, [salDetails, selectedProduct, selectedRegion, selectedStatus, selectedCategories, searchTerm]);
+  }, [salDetails, selectedProduct, selectedRegion, selectedStatus, selectedCategories, selectedSources, searchTerm]);
 
   // Setup sorting
   const { sortedData, handleSort, getSortDirection } = useSortableTable(
@@ -221,6 +233,27 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
                     }}
                   >
                     {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="filter-group source-filter">
+              <label>Source:</label>
+              <div className="source-pills">
+                {ALL_SOURCES.map((src) => (
+                  <button
+                    key={src}
+                    className={`source-pill ${selectedSources.includes(src) ? 'active' : ''}`}
+                    onClick={() => {
+                      setCurrentPage(1);
+                      setSelectedSources(prev =>
+                        prev.includes(src)
+                          ? prev.filter(s => s !== src)
+                          : [...prev, src]
+                      );
+                    }}
+                  >
+                    {src}
                   </button>
                 ))}
               </div>
@@ -527,6 +560,36 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
               background: #10b981;
               color: white;
               border-color: #10b981;
+            }
+            .filter-group.source-filter {
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            }
+            .source-pills {
+              display: flex;
+              gap: 4px;
+              flex-wrap: wrap;
+            }
+            .source-pill {
+              font-size: 0.6rem;
+              padding: 2px 6px;
+              border: 1px solid var(--border-primary);
+              border-radius: 12px;
+              background: var(--bg-secondary);
+              color: var(--text-tertiary);
+              cursor: pointer;
+              transition: all 0.15s;
+              font-weight: 500;
+            }
+            .source-pill:hover {
+              background: var(--bg-hover);
+              border-color: #3b82f6;
+            }
+            .source-pill.active {
+              background: #3b82f6;
+              color: white;
+              border-color: #3b82f6;
             }
             .sal-table-container {
               overflow-x: auto;

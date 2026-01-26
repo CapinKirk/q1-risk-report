@@ -1518,7 +1518,7 @@ async function getSQLDetails(filters: ReportFilters) {
         END AS salesforce_url,
         COALESCE(f.Company, 'Unknown') AS company_name,
         COALESCE(f.LeadEmail, f.ContactEmail, 'N/A') AS email,
-        COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND') AS source,
+        UPPER(COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
         CAST(f.SQL_DT AS STRING) AS sql_date,
         CAST(f.MQL_DT AS STRING) AS mql_date,
         DATE_DIFF(CAST(f.SQL_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_mql_to_sql,
@@ -1684,7 +1684,7 @@ async function getSQLDetails(filters: ReportFilters) {
         END AS salesforce_url,
         COALESCE(f.Company, 'Unknown') AS company_name,
         f.Email AS email,
-        COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND') AS source,
+        UPPER(COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
         CAST(f.SQL_DT AS STRING) AS sql_date,
         CAST(f.MQL_DT AS STRING) AS mql_date,
         DATE_DIFF(CAST(f.SQL_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_mql_to_sql,
@@ -1880,7 +1880,7 @@ async function getSALDetails(filters: ReportFilters) {
         END AS salesforce_url,
         COALESCE(f.Company, 'Unknown') AS company_name,
         COALESCE(f.LeadEmail, f.ContactEmail, 'N/A') AS email,
-        COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND') AS source,
+        UPPER(COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
         CAST(f.SAL_DT AS STRING) AS sal_date,
         CAST(f.SQL_DT AS STRING) AS sql_date,
         CAST(f.MQL_DT AS STRING) AS mql_date,
@@ -1907,7 +1907,12 @@ async function getSALDetails(filters: ReportFilters) {
         COALESCE(f.OpportunityName, o.OpportunityName, o2.OpportunityName, o3.OpportunityName, o4.OpportunityName, o5.OpportunityName, o6.OpportunityName) AS opportunity_name,
         COALESCE(o.StageName, o2.StageName, o3.StageName, o4.StageName, o5.StageName, o6.StageName) AS opportunity_stage,
         COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
-        COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
+        -- Prefer RejectedReason over ClosedLostReason for SAL rejection tracking
+        COALESCE(
+          NULLIF(COALESCE(o.RejectedReason, o2.RejectedReason, o3.RejectedReason, o4.RejectedReason, o5.RejectedReason, o6.RejectedReason), ''),
+          NULLIF(COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason), ''),
+          'N/A'
+        ) AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(f.SAL_DT AS DATE), DAY) AS days_in_stage,
         -- Derive category from opportunity Type field
         CASE
@@ -1981,7 +1986,7 @@ async function getSALDetails(filters: ReportFilters) {
         CONCAT('https://por.my.salesforce.com/', o.Id) AS salesforce_url,
         COALESCE(o.AccountName, 'Unknown') AS company_name,
         'N/A' AS email,
-        COALESCE(NULLIF(COALESCE(o.SDRSource, o.POR_SDRSource), ''), 'EXPANSION') AS source,
+        UPPER(COALESCE(NULLIF(COALESCE(o.SDRSource, o.POR_SDRSource), ''), 'EXPANSION')) AS source,
         CAST(o.CreatedDate AS STRING) AS sal_date,
         CAST(NULL AS STRING) AS sql_date,
         CAST(NULL AS STRING) AS mql_date,
@@ -1999,7 +2004,8 @@ async function getSALDetails(filters: ReportFilters) {
         o.OpportunityName AS opportunity_name,
         o.StageName AS opportunity_stage,
         o.ACV AS opportunity_acv,
-        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+        -- Prefer RejectedReason over ClosedLostReason for SAL rejection tracking
+        COALESCE(NULLIF(o.RejectedReason, ''), NULLIF(o.ClosedLostReason, ''), 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) AS days_in_stage,
         CASE
           WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
@@ -2127,7 +2133,7 @@ async function getSQODetails(filters: ReportFilters) {
         END AS salesforce_url,
         COALESCE(f.Company, 'Unknown') AS company_name,
         COALESCE(f.LeadEmail, f.ContactEmail, 'N/A') AS email,
-        COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND') AS source,
+        UPPER(COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
         CAST(f.SQO_DT AS STRING) AS sqo_date,
         CAST(f.SAL_DT AS STRING) AS sal_date,
         CAST(f.SQL_DT AS STRING) AS sql_date,
@@ -2290,7 +2296,7 @@ async function getSQODetails(filters: ReportFilters) {
         END AS salesforce_url,
         COALESCE(f.Company, 'Unknown') AS company_name,
         COALESCE(f.Email, 'N/A') AS email,
-        COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND') AS source,
+        UPPER(COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
         CAST(f.SQO_DT AS STRING) AS sqo_date,
         'N/A' AS sal_date,
         CAST(f.SQL_DT AS STRING) AS sql_date,
