@@ -183,6 +183,11 @@ function formatInline(text: string): string {
     // CPA highlighting
     .replace(/\$[\d,]+\.?\d*\s*\(target/gi, '<span class="text-red">$&</span>');
 
+  // Color-code percentage ranges like "0–21% attainment" (use upper bound for color)
+  result = result.replace(/(\d+(?:\.\d+)?)\s*[–\-]\s*(\d+(?:\.\d+)?)\s*%\s*(QTD\s+)?(attainment|pacing|conversion)/gi, (match, _low, high) => {
+    return colorCodeAttainment(match, high);
+  });
+
   // Color-code attainment/pacing percentages based on value (>=100 green, 70-99 yellow, <70 red)
   result = result.replace(/(\d+(?:\.\d+)?)\s*%\s*(QTD\s+)?(attainment|pacing|conversion)/gi, (match, pct) => colorCodeAttainment(match, pct));
 
