@@ -413,6 +413,7 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
                 border: '1px solid var(--border-primary)',
                 borderRadius: '4px',
                 background: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
                 fontSize: '0.75rem',
                 cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
                 opacity: currentPage === 1 ? 0.5 : 1
@@ -428,6 +429,7 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
                 border: '1px solid var(--border-primary)',
                 borderRadius: '4px',
                 background: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
                 fontSize: '0.75rem',
                 cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
                 opacity: currentPage === 1 ? 0.5 : 1
@@ -446,6 +448,7 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
                 border: '1px solid var(--border-primary)',
                 borderRadius: '4px',
                 background: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
                 fontSize: '0.75rem',
                 cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
                 opacity: currentPage === totalPages ? 0.5 : 1
@@ -461,6 +464,7 @@ export default function LostOpportunities({ data }: LostOpportunitiesProps) {
                 border: '1px solid var(--border-primary)',
                 borderRadius: '4px',
                 background: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
                 fontSize: '0.75rem',
                 cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
                 opacity: currentPage === totalPages ? 0.5 : 1
