@@ -157,7 +157,15 @@ function colorCodeAttainment(match: string, pct: string): string {
 }
 
 function formatInline(text: string): string {
+  // FIRST: Clean up malformed AI patterns like HIGH">RED, MEDIUM">YELLOW
   let result = text
+    .replace(/HIGH\s*["'`"">»>\-:=\s]+\s*RED/gi, 'RED')
+    .replace(/MEDIUM\s*["'`"">»>\-:=\s]+\s*YELLOW/gi, 'YELLOW')
+    .replace(/LOW\s*["'`"">»>\-:=\s]+\s*GREEN/gi, 'GREEN')
+    .replace(/HIGH[^A-Za-z\n]{1,10}RED/gi, 'RED')
+    .replace(/MEDIUM[^A-Za-z\n]{1,15}YELLOW/gi, 'YELLOW')
+    .replace(/LOW[^A-Za-z\n]{1,10}GREEN/gi, 'GREEN')
+    // Standard markdown formatting
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
@@ -172,13 +180,10 @@ function formatInline(text: string): string {
     .replace(/\bAMER\b/g, '<span class="badge-region badge-amer">\u{1F1FA}\u{1F1F8} AMER</span>')
     .replace(/\bEMEA\b/g, '<span class="badge-region badge-emea">\u{1F1EC}\u{1F1E7} EMEA</span>')
     .replace(/\bAPAC\b/g, '<span class="badge-region badge-apac">\u{1F1E6}\u{1F1FA} APAC</span>')
-    // Risk levels
+    // Risk levels (RED/YELLOW/GREEN only - don't badge HIGH/MEDIUM/LOW separately)
     .replace(/\bRED\b/g, '<span class="risk-high">RED</span>')
     .replace(/\bYELLOW\b/g, '<span class="risk-medium">YELLOW</span>')
     .replace(/\bGREEN\b/g, '<span class="risk-low">GREEN</span>')
-    .replace(/\bHIGH\b/gi, '<span class="risk-high">HIGH</span>')
-    .replace(/\bMEDIUM\b/gi, '<span class="risk-medium">MEDIUM</span>')
-    .replace(/\bLOW\b/gi, '<span class="risk-low">LOW</span>')
     // Funnel stages
     .replace(/\b(MQL|SQL|SAL|SQO|EQL)\b/g, '<span class="stage-badge">$1</span>')
     // Category badges
