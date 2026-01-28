@@ -56,8 +56,8 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
             qtd_target: 0,
             qtd_actual: 0,
             pipeline_acv: 0,
-            win_rate_total: 0,
-            count: 0,
+            won_deals: 0,
+            lost_deals: 0,
           };
         }
         acc[region].fy_target += (row as any).fy_target || 0;
@@ -65,8 +65,8 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
         acc[region].qtd_target += row.qtd_target || 0;
         acc[region].qtd_actual += row.qtd_acv || 0;
         acc[region].pipeline_acv += row.pipeline_acv || 0;
-        acc[region].win_rate_total += row.win_rate_pct || 0;
-        acc[region].count += 1;
+        acc[region].won_deals += row.qtd_deals || 0;
+        acc[region].lost_deals += row.qtd_lost_deals || 0;
         return acc;
       }, {} as Record<string, any>);
 
@@ -75,6 +75,7 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
         const remainingQ1Gap = Math.max(0, data.q1_target - data.qtd_actual);
         // Coverage = pipeline / remaining gap. If no gap (target met), coverage = 0
         const coverage = remainingQ1Gap > 0 ? data.pipeline_acv / remainingQ1Gap : 0;
+        const totalDeals = data.won_deals + data.lost_deals;
         rows.push({
           product: 'POR',
           region,
@@ -86,7 +87,7 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
           attainment_pct: data.qtd_target > 0 ? (data.qtd_actual / data.qtd_target) * 100 : 0,
           pipeline_acv: data.pipeline_acv,
           pipeline_coverage: coverage,
-          win_rate_pct: data.count > 0 ? data.win_rate_total / data.count : 0,
+          win_rate_pct: totalDeals > 0 ? (data.won_deals / totalDeals) * 100 : 0,
         });
       });
     }
@@ -102,8 +103,8 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
             qtd_target: 0,
             qtd_actual: 0,
             pipeline_acv: 0,
-            win_rate_total: 0,
-            count: 0,
+            won_deals: 0,
+            lost_deals: 0,
           };
         }
         acc[region].fy_target += (row as any).fy_target || 0;
@@ -111,8 +112,8 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
         acc[region].qtd_target += row.qtd_target || 0;
         acc[region].qtd_actual += row.qtd_acv || 0;
         acc[region].pipeline_acv += row.pipeline_acv || 0;
-        acc[region].win_rate_total += row.win_rate_pct || 0;
-        acc[region].count += 1;
+        acc[region].won_deals += row.qtd_deals || 0;
+        acc[region].lost_deals += row.qtd_lost_deals || 0;
         return acc;
       }, {} as Record<string, any>);
 
@@ -121,6 +122,7 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
         const remainingQ1Gap = Math.max(0, data.q1_target - data.qtd_actual);
         // Coverage = pipeline / remaining gap. If no gap (target met), coverage = 0
         const coverage = remainingQ1Gap > 0 ? data.pipeline_acv / remainingQ1Gap : 0;
+        const totalDeals = data.won_deals + data.lost_deals;
         rows.push({
           product: 'R360',
           region,
@@ -132,7 +134,7 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
           attainment_pct: data.qtd_target > 0 ? (data.qtd_actual / data.qtd_target) * 100 : 0,
           pipeline_acv: data.pipeline_acv,
           pipeline_coverage: coverage,
-          win_rate_pct: data.count > 0 ? data.win_rate_total / data.count : 0,
+          win_rate_pct: totalDeals > 0 ? (data.won_deals / totalDeals) * 100 : 0,
         });
       });
     }
