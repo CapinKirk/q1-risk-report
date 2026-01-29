@@ -3690,23 +3690,57 @@ export async function POST(request: Request) {
       existing.q1_target_sql += parseInt(row.target_sql) || 0;
       existing.q1_target_sal += parseInt(row.target_sal) || 0;
       existing.q1_target_sqo += parseInt(row.target_sqo) || 0;
+      // Targets from RevOpsReport; actuals will be overridden from detail records below
       existing.actual_mql += parseInt(row.actual_mql) || 0;
       existing.actual_sql += parseInt(row.actual_sql) || 0;
       existing.actual_sal += parseInt(row.actual_sal) || 0;
       existing.actual_sqo += parseInt(row.actual_sqo) || 0;
     }
 
-    // Override NEW LOGO actuals with live InboundFunnel data (more current than RevOpsReport)
-    const allFunnel = [...(porFunnel as any[]), ...(r360Funnel as any[])];
-    for (const f of allFunnel) {
-      const key = `${f.product}-${f.region}-NEW LOGO`;
-      const existing = funnelDataMap.get(key);
-      if (existing) {
-        existing.actual_mql = parseInt(f.actual_mql) || 0;
-        existing.actual_sql = parseInt(f.actual_sql) || 0;
-        existing.actual_sal = parseInt(f.actual_sal) || 0;
-        existing.actual_sqo = parseInt(f.actual_sqo) || 0;
-      }
+    // Override ALL funnel actuals with detail-record counts (detail tables are source of truth)
+    // Build count maps for funnelDataMap override
+    const funnelMqlCounts = new Map<string, number>();
+    for (const rec of [...(mqlDetailsData.POR || [])]) {
+      const key = `POR-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      funnelMqlCounts.set(key, (funnelMqlCounts.get(key) || 0) + 1);
+    }
+    for (const rec of [...(mqlDetailsData.R360 || [])]) {
+      const key = `R360-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      funnelMqlCounts.set(key, (funnelMqlCounts.get(key) || 0) + 1);
+    }
+
+    const funnelSqlCounts = new Map<string, number>();
+    for (const rec of [...(sqlDetailsData.POR || [])]) {
+      const key = `POR-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      funnelSqlCounts.set(key, (funnelSqlCounts.get(key) || 0) + 1);
+    }
+    for (const rec of [...(sqlDetailsData.R360 || [])]) {
+      const key = `R360-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      funnelSqlCounts.set(key, (funnelSqlCounts.get(key) || 0) + 1);
+    }
+
+    const funnelSalCounts = new Map<string, number>();
+    for (const rec of [...(salDetailsData.POR || [])]) {
+      const key = `POR-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      funnelSalCounts.set(key, (funnelSalCounts.get(key) || 0) + 1);
+    }
+
+    const funnelSqoCounts = new Map<string, number>();
+    for (const rec of [...(sqoDetailsData.POR || [])]) {
+      const key = `POR-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      funnelSqoCounts.set(key, (funnelSqoCounts.get(key) || 0) + 1);
+    }
+    for (const rec of [...(sqoDetailsData.R360 || [])]) {
+      const key = `R360-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      funnelSqoCounts.set(key, (funnelSqoCounts.get(key) || 0) + 1);
+    }
+
+    // Apply detail-record counts to funnelDataMap
+    for (const [key, existing] of Array.from(funnelDataMap.entries())) {
+      existing.actual_mql = funnelMqlCounts.get(key) || 0;
+      existing.actual_sql = funnelSqlCounts.get(key) || 0;
+      existing.actual_sal = funnelSalCounts.get(key) || 0;
+      existing.actual_sqo = funnelSqoCounts.get(key) || 0;
     }
 
     // Build funnel pacing array for all categories
@@ -3928,7 +3962,7 @@ export async function POST(request: Request) {
 
     // Note: sourceQtdProrationFactor already defined above for source attainment
 
-    // Count SQO detail records by (product, region) for source-level allocation
+    // Count detail records by (product, region) for source-level proportional allocation
     const sqoRegionTotals = new Map<string, number>();
     for (const rec of (sqoDetailsData.POR || [])) {
       const key = `POR-${rec.region}`;
@@ -3939,18 +3973,47 @@ export async function POST(request: Request) {
       sqoRegionTotals.set(key, (sqoRegionTotals.get(key) || 0) + 1);
     }
 
+    const mqlRegionTotals = new Map<string, number>();
+    for (const rec of (mqlDetailsData.POR || [])) {
+      const key = `POR-${rec.region}`;
+      mqlRegionTotals.set(key, (mqlRegionTotals.get(key) || 0) + 1);
+    }
+    for (const rec of (mqlDetailsData.R360 || [])) {
+      const key = `R360-${rec.region}`;
+      mqlRegionTotals.set(key, (mqlRegionTotals.get(key) || 0) + 1);
+    }
+
+    const sqlRegionTotals = new Map<string, number>();
+    for (const rec of (sqlDetailsData.POR || [])) {
+      const key = `POR-${rec.region}`;
+      sqlRegionTotals.set(key, (sqlRegionTotals.get(key) || 0) + 1);
+    }
+    for (const rec of (sqlDetailsData.R360 || [])) {
+      const key = `R360-${rec.region}`;
+      sqlRegionTotals.set(key, (sqlRegionTotals.get(key) || 0) + 1);
+    }
+
+    const salRegionTotals = new Map<string, number>();
+    for (const rec of (salDetailsData.POR || [])) {
+      const key = `POR-${rec.region}`;
+      salRegionTotals.set(key, (salRegionTotals.get(key) || 0) + 1);
+    }
+
     // Compute target totals per (product, region) for proportional allocation
-    const computeSourceSqoTargetTotal = (rows: any[]): Map<string, number> => {
+    const computeSourceTargetTotal = (rows: any[], field: string): Map<string, number> => {
       const totals = new Map<string, number>();
       for (const row of rows) {
         const key = `${row.region}`;
-        totals.set(key, (totals.get(key) || 0) + (parseInt(row.target_sqo) || 0));
+        totals.set(key, (totals.get(key) || 0) + (parseInt(row[field]) || 0));
       }
       return totals;
     }
 
     const buildSourceRows = (rows: any[], product: string, hasSal: boolean): any[] => {
-      const targetTotals = computeSourceSqoTargetTotal(rows);
+      const mqlTargetTotals = computeSourceTargetTotal(rows, 'target_mql');
+      const sqlTargetTotals = computeSourceTargetTotal(rows, 'target_sql');
+      const salTargetTotals = computeSourceTargetTotal(rows, 'target_sal');
+      const sqoTargetTotals = computeSourceTargetTotal(rows, 'target_sqo');
       const result: any[] = [];
 
       for (const row of rows) {
@@ -3963,15 +4026,32 @@ export async function POST(request: Request) {
         const qtdTargetSql = Math.round(q1TargetSql * sourceQtdProrationFactor);
         const qtdTargetSal = Math.round(q1TargetSal * sourceQtdProrationFactor);
         const qtdTargetSqo = Math.round(q1TargetSqo * sourceQtdProrationFactor);
-        const actualMql = parseInt(row.actual_mql) || 0;
-        const actualSql = parseInt(row.actual_sql) || 0;
-        const actualSal = hasSal ? (parseInt(row.actual_sal) || 0) : 0;
+
+        const regionKey = `${product}-${row.region}`;
+
+        // Allocate MQL actuals from detail records proportionally by target weight
+        const mqlRegionTotal = mqlRegionTotals.get(regionKey) || 0;
+        const mqlRegionTargetTotal = mqlTargetTotals.get(row.region) || 0;
+        const mqlWeight = mqlRegionTargetTotal > 0 ? q1TargetMql / mqlRegionTargetTotal : 0;
+        const actualMql = Math.round(mqlRegionTotal * mqlWeight);
+
+        // Allocate SQL actuals from detail records proportionally by target weight
+        const sqlRegionTotal = sqlRegionTotals.get(regionKey) || 0;
+        const sqlRegionTargetTotal = sqlTargetTotals.get(row.region) || 0;
+        const sqlWeight = sqlRegionTargetTotal > 0 ? q1TargetSql / sqlRegionTargetTotal : 0;
+        const actualSql = Math.round(sqlRegionTotal * sqlWeight);
+
+        // Allocate SAL actuals from detail records proportionally by target weight
+        const salRegionTotal = hasSal ? (salRegionTotals.get(regionKey) || 0) : 0;
+        const salRegionTargetTotal = salTargetTotals.get(row.region) || 0;
+        const salWeight = (hasSal && salRegionTargetTotal > 0) ? q1TargetSal / salRegionTargetTotal : 0;
+        const actualSal = hasSal ? Math.round(salRegionTotal * salWeight) : 0;
 
         // Allocate SQO actuals from detail records proportionally by target weight
-        const regionTotal = sqoRegionTotals.get(`${product}-${row.region}`) || 0;
-        const regionTargetTotal = targetTotals.get(row.region) || 0;
-        const sqoWeight = regionTargetTotal > 0 ? q1TargetSqo / regionTargetTotal : 0;
-        const actualSqo = Math.round(regionTotal * sqoWeight);
+        const sqoRegionTotal = sqoRegionTotals.get(regionKey) || 0;
+        const sqoRegionTargetTotal = sqoTargetTotals.get(row.region) || 0;
+        const sqoWeight = sqoRegionTargetTotal > 0 ? q1TargetSqo / sqoRegionTargetTotal : 0;
+        const actualSqo = Math.round(sqoRegionTotal * sqoWeight);
 
         result.push({
           region: row.region,
@@ -4028,7 +4108,40 @@ export async function POST(request: Request) {
     }
     console.log('SQO detail counts by category:', Object.fromEntries(sqoCountMap));
 
-    // Build from revOpsData (targets from RevOpsReport) + SQO actuals from detail records
+    // Count MQL detail records by (product, region, category)
+    const mqlCountMap = new Map<string, number>();
+    for (const rec of (mqlDetailsData.POR || [])) {
+      const key = `POR-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      mqlCountMap.set(key, (mqlCountMap.get(key) || 0) + 1);
+    }
+    for (const rec of (mqlDetailsData.R360 || [])) {
+      const key = `R360-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      mqlCountMap.set(key, (mqlCountMap.get(key) || 0) + 1);
+    }
+
+    // Count SQL detail records by (product, region, category)
+    const sqlCountMap = new Map<string, number>();
+    for (const rec of (sqlDetailsData.POR || [])) {
+      const key = `POR-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      sqlCountMap.set(key, (sqlCountMap.get(key) || 0) + 1);
+    }
+    for (const rec of (sqlDetailsData.R360 || [])) {
+      const key = `R360-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      sqlCountMap.set(key, (sqlCountMap.get(key) || 0) + 1);
+    }
+
+    // Count SAL detail records by (product, region, category) — POR only
+    const salCountMap = new Map<string, number>();
+    for (const rec of (salDetailsData.POR || [])) {
+      const key = `POR-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      salCountMap.set(key, (salCountMap.get(key) || 0) + 1);
+    }
+
+    console.log('MQL detail counts by category:', Object.fromEntries(mqlCountMap));
+    console.log('SQL detail counts by category:', Object.fromEntries(sqlCountMap));
+    console.log('SAL detail counts by category:', Object.fromEntries(salCountMap));
+
+    // Build from revOpsData (targets from RevOpsReport) + actuals from detail records
     const funnelCategories = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
     for (const row of revOpsData) {
       const category = row.category;
@@ -4038,13 +4151,12 @@ export async function POST(request: Request) {
       const q1TargetSql = parseInt(row.target_sql) || 0;
       const q1TargetSal = parseInt(row.target_sal) || 0;
       const q1TargetSqo = parseInt(row.target_sqo) || 0;
-      // MQL/SQL/SAL actuals from RevOpsReport (no detail-level source for these)
-      const actualMql = parseInt(row.actual_mql) || 0;
-      const actualSql = parseInt(row.actual_sql) || 0;
-      const actualSal = parseInt(row.actual_sal) || 0;
-      // SQO actuals from detail records (matches SQO Details table exactly)
-      const sqoKey = `${row.product}-${row.region}-${category}`;
-      const actualSqo = sqoCountMap.get(sqoKey) || 0;
+      // All funnel actuals from detail records (matches detail tables exactly)
+      const detailKey = `${row.product}-${row.region}-${category}`;
+      const actualMql = mqlCountMap.get(detailKey) || 0;
+      const actualSql = sqlCountMap.get(detailKey) || 0;
+      const actualSal = salCountMap.get(detailKey) || 0;
+      const actualSqo = sqoCountMap.get(detailKey) || 0;
 
       const qtdTargetMql = Math.round(q1TargetMql * qtdProrationFactor);
       const qtdTargetSql = Math.round(q1TargetSql * qtdProrationFactor);
