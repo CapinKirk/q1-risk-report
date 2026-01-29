@@ -43,7 +43,7 @@ export async function GET() {
         Segment
       FROM \`data-analytics-306119.Staging.RevOpsReport\`
       WHERE Horizon = 'QTD'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = 'P90'
         AND Period_Start_Date = '2026-01-01'
         AND RecordType IN ('POR', 'R360')
         AND Region IN ('AMER', 'EMEA', 'APAC')
@@ -95,7 +95,7 @@ export async function GET() {
         ROUND(SUM(Target_SQO), 0) as total_target_sqo
       FROM \`data-analytics-306119.Staging.RevOpsReport\`
       WHERE Horizon = 'QTD'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = 'P90'
         AND Period_Start_Date = '2026-01-01'
         AND RecordType IN ('POR', 'R360')
         AND Region IN ('AMER', 'EMEA', 'APAC')
@@ -259,7 +259,7 @@ export async function GET() {
       FROM \`data-analytics-306119.Staging.RevOpsReport\`
       WHERE RecordType = 'POR'
         AND Horizon = 'QTD'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = 'P90'
         AND OpportunityType = 'Migration'
 
       UNION ALL
@@ -341,7 +341,7 @@ export async function GET() {
       FROM \`data-analytics-306119.Staging.RevOpsReport\`
       WHERE RecordType = 'POR'
         AND Horizon = 'QTD'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = 'P90'
         AND OpportunityType = 'Existing Business'
     `;
     try {
@@ -470,7 +470,7 @@ export async function GET() {
       FROM \`data-analytics-306119.Staging.RevOpsReport\`
       WHERE RecordType = 'POR'
         AND Horizon = 'YTD'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = 'P90'
         AND OpportunityType = 'Migration'
 
       UNION ALL
@@ -481,7 +481,7 @@ export async function GET() {
       FROM \`data-analytics-306119.Staging.RevOpsReport\`
       WHERE RecordType = 'POR'
         AND Horizon = 'QTD'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = 'P90'
         AND OpportunityType = 'Migration'
     `;
     try {
@@ -523,7 +523,7 @@ export async function GET() {
       FROM \`data-analytics-306119.Staging.RevOpsReport\`
       WHERE RecordType = 'POR'
         AND Horizon = 'QTD'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = 'P90'
         AND OpportunityType = 'Existing Business'
     `;
     try {
@@ -610,7 +610,7 @@ export async function GET() {
       FROM \`data-analytics-306119.Staging.RevOpsReport\`
       WHERE RecordType = 'POR'
         AND Horizon = 'MTD'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = 'P90'
         AND OpportunityType = 'Migration'
 
       UNION ALL
@@ -902,7 +902,7 @@ export async function GET() {
         SUM(Target_ACV) AS q1_target_acv
       FROM \`data-analytics-306119.Staging.RevOpsReport\`
       WHERE Horizon = 'QTD'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = 'P90'
         AND Period_Start_Date = '2026-01-01'
         AND RecordType IN ('POR', 'R360')
         AND Region IN ('AMER', 'EMEA', 'APAC')

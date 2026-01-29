@@ -347,10 +347,10 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           const qtdTargetSal = row.qtd_target_sal || 0;
           const qtdTargetSqo = row.qtd_target_sqo || 0;
 
-          const mqlPacingPct = qtdTargetMql > 0 ? Math.round((row.actual_mql / qtdTargetMql) * 100) : 100;
-          const sqlPacingPct = qtdTargetSql > 0 ? Math.round((row.actual_sql / qtdTargetSql) * 100) : 100;
-          const salPacingPct = qtdTargetSal > 0 ? Math.round((row.actual_sal / qtdTargetSal) * 100) : 100;
-          const sqoPacingPct = qtdTargetSqo > 0 ? Math.round((row.actual_sqo / qtdTargetSqo) * 100) : 100;
+          const mqlPacingPct = qtdTargetMql > 0 ? Math.round((row.actual_mql / qtdTargetMql) * 100) : (row.actual_mql > 0 ? 100 : 0);
+          const sqlPacingPct = qtdTargetSql > 0 ? Math.round((row.actual_sql / qtdTargetSql) * 100) : (row.actual_sql > 0 ? 100 : 0);
+          const salPacingPct = qtdTargetSal > 0 ? Math.round((row.actual_sal / qtdTargetSal) * 100) : (row.actual_sal > 0 ? 100 : 0);
+          const sqoPacingPct = qtdTargetSqo > 0 ? Math.round((row.actual_sqo / qtdTargetSqo) * 100) : (row.actual_sqo > 0 ? 100 : 0);
 
           rows.push({
             id: `${product}-${row.region}-${row.source}`,
@@ -393,10 +393,10 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       catRows.forEach(row => {
         if (!funnelCategories.includes(row.category)) return;
 
-        const mqlPacingPct = (row.qtd_target_mql || 0) > 0 ? Math.round(((row.actual_mql || 0) / (row.qtd_target_mql || 1)) * 100) : 100;
-        const sqlPacingPct = (row.qtd_target_sql || 0) > 0 ? Math.round(((row.actual_sql || 0) / (row.qtd_target_sql || 1)) * 100) : 100;
-        const salPacingPct = (row.qtd_target_sal || 0) > 0 ? Math.round(((row.actual_sal || 0) / (row.qtd_target_sal || 1)) * 100) : 100;
-        const sqoPacingPct = (row.qtd_target_sqo || 0) > 0 ? Math.round(((row.actual_sqo || 0) / (row.qtd_target_sqo || 1)) * 100) : 100;
+        const mqlPacingPct = (row.qtd_target_mql || 0) > 0 ? Math.round(((row.actual_mql || 0) / (row.qtd_target_mql || 1)) * 100) : ((row.actual_mql || 0) > 0 ? 100 : 0);
+        const sqlPacingPct = (row.qtd_target_sql || 0) > 0 ? Math.round(((row.actual_sql || 0) / (row.qtd_target_sql || 1)) * 100) : ((row.actual_sql || 0) > 0 ? 100 : 0);
+        const salPacingPct = (row.qtd_target_sal || 0) > 0 ? Math.round(((row.actual_sal || 0) / (row.qtd_target_sal || 1)) * 100) : ((row.actual_sal || 0) > 0 ? 100 : 0);
+        const sqoPacingPct = (row.qtd_target_sqo || 0) > 0 ? Math.round(((row.actual_sqo || 0) / (row.qtd_target_sqo || 1)) * 100) : ((row.actual_sqo || 0) > 0 ? 100 : 0);
 
         const qtdTargetMql = row.qtd_target_mql || 0;
         const qtdTargetSql = row.qtd_target_sql || 0;
@@ -481,10 +481,10 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     }> = [];
 
     categoryMap.forEach((data, category) => {
-      const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : 100;
-      const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : 100;
-      const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 100;
-      const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 100;
+      const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : (data.mqlActual > 0 ? 100 : 0);
+      const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : (data.sqlActual > 0 ? 100 : 0);
+      const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : (data.salActual > 0 ? 100 : 0);
+      const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : (data.sqoActual > 0 ? 100 : 0);
 
       // Use R360 weights if R360 is the only EFFECTIVE product (selected AND available)
       const effectiveProducts = selectedProducts.filter(p => availableProducts.includes(p));
@@ -557,10 +557,10 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       const hasTargets = data.mqlTarget > 0 || data.sqlTarget > 0 || data.salTarget > 0 || data.sqoTarget > 0;
       if (!hasActuals && !hasTargets) return;
 
-      const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : 100;
-      const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : 100;
-      const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 100;
-      const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 100;
+      const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : (data.mqlActual > 0 ? 100 : 0);
+      const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : (data.sqlActual > 0 ? 100 : 0);
+      const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : (data.salActual > 0 ? 100 : 0);
+      const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : (data.sqoActual > 0 ? 100 : 0);
 
       // Use R360 weights if R360 is the only EFFECTIVE product (selected AND available)
       const effectiveProducts = selectedProducts.filter(p => availableProducts.includes(p));
@@ -626,10 +626,10 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     }> = [];
 
     regionMap.forEach((data, region) => {
-      const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : 100;
-      const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : 100;
-      const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : 100;
-      const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : 100;
+      const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : (data.mqlActual > 0 ? 100 : 0);
+      const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : (data.sqlActual > 0 ? 100 : 0);
+      const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : (data.salActual > 0 ? 100 : 0);
+      const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : (data.sqoActual > 0 ? 100 : 0);
 
       // Use R360 weights if R360 is the only EFFECTIVE product (selected AND available)
       const effectiveProducts = selectedProducts.filter(p => availableProducts.includes(p));

@@ -103,7 +103,7 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
     // This matches the "Q1 Target" display and user expectations
     const qtdAttainmentPct = q1Target > 0
       ? Math.round((forecastedBookings / q1Target) * 1000) / 10
-      : 100;
+      : (forecastedBookings > 0 ? 100 : 0);
 
     return {
       renewalCount: summaries.reduce((sum, s) => sum + s.renewalCount, 0),

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { Region, Product, Category, Source, ReportData, AttainmentRow, RAGStatus } from '@/lib/types';
+import type { RiskProfile } from '@/lib/constants/dimensions';
 import { filterReportData, parseRegionsFromURL, parseProductsFromURL, parseCategoriesFromURL, parseSourcesFromURL } from '@/lib/filterData';
 import ReportFilter from '@/components/ReportFilter';
 import UserMenu from '@/components/UserMenu';
@@ -341,6 +342,7 @@ function ReportContent() {
   const [useLiveData, setUseLiveData] = useState(true); // Default to live mode
   const [renewalsRefreshKey, setRenewalsRefreshKey] = useState(0); // Increment to force renewals refresh
   const [lastFetchTime, setLastFetchTime] = useState<string | null>(null);
+  const [selectedRiskProfile, setSelectedRiskProfile] = useState<RiskProfile>('P90');
 
   // Date range state - default to Q1 2026
   const [startDate, setStartDate] = useState('2026-01-01');
@@ -359,7 +361,8 @@ function ReportContent() {
     products: Product[],
     regions: Region[],
     dateStart: string,
-    dateEnd: string
+    dateEnd: string,
+    riskProfile: RiskProfile = 'P90'
   ) => {
     setIsRefreshing(true);
     setRefreshError(null);
@@ -375,6 +378,7 @@ function ReportContent() {
           endDate: dateEnd,
           products: products.length === 2 ? [] : products, // Empty array means all products
           regions: regions.length === 3 ? [] : regions,     // Empty array means all regions
+          riskProfile,
         }),
       });
 
@@ -403,7 +407,7 @@ function ReportContent() {
     // Trigger renewals section to refresh from Salesforce directly
     setRenewalsRefreshKey(prev => prev + 1);
 
-    const liveData = await fetchLiveData(selectedProducts, selectedRegions, startDate, endDate);
+    const liveData = await fetchLiveData(selectedProducts, selectedRegions, startDate, endDate, selectedRiskProfile);
     if (liveData) {
       const filtered = filterReportData(liveData, selectedRegions, selectedProducts, selectedCategories, selectedSources);
       setFilteredData(filtered);
@@ -443,7 +447,7 @@ function ReportContent() {
       // Also fetch live data in background for initial load if live mode enabled
       if (useLiveData && !fetchInProgress.current) {
         fetchInProgress.current = true;
-        fetchLiveData(selectedProducts, selectedRegions, startDate, endDate).then(liveData => {
+        fetchLiveData(selectedProducts, selectedRegions, startDate, endDate, selectedRiskProfile).then(liveData => {
           fetchInProgress.current = false;
           if (liveData) {
             const filtered = filterReportData(liveData, selectedRegions, selectedProducts, selectedCategories, selectedSources);
@@ -460,7 +464,7 @@ function ReportContent() {
       const debounceTimer = setTimeout(async () => {
         if (!fetchInProgress.current) {
           fetchInProgress.current = true;
-          const liveData = await fetchLiveData(selectedProducts, selectedRegions, startDate, endDate);
+          const liveData = await fetchLiveData(selectedProducts, selectedRegions, startDate, endDate, selectedRiskProfile);
           fetchInProgress.current = false;
           if (liveData) {
             const filtered = filterReportData(liveData, selectedRegions, selectedProducts, selectedCategories, selectedSources);
@@ -477,7 +481,7 @@ function ReportContent() {
         setFilteredData(filtered);
       }
     }
-  }, [urlParamsLoaded, selectedRegions, selectedProducts, selectedCategories, selectedSources, rawData, useLiveData, fetchLiveData, startDate, endDate]);
+  }, [urlParamsLoaded, selectedRegions, selectedProducts, selectedCategories, selectedSources, rawData, useLiveData, fetchLiveData, startDate, endDate, selectedRiskProfile]);
 
   if (!filteredData) {
     return <div className="loading">Loading report data...</div>;
@@ -532,6 +536,16 @@ function ReportContent() {
             <span className={`refresh-icon ${isRefreshing ? 'spinning' : ''}`}>↻</span>
             {isRefreshing ? 'Loading...' : (useLiveData ? 'Refresh' : 'Go Live')}
           </button>
+          <select
+            value={selectedRiskProfile}
+            onChange={(e) => setSelectedRiskProfile(e.target.value as RiskProfile)}
+            className="risk-profile-select"
+            title="Risk profile for target calculations"
+          >
+            <option value="P50">P50 (Optimistic)</option>
+            <option value="P75">P75 (Moderate)</option>
+            <option value="P90">P90 (Conservative)</option>
+          </select>
           <ThemeToggle />
           <UserMenu />
         </div>

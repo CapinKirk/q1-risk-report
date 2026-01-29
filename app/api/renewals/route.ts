@@ -81,7 +81,7 @@ interface RequestFilters {
   regions?: string[];
 }
 
-// Renewal targets from RevOpsReport (P75)
+// Renewal targets from RevOpsReport (P90)
 // Now includes regional breakdown for accurate filtering
 interface RegionalTargets {
   q1Target: number;
@@ -109,7 +109,7 @@ function calculateRAG(attainmentPct: number): 'GREEN' | 'YELLOW' | 'RED' {
 
 // Query renewal targets from RevOpsReport (Layer 5 - PRIMARY SOURCE)
 // RATIONALE: RevOpsReport is the single source of truth for all bookings targets
-// Use P75 risk profile and QTD horizon for Q1 targets
+// Use P90 risk profile and QTD horizon for Q1 targets
 async function getRenewalTargets(): Promise<RenewalTargets> {
   const emptyRegionalTargets: Record<Region, RegionalTargets> = {
     AMER: { q1Target: 0, qtdActual: 0, attainmentPct: 0 },
@@ -120,7 +120,7 @@ async function getRenewalTargets(): Promise<RenewalTargets> {
   try {
     const bigquery = getBigQueryClient();
 
-    // Query RevOpsReport for renewal targets (P75 risk profile)
+    // Query RevOpsReport for renewal targets (P90 risk profile)
     // This is the official source of truth for all bookings targets
     const query = `
       SELECT
@@ -128,7 +128,7 @@ async function getRenewalTargets(): Promise<RenewalTargets> {
         Region AS region,
         ROUND(Target_ACV, 2) AS q1_target
       FROM \`data-analytics-306119.Staging.RevOpsReport\`
-      WHERE RiskProfile = 'P75'
+      WHERE RiskProfile = 'P90'
         AND Horizon = 'QTD'
         AND OpportunityType = 'Renewal'
         AND Period_Start_Date = '2026-01-01'
@@ -169,7 +169,7 @@ async function getRenewalTargets(): Promise<RenewalTargets> {
       }
     }
 
-    console.log('Renewal targets (P75 from RevOpsReport):', JSON.stringify(targets, null, 2));
+    console.log('Renewal targets (P90 from RevOpsReport):', JSON.stringify(targets, null, 2));
     return targets;
   } catch (error: any) {
     console.error('Failed to fetch renewal targets from RevOpsReport:', error.message);
@@ -740,7 +740,7 @@ function calculateRenewalSummary(
 
   const ragStatus = calculateRAG(qtdAttainmentPct);
 
-  console.log(`Renewal Forecast (P75): Won Uplift=${wonRenewalUplift}, Q1 Expected Uplift=${q1ExpectedUplift}, Total Forecast=${forecastedBookings}, Q1 Target=${effectiveQ1Target}, Attainment=${qtdAttainmentPct}%, RAG=${ragStatus}`);
+  console.log(`Renewal Forecast (P90): Won Uplift=${wonRenewalUplift}, Q1 Expected Uplift=${q1ExpectedUplift}, Total Forecast=${forecastedBookings}, Q1 Target=${effectiveQ1Target}, Attainment=${qtdAttainmentPct}%, RAG=${ragStatus}`);
 
   // Track contracts with ACV but missing uplift - these are revenue leakage!
   // CRITICAL: Use passed-in list if provided to ensure 100% consistency with response
@@ -778,7 +778,7 @@ function calculateRenewalSummary(
     expectedRenewalACVWithUplift,
     renewalRiskGap,
     renewalRiskPct,
-    // New target/RAG fields (P75 from RevOpsReport)
+    // New target/RAG fields (P90 from RevOpsReport)
     q1Target: effectiveQ1Target,
     qtdTarget: effectiveQtdTarget,
     qtdAttainmentPct,
@@ -876,7 +876,7 @@ export async function GET(request: Request) {
   const missingUpliftContractsPOR = filteredContractsByProduct.POR.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0);
   const missingUpliftContractsR360 = filteredContractsByProduct.R360.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0);
 
-  // Calculate summaries with P75 targets for RAG status
+  // Calculate summaries with P90 targets for RAG status
   // Pass the pre-built missingUpliftContracts to ensure consistency
     const porSummary = calculateRenewalSummary(
       wonByProduct.POR,

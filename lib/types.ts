@@ -86,7 +86,7 @@ export interface RenewalSummary {
   renewalRiskGap: number;           // Expected - Target (negative = at risk)
   renewalRiskPct: number;           // Pacing percentage vs target
   // NEW: Target-based RAG assessment
-  q1Target: number;                 // Full Q1 renewal bookings target (P75)
+  q1Target: number;                 // Full Q1 renewal bookings target (P90)
   qtdTarget: number;                // Same as q1Target for renewals (no prorating)
   qtdAttainmentPct: number;         // (Won renewals + Expected uplift) / Q1 Target * 100
   forecastedBookings: number;       // Won UPLIFT + Expected Q1 uplift from upcoming contracts

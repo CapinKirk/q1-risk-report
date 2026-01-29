@@ -11,13 +11,13 @@ import {
  * Q1 2026 Risk Report API - RevOps Architecture
  *
  * Data Sources (RevOps Layer Architecture):
- * - Layer 5: RevOpsReport - WTD, MTD, QTD, YTD reporting with P75 targets
+ * - Layer 5: RevOpsReport - WTD, MTD, QTD, YTD reporting with P90 targets
  * - Layer 4: RevOpsPerformance - Daily pacing with actuals (for trends)
  * - sfdc.OpportunityViewTable - Deal-level details (won, lost, pipeline)
  * - MarketingFunnel - Lead/funnel stage details
  *
  * Key Changes from StrategicOperatingPlan:
- * - Now uses RevOpsReport with RiskProfile='P75' for risk-adjusted targets
+ * - Now uses RevOpsReport with RiskProfile='P90' for risk-adjusted targets
  * - Horizon='QTD' for quarter-to-date metrics
  * - Period_Start_Date='2026-01-01' for Q1 2026
  * - OpportunityType maps to Category (New Business->NEW LOGO, etc.)
@@ -28,6 +28,7 @@ interface ReportFilters {
   endDate: string;
   products: string[];
   regions: string[];
+  riskProfile: string;
 }
 
 // Helper to get BigQuery client
@@ -36,11 +37,60 @@ function getBigQuery() {
 }
 
 /**
+ * Cap SQO detail records to match RevOpsReport actual_sqo counts.
+ * RevOpsReport is the source of truth for funnel counts. Detail records from
+ * raw funnel tables may exceed that count due to different dedup logic.
+ * We keep the most recent records (by sqo_date DESC) up to the RevOpsReport cap.
+ */
+function capDetailsToCounts(
+  sqoDetails: { POR: any[]; R360: any[] },
+  revOpsData: any[]
+): { POR: any[]; R360: any[] } {
+  // Build cap map from RevOpsReport: product-region-category → actual_sqo
+  const capMap = new Map<string, number>();
+  const funnelCategories = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
+  for (const row of revOpsData) {
+    if (!funnelCategories.includes(row.category)) continue;
+    const key = `${row.product}-${row.region}-${row.category}`;
+    capMap.set(key, (capMap.get(key) || 0) + (parseInt(row.actual_sqo) || 0));
+  }
+
+  function capProduct(records: any[], product: string): any[] {
+    // Group records by region-category
+    const groups = new Map<string, any[]>();
+    for (const rec of records) {
+      const category = rec.category || 'NEW LOGO';
+      const key = `${product}-${rec.region}-${category}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(rec);
+    }
+
+    const result: any[] = [];
+    for (const [key, recs] of Array.from(groups.entries())) {
+      const cap = capMap.get(key);
+      if (cap !== undefined) {
+        // Records are already ordered by sqo_date DESC from the query
+        result.push(...recs.slice(0, cap));
+      } else {
+        // No cap found in RevOpsReport — include all (category may not exist in RevOps)
+        result.push(...recs);
+      }
+    }
+    return result;
+  }
+
+  return {
+    POR: capProduct(sqoDetails.POR, 'POR'),
+    R360: capProduct(sqoDetails.R360, 'R360'),
+  };
+}
+
+/**
  * Get renewal targets from RevOpsPlan (Layer 3 - AUTHORITATIVE SOURCE)
  * Q1 target = SUM(daily Target_ACV_Won) over ActivityQuarterYear='2026-Q1'
  * RevOpsPlan is the single source of truth for ALL planned targets
  */
-async function getRenewalTargetsFromRawPlan(): Promise<Map<string, number>> {
+async function getRenewalTargetsFromRawPlan(riskProfile: string = 'P90'): Promise<Map<string, number>> {
   try {
     const query = `
       SELECT
@@ -48,7 +98,7 @@ async function getRenewalTargetsFromRawPlan(): Promise<Map<string, number>> {
         Region AS region,
         ROUND(SUM(COALESCE(Target_ACV_Won, 0)), 2) AS q1_target
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPlan\`
-      WHERE RiskProfile = 'P75'
+      WHERE RiskProfile = '${riskProfile}'
         AND ActivityQuarterYear = '2026-Q1'
         AND OpportunityType = 'Renewal'
       GROUP BY 1, 2
@@ -68,7 +118,7 @@ async function getRenewalTargetsFromRawPlan(): Promise<Map<string, number>> {
       }
     }
 
-    console.log('Renewal targets from RevOpsPlan (P75):', Object.fromEntries(renewalTargetMap));
+    console.log('Renewal targets from RevOpsPlan (P90):', Object.fromEntries(renewalTargetMap));
     return renewalTargetMap;
   } catch (error: any) {
     console.error('Failed to fetch renewal targets from RevOpsPlan:', error.message);
@@ -232,7 +282,7 @@ function buildOpportunityFilterClause(filters: ReportFilters): {
 }
 
 /**
- * Query RevOpsReport for QTD targets and actuals with P75 risk profile
+ * Query RevOpsReport for QTD targets and actuals with P90 risk profile
  * This replaces the old StrategicOperatingPlan queries
  */
 async function getRevOpsQTDData(filters: ReportFilters) {
@@ -259,7 +309,7 @@ async function getRevOpsQTDData(filters: ReportFilters) {
         ROUND(SUM(COALESCE(Target_SQO, 0)), 0) AS target_sqo,
         ROUND(SUM(COALESCE(Target_Won, 0)), 0) AS target_won
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPlan\`
-      WHERE RiskProfile = 'P75'
+      WHERE RiskProfile = '${filters.riskProfile}'
         AND ActivityQuarterYear = '2026-Q1'
         AND RecordType IN ('POR', 'R360')
         AND Region IN ('AMER', 'EMEA', 'APAC')
@@ -290,7 +340,7 @@ async function getRevOpsQTDData(filters: ReportFilters) {
         ROUND(AVG(COALESCE(SAL_to_SQO_Leakage_Variance, 0)), 1) AS sal_to_sqo_leakage
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsReport\`
       WHERE Horizon = 'QTD'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = '${filters.riskProfile}'
         AND Period_Start_Date = '2026-01-01'
         AND RecordType IN ('POR', 'R360')
         AND Region IN ('AMER', 'EMEA', 'APAC')
@@ -321,7 +371,7 @@ async function getRevOpsQTDData(filters: ReportFilters) {
       COALESCE(a.mql_to_sql_leakage, 0) AS mql_to_sql_leakage,
       COALESCE(a.sql_to_sal_leakage, 0) AS sql_to_sal_leakage,
       COALESCE(a.sal_to_sqo_leakage, 0) AS sal_to_sqo_leakage,
-      'P75' AS risk_profile
+      '${filters.riskProfile}' AS risk_profile
     FROM plan_targets t
     FULL OUTER JOIN report_actuals a
       ON t.product = a.product AND t.region = a.region AND t.category = a.category
@@ -358,7 +408,7 @@ async function getRevOpsQ1Targets(filters: ReportFilters) {
       END AS category,
       ROUND(SUM(COALESCE(Target_ACV_Won, 0)), 2) AS q1_target
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPlan\`
-    WHERE RiskProfile = 'P75'
+    WHERE RiskProfile = '${filters.riskProfile}'
       AND ActivityQuarterYear = '2026-Q1'
       AND RecordType IN ('POR', 'R360')
       AND Region IN ('AMER', 'EMEA', 'APAC')
@@ -502,47 +552,73 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
         ROUND(SUM(COALESCE(Target_Won, 0))) AS target_won
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsPlan\`
       WHERE RecordType = '${recordType}'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = '${filters.riskProfile}'
         AND ActivityQuarterYear = '2026-Q1'
         AND OpportunityType != 'Renewal'
         AND Source IS NOT NULL AND Source != ''
         ${regionFilter}
       GROUP BY 1, 2
     ),
-    report_actuals AS (
+    -- Category-level actuals from RevOpsReport (source of truth, matches By Category table)
+    category_actuals AS (
       SELECT
         Region AS region,
-        ${sourceNormCase} AS source,
-        SUM(COALESCE(Actual_MQL, 0)) AS actual_mql,
-        SUM(COALESCE(Actual_SQL, 0)) AS actual_sql,
-        SUM(COALESCE(Actual_SAL, 0)) AS actual_sal,
-        SUM(COALESCE(Actual_SQO, 0)) AS actual_sqo
+        SUM(COALESCE(Actual_MQL, 0)) AS total_actual_mql,
+        SUM(COALESCE(Actual_SQL, 0)) AS total_actual_sql,
+        SUM(COALESCE(Actual_SAL, 0)) AS total_actual_sal,
+        SUM(COALESCE(Actual_SQO, 0)) AS total_actual_sqo
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsReport\`
       WHERE RecordType = '${recordType}'
-        AND RiskProfile = 'P75'
+        AND RiskProfile = '${filters.riskProfile}'
         AND Horizon = 'QTD'
         AND Period_Start_Date = '2026-01-01'
-        AND Source IS NOT NULL AND Source != ''
         AND OpportunityType != 'Renewal'
         ${regionFilter}
-      GROUP BY 1, 2
+      GROUP BY 1
+    ),
+    -- Region-level target totals for proportional allocation
+    region_target_totals AS (
+      SELECT
+        Region AS region,
+        SUM(COALESCE(Target_MQL, 0)) AS total_target_mql,
+        SUM(COALESCE(Target_SQL, 0)) AS total_target_sql,
+        SUM(COALESCE(Target_SAL, 0)) AS total_target_sal,
+        SUM(COALESCE(Target_SQO, 0)) AS total_target_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsPlan\`
+      WHERE RecordType = '${recordType}'
+        AND RiskProfile = '${filters.riskProfile}'
+        AND ActivityQuarterYear = '2026-Q1'
+        AND OpportunityType != 'Renewal'
+        AND Source IS NOT NULL AND Source != ''
+        ${regionFilter}
+      GROUP BY 1
     ),
     combined AS (
       SELECT
         '${product}' AS product,
-        COALESCE(t.region, a.region) AS region,
-        COALESCE(t.source, a.source) AS source,
-        COALESCE(a.actual_mql, 0) AS actual_mql,
-        COALESCE(a.actual_sql, 0) AS actual_sql,
-        COALESCE(a.actual_sal, 0) AS actual_sal,
-        COALESCE(a.actual_sqo, 0) AS actual_sqo,
-        CAST(COALESCE(t.target_mql, 0) AS INT64) AS target_mql,
-        CAST(COALESCE(t.target_sql, 0) AS INT64) AS target_sql,
-        CAST(COALESCE(t.target_sal, 0) AS INT64) AS target_sal,
-        CAST(COALESCE(t.target_sqo, 0) AS INT64) AS target_sqo,
-        COALESCE(t.target_acv, 0) AS target_acv
+        t.region,
+        t.source,
+        -- Allocate category-level actuals to sources proportionally by target weight
+        CAST(ROUND(CASE WHEN rt.total_target_mql > 0
+          THEN ca.total_actual_mql * (t.target_mql / rt.total_target_mql)
+          ELSE 0 END) AS INT64) AS actual_mql,
+        CAST(ROUND(CASE WHEN rt.total_target_sql > 0
+          THEN ca.total_actual_sql * (t.target_sql / rt.total_target_sql)
+          ELSE 0 END) AS INT64) AS actual_sql,
+        CAST(ROUND(CASE WHEN rt.total_target_sal > 0
+          THEN ca.total_actual_sal * (t.target_sal / rt.total_target_sal)
+          ELSE 0 END) AS INT64) AS actual_sal,
+        CAST(ROUND(CASE WHEN rt.total_target_sqo > 0
+          THEN ca.total_actual_sqo * (t.target_sqo / rt.total_target_sqo)
+          ELSE 0 END) AS INT64) AS actual_sqo,
+        CAST(t.target_mql AS INT64) AS target_mql,
+        CAST(t.target_sql AS INT64) AS target_sql,
+        CAST(t.target_sal AS INT64) AS target_sal,
+        CAST(t.target_sqo AS INT64) AS target_sqo,
+        t.target_acv
       FROM plan_targets t
-      FULL OUTER JOIN report_actuals a ON t.region = a.region AND t.source = a.source
+      LEFT JOIN region_target_totals rt ON t.region = rt.region
+      LEFT JOIN category_actuals ca ON t.region = ca.region
     )
     SELECT *
     FROM combined
@@ -2726,10 +2802,60 @@ async function getSQODetails(filters: ReportFilters) {
         AND CAST(nl.SQO_DT AS DATE) >= '${filters.startDate}'
         AND CAST(nl.SQO_DT AS DATE) <= '${filters.endDate}'
         ${r360RegionClause.replace(/f\.Region/g, 'nl.Region')}
+    ),
+    -- EXPANSION and MIGRATION R360 opportunities at SQO stage (Proposal+)
+    expansion_migration_r360_sqos AS (
+      SELECT
+        'R360' AS product,
+        CASE o.Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        o.Id AS record_id,
+        CONCAT('https://por.my.salesforce.com/', o.Id) AS salesforce_url,
+        COALESCE(o.AccountName, 'Unknown') AS company_name,
+        'N/A' AS email,
+        UPPER(COALESCE(NULLIF(COALESCE(o.SDRSource, o.POR_SDRSource), ''), 'EXPANSION')) AS source,
+        CAST(o.CreatedDate AS STRING) AS sqo_date,
+        CAST(NULL AS STRING) AS sal_date,
+        CAST(NULL AS STRING) AS sql_date,
+        CAST(NULL AS STRING) AS mql_date,
+        0 AS days_sal_to_sqo,
+        DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) AS days_total_cycle,
+        CASE
+          WHEN o.Won THEN 'WON'
+          WHEN o.IsClosed AND NOT o.Won THEN 'LOST'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) > 60 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sqo_status,
+        o.Id AS opportunity_id,
+        o.OpportunityName AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        o.ACV AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) AS days_in_stage,
+        CASE
+          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN o.Type = 'Migration' THEN 'MIGRATION'
+        END AS category,
+        ROW_NUMBER() OVER (PARTITION BY o.Id ORDER BY o.CreatedDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+      WHERE o.por_record__c = false
+        AND o.Division IN ('US', 'UK', 'AU')
+        AND o.Type IN ('Existing Business', 'Migration')
+        AND o.ACV > 0
+        -- SQO stage = Proposal stage or beyond OR Won
+        AND (o.StageName IN ('Proposal', 'Negotiation', 'Closed Won', 'Closed Lost') OR o.Won OR o.IsClosed)
+        AND CAST(o.CreatedDate AS DATE) >= '${filters.startDate}'
+        AND CAST(o.CreatedDate AS DATE) <= '${filters.endDate}'
+        ${regionClause.replace(/f\.Division/g, 'o.Division')}
     )
     SELECT * EXCEPT(rn) FROM ranked_sqos WHERE rn = 1
     UNION ALL
     SELECT * EXCEPT(rn) FROM non_inbound_r360_sqos WHERE rn = 1
+    UNION ALL
+    SELECT * EXCEPT(rn) FROM expansion_migration_r360_sqos WHERE rn = 1
     ORDER BY sqo_date DESC
   `;
 
@@ -3144,7 +3270,7 @@ function calculateRAG(attainmentPct: number): RAGStatus {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { startDate, endDate, products = [], regions = [] } = body;
+    const { startDate, endDate, products = [], regions = [], riskProfile = 'P90' } = body;
 
     if (!startDate || !endDate) {
       return NextResponse.json(
@@ -3153,7 +3279,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const filters: ReportFilters = { startDate, endDate, products, regions };
+    const validProfiles = ['P50', 'P75', 'P90'];
+    const safeRiskProfile = validProfiles.includes(riskProfile) ? riskProfile : 'P90';
+
+    const filters: ReportFilters = { startDate, endDate, products, regions, riskProfile: safeRiskProfile };
 
     // Execute all BigQuery queries in parallel
     const [
@@ -3214,7 +3343,7 @@ export async function POST(request: Request) {
         ? getFunnelByCategory(filters, 'R360')
         : Promise.resolve([]),
       getUpcomingRenewalUplift(),
-      getRenewalTargetsFromRawPlan(),
+      getRenewalTargetsFromRawPlan(filters.riskProfile),
       Promise.resolve(null),  // Source mix no longer needed - targets from RevOpsReport directly
       getFYTargetsFromPlan(),
       getUtmBreakdown(filters),
@@ -3223,7 +3352,7 @@ export async function POST(request: Request) {
     // Calculate period info
     const periodInfo = calculatePeriodInfo(startDate, endDate);
 
-    // Build target map from RevOpsReport data (P75 targets)
+    // Build target map from RevOpsReport data (P90 targets)
     // IMPORTANT: Sum targets for duplicate product-region-category combinations
     // RevOpsReport may have multiple rows per segment (e.g., different Segments within same OpportunityType)
     const revOpsTargetMap = new Map<string, any>();
@@ -3250,7 +3379,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // CRITICAL: Ensure RENEWAL targets are present from RevOpsReport (P75)
+    // CRITICAL: Ensure RENEWAL targets are present from RevOpsReport (P90)
     // This ensures renewal targets are included even if RevOpsReport main query missed them
     for (const [key, correctTarget] of Array.from(renewalTargetsMap.entries())) {
       if (revOpsTargetMap.has(key)) {
@@ -3277,7 +3406,7 @@ export async function POST(request: Request) {
           mql_to_sql_leakage: 0,
           sql_to_sal_leakage: 0,
           sal_to_sqo_leakage: 0,
-          risk_profile: 'P75',
+          risk_profile: filters.riskProfile,
         });
         console.log(`RENEWAL target added: ${key} = $${correctTarget}`);
       }
@@ -3322,7 +3451,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Build attainment detail from RevOpsReport P75 targets
+    // Build attainment detail from RevOpsReport P90 targets
     const attainmentDetail: any[] = [];
 
     for (const [key, target] of Array.from(revOpsTargetMap.entries())) {
@@ -3434,7 +3563,7 @@ export async function POST(request: Request) {
         mql_to_sql_leakage: parseFloat(target.mql_to_sql_leakage) || 0,
         sql_to_sal_leakage: parseFloat(target.sql_to_sal_leakage) || 0,
         sal_to_sqo_leakage: parseFloat(target.sal_to_sqo_leakage) || 0,
-        risk_profile: target.risk_profile || 'P75',
+        risk_profile: target.risk_profile || filters.riskProfile,
       });
     }
 
@@ -3473,7 +3602,7 @@ export async function POST(request: Request) {
         : 0,
       total_won_deals: totalWonDeals,
       total_lost_deals: totalLostDeals,
-      risk_profile: 'P75',
+      risk_profile: filters.riskProfile,
     };
 
     // Calculate product totals
@@ -3514,7 +3643,7 @@ export async function POST(request: Request) {
           total_won_deals: prodWonDeals,
           total_lost_deals: prodLostDeals,
           total_lost_acv: prodLostAcv,
-          risk_profile: 'P75',
+          risk_profile: filters.riskProfile,
         };
       }
     }
@@ -3793,274 +3922,175 @@ export async function POST(request: Request) {
     sourceAttainment.R360.sort((a, b) => a.region.localeCompare(b.region) || a.source.localeCompare(b.source));
 
     // Build funnel by source data
+    // SQO actuals are overridden from detail records to match SQO Details exactly.
+    // We allocate the detail-record total to sources proportionally by target weight.
     const funnelBySource: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
 
     // Note: sourceQtdProrationFactor already defined above for source attainment
 
-    // Funnel by source: now includes source-level targets from plan with QTD proration
-    for (const row of porFunnelBySource as any[]) {
-      const q1TargetMql = parseInt(row.target_mql) || 0;
-      const q1TargetSql = parseInt(row.target_sql) || 0;
-      const q1TargetSal = parseInt(row.target_sal) || 0;
-      const q1TargetSqo = parseInt(row.target_sqo) || 0;
-      const q1TargetAcv = Math.round(parseFloat(row.target_acv) || 0);
-      // Calculate QTD targets by applying proration factor
-      const qtdTargetMql = Math.round(q1TargetMql * sourceQtdProrationFactor);
-      const qtdTargetSql = Math.round(q1TargetSql * sourceQtdProrationFactor);
-      const qtdTargetSal = Math.round(q1TargetSal * sourceQtdProrationFactor);
-      const qtdTargetSqo = Math.round(q1TargetSqo * sourceQtdProrationFactor);
-      const actualMql = parseInt(row.actual_mql) || 0;
-      const actualSql = parseInt(row.actual_sql) || 0;
-      const actualSal = parseInt(row.actual_sal) || 0;
-      const actualSqo = parseInt(row.actual_sqo) || 0;
-
-      funnelBySource.POR.push({
-        region: row.region,
-        source: row.source,
-        target_acv: q1TargetAcv,
-        actual_mql: actualMql,
-        actual_sql: actualSql,
-        actual_sal: actualSal,
-        actual_sqo: actualSqo,
-        q1_target_mql: q1TargetMql,
-        q1_target_sql: q1TargetSql,
-        q1_target_sal: q1TargetSal,
-        q1_target_sqo: q1TargetSqo,
-        qtd_target_mql: qtdTargetMql,
-        qtd_target_sql: qtdTargetSql,
-        qtd_target_sal: qtdTargetSal,
-        qtd_target_sqo: qtdTargetSqo,
-        // Pacing calculated against QTD targets (not Q1)
-        mql_pacing_pct: qtdTargetMql > 0 ? Math.round((actualMql / qtdTargetMql) * 100) : 100,
-        sql_pacing_pct: qtdTargetSql > 0 ? Math.round((actualSql / qtdTargetSql) * 100) : 100,
-        sal_pacing_pct: qtdTargetSal > 0 ? Math.round((actualSal / qtdTargetSal) * 100) : 100,
-        sqo_pacing_pct: qtdTargetSqo > 0 ? Math.round((actualSqo / qtdTargetSqo) * 100) : 100,
-        // Gaps calculated against QTD targets
-        mql_gap: actualMql - qtdTargetMql,
-        sql_gap: actualSql - qtdTargetSql,
-        sal_gap: actualSal - qtdTargetSal,
-        sqo_gap: actualSqo - qtdTargetSqo,
-        mql_to_sql_rate: parseFloat(row.mql_to_sql_rate) || 0,
-        sql_to_sal_rate: parseFloat(row.sql_to_sal_rate) || 0,
-        sal_to_sqo_rate: parseFloat(row.sal_to_sqo_rate) || 0,
-      });
+    // Count SQO detail records by (product, region) for source-level allocation
+    const sqoRegionTotals = new Map<string, number>();
+    for (const rec of (sqoDetailsData.POR || [])) {
+      const key = `POR-${rec.region}`;
+      sqoRegionTotals.set(key, (sqoRegionTotals.get(key) || 0) + 1);
+    }
+    for (const rec of (sqoDetailsData.R360 || [])) {
+      const key = `R360-${rec.region}`;
+      sqoRegionTotals.set(key, (sqoRegionTotals.get(key) || 0) + 1);
     }
 
-    for (const row of r360FunnelBySource as any[]) {
-      const q1TargetMql = parseInt(row.target_mql) || 0;
-      const q1TargetSql = parseInt(row.target_sql) || 0;
-      const q1TargetSqo = parseInt(row.target_sqo) || 0;
-      const q1TargetAcv = Math.round(parseFloat(row.target_acv) || 0);
-      // Calculate QTD targets by applying proration factor
-      const qtdTargetMql = Math.round(q1TargetMql * sourceQtdProrationFactor);
-      const qtdTargetSql = Math.round(q1TargetSql * sourceQtdProrationFactor);
-      const qtdTargetSqo = Math.round(q1TargetSqo * sourceQtdProrationFactor);
-      const actualMql = parseInt(row.actual_mql) || 0;
-      const actualSql = parseInt(row.actual_sql) || 0;
-      const actualSqo = parseInt(row.actual_sqo) || 0;
-
-      funnelBySource.R360.push({
-        region: row.region,
-        source: row.source,
-        target_acv: q1TargetAcv,
-        actual_mql: actualMql,
-        actual_sql: actualSql,
-        actual_sal: 0,  // R360 has no SAL stage
-        actual_sqo: actualSqo,
-        q1_target_mql: q1TargetMql,
-        q1_target_sql: q1TargetSql,
-        q1_target_sal: 0,
-        q1_target_sqo: q1TargetSqo,
-        qtd_target_mql: qtdTargetMql,
-        qtd_target_sql: qtdTargetSql,
-        qtd_target_sal: 0,
-        qtd_target_sqo: qtdTargetSqo,
-        // Pacing calculated against QTD targets (not Q1)
-        mql_pacing_pct: qtdTargetMql > 0 ? Math.round((actualMql / qtdTargetMql) * 100) : 100,
-        sql_pacing_pct: qtdTargetSql > 0 ? Math.round((actualSql / qtdTargetSql) * 100) : 100,
-        sal_pacing_pct: 100,
-        sqo_pacing_pct: qtdTargetSqo > 0 ? Math.round((actualSqo / qtdTargetSqo) * 100) : 100,
-        // Gaps calculated against QTD targets
-        mql_gap: actualMql - qtdTargetMql,
-        sql_gap: actualSql - qtdTargetSql,
-        sal_gap: 0,
-        sqo_gap: actualSqo - qtdTargetSqo,
-        mql_to_sql_rate: parseFloat(row.mql_to_sql_rate) || 0,
-        sql_to_sal_rate: 0,
-        sal_to_sqo_rate: parseFloat(row.sal_to_sqo_rate) || 0,
-      });
+    // Compute target totals per (product, region) for proportional allocation
+    const computeSourceSqoTargetTotal = (rows: any[]): Map<string, number> => {
+      const totals = new Map<string, number>();
+      for (const row of rows) {
+        const key = `${row.region}`;
+        totals.set(key, (totals.get(key) || 0) + (parseInt(row.target_sqo) || 0));
+      }
+      return totals;
     }
+
+    const buildSourceRows = (rows: any[], product: string, hasSal: boolean): any[] => {
+      const targetTotals = computeSourceSqoTargetTotal(rows);
+      const result: any[] = [];
+
+      for (const row of rows) {
+        const q1TargetMql = parseInt(row.target_mql) || 0;
+        const q1TargetSql = parseInt(row.target_sql) || 0;
+        const q1TargetSal = hasSal ? (parseInt(row.target_sal) || 0) : 0;
+        const q1TargetSqo = parseInt(row.target_sqo) || 0;
+        const q1TargetAcv = Math.round(parseFloat(row.target_acv) || 0);
+        const qtdTargetMql = Math.round(q1TargetMql * sourceQtdProrationFactor);
+        const qtdTargetSql = Math.round(q1TargetSql * sourceQtdProrationFactor);
+        const qtdTargetSal = Math.round(q1TargetSal * sourceQtdProrationFactor);
+        const qtdTargetSqo = Math.round(q1TargetSqo * sourceQtdProrationFactor);
+        const actualMql = parseInt(row.actual_mql) || 0;
+        const actualSql = parseInt(row.actual_sql) || 0;
+        const actualSal = hasSal ? (parseInt(row.actual_sal) || 0) : 0;
+
+        // Allocate SQO actuals from detail records proportionally by target weight
+        const regionTotal = sqoRegionTotals.get(`${product}-${row.region}`) || 0;
+        const regionTargetTotal = targetTotals.get(row.region) || 0;
+        const sqoWeight = regionTargetTotal > 0 ? q1TargetSqo / regionTargetTotal : 0;
+        const actualSqo = Math.round(regionTotal * sqoWeight);
+
+        result.push({
+          region: row.region,
+          source: row.source,
+          target_acv: q1TargetAcv,
+          actual_mql: actualMql,
+          actual_sql: actualSql,
+          actual_sal: actualSal,
+          actual_sqo: actualSqo,
+          q1_target_mql: q1TargetMql,
+          q1_target_sql: q1TargetSql,
+          q1_target_sal: q1TargetSal,
+          q1_target_sqo: q1TargetSqo,
+          qtd_target_mql: qtdTargetMql,
+          qtd_target_sql: qtdTargetSql,
+          qtd_target_sal: qtdTargetSal,
+          qtd_target_sqo: qtdTargetSqo,
+          mql_pacing_pct: qtdTargetMql > 0 ? Math.round((actualMql / qtdTargetMql) * 100) : (actualMql > 0 ? 100 : 0),
+          sql_pacing_pct: qtdTargetSql > 0 ? Math.round((actualSql / qtdTargetSql) * 100) : (actualSql > 0 ? 100 : 0),
+          sal_pacing_pct: hasSal ? (qtdTargetSal > 0 ? Math.round((actualSal / qtdTargetSal) * 100) : (actualSal > 0 ? 100 : 0)) : 100,
+          sqo_pacing_pct: qtdTargetSqo > 0 ? Math.round((actualSqo / qtdTargetSqo) * 100) : (actualSqo > 0 ? 100 : 0),
+          mql_gap: actualMql - qtdTargetMql,
+          sql_gap: actualSql - qtdTargetSql,
+          sal_gap: actualSal - qtdTargetSal,
+          sqo_gap: actualSqo - qtdTargetSqo,
+          mql_to_sql_rate: parseFloat(row.mql_to_sql_rate) || 0,
+          sql_to_sal_rate: hasSal ? (parseFloat(row.sql_to_sal_rate) || 0) : 0,
+          sal_to_sqo_rate: parseFloat(row.sal_to_sqo_rate) || 0,
+        });
+      }
+      return result;
+    }
+
+    funnelBySource.POR = buildSourceRows(porFunnelBySource as any[], 'POR', true);
+    funnelBySource.R360 = buildSourceRows(r360FunnelBySource as any[], 'R360', false);
 
     // Build funnel by category data
+    // TARGETS from RevOpsReport, SQO ACTUALS from detail records (getSQODetails)
+    // This ensures the "By Category" SQO count matches "SQO Details" exactly.
     const funnelByCategory: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
 
     // Calculate QTD proration factor based on time elapsed in Q1
     const qtdProrationFactor = periodInfo.quarter_pct_complete / 100;
 
-    // Get category-level targets from RevOpsReport
-    const categoryTargetMap = new Map<string, any>();
-    for (const row of revOpsData) {
-      const key = `${row.product}-${row.region}-${row.category}`;
-      if (!categoryTargetMap.has(key)) {
-        categoryTargetMap.set(key, {
-          q1_target_mql: 0,
-          q1_target_sql: 0,
-          q1_target_sal: 0,
-          q1_target_sqo: 0,
-        });
-      }
-      const existing = categoryTargetMap.get(key)!;
-      existing.q1_target_mql += parseInt(row.target_mql) || 0;
-      existing.q1_target_sql += parseInt(row.target_sql) || 0;
-      existing.q1_target_sal += parseInt(row.target_sal) || 0;
-      existing.q1_target_sqo += parseInt(row.target_sqo) || 0;
+    // Count SQO detail records by (product, region, category) — this is the SQO source of truth
+    const sqoCountMap = new Map<string, number>();
+    for (const rec of (sqoDetailsData.POR || [])) {
+      const key = `POR-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      sqoCountMap.set(key, (sqoCountMap.get(key) || 0) + 1);
     }
-
-    for (const row of porFunnelByCategory as any[]) {
-      const key = `${row.product}-${row.region}-${row.category}`;
-      const catTargets = categoryTargetMap.get(key) || {
-        q1_target_mql: 0,
-        q1_target_sql: 0,
-        q1_target_sal: 0,
-        q1_target_sqo: 0,
-      };
-
-      // Calculate prorated QTD targets based on time elapsed in Q1
-      const qtdTargetMql = Math.round(catTargets.q1_target_mql * qtdProrationFactor);
-      const qtdTargetSql = Math.round(catTargets.q1_target_sql * qtdProrationFactor);
-      const qtdTargetSal = Math.round(catTargets.q1_target_sal * qtdProrationFactor);
-      const qtdTargetSqo = Math.round(catTargets.q1_target_sqo * qtdProrationFactor);
-
-      // Calculate pacing against prorated QTD targets
-      // Logic: target=0 means 100% pacing (met zero target). Rounded for display.
-      const mqlPacing = qtdTargetMql > 0 ? Math.round((parseInt(row.actual_mql) / qtdTargetMql) * 100) : 100;
-      const sqlPacing = qtdTargetSql > 0 ? Math.round((parseInt(row.actual_sql) / qtdTargetSql) * 100) : 100;
-      const salPacing = qtdTargetSal > 0 ? Math.round((parseInt(row.actual_sal) / qtdTargetSal) * 100) : 100;
-      const sqoPacing = qtdTargetSqo > 0 ? Math.round((parseInt(row.actual_sqo) / qtdTargetSqo) * 100) : 100;
-
-      funnelByCategory.POR.push({
-        category: row.category,
-        region: row.region,
-        actual_mql: parseInt(row.actual_mql) || 0,
-        q1_target_mql: Math.round(catTargets.q1_target_mql),
-        qtd_target_mql: qtdTargetMql,
-        mql_pacing_pct: mqlPacing,
-        mql_gap: (parseInt(row.actual_mql) || 0) - qtdTargetMql,
-        actual_sql: parseInt(row.actual_sql) || 0,
-        q1_target_sql: Math.round(catTargets.q1_target_sql),
-        qtd_target_sql: qtdTargetSql,
-        sql_pacing_pct: sqlPacing,
-        sql_gap: (parseInt(row.actual_sql) || 0) - qtdTargetSql,
-        actual_sal: parseInt(row.actual_sal) || 0,
-        q1_target_sal: Math.round(catTargets.q1_target_sal),
-        qtd_target_sal: qtdTargetSal,
-        sal_pacing_pct: salPacing,
-        sal_gap: (parseInt(row.actual_sal) || 0) - qtdTargetSal,
-        actual_sqo: parseInt(row.actual_sqo) || 0,
-        q1_target_sqo: Math.round(catTargets.q1_target_sqo),
-        qtd_target_sqo: qtdTargetSqo,
-        sqo_pacing_pct: sqoPacing,
-        sqo_gap: (parseInt(row.actual_sqo) || 0) - qtdTargetSqo,
-        weighted_tof_score: Math.round((mqlPacing * 0.1 + sqlPacing * 0.2 + salPacing * 0.3 + sqoPacing * 0.4)),
-      });
+    for (const rec of (sqoDetailsData.R360 || [])) {
+      const key = `R360-${rec.region}-${rec.category || 'NEW LOGO'}`;
+      sqoCountMap.set(key, (sqoCountMap.get(key) || 0) + 1);
     }
+    console.log('SQO detail counts by category:', Object.fromEntries(sqoCountMap));
 
-    for (const row of r360FunnelByCategory as any[]) {
-      const key = `${row.product}-${row.region}-${row.category}`;
-      const catTargets = categoryTargetMap.get(key) || {
-        q1_target_mql: 0,
-        q1_target_sql: 0,
-        q1_target_sal: 0,
-        q1_target_sqo: 0,
-      };
-
-      // Calculate prorated QTD targets based on time elapsed in Q1
-      const qtdTargetMql = Math.round(catTargets.q1_target_mql * qtdProrationFactor);
-      const qtdTargetSql = Math.round(catTargets.q1_target_sql * qtdProrationFactor);
-      const qtdTargetSal = Math.round(catTargets.q1_target_sal * qtdProrationFactor);
-      const qtdTargetSqo = Math.round(catTargets.q1_target_sqo * qtdProrationFactor);
-
-      // Calculate pacing against prorated QTD targets
-      // Logic: target=0 means 100% pacing (met zero target). Rounded for display.
-      const mqlPacing = qtdTargetMql > 0 ? Math.round((parseInt(row.actual_mql) / qtdTargetMql) * 100) : 100;
-      const sqlPacing = qtdTargetSql > 0 ? Math.round((parseInt(row.actual_sql) / qtdTargetSql) * 100) : 100;
-      const salPacing = qtdTargetSal > 0 ? Math.round((parseInt(row.actual_sal) / qtdTargetSal) * 100) : 100;
-      const sqoPacing = qtdTargetSqo > 0 ? Math.round((parseInt(row.actual_sqo) / qtdTargetSqo) * 100) : 100;
-
-      funnelByCategory.R360.push({
-        category: row.category,
-        region: row.region,
-        actual_mql: parseInt(row.actual_mql) || 0,
-        q1_target_mql: Math.round(catTargets.q1_target_mql),
-        qtd_target_mql: qtdTargetMql,
-        mql_pacing_pct: mqlPacing,
-        mql_gap: (parseInt(row.actual_mql) || 0) - qtdTargetMql,
-        actual_sql: parseInt(row.actual_sql) || 0,
-        q1_target_sql: Math.round(catTargets.q1_target_sql),
-        qtd_target_sql: qtdTargetSql,
-        sql_pacing_pct: sqlPacing,
-        sql_gap: (parseInt(row.actual_sql) || 0) - qtdTargetSql,
-        actual_sal: parseInt(row.actual_sal) || 0,
-        q1_target_sal: Math.round(catTargets.q1_target_sal),
-        qtd_target_sal: qtdTargetSal,
-        sal_pacing_pct: salPacing,
-        sal_gap: (parseInt(row.actual_sal) || 0) - qtdTargetSal,
-        actual_sqo: parseInt(row.actual_sqo) || 0,
-        q1_target_sqo: Math.round(catTargets.q1_target_sqo),
-        qtd_target_sqo: qtdTargetSqo,
-        sqo_pacing_pct: sqoPacing,
-        sqo_gap: (parseInt(row.actual_sqo) || 0) - qtdTargetSqo,
-        // R360 has no SAL stage - redistribute weights (10:20:40 → 14.3:28.6:57.1)
-        weighted_tof_score: Math.round((mqlPacing * 0.143 + sqlPacing * 0.286 + sqoPacing * 0.571)),
-      });
-    }
-
-    // Add entries for categories that have targets but no actuals (e.g., STRATEGIC with 0 deals)
+    // Build from revOpsData (targets from RevOpsReport) + SQO actuals from detail records
     const funnelCategories = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
-    const existingPorKeys = new Set(funnelByCategory.POR.map((r: any) => `${r.region}-${r.category}`));
-    const existingR360Keys = new Set(funnelByCategory.R360.map((r: any) => `${r.region}-${r.category}`));
-
-    for (const [key, catTargets] of Array.from(categoryTargetMap.entries())) {
-      const [product, region, category] = key.split('-');
+    for (const row of revOpsData) {
+      const category = row.category;
       if (!funnelCategories.includes(category)) continue;
-      // Skip if no meaningful targets
-      if ((catTargets.q1_target_mql + catTargets.q1_target_sql + catTargets.q1_target_sqo) === 0) continue;
 
-      const rowKey = `${region}-${category}`;
-      const qtdTargetMql = Math.round(catTargets.q1_target_mql * qtdProrationFactor);
-      const qtdTargetSql = Math.round(catTargets.q1_target_sql * qtdProrationFactor);
-      const qtdTargetSal = Math.round(catTargets.q1_target_sal * qtdProrationFactor);
-      const qtdTargetSqo = Math.round(catTargets.q1_target_sqo * qtdProrationFactor);
+      const q1TargetMql = parseInt(row.target_mql) || 0;
+      const q1TargetSql = parseInt(row.target_sql) || 0;
+      const q1TargetSal = parseInt(row.target_sal) || 0;
+      const q1TargetSqo = parseInt(row.target_sqo) || 0;
+      // MQL/SQL/SAL actuals from RevOpsReport (no detail-level source for these)
+      const actualMql = parseInt(row.actual_mql) || 0;
+      const actualSql = parseInt(row.actual_sql) || 0;
+      const actualSal = parseInt(row.actual_sal) || 0;
+      // SQO actuals from detail records (matches SQO Details table exactly)
+      const sqoKey = `${row.product}-${row.region}-${category}`;
+      const actualSqo = sqoCountMap.get(sqoKey) || 0;
 
-      if (product === 'POR' && !existingPorKeys.has(rowKey)) {
-        funnelByCategory.POR.push({
-          category,
-          region,
-          actual_mql: 0, q1_target_mql: Math.round(catTargets.q1_target_mql), qtd_target_mql: qtdTargetMql,
-          mql_pacing_pct: qtdTargetMql > 0 ? 0 : 100, mql_gap: -qtdTargetMql,
-          actual_sql: 0, q1_target_sql: Math.round(catTargets.q1_target_sql), qtd_target_sql: qtdTargetSql,
-          sql_pacing_pct: qtdTargetSql > 0 ? 0 : 100, sql_gap: -qtdTargetSql,
-          actual_sal: 0, q1_target_sal: Math.round(catTargets.q1_target_sal), qtd_target_sal: qtdTargetSal,
-          sal_pacing_pct: qtdTargetSal > 0 ? 0 : 100, sal_gap: -qtdTargetSal,
-          actual_sqo: 0, q1_target_sqo: Math.round(catTargets.q1_target_sqo), qtd_target_sqo: qtdTargetSqo,
-          sqo_pacing_pct: qtdTargetSqo > 0 ? 0 : 100, sqo_gap: -qtdTargetSqo,
-          weighted_tof_score: 0,
-        });
-      }
-      if (product === 'R360' && !existingR360Keys.has(rowKey)) {
-        funnelByCategory.R360.push({
-          category,
-          region,
-          actual_mql: 0, q1_target_mql: Math.round(catTargets.q1_target_mql), qtd_target_mql: qtdTargetMql,
-          mql_pacing_pct: qtdTargetMql > 0 ? 0 : 100, mql_gap: -qtdTargetMql,
-          actual_sql: 0, q1_target_sql: Math.round(catTargets.q1_target_sql), qtd_target_sql: qtdTargetSql,
-          sql_pacing_pct: qtdTargetSql > 0 ? 0 : 100, sql_gap: -qtdTargetSql,
-          actual_sal: 0, q1_target_sal: Math.round(catTargets.q1_target_sal), qtd_target_sal: qtdTargetSal,
-          sal_pacing_pct: qtdTargetSal > 0 ? 0 : 100, sal_gap: -qtdTargetSal,
-          actual_sqo: 0, q1_target_sqo: Math.round(catTargets.q1_target_sqo), qtd_target_sqo: qtdTargetSqo,
-          sqo_pacing_pct: qtdTargetSqo > 0 ? 0 : 100, sqo_gap: -qtdTargetSqo,
-          weighted_tof_score: 0,
-        });
+      const qtdTargetMql = Math.round(q1TargetMql * qtdProrationFactor);
+      const qtdTargetSql = Math.round(q1TargetSql * qtdProrationFactor);
+      const qtdTargetSal = Math.round(q1TargetSal * qtdProrationFactor);
+      const qtdTargetSqo = Math.round(q1TargetSqo * qtdProrationFactor);
+
+      const mqlPacing = qtdTargetMql > 0 ? Math.round((actualMql / qtdTargetMql) * 100) : (actualMql > 0 ? 100 : 0);
+      const sqlPacing = qtdTargetSql > 0 ? Math.round((actualSql / qtdTargetSql) * 100) : (actualSql > 0 ? 100 : 0);
+      const salPacing = qtdTargetSal > 0 ? Math.round((actualSal / qtdTargetSal) * 100) : (actualSal > 0 ? 100 : 0);
+      const sqoPacing = qtdTargetSqo > 0 ? Math.round((actualSqo / qtdTargetSqo) * 100) : (actualSqo > 0 ? 100 : 0);
+
+      const isR360 = row.product === 'R360';
+      const tofScore = isR360
+        ? Math.round((mqlPacing * 0.143 + sqlPacing * 0.286 + sqoPacing * 0.571))
+        : Math.round((mqlPacing * 0.1 + sqlPacing * 0.2 + salPacing * 0.3 + sqoPacing * 0.4));
+
+      const entry = {
+        category,
+        region: row.region,
+        actual_mql: actualMql,
+        q1_target_mql: q1TargetMql,
+        qtd_target_mql: qtdTargetMql,
+        mql_pacing_pct: mqlPacing,
+        mql_gap: actualMql - qtdTargetMql,
+        actual_sql: actualSql,
+        q1_target_sql: q1TargetSql,
+        qtd_target_sql: qtdTargetSql,
+        sql_pacing_pct: sqlPacing,
+        sql_gap: actualSql - qtdTargetSql,
+        actual_sal: actualSal,
+        q1_target_sal: q1TargetSal,
+        qtd_target_sal: qtdTargetSal,
+        sal_pacing_pct: salPacing,
+        sal_gap: actualSal - qtdTargetSal,
+        actual_sqo: actualSqo,
+        q1_target_sqo: q1TargetSqo,
+        qtd_target_sqo: qtdTargetSqo,
+        sqo_pacing_pct: sqoPacing,
+        sqo_gap: actualSqo - qtdTargetSqo,
+        weighted_tof_score: tofScore,
+      };
+
+      if (row.product === 'POR') {
+        funnelByCategory.POR.push(entry);
+      } else if (row.product === 'R360') {
+        funnelByCategory.R360.push(entry);
       }
     }
 
@@ -4447,7 +4477,7 @@ export async function POST(request: Request) {
       filters_applied: filters,
       period: periodInfo,
       data_source: {
-        targets: 'RevOpsReport (P75)',
+        targets: 'RevOpsReport (P90)',
         actuals: 'sfdc.OpportunityViewTable + RevOpsReport',
         funnel: 'MarketingFunnel + DailyRevenueFunnel',
       },
@@ -4501,9 +4531,9 @@ export async function GET() {
   return NextResponse.json({
     endpoint: '/api/report-data',
     method: 'POST',
-    description: 'Fetch Q1 2026 Risk Report data using RevOps architecture with P75 targets',
+    description: 'Fetch Q1 2026 Risk Report data using RevOps architecture with P90 targets',
     data_sources: {
-      targets: 'Staging.RevOpsReport (RiskProfile=P75, Horizon=QTD)',
+      targets: 'Staging.RevOpsReport (RiskProfile=P90, Horizon=QTD)',
       actuals: 'sfdc.OpportunityViewTable + RevOpsReport.Actual_ACV',
       funnel: 'MarketingFunnel.InboundFunnel, R360InboundFunnel, DailyRevenueFunnel',
       google_ads: 'GoogleAds_POR_*, GoogleAds_Record360_*',
@@ -4521,7 +4551,7 @@ export async function GET() {
       regions: ['AMER', 'EMEA'],
     },
     notes: [
-      'Uses P75 risk profile for conservative/realistic targets',
+      'Uses P90 risk profile for conservative/realistic targets',
       'RevOpsReport provides pre-calculated QTD attainment',
       'OpportunityType maps to Category (New Business -> NEW LOGO, etc.)',
       'Renewal forecasts include expected uplift from auto-renewing contracts',

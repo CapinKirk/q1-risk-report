@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { SQODetailRow, Product, Region } from '@/lib/types';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
@@ -29,6 +29,40 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
   const [selectedSources, setSelectedSources] = useState<SourceType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Sync component filters with page-level filters by detecting available data
+  const availableProducts = useMemo(() => {
+    const products = new Set<Product>();
+    if (sqoDetails.POR.length > 0) products.add('POR');
+    if (sqoDetails.R360.length > 0) products.add('R360');
+    return Array.from(products);
+  }, [sqoDetails]);
+
+  const availableRegions = useMemo(() => {
+    const regions = new Set<Region>();
+    [...sqoDetails.POR, ...sqoDetails.R360].forEach(s => {
+      if (s.region) regions.add(s.region as Region);
+    });
+    return Array.from(regions);
+  }, [sqoDetails]);
+
+  useEffect(() => {
+    // Auto-select single product if page filter narrowed to one
+    if (availableProducts.length === 1) {
+      setSelectedProduct(availableProducts[0]);
+    } else {
+      setSelectedProduct('ALL');
+    }
+  }, [availableProducts]);
+
+  useEffect(() => {
+    // Auto-select single region if page filter narrowed to one
+    if (availableRegions.length === 1) {
+      setSelectedRegion(availableRegions[0]);
+    } else {
+      setSelectedRegion('ALL');
+    }
+  }, [availableRegions]);
 
   // Combine and filter SQO data
   const filteredSQOs = useMemo(() => {

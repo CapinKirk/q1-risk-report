@@ -137,7 +137,7 @@ export const BIGQUERY_CONFIG = {
 
 // RevOps Risk Profile levels
 export type RiskProfile = 'P50' | 'P75' | 'P90';
-export const DEFAULT_RISK_PROFILE: RiskProfile = 'P75';
+export const DEFAULT_RISK_PROFILE: RiskProfile = 'P90';
 
 // RevOps Horizon levels for reporting
 export type Horizon = 'WTD' | 'MTD' | 'QTD' | 'YTD';
