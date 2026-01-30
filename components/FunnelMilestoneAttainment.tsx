@@ -807,7 +807,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
               >
                 {labelHeader}{getSortIndicator('label', sortConfig)}
               </th>
-              <th colSpan={3}>EQL/MQL</th>
+              <th colSpan={3}>EQL</th>
+              <th colSpan={3}>MQL</th>
               <th colSpan={3}>SQL</th>
               <th colSpan={3} className={isR360Only ? 'na-header' : ''}>SAL{isR360Only && ' (N/A)'}</th>
               <th colSpan={3}>SQO</th>
@@ -816,10 +817,13 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
                 className={canSort ? 'sortable-header' : ''}
                 onClick={() => headerClick('tofScore')}
               >
-                TOF Score{getSortIndicator('tofScore', sortConfig)}
+                Score{getSortIndicator('tofScore', sortConfig)}
               </th>
             </tr>
             <tr className="sub-header">
+              <th className={canSort ? 'sortable-header' : ''} onClick={() => headerClick('eqlActual')}>Act{getSortIndicator('eqlActual', sortConfig)}</th>
+              <th className={canSort ? 'sortable-header' : ''} onClick={() => headerClick('eqlTarget')}>Tgt{getSortIndicator('eqlTarget', sortConfig)}</th>
+              <th className={canSort ? 'sortable-header' : ''} onClick={() => headerClick('eqlPacingPct')}>Pace{getSortIndicator('eqlPacingPct', sortConfig)}</th>
               <th className={canSort ? 'sortable-header' : ''} onClick={() => headerClick('mqlActual')}>Act{getSortIndicator('mqlActual', sortConfig)}</th>
               <th className={canSort ? 'sortable-header' : ''} onClick={() => headerClick('mqlTarget')}>Tgt{getSortIndicator('mqlTarget', sortConfig)}</th>
               <th className={canSort ? 'sortable-header' : ''} onClick={() => headerClick('mqlPacingPct')}>Pace{getSortIndicator('mqlPacingPct', sortConfig)}</th>
@@ -862,7 +866,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
 
   return (
     <section>
-      <h2>Full Funnel Pacing ({isR360Only ? 'MQL' : 'EQL/MQL'} → SQO)</h2>
+      <h2>Full Funnel Pacing (EQL/MQL → SQO)</h2>
       <p className="section-subtitle">
         <span className="lead-label mql">MQL</span> Marketing Qualified Lead (NEW LOGO)
         {!isR360Only && (
@@ -872,7 +876,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           </>
         )}
         <span className="separator">|</span>
-        <span className="tof-label">TOF Score</span> {isR360Only
+        <span className="tof-label">Score</span> {isR360Only
           ? '14% MQL + 29% SQL + 57% SQO (no SAL)'
           : 'POR: 10% EQL/MQL + 20% SQL + 30% SAL + 40% SQO | R360: 14% MQL + 29% SQL + 57% SQO (no SAL)'
         }
