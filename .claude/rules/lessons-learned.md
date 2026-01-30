@@ -15,7 +15,7 @@
 | Source | POR EXPANSION | POR MIGRATION |
 |--------|---------------|---------------|
 | DailyRevenueFunnel QTD | **134** ✅ | 13 |
-| RevOpsReport QTD (P75) | **134** ✅ | 13 |
+| RevOpsReport QTD (P90) | **134** ✅ | 13 |
 | ExpansionFunnel SQO_DT QTD | 183 | n/a |
 | MigrationFunnel SQO_DT QTD | n/a | 26 |
 | MigrationFunnel Last 90 Days | n/a | 175 |
@@ -205,7 +205,7 @@ curl -X POST "URL/api/report-data" \
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
 | `DailyRevenueFunnel` | **Primary source** for daily funnel | RecordType, FunnelType, CaptureDate, SQO, MQL, SQL, SAL |
-| `RevOpsReport` | **Primary source** for bookings/revenue | Horizon, RiskProfile='P75', OpportunityType, Actual_SQO |
+| `RevOpsReport` | **Primary source** for bookings/revenue | Horizon, RiskProfile='P90', OpportunityType, Actual_SQO |
 | `MonthlyRevenueFunnel` | Monthly aggregates | Similar to Daily |
 | `BookingsPlan2026` | 2026 targets | Plan/Target values |
 
@@ -271,7 +271,7 @@ WHERE LOWER(Booking_Type) = 'renewal'
 
 ## Verified Q1 2026 Targets (2026-01-20)
 
-**Source:** `Staging.RevOpsReport` with `RiskProfile='P75'`, `Horizon='QTD'`, `Period_Start_Date='2026-01-01'`
+**Source:** `Staging.RevOpsReport` with `RiskProfile='P90'`, `Horizon='QTD'`, `Period_Start_Date='2026-01-01'`
 
 | Product | Q1 Target |
 |---------|-----------|

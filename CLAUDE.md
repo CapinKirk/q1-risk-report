@@ -163,7 +163,7 @@ npx playwright test  # Run E2E tests
 
 The RevOps architecture is a 6-layer data model for 2026 bookings targets and performance tracking.
 
-**Always use P75 risk profile for targets.**
+**Always use P90 risk profile for targets.**
 
 | Layer | Table | Purpose | Key Columns |
 |-------|-------|---------|-------------|
@@ -181,7 +181,7 @@ The RevOps architecture is a 6-layer data model for 2026 bookings targets and pe
 
 **RevOpsReport Key Columns:**
 - `Horizon`: WTD, MTD, QTD, YTD
-- `RiskProfile`: P50, P75, P90 (use P75)
+- `RiskProfile`: P50, P75, P90 (use P90)
 - `RecordType`: POR, R360
 - `Region`: AMER, EMEA, APAC
 - `OpportunityType`: New Business, Existing Business, Migration, Renewal

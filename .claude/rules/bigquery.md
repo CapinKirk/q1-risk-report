@@ -8,14 +8,14 @@ paths:
 
 ## RevOps Architecture (PRIMARY - 2026)
 
-**Always use P75 risk profile for targets. Query RevOpsReport for all performance metrics.**
+**Always use P90 risk profile for targets. Query RevOpsReport for all performance metrics.**
 
 ### Staging Dataset - RevOps Tables
 
 **RevOpsReport** (Layer 5) - **PRIMARY TABLE FOR ALL REPORTING**
 - Columns: Horizon, RiskProfile, RecordType, Region, OpportunityType, Period_Start_Date, Target_ACV, Actual_ACV, Revenue_Pacing_Score
 - Use: WTD/MTD/QTD/YTD targets and actuals
-- Filter: `RiskProfile = 'P75'` for standard reporting
+- Filter: `RiskProfile = 'P90'` for standard reporting
 
 **RevOpsPerformance** (Layer 4) - Daily pacing
 - Columns: Date, RecordType, Region, OpportunityType, RiskProfile, Target_ACV, Actual_ACV
@@ -74,7 +74,7 @@ SELECT
   ROUND(COALESCE(Revenue_Pacing_Score, 0), 2) AS attainment_pct
 FROM `data-analytics-306119.Staging.RevOpsReport`
 WHERE Horizon = 'QTD'
-  AND RiskProfile = 'P75'
+  AND RiskProfile = 'P90'
   AND Period_Start_Date = '2026-01-01'
   AND RecordType IN ('POR', 'R360')
   AND Region IN ('AMER', 'EMEA', 'APAC')

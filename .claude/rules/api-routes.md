@@ -57,9 +57,9 @@ curl ... | jq '.sqo_details.POR | length'
 
 | Target Type | Primary Source | Fallback |
 |-------------|----------------|----------|
-| New Business | RevOpsReport (P75, QTD) | - |
-| Expansion | RevOpsReport (P75, QTD) | - |
-| Migration | RevOpsReport (P75, QTD) | - |
+| New Business | RevOpsReport (P90, QTD) | - |
+| Expansion | RevOpsReport (P90, QTD) | - |
+| Migration | RevOpsReport (P90, QTD) | - |
 | **Renewal** | RAW_2026_Plan_by_Month.Q1_Plan_2026 | Q1_Actual_2025 |
 
 **Note:** Renewal targets use `COALESCE(Q1_Plan_2026, Q1_Actual_2025, 0)` because new products like R360 have no prior year renewal history.

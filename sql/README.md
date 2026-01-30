@@ -36,7 +36,7 @@ See `schemas/data-lineage.md` for complete source documentation.
 | 1 | SourcePlanByMonth2026, SourceTargetRates, SalesCycleLags2026 | Processed sources |
 | 0 | RAW_2026_Plan_by_Month, MonthlyRevenueFunnel, DailyRevenueFunnel | Raw data |
 
-**Use P75 RiskProfile for all target queries.**
+**Use P90 RiskProfile for all target queries.**
 
 ### Legacy Tables
 
