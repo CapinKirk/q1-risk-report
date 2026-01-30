@@ -289,7 +289,8 @@ async function getRevOpsQTDData(filters: ReportFilters) {
   const filterClause = buildRevOpsFilterClause(filters);
 
   const query = `
-    WITH plan_targets AS (
+    WITH plan_q1_targets AS (
+      -- Full Q1 targets (reference totals)
       SELECT
         RecordType AS product,
         Region AS region,
@@ -303,14 +304,43 @@ async function getRevOpsQTDData(filters: ReportFilters) {
         END AS category,
         OpportunityType AS opportunity_type,
         ROUND(SUM(COALESCE(Target_ACV_Won, 0)), 2) AS q1_target,
-        ROUND(SUM(COALESCE(Target_MQL, 0)), 0) AS target_mql,
-        ROUND(SUM(COALESCE(Target_SQL, 0)), 0) AS target_sql,
-        ROUND(SUM(COALESCE(Target_SAL, 0)), 0) AS target_sal,
-        ROUND(SUM(COALESCE(Target_SQO, 0)), 0) AS target_sqo,
-        ROUND(SUM(COALESCE(Target_Won, 0)), 0) AS target_won
+        ROUND(SUM(COALESCE(Target_MQL, 0)), 0) AS q1_target_mql,
+        ROUND(SUM(COALESCE(Target_SQL, 0)), 0) AS q1_target_sql,
+        ROUND(SUM(COALESCE(Target_SAL, 0)), 0) AS q1_target_sal,
+        ROUND(SUM(COALESCE(Target_SQO, 0)), 0) AS q1_target_sqo,
+        ROUND(SUM(COALESCE(Target_Won, 0)), 0) AS q1_target_won
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPlan\`
       WHERE RiskProfile = '${filters.riskProfile}'
         AND ActivityQuarterYear = '2026-Q1'
+        AND RecordType IN ('POR', 'R360')
+        AND Region IN ('AMER', 'EMEA', 'APAC')
+        ${filterClause}
+      GROUP BY 1, 2, 3, 4
+    ),
+    plan_period_targets AS (
+      -- Period-specific targets (date-range sum for pacing)
+      SELECT
+        RecordType AS product,
+        Region AS region,
+        CASE
+          WHEN OpportunityType = 'New Business' AND Segment = 'Strategic' THEN 'STRATEGIC'
+          WHEN OpportunityType = 'New Business' THEN 'NEW LOGO'
+          WHEN OpportunityType = 'Existing Business' THEN 'EXPANSION'
+          WHEN OpportunityType = 'Migration' THEN 'MIGRATION'
+          WHEN OpportunityType = 'Renewal' THEN 'RENEWAL'
+          ELSE OpportunityType
+        END AS category,
+        OpportunityType AS opportunity_type,
+        ROUND(SUM(COALESCE(Target_ACV_Won, 0)), 2) AS period_target,
+        ROUND(SUM(COALESCE(Target_MQL, 0)), 2) AS period_target_mql,
+        ROUND(SUM(COALESCE(Target_SQL, 0)), 2) AS period_target_sql,
+        ROUND(SUM(COALESCE(Target_SAL, 0)), 2) AS period_target_sal,
+        ROUND(SUM(COALESCE(Target_SQO, 0)), 2) AS period_target_sqo,
+        ROUND(SUM(COALESCE(Target_Won, 0)), 2) AS period_target_won
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPlan\`
+      WHERE RiskProfile = '${filters.riskProfile}'
+        AND ActivityQuarterYear = '2026-Q1'
+        AND ActivityDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
         AND RecordType IN ('POR', 'R360')
         AND Region IN ('AMER', 'EMEA', 'APAC')
         ${filterClause}
@@ -358,23 +388,35 @@ async function getRevOpsQTDData(filters: ReportFilters) {
         THEN ROUND(COALESCE(a.qtd_actual, 0) / t.q1_target * 100, 1)
         ELSE 0
       END AS attainment_pct,
-      COALESCE(t.target_mql, 0) AS target_mql,
+      -- Q1 full targets (reference)
+      COALESCE(t.q1_target_mql, 0) AS q1_target_mql,
+      COALESCE(t.q1_target_sql, 0) AS q1_target_sql,
+      COALESCE(t.q1_target_sal, 0) AS q1_target_sal,
+      COALESCE(t.q1_target_sqo, 0) AS q1_target_sqo,
+      COALESCE(t.q1_target_won, 0) AS q1_target_won,
+      -- Period-specific targets (date-range sum for pacing)
+      COALESCE(p.period_target_mql, 0) AS target_mql,
+      COALESCE(p.period_target_sql, 0) AS target_sql,
+      COALESCE(p.period_target_sal, 0) AS target_sal,
+      COALESCE(p.period_target_sqo, 0) AS target_sqo,
+      COALESCE(p.period_target_won, 0) AS target_won,
+      -- Actuals
       COALESCE(a.actual_mql, 0) AS actual_mql,
-      COALESCE(t.target_sql, 0) AS target_sql,
       COALESCE(a.actual_sql, 0) AS actual_sql,
-      COALESCE(t.target_sal, 0) AS target_sal,
       COALESCE(a.actual_sal, 0) AS actual_sal,
-      COALESCE(t.target_sqo, 0) AS target_sqo,
       COALESCE(a.actual_sqo, 0) AS actual_sqo,
-      COALESCE(t.target_won, 0) AS target_won,
       COALESCE(a.actual_won, 0) AS actual_won,
       COALESCE(a.mql_to_sql_leakage, 0) AS mql_to_sql_leakage,
       COALESCE(a.sql_to_sal_leakage, 0) AS sql_to_sal_leakage,
       COALESCE(a.sal_to_sqo_leakage, 0) AS sal_to_sqo_leakage,
       '${filters.riskProfile}' AS risk_profile
-    FROM plan_targets t
+    FROM plan_q1_targets t
     FULL OUTER JOIN report_actuals a
       ON t.product = a.product AND t.region = a.region AND t.category = a.category
+    LEFT JOIN plan_period_targets p
+      ON COALESCE(t.product, a.product) = p.product
+      AND COALESCE(t.region, a.region) = p.region
+      AND COALESCE(t.category, a.category) = p.category
     ORDER BY product, region, category
   `;
 
@@ -537,8 +579,8 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
-  // Query RevOpsPlan (Layer 3) for Q1 targets by source
-  // SUM daily target values over the full quarter for Q1 totals
+  // Query RevOpsPlan (Layer 3) for period-specific targets by source
+  // SUM daily target values over the requested date range (seasonal distribution)
   const query = `
     WITH plan_targets AS (
       SELECT
@@ -554,6 +596,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
       WHERE RecordType = '${recordType}'
         AND RiskProfile = '${filters.riskProfile}'
         AND ActivityQuarterYear = '2026-Q1'
+        AND ActivityDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
         AND OpportunityType != 'Renewal'
         AND Source IS NOT NULL AND Source != ''
         ${regionFilter}
@@ -576,7 +619,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
         ${regionFilter}
       GROUP BY 1
     ),
-    -- Region-level target totals for proportional allocation
+    -- Region-level target totals for proportional allocation (same date range)
     region_target_totals AS (
       SELECT
         Region AS region,
@@ -588,6 +631,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
       WHERE RecordType = '${recordType}'
         AND RiskProfile = '${filters.riskProfile}'
         AND ActivityQuarterYear = '2026-Q1'
+        AND ActivityDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
         AND OpportunityType != 'Renewal'
         AND Source IS NOT NULL AND Source != ''
         ${regionFilter}
@@ -3652,16 +3696,18 @@ export async function POST(request: Request) {
     // NEW LOGO uses MQL, EXPANSION/MIGRATION use EQL (stored as MQL in RevOpsReport)
     const funnelPacing: any[] = [];
 
-    // Calculate QTD proration factor for funnel pacing
-    const funnelQtdProrationFactor = periodInfo.quarter_pct_complete / 100;
-
     // Build funnel targets and actuals from RevOpsReport for all categories
     // Key: product-region-category
+    // Period targets come from RevOpsPlan date-range sums (no linear proration needed)
     const funnelDataMap = new Map<string, {
       q1_target_mql: number;
       q1_target_sql: number;
       q1_target_sal: number;
       q1_target_sqo: number;
+      period_target_mql: number;
+      period_target_sql: number;
+      period_target_sal: number;
+      period_target_sqo: number;
       actual_mql: number;
       actual_sql: number;
       actual_sal: number;
@@ -3679,6 +3725,10 @@ export async function POST(request: Request) {
           q1_target_sql: 0,
           q1_target_sal: 0,
           q1_target_sqo: 0,
+          period_target_mql: 0,
+          period_target_sql: 0,
+          period_target_sal: 0,
+          period_target_sqo: 0,
           actual_mql: 0,
           actual_sql: 0,
           actual_sal: 0,
@@ -3686,11 +3736,16 @@ export async function POST(request: Request) {
         });
       }
       const existing = funnelDataMap.get(key)!;
-      existing.q1_target_mql += parseInt(row.target_mql) || 0;
-      existing.q1_target_sql += parseInt(row.target_sql) || 0;
-      existing.q1_target_sal += parseInt(row.target_sal) || 0;
-      existing.q1_target_sqo += parseInt(row.target_sqo) || 0;
-      // Targets from RevOpsReport; actuals will be overridden from detail records below
+      existing.q1_target_mql += parseInt(row.q1_target_mql) || 0;
+      existing.q1_target_sql += parseInt(row.q1_target_sql) || 0;
+      existing.q1_target_sal += parseInt(row.q1_target_sal) || 0;
+      existing.q1_target_sqo += parseInt(row.q1_target_sqo) || 0;
+      // Period targets from date-range sum (seasonal, not linearly prorated)
+      existing.period_target_mql += parseFloat(row.target_mql) || 0;
+      existing.period_target_sql += parseFloat(row.target_sql) || 0;
+      existing.period_target_sal += parseFloat(row.target_sal) || 0;
+      existing.period_target_sqo += parseFloat(row.target_sqo) || 0;
+      // Actuals from RevOpsReport; will be overridden from detail records below
       existing.actual_mql += parseInt(row.actual_mql) || 0;
       existing.actual_sql += parseInt(row.actual_sql) || 0;
       existing.actual_sal += parseInt(row.actual_sal) || 0;
@@ -3750,11 +3805,11 @@ export async function POST(request: Request) {
       // Skip if no meaningful targets
       if (data.q1_target_mql === 0 && data.q1_target_sql === 0 && data.q1_target_sqo === 0) continue;
 
-      // Calculate prorated QTD targets
-      const qtdTargetMql = Math.round(data.q1_target_mql * funnelQtdProrationFactor);
-      const qtdTargetSql = Math.round(data.q1_target_sql * funnelQtdProrationFactor);
-      const qtdTargetSal = Math.round(data.q1_target_sal * funnelQtdProrationFactor);
-      const qtdTargetSqo = Math.round(data.q1_target_sqo * funnelQtdProrationFactor);
+      // Period targets from date-range sum (seasonal distribution, no linear proration)
+      const qtdTargetMql = Math.round(data.period_target_mql);
+      const qtdTargetSql = Math.round(data.period_target_sql);
+      const qtdTargetSal = Math.round(data.period_target_sal);
+      const qtdTargetSqo = Math.round(data.period_target_sqo);
 
       // Calculate pacing against prorated QTD targets
       // Logic: target=0 means 100% pacing (met zero target). Rounded for display.
