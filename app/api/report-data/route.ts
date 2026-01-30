@@ -3763,13 +3763,23 @@ export async function POST(request: Request) {
       const salPacing = qtdTargetSal > 0 ? Math.round((data.actual_sal / qtdTargetSal) * 100) : null; // SAL can be null if no target
       const sqoPacing = qtdTargetSqo > 0 ? Math.round((data.actual_sqo / qtdTargetSqo) * 100) : 100;
 
-      // Calculate TOF Score: MQL/EQL=10%, SQL=20%, SAL=30%, SQO=40%
-      const tofScore = Math.round(
-        (mqlPacing || 0) * 0.10 +
-        (sqlPacing || 0) * 0.20 +
-        ((salPacing !== null ? salPacing : (sqlPacing || 0)) * 0.30) + // Use SQL pacing if no SAL
-        (sqoPacing || 0) * 0.40
-      );
+      // Calculate TOF Score: exclude stages with zero targets, redistribute weights
+      const isR360Product = product === 'R360';
+      const activeStages: { pct: number; weight: number }[] = [];
+      const baseMqlWeight = isR360Product ? 0.143 : 0.10;
+      const baseSqlWeight = isR360Product ? 0.286 : 0.20;
+      const baseSalWeight = isR360Product ? 0 : 0.30;
+      const baseSqoWeight = isR360Product ? 0.571 : 0.40;
+
+      if (data.q1_target_mql > 0) activeStages.push({ pct: mqlPacing || 0, weight: baseMqlWeight });
+      if (data.q1_target_sql > 0) activeStages.push({ pct: sqlPacing || 0, weight: baseSqlWeight });
+      if (data.q1_target_sal > 0 && !isR360Product) activeStages.push({ pct: salPacing || 0, weight: baseSalWeight });
+      if (data.q1_target_sqo > 0) activeStages.push({ pct: sqoPacing || 0, weight: baseSqoWeight });
+
+      const totalActiveWeight = activeStages.reduce((sum, s) => sum + s.weight, 0);
+      const tofScore = totalActiveWeight > 0
+        ? Math.round(activeStages.reduce((sum, s) => sum + s.pct * (s.weight / totalActiveWeight), 0))
+        : 0;
 
       // Label: EQL for EXPANSION/MIGRATION, MQL for NEW LOGO/STRATEGIC
       const leadStageLabel = (category === 'NEW LOGO' || category === 'STRATEGIC') ? 'MQL' : 'EQL';
@@ -4169,9 +4179,22 @@ export async function POST(request: Request) {
       const sqoPacing = qtdTargetSqo > 0 ? Math.round((actualSqo / qtdTargetSqo) * 100) : (actualSqo > 0 ? 100 : 0);
 
       const isR360 = row.product === 'R360';
-      const tofScore = isR360
-        ? Math.round((mqlPacing * 0.143 + sqlPacing * 0.286 + sqoPacing * 0.571))
-        : Math.round((mqlPacing * 0.1 + sqlPacing * 0.2 + salPacing * 0.3 + sqoPacing * 0.4));
+      // Exclude stages with zero targets, redistribute weights
+      const catActiveStages: { pct: number; weight: number }[] = [];
+      const catMqlW = isR360 ? 0.143 : 0.10;
+      const catSqlW = isR360 ? 0.286 : 0.20;
+      const catSalW = isR360 ? 0 : 0.30;
+      const catSqoW = isR360 ? 0.571 : 0.40;
+
+      if (q1TargetMql > 0) catActiveStages.push({ pct: mqlPacing, weight: catMqlW });
+      if (q1TargetSql > 0) catActiveStages.push({ pct: sqlPacing, weight: catSqlW });
+      if (q1TargetSal > 0 && !isR360) catActiveStages.push({ pct: salPacing, weight: catSalW });
+      if (q1TargetSqo > 0) catActiveStages.push({ pct: sqoPacing, weight: catSqoW });
+
+      const catTotalWeight = catActiveStages.reduce((sum, s) => sum + s.weight, 0);
+      const tofScore = catTotalWeight > 0
+        ? Math.round(catActiveStages.reduce((sum, s) => sum + s.pct * (s.weight / catTotalWeight), 0))
+        : 0;
 
       const entry = {
         category,

@@ -98,6 +98,9 @@ interface UnifiedRowData {
   category: Category;
   source: string;
   leadStageLabel: 'MQL' | 'EQL';
+  eqlActual: number;
+  eqlTarget: number;
+  eqlPacingPct: number;
   mqlActual: number;
   mqlTarget: number;
   mqlPacingPct: number;
@@ -254,7 +257,8 @@ function MultiSelect<T extends string>({ label, options, selected, onChange, all
 // SORTING TYPES AND HELPERS
 // ============================================================================
 
-type SortKey = 'label' | 'mqlActual' | 'mqlTarget' | 'mqlPacingPct' |
+type SortKey = 'label' | 'eqlActual' | 'eqlTarget' | 'eqlPacingPct' |
+               'mqlActual' | 'mqlTarget' | 'mqlPacingPct' |
                'sqlActual' | 'sqlTarget' | 'sqlPacingPct' |
                'salActual' | 'salTarget' | 'salPacingPct' |
                'sqoActual' | 'sqoTarget' | 'sqoPacingPct' | 'tofScore';
@@ -266,7 +270,7 @@ interface SortConfig {
   direction: SortDirection;
 }
 
-function sortData<T extends { label: string; mqlActual: number; mqlTarget: number; mqlPacingPct: number; sqlActual: number; sqlTarget: number; sqlPacingPct: number; salActual: number; salTarget: number; salPacingPct: number; sqoActual: number; sqoTarget: number; sqoPacingPct: number; tofScore: number }>(
+function sortData<T extends { label: string; eqlActual: number; eqlTarget: number; eqlPacingPct: number; mqlActual: number; mqlTarget: number; mqlPacingPct: number; sqlActual: number; sqlTarget: number; sqlPacingPct: number; salActual: number; salTarget: number; salPacingPct: number; sqoActual: number; sqoTarget: number; sqoPacingPct: number; tofScore: number }>(
   data: T[],
   sortConfig: SortConfig | null
 ): T[] {
@@ -359,6 +363,9 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
             category,
             source: row.source,
             leadStageLabel: getLeadStageLabel(category),
+            eqlActual: 0,
+            eqlTarget: 0,
+            eqlPacingPct: 0,
             mqlActual: row.actual_mql,
             mqlTarget: qtdTargetMql,
             mqlPacingPct,
@@ -403,16 +410,21 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         const qtdTargetSal = row.qtd_target_sal || 0;
         const qtdTargetSqo = row.qtd_target_sqo || 0;
 
+        const leadStageLabel = getLeadStageLabel(row.category);
+
         rows.push({
           id: `${product}-${row.region}-${row.category}`,
           product,
           region: row.region,
           category: row.category,
           source: 'ALL',
-          leadStageLabel: getLeadStageLabel(row.category),
-          mqlActual: row.actual_mql || 0,
-          mqlTarget: qtdTargetMql,
-          mqlPacingPct,
+          leadStageLabel,
+          eqlActual: leadStageLabel === 'EQL' ? (row.actual_mql || 0) : 0,
+          eqlTarget: leadStageLabel === 'EQL' ? qtdTargetMql : 0,
+          eqlPacingPct: leadStageLabel === 'EQL' ? mqlPacingPct : 0,
+          mqlActual: leadStageLabel === 'MQL' ? (row.actual_mql || 0) : 0,
+          mqlTarget: leadStageLabel === 'MQL' ? qtdTargetMql : 0,
+          mqlPacingPct: leadStageLabel === 'MQL' ? mqlPacingPct : 0,
           sqlActual: row.actual_sql || 0,
           sqlTarget: qtdTargetSql,
           sqlPacingPct,
@@ -445,6 +457,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
 
     // Aggregate by category (sum across products and regions)
     const categoryMap = new Map<Category, {
+      eqlActual: number; eqlTarget: number;
       mqlActual: number; mqlTarget: number;
       sqlActual: number; sqlTarget: number;
       salActual: number; salTarget: number;
@@ -453,10 +466,12 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
 
     baseData.forEach(row => {
       const existing = categoryMap.get(row.category) || {
-        mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
+        eqlActual: 0, eqlTarget: 0, mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
         salActual: 0, salTarget: 0, sqoActual: 0, sqoTarget: 0,
       };
       categoryMap.set(row.category, {
+        eqlActual: existing.eqlActual + row.eqlActual,
+        eqlTarget: existing.eqlTarget + row.eqlTarget,
         mqlActual: existing.mqlActual + row.mqlActual,
         mqlTarget: existing.mqlTarget + row.mqlTarget,
         sqlActual: existing.sqlActual + row.sqlActual,
@@ -473,6 +488,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       type: 'category';
       category: Category;
       leadStageLabel: 'MQL' | 'EQL';
+      eqlActual: number; eqlTarget: number; eqlPacingPct: number;
       mqlActual: number; mqlTarget: number; mqlPacingPct: number;
       sqlActual: number; sqlTarget: number; sqlPacingPct: number;
       salActual: number; salTarget: number; salPacingPct: number;
@@ -481,6 +497,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     }> = [];
 
     categoryMap.forEach((data, category) => {
+      const eqlPacingPct = data.eqlTarget > 0 ? Math.round((data.eqlActual / data.eqlTarget) * 100) : (data.eqlActual > 0 ? 100 : 0);
       const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : (data.mqlActual > 0 ? 100 : 0);
       const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : (data.sqlActual > 0 ? 100 : 0);
       const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : (data.salActual > 0 ? 100 : 0);
@@ -494,10 +511,20 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         type: 'category',
         category,
         leadStageLabel: getLeadStageLabel(category),
-        ...data,
+        eqlActual: data.eqlActual,
+        eqlTarget: data.eqlTarget,
+        eqlPacingPct,
+        mqlActual: data.mqlActual,
+        mqlTarget: data.mqlTarget,
         mqlPacingPct,
+        sqlActual: data.sqlActual,
+        sqlTarget: data.sqlTarget,
         sqlPacingPct,
+        salActual: data.salActual,
+        salTarget: data.salTarget,
         salPacingPct,
+        sqoActual: data.sqoActual,
+        sqoTarget: data.sqoTarget,
         sqoPacingPct,
         tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
           { mql: data.mqlTarget, sql: data.sqlTarget, sal: data.salTarget, sqo: data.sqoTarget }),
@@ -517,6 +544,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
 
     // Aggregate by source
     const sourceMap = new Map<string, {
+      eqlActual: number; eqlTarget: number;
       mqlActual: number; mqlTarget: number;
       sqlActual: number; sqlTarget: number;
       salActual: number; salTarget: number;
@@ -525,10 +553,12 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
 
     baseData.forEach(row => {
       const existing = sourceMap.get(row.source) || {
-        mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
+        eqlActual: 0, eqlTarget: 0, mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
         salActual: 0, salTarget: 0, sqoActual: 0, sqoTarget: 0,
       };
       sourceMap.set(row.source, {
+        eqlActual: existing.eqlActual + row.eqlActual,
+        eqlTarget: existing.eqlTarget + row.eqlTarget,
         mqlActual: existing.mqlActual + row.mqlActual,
         mqlTarget: existing.mqlTarget + row.mqlTarget,
         sqlActual: existing.sqlActual + row.sqlActual,
@@ -544,6 +574,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       label: string;
       type: 'source';
       source: string;
+      eqlActual: number; eqlTarget: number; eqlPacingPct: number;
       mqlActual: number; mqlTarget: number; mqlPacingPct: number;
       sqlActual: number; sqlTarget: number; sqlPacingPct: number;
       salActual: number; salTarget: number; salPacingPct: number;
@@ -553,10 +584,11 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
 
     sourceMap.forEach((data, source) => {
       // Only skip if BOTH actuals AND targets are all zero (truly empty)
-      const hasActuals = data.mqlActual > 0 || data.sqlActual > 0 || data.salActual > 0 || data.sqoActual > 0;
-      const hasTargets = data.mqlTarget > 0 || data.sqlTarget > 0 || data.salTarget > 0 || data.sqoTarget > 0;
+      const hasActuals = data.eqlActual > 0 || data.mqlActual > 0 || data.sqlActual > 0 || data.salActual > 0 || data.sqoActual > 0;
+      const hasTargets = data.eqlTarget > 0 || data.mqlTarget > 0 || data.sqlTarget > 0 || data.salTarget > 0 || data.sqoTarget > 0;
       if (!hasActuals && !hasTargets) return;
 
+      const eqlPacingPct = data.eqlTarget > 0 ? Math.round((data.eqlActual / data.eqlTarget) * 100) : (data.eqlActual > 0 ? 100 : 0);
       const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : (data.mqlActual > 0 ? 100 : 0);
       const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : (data.sqlActual > 0 ? 100 : 0);
       const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : (data.salActual > 0 ? 100 : 0);
@@ -569,10 +601,20 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         label: source,
         type: 'source',
         source,
-        ...data,
+        eqlActual: data.eqlActual,
+        eqlTarget: data.eqlTarget,
+        eqlPacingPct,
+        mqlActual: data.mqlActual,
+        mqlTarget: data.mqlTarget,
         mqlPacingPct,
+        sqlActual: data.sqlActual,
+        sqlTarget: data.sqlTarget,
         sqlPacingPct,
+        salActual: data.salActual,
+        salTarget: data.salTarget,
         salPacingPct,
+        sqoActual: data.sqoActual,
+        sqoTarget: data.sqoTarget,
         sqoPacingPct,
         tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
           { mql: data.mqlTarget, sql: data.sqlTarget, sal: data.salTarget, sqo: data.sqoTarget }),
@@ -591,6 +633,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     );
 
     const regionMap = new Map<Region, {
+      eqlActual: number; eqlTarget: number;
       mqlActual: number; mqlTarget: number;
       sqlActual: number; sqlTarget: number;
       salActual: number; salTarget: number;
@@ -599,10 +642,12 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
 
     baseData.forEach(row => {
       const existing = regionMap.get(row.region) || {
-        mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
+        eqlActual: 0, eqlTarget: 0, mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
         salActual: 0, salTarget: 0, sqoActual: 0, sqoTarget: 0,
       };
       regionMap.set(row.region, {
+        eqlActual: existing.eqlActual + row.eqlActual,
+        eqlTarget: existing.eqlTarget + row.eqlTarget,
         mqlActual: existing.mqlActual + row.mqlActual,
         mqlTarget: existing.mqlTarget + row.mqlTarget,
         sqlActual: existing.sqlActual + row.sqlActual,
@@ -618,6 +663,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
       label: string;
       type: 'region';
       region: Region;
+      eqlActual: number; eqlTarget: number; eqlPacingPct: number;
       mqlActual: number; mqlTarget: number; mqlPacingPct: number;
       sqlActual: number; sqlTarget: number; sqlPacingPct: number;
       salActual: number; salTarget: number; salPacingPct: number;
@@ -626,6 +672,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     }> = [];
 
     regionMap.forEach((data, region) => {
+      const eqlPacingPct = data.eqlTarget > 0 ? Math.round((data.eqlActual / data.eqlTarget) * 100) : (data.eqlActual > 0 ? 100 : 0);
       const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : (data.mqlActual > 0 ? 100 : 0);
       const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : (data.sqlActual > 0 ? 100 : 0);
       const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : (data.salActual > 0 ? 100 : 0);
@@ -639,6 +686,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
         type: 'region',
         region,
         ...data,
+        eqlPacingPct,
         mqlPacingPct,
         sqlPacingPct,
         salPacingPct,
@@ -662,15 +710,16 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
   const isR360Only = effectiveProductsForDisplay.length === 1 && effectiveProductsForDisplay[0] === 'R360';
 
   // Reusable table row renderer
-  const renderStageColumns = (row: { mqlActual: number; mqlTarget: number; mqlPacingPct: number; sqlActual: number; sqlTarget: number; sqlPacingPct: number; salActual: number; salTarget: number; salPacingPct: number; sqoActual: number; sqoTarget: number; sqoPacingPct: number; tofScore: number }, isBold = false) => (
+  const renderStageColumns = (row: { eqlActual: number; eqlTarget: number; eqlPacingPct: number; mqlActual: number; mqlTarget: number; mqlPacingPct: number; sqlActual: number; sqlTarget: number; sqlPacingPct: number; salActual: number; salTarget: number; salPacingPct: number; sqoActual: number; sqoTarget: number; sqoPacingPct: number; tofScore: number }, isBold = false) => (
     <>
-      <td className="number-cell">{isBold ? <strong>{row.mqlActual.toLocaleString()}</strong> : row.mqlActual.toLocaleString()}</td>
-      <td className="number-cell target-cell">{isBold ? <strong>{row.mqlTarget.toLocaleString()}</strong> : row.mqlTarget.toLocaleString()}</td>
-      <td className="pacing-cell">
-        <span className="rag-tile" style={{ backgroundColor: getRagColor(getRAG(row.mqlPacingPct)) }}>
-          {isBold ? <strong>{row.mqlPacingPct}%</strong> : `${row.mqlPacingPct}%`}
-        </span>
-      </td>
+      {/* EQL columns */}
+      <td className="number-cell">{(row.eqlActual > 0 || row.eqlTarget > 0) ? (isBold ? <strong>{row.eqlActual.toLocaleString()}</strong> : row.eqlActual.toLocaleString()) : <span className="na-cell">—</span>}</td>
+      <td className="number-cell target-cell">{(row.eqlActual > 0 || row.eqlTarget > 0) ? (isBold ? <strong>{row.eqlTarget.toLocaleString()}</strong> : row.eqlTarget.toLocaleString()) : <span className="na-cell">—</span>}</td>
+      <td className="pacing-cell">{(row.eqlActual > 0 || row.eqlTarget > 0) ? <span className="rag-tile" style={{ backgroundColor: getRagColor(getRAG(row.eqlPacingPct)) }}>{isBold ? <strong>{row.eqlPacingPct}%</strong> : `${row.eqlPacingPct}%`}</span> : <span className="na-cell">—</span>}</td>
+      {/* MQL columns */}
+      <td className="number-cell">{(row.mqlActual > 0 || row.mqlTarget > 0) ? (isBold ? <strong>{row.mqlActual.toLocaleString()}</strong> : row.mqlActual.toLocaleString()) : <span className="na-cell">—</span>}</td>
+      <td className="number-cell target-cell">{(row.mqlActual > 0 || row.mqlTarget > 0) ? (isBold ? <strong>{row.mqlTarget.toLocaleString()}</strong> : row.mqlTarget.toLocaleString()) : <span className="na-cell">—</span>}</td>
+      <td className="pacing-cell">{(row.mqlActual > 0 || row.mqlTarget > 0) ? <span className="rag-tile" style={{ backgroundColor: getRagColor(getRAG(row.mqlPacingPct)) }}>{isBold ? <strong>{row.mqlPacingPct}%</strong> : `${row.mqlPacingPct}%`}</span> : <span className="na-cell">—</span>}</td>
       <td className="number-cell">{isBold ? <strong>{row.sqlActual.toLocaleString()}</strong> : row.sqlActual.toLocaleString()}</td>
       <td className="number-cell target-cell">{isBold ? <strong>{row.sqlTarget.toLocaleString()}</strong> : row.sqlTarget.toLocaleString()}</td>
       <td className="pacing-cell">
@@ -731,7 +780,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
   };
 
   const renderTable = (
-    data: Array<{ label: string; mqlActual: number; mqlTarget: number; mqlPacingPct: number; sqlActual: number; sqlTarget: number; sqlPacingPct: number; salActual: number; salTarget: number; salPacingPct: number; sqoActual: number; sqoTarget: number; sqoPacingPct: number; tofScore: number; category?: Category; leadStageLabel?: 'MQL' | 'EQL' }>,
+    data: Array<{ label: string; eqlActual: number; eqlTarget: number; eqlPacingPct: number; mqlActual: number; mqlTarget: number; mqlPacingPct: number; sqlActual: number; sqlTarget: number; sqlPacingPct: number; salActual: number; salTarget: number; salPacingPct: number; sqoActual: number; sqoTarget: number; sqoPacingPct: number; tofScore: number; category?: Category; leadStageLabel?: 'MQL' | 'EQL' }>,
     labelHeader: string,
     showLeadBadge = false,
     sortConfig: SortConfig | null = null,
