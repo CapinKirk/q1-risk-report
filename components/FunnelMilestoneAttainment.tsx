@@ -297,6 +297,7 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
   const [categorySortConfig, setCategorySortConfig] = useState<SortConfig | null>(null);
   const [sourceSortConfig, setSourceSortConfig] = useState<SortConfig | null>(null);
   const [regionSortConfig, setRegionSortConfig] = useState<SortConfig | null>(null);
+  const [inboundRegionSortConfig, setInboundRegionSortConfig] = useState<SortConfig | null>(null);
 
   // Available options
   const availableProducts: Product[] = useMemo(() => {
@@ -341,17 +342,18 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     if (funnelBySource) {
       const processRows = (sourceRows: FunnelBySourceActuals[], product: Product) => {
         sourceRows.forEach(row => {
-          // Determine category based on source patterns or default to NEW LOGO
-          // In the source data, we don't have category directly, so we'll aggregate by source
-          const category: Category = 'NEW LOGO'; // Default - source view doesn't have category
+          // Source data spans all categories — cannot split EQL/MQL at source level.
+          // AM SOURCED uses EQL column, all others use MQL column.
+          const isEqlSource = row.source === 'AM SOURCED';
+          const category: Category = isEqlSource ? 'EXPANSION' : 'NEW LOGO';
 
           // Use QTD targets for pacing calculations (not Q1 targets)
-          const qtdTargetMql = row.qtd_target_mql || 0;
+          const qtdTargetLead = row.qtd_target_mql || 0;
           const qtdTargetSql = row.qtd_target_sql || 0;
           const qtdTargetSal = row.qtd_target_sal || 0;
           const qtdTargetSqo = row.qtd_target_sqo || 0;
 
-          const mqlPacingPct = qtdTargetMql > 0 ? Math.round((row.actual_mql / qtdTargetMql) * 100) : (row.actual_mql > 0 ? 100 : 0);
+          const leadPacingPct = qtdTargetLead > 0 ? Math.round((row.actual_mql / qtdTargetLead) * 100) : (row.actual_mql > 0 ? 100 : 0);
           const sqlPacingPct = qtdTargetSql > 0 ? Math.round((row.actual_sql / qtdTargetSql) * 100) : (row.actual_sql > 0 ? 100 : 0);
           const salPacingPct = qtdTargetSal > 0 ? Math.round((row.actual_sal / qtdTargetSal) * 100) : (row.actual_sal > 0 ? 100 : 0);
           const sqoPacingPct = qtdTargetSqo > 0 ? Math.round((row.actual_sqo / qtdTargetSqo) * 100) : (row.actual_sqo > 0 ? 100 : 0);
@@ -362,13 +364,13 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
             region: row.region,
             category,
             source: row.source,
-            leadStageLabel: getLeadStageLabel(category),
-            eqlActual: 0,
-            eqlTarget: 0,
-            eqlPacingPct: 0,
-            mqlActual: row.actual_mql,
-            mqlTarget: qtdTargetMql,
-            mqlPacingPct,
+            leadStageLabel: isEqlSource ? 'EQL' : 'MQL',
+            eqlActual: isEqlSource ? row.actual_mql : 0,
+            eqlTarget: isEqlSource ? qtdTargetLead : 0,
+            eqlPacingPct: isEqlSource ? leadPacingPct : 0,
+            mqlActual: isEqlSource ? 0 : row.actual_mql,
+            mqlTarget: isEqlSource ? 0 : qtdTargetLead,
+            mqlPacingPct: isEqlSource ? 0 : leadPacingPct,
             sqlActual: row.actual_sql,
             sqlTarget: qtdTargetSql,
             sqlPacingPct,
@@ -378,8 +380,8 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
             sqoActual: row.actual_sqo,
             sqoTarget: qtdTargetSqo,
             sqoPacingPct,
-            tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, product,
-              { mql: qtdTargetMql, sql: qtdTargetSql, sal: qtdTargetSal, sqo: qtdTargetSqo }),
+            tofScore: calculateTOFScore(leadPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, product,
+              { mql: qtdTargetLead, sql: qtdTargetSql, sal: qtdTargetSal, sqo: qtdTargetSqo }),
           });
         });
       };
@@ -699,6 +701,83 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
     return result.sort((a, b) => a.tofScore - b.tofScore);
   }, [categoryData, selectedProducts, selectedRegions, selectedCategories, availableProducts]);
 
+  // Aggregate INBOUND ONLY by Region
+  const inboundByRegionData = useMemo(() => {
+    // Filter to INBOUND only from source data
+    const inboundRecords = unifiedData.filter(row =>
+      row.source === 'INBOUND' &&
+      selectedProducts.includes(row.product) &&
+      selectedRegions.includes(row.region)
+    );
+
+    // Group by region and aggregate
+    const regionMap = new Map<Region, {
+      eqlActual: number; eqlTarget: number;
+      mqlActual: number; mqlTarget: number;
+      sqlActual: number; sqlTarget: number;
+      salActual: number; salTarget: number;
+      sqoActual: number; sqoTarget: number;
+    }>();
+
+    inboundRecords.forEach(row => {
+      const existing = regionMap.get(row.region) || {
+        eqlActual: 0, eqlTarget: 0, mqlActual: 0, mqlTarget: 0, sqlActual: 0, sqlTarget: 0,
+        salActual: 0, salTarget: 0, sqoActual: 0, sqoTarget: 0,
+      };
+      regionMap.set(row.region, {
+        eqlActual: existing.eqlActual + row.eqlActual,
+        eqlTarget: existing.eqlTarget + row.eqlTarget,
+        mqlActual: existing.mqlActual + row.mqlActual,
+        mqlTarget: existing.mqlTarget + row.mqlTarget,
+        sqlActual: existing.sqlActual + row.sqlActual,
+        sqlTarget: existing.sqlTarget + row.sqlTarget,
+        salActual: existing.salActual + row.salActual,
+        salTarget: existing.salTarget + row.salTarget,
+        sqoActual: existing.sqoActual + row.sqoActual,
+        sqoTarget: existing.sqoTarget + row.sqoTarget,
+      });
+    });
+
+    const result: Array<{
+      label: string;
+      type: 'region';
+      region: Region;
+      eqlActual: number; eqlTarget: number; eqlPacingPct: number;
+      mqlActual: number; mqlTarget: number; mqlPacingPct: number;
+      sqlActual: number; sqlTarget: number; sqlPacingPct: number;
+      salActual: number; salTarget: number; salPacingPct: number;
+      sqoActual: number; sqoTarget: number; sqoPacingPct: number;
+      tofScore: number;
+    }> = [];
+
+    regionMap.forEach((data, region) => {
+      const eqlPacingPct = data.eqlTarget > 0 ? Math.round((data.eqlActual / data.eqlTarget) * 100) : (data.eqlActual > 0 ? 100 : 0);
+      const mqlPacingPct = data.mqlTarget > 0 ? Math.round((data.mqlActual / data.mqlTarget) * 100) : (data.mqlActual > 0 ? 100 : 0);
+      const sqlPacingPct = data.sqlTarget > 0 ? Math.round((data.sqlActual / data.sqlTarget) * 100) : (data.sqlActual > 0 ? 100 : 0);
+      const salPacingPct = data.salTarget > 0 ? Math.round((data.salActual / data.salTarget) * 100) : (data.salActual > 0 ? 100 : 0);
+      const sqoPacingPct = data.sqoTarget > 0 ? Math.round((data.sqoActual / data.sqoTarget) * 100) : (data.sqoActual > 0 ? 100 : 0);
+
+      // Use R360 weights if R360 is the only EFFECTIVE product (selected AND available)
+      const effectiveProducts = selectedProducts.filter(p => availableProducts.includes(p));
+      const effectiveProduct: Product = effectiveProducts.length === 1 && effectiveProducts[0] === 'R360' ? 'R360' : 'POR';
+      result.push({
+        label: region,
+        type: 'region',
+        region,
+        ...data,
+        eqlPacingPct,
+        mqlPacingPct,
+        sqlPacingPct,
+        salPacingPct,
+        sqoPacingPct,
+        tofScore: calculateTOFScore(mqlPacingPct, sqlPacingPct, salPacingPct, sqoPacingPct, effectiveProduct,
+          { mql: data.mqlTarget, sql: data.sqlTarget, sal: data.salTarget, sqo: data.sqoTarget }),
+      });
+    });
+
+    return result.sort((a, b) => a.tofScore - b.tofScore);
+  }, [unifiedData, selectedProducts, selectedRegions, availableProducts]);
+
   // Calculate totals
   if (categoryData.length === 0 && unifiedData.length === 0) {
     return null;
@@ -928,6 +1007,14 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           <h3 className="table-title">By Region</h3>
           {renderTable(regionAggregatedData, 'Region', false, regionSortConfig, setRegionSortConfig)}
         </div>
+
+        {inboundByRegionData.length > 0 && (
+          <div className="table-section">
+            <h3 className="table-title">Inbound ONLY by Region</h3>
+            <p className="table-subtitle">Showing INBOUND source data broken down by region</p>
+            {renderTable(inboundByRegionData, 'Region', false, inboundRegionSortConfig, setInboundRegionSortConfig)}
+          </div>
+        )}
       </div>
 
       <style jsx>{`
@@ -980,6 +1067,13 @@ export default function FunnelMilestoneAttainment({ funnelData, funnelBySource }
           font-weight: 600;
           margin: 0 0 8px 0;
           color: var(--text-primary);
+        }
+
+        .table-subtitle {
+          font-size: 0.7rem;
+          color: var(--text-muted);
+          margin: -4px 0 8px 0;
+          font-style: italic;
         }
 
         .table-container {
