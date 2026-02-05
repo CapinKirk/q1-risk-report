@@ -1622,6 +1622,8 @@ async function getMQLDetails(filters: ReportFilters) {
         AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
         -- Include reverted MQLs for disqualification analysis
         AND MQL_DT IS NOT NULL
+        -- Filter to INBOUND source only to match summary counts (funnel_by_category)
+        AND (SDRSource IS NULL OR SDRSource = '' OR UPPER(SDRSource) = 'INBOUND')
         AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
         AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
         ${regionClause}
@@ -1674,6 +1676,8 @@ async function getMQLDetails(filters: ReportFilters) {
       WHERE Region IS NOT NULL
         -- Include reverted MQLs for disqualification analysis
         AND MQL_DT IS NOT NULL
+        -- Filter to INBOUND source only to match summary counts (funnel_by_category)
+        AND (SDRSource IS NULL OR SDRSource = '' OR UPPER(SDRSource) = 'INBOUND')
         AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
         AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
         ${r360RegionClause}
@@ -1864,10 +1868,10 @@ async function getSQLDetails(filters: ReportFilters) {
                OR amo.opp_id IS NOT NULL
         THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
-          WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN f.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
-          WHEN COALESCE(o.IsClosed, o2.IsClosed, o3.IsClosed, o4.IsClosed, o5.IsClosed, o6.IsClosed, false) AND NOT COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'LOST'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
@@ -2206,9 +2210,9 @@ async function getSQLDetails(filters: ReportFilters) {
                OR amo.opp_id IS NOT NULL
         THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
-          WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN COALESCE(o.IsClosed, o2.IsClosed, o3.IsClosed, o4.IsClosed, o5.IsClosed, o6.IsClosed, false) AND NOT COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'LOST'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
@@ -2287,7 +2291,7 @@ async function getSQLDetails(filters: ReportFilters) {
           WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
           ELSE 'https://por.my.salesforce.com/'
         END AS salesforce_url,
-        COALESCE(nl.OpportunityName, 'Unknown') AS company_name,
+        COALESCE(o.AccountName, nl.OpportunityName, 'Unknown') AS company_name,
         'N/A' AS email,
         UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
         CAST(nl.SQL_DT AS STRING) AS sql_date,
@@ -2517,9 +2521,9 @@ async function getSALDetails(filters: ReportFilters) {
                OR amo.opp_id IS NOT NULL
         THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
-          WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN COALESCE(o.IsClosed, o2.IsClosed, o3.IsClosed, o4.IsClosed, o5.IsClosed, o6.IsClosed, false) AND NOT COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'LOST'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SAL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sal_status,
@@ -2819,10 +2823,10 @@ async function getSQODetails(filters: ReportFilters) {
         CAST(f.MQL_DT AS STRING) AS mql_date,
         DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.SAL_DT AS DATE), DAY) AS days_sal_to_sqo,
         DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_total_cycle,
-        -- 7-tier sqo_status check
+        -- Status from direct-linked opportunity only (Tier 1-2)
         CASE
-          WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'
-          WHEN COALESCE(o.IsClosed, o2.IsClosed, o3.IsClosed, o4.IsClosed, o5.IsClosed, o6.IsClosed, false) AND NOT COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'LOST'
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
@@ -2844,7 +2848,7 @@ async function getSQODetails(filters: ReportFilters) {
         ROW_NUMBER() OVER (
           PARTITION BY COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id, COALESCE(f.LeadEmail, f.ContactEmail))
           ORDER BY
-            CASE WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 0 ELSE 1 END,
+            CASE WHEN o.Won = true THEN 0 ELSE 1 END,
             f.SQO_DT DESC
         ) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\` f
@@ -3090,10 +3094,10 @@ async function getSQODetails(filters: ReportFilters) {
         CAST(f.MQL_DT AS STRING) AS mql_date,
         0 AS days_sal_to_sqo,
         DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_total_cycle,
-        -- 7-tier sqo_status check
+        -- Status from direct-linked opportunity only (Tier 1-2)
         CASE
-          WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'
-          WHEN COALESCE(o.IsClosed, o2.IsClosed, o3.IsClosed, o4.IsClosed, o5.IsClosed, o6.IsClosed, false) AND NOT COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'LOST'
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
@@ -3115,7 +3119,7 @@ async function getSQODetails(filters: ReportFilters) {
         ROW_NUMBER() OVER (
           PARTITION BY COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id, f.Email)
           ORDER BY
-            CASE WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 0 ELSE 1 END,
+            CASE WHEN o.Won = true THEN 0 ELSE 1 END,
             f.SQO_DT DESC
         ) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\` f
@@ -3172,7 +3176,7 @@ async function getSQODetails(filters: ReportFilters) {
           WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
           ELSE 'https://por.my.salesforce.com/'
         END AS salesforce_url,
-        COALESCE(nl.OpportunityName, 'Unknown') AS company_name,
+        COALESCE(o.AccountName, nl.OpportunityName, 'Unknown') AS company_name,
         'N/A' AS email,
         UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
         CAST(nl.SQO_DT AS STRING) AS sqo_date,
@@ -4069,21 +4073,51 @@ export async function POST(request: Request) {
     const funnelCategories = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
 
     // Sum period actuals + targets by (product, region, category)
+    // For NEW LOGO/STRATEGIC: only include INBOUND source actuals.
+    // DailyRevenueFunnel tracks "Inbound" and "New Logo" (outbound) as separate funnels.
+    // The category view shows the Inbound funnel flow (MQL→SQL→SAL→SQO).
+    // Outbound records (OUTBOUND, AE SOURCED, TRADESHOW) appear in the source view only.
+    // For EXPANSION/MIGRATION: include all sources (they represent a single funnel).
     for (const row of perfPeriod) {
       if (!row.category || !funnelCategories.includes(row.category)) continue;
-      const key = `${row.product}-${row.region}-${row.category}`;
-      if (!funnelDataMap.has(key)) {
-        funnelDataMap.set(key, {
-          q1_target_mql: 0, q1_target_sql: 0, q1_target_sal: 0, q1_target_sqo: 0,
-          period_target_mql: 0, period_target_sql: 0, period_target_sal: 0, period_target_sqo: 0,
-          actual_mql: 0, actual_sql: 0, actual_sal: 0, actual_sqo: 0,
-        });
+
+      const isNewLogoCategory = row.category === 'NEW LOGO' || row.category === 'STRATEGIC';
+      const isInboundSource = row.source === 'INBOUND';
+
+      // For NEW LOGO/STRATEGIC actuals: only count INBOUND source.
+      // DailyRevenueFunnel tracks "Inbound" (MQL→SQL→SAL→SQO) and "New Logo" (outbound SQL→SQO)
+      // as separate funnels. The category view shows the Inbound funnel flow.
+      // Outbound records appear in the source view only.
+      // STRATEGIC INBOUND actuals are merged into NEW LOGO (DailyRevenueFunnel "Inbound"
+      // includes both SMB and Strategic; RevOpsPerformance splits them).
+      const actualsKey = (isNewLogoCategory && isInboundSource && row.category === 'STRATEGIC')
+        ? `${row.product}-${row.region}-NEW LOGO`  // Merge Strategic INBOUND actuals into NEW LOGO
+        : `${row.product}-${row.region}-${row.category}`;
+      const targetsKey = `${row.product}-${row.region}-${row.category}`;
+
+      // Ensure both keys exist
+      for (const k of [actualsKey, targetsKey]) {
+        if (!funnelDataMap.has(k)) {
+          funnelDataMap.set(k, {
+            q1_target_mql: 0, q1_target_sql: 0, q1_target_sal: 0, q1_target_sqo: 0,
+            period_target_mql: 0, period_target_sql: 0, period_target_sal: 0, period_target_sqo: 0,
+            actual_mql: 0, actual_sql: 0, actual_sal: 0, actual_sqo: 0,
+          });
+        }
       }
-      const existing = funnelDataMap.get(key)!;
-      existing.actual_mql += parseInt(row.actual_mql) || 0;
-      existing.actual_sql += parseInt(row.actual_sql) || 0;
-      existing.actual_sal += parseInt(row.actual_sal) || 0;
-      existing.actual_sqo += parseInt(row.actual_sqo) || 0;
+
+      // Actuals: NEW LOGO/STRATEGIC only from INBOUND; EXPANSION/MIGRATION from all sources
+      if (!isNewLogoCategory || isInboundSource) {
+        const actualsEntry = funnelDataMap.get(actualsKey)!;
+        actualsEntry.actual_mql += parseInt(row.actual_mql) || 0;
+        actualsEntry.actual_sql += parseInt(row.actual_sql) || 0;
+        actualsEntry.actual_sal += parseInt(row.actual_sal) || 0;
+        actualsEntry.actual_sqo += parseInt(row.actual_sqo) || 0;
+      }
+
+      const existing = funnelDataMap.get(targetsKey)!;
+
+      // Targets: always sum all sources
       existing.period_target_mql += parseFloat(row.target_mql) || 0;
       existing.period_target_sql += parseFloat(row.target_sql) || 0;
       existing.period_target_sal += parseFloat(row.target_sal) || 0;
@@ -4106,6 +4140,40 @@ export async function POST(request: Request) {
       existing.q1_target_sql += parseInt(row.q1_target_sql) || 0;
       existing.q1_target_sal += parseInt(row.q1_target_sal) || 0;
       existing.q1_target_sqo += parseInt(row.q1_target_sqo) || 0;
+    }
+
+    // OVERRIDE: Replace actual_mql with counts from mqlDetailsData to ensure summary matches details
+    // Summary comes from RevOpsPerformance (DailyRevenueFunnel) which differs from InboundFunnel detail records
+    // Count MQL records (lead_type='MQL') by product-region from detail data
+    const mqlCountByProductRegion = new Map<string, number>();
+    const mqlDetails = mqlDetailsData as { POR: any[]; R360: any[] };
+
+    // Count POR MQL records by region (MQL = NEW LOGO, EQL = EXPANSION/MIGRATION)
+    for (const record of mqlDetails.POR) {
+      if (record.lead_type === 'MQL') {
+        const key = `POR-${record.region}-NEW LOGO`;
+        mqlCountByProductRegion.set(key, (mqlCountByProductRegion.get(key) || 0) + 1);
+      }
+    }
+
+    // Count R360 MQL records by region
+    for (const record of mqlDetails.R360) {
+      if (record.lead_type === 'MQL') {
+        const key = `R360-${record.region}-NEW LOGO`;
+        mqlCountByProductRegion.set(key, (mqlCountByProductRegion.get(key) || 0) + 1);
+      }
+    }
+
+    // Override funnelDataMap actual_mql for NEW LOGO with detail counts
+    for (const [key, count] of Array.from(mqlCountByProductRegion.entries())) {
+      if (funnelDataMap.has(key)) {
+        const existing = funnelDataMap.get(key)!;
+        const oldCount = existing.actual_mql;
+        existing.actual_mql = count;
+        if (oldCount !== count) {
+          console.log(`MQL override: ${key} = ${count} (was ${oldCount} from RevOpsPerformance)`);
+        }
+      }
     }
 
     // Build funnel pacing array for all categories
@@ -4332,8 +4400,14 @@ export async function POST(request: Request) {
     const sourceMap = new Map<string, any>();
     const sourceQ1Map = new Map<string, any>();
 
+    // Source view only includes NEW LOGO + STRATEGIC categories.
+    // EXPANSION/MIGRATION have their own category rows and should not inflate source totals
+    // (e.g., INBOUND source would mix MQLs from NEW LOGO with EQLs from EXPANSION).
+    const sourceCategories = ['NEW LOGO', 'STRATEGIC'];
+
     for (const row of perfPeriod) {
-      if (!row.source || row.source === 'N/A' || row.source === '' || row.category === 'RENEWAL') continue;
+      if (!row.source || row.source === 'N/A' || row.source === '' || !row.category) continue;
+      if (!sourceCategories.includes(row.category)) continue;
       const key = `${row.product}-${row.region}-${row.source}`;
       if (!sourceMap.has(key)) {
         sourceMap.set(key, {
@@ -4356,7 +4430,8 @@ export async function POST(request: Request) {
     }
 
     for (const row of perfQ1) {
-      if (!row.source || row.source === 'N/A' || row.source === '' || row.category === 'RENEWAL') continue;
+      if (!row.source || row.source === 'N/A' || row.source === '' || !row.category) continue;
+      if (!sourceCategories.includes(row.category)) continue;
       const key = `${row.product}-${row.region}-${row.source}`;
       if (!sourceQ1Map.has(key)) {
         sourceQ1Map.set(key, {
