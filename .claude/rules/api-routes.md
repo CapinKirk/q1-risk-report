@@ -80,3 +80,23 @@ curl ... | jq '.sqo_details.POR | length'
 -- Opportunities past Needs Analysis stage (Stage 3) OR Won
 WHERE (StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') OR Won)
 ```
+
+## Funnel Status Determination (Updated 2026-02-04)
+
+**Status fields use only Tier 1-2 (`o` alias — direct OpportunityID or ConvertedOpportunityId):**
+```sql
+CASE
+  WHEN o.Won = true THEN 'WON'
+  WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
+  WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+  WHEN f.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
+  WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 21 THEN 'STALLED'
+  ELSE 'ACTIVE'
+END
+```
+
+**STALLED Thresholds:** SQL = 21 days. Must be less than max record age in date range.
+
+**Display fields (opportunity_name, stage, ACV)** can safely COALESCE across all 7 tiers.
+
+**Never use `Won_DT IS NOT NULL` for status** — unreliable, records at Discovery stage can have it populated.

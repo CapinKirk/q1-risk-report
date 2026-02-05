@@ -136,6 +136,30 @@ Division IN ('US', 'UK', 'AU')                     -- Valid divisions only
 | NULL-safe sum | `COALESCE(SUM(value), 0)` |
 | Date cast | `CAST(SQL_DT AS DATE)` |
 
+## Status Determination in Funnel Queries
+
+**CRITICAL: Only use Tier 1-2 (`o` alias) for status. Never COALESCE Won/IsClosed across all tiers.**
+
+```sql
+-- CORRECT: Direct-linked opportunity only
+CASE
+  WHEN o.Won = true THEN 'WON'
+  WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
+  WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+  WHEN f.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
+  WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 21 THEN 'STALLED'
+  ELSE 'ACTIVE'
+END AS sql_status
+
+-- WRONG: Tiers 3-7 can link to unrelated WON opportunities
+WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'
+
+-- WRONG: Won_DT is unreliable (records at Discovery stage have it populated)
+WHEN f.Won_DT IS NOT NULL THEN 'WON'
+```
+
+**STALLED thresholds:** SQL = 21 days, SAL/SQO = check current implementation. Must be less than max record age in date range.
+
 ## Troubleshooting
 
 | Error | Solution |
@@ -143,3 +167,5 @@ Division IN ('US', 'UK', 'AU')                     -- Valid divisions only
 | "Unrecognized name" | Check column name/alias |
 | "Missing GROUP BY" | Add field to GROUP BY |
 | "Division by zero" | Use SAFE_DIVIDE |
+| "No matching signature for NULLIF" | Both args must be same type. Use `NULLIF(CAST(col AS STRING), '')` for BOOL columns |
+| Silent empty results from funnel details | Check `vercel logs <url> --json` for BigQuery errors caught by try/catch |

@@ -74,17 +74,26 @@ When queries fail silently (return empty arrays), the cause is usually:
 2. **Table doesn't exist** (e.g., R360ExpansionFunnel)
 3. **JOIN mismatch** - alias references non-existent columns
 
-**Pattern that works:**
+**Pattern that works (with OpportunityViewTable JOIN):**
 ```sql
--- Simplified query - no JOINs, derive status from funnel dates only
+-- Use direct-linked opportunity (Tier 1-2 only) for status
+-- Display fields can safely COALESCE across all tiers (o through o6)
 CASE
-  WHEN f.Won_DT IS NOT NULL THEN 'WON'
-  WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
+  WHEN o.Won = true THEN 'WON'
+  WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
+  WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 21 THEN 'STALLED'
   ELSE 'ACTIVE'
-END AS status,
-CAST(NULL AS STRING) AS opportunity_stage,  -- NULL instead of JOIN
-CAST(NULL AS FLOAT64) AS opportunity_acv,
-'N/A' AS loss_reason
+END AS sql_status,
+COALESCE(o.StageName, o2.StageName, ...) AS opportunity_stage,  -- Display: all tiers OK
+COALESCE(o.ACV, o2.ACV, ...) AS opportunity_acv,               -- Display: all tiers OK
+```
+
+**DEPRECATED pattern (DO NOT USE):**
+```sql
+-- Won_DT is unreliable — records at Discovery stage can have Won_DT populated
+WHEN f.Won_DT IS NOT NULL THEN 'WON'  -- FALSE POSITIVES! Removed 2026-02-04
+-- COALESCE across all 7 tiers for status — links to unrelated WON opps
+WHEN COALESCE(o.Won, o2.Won, o3.Won, o4.Won, o5.Won, o6.Won, false) THEN 'WON'  -- FALSE POSITIVES!
 ```
 
 **Pattern that fails:**
@@ -106,6 +115,72 @@ o.StageName AS opportunity_stage,  -- Column name mismatch
 | R360InboundFunnel | OpportunityID/LeadId/Email | No (uses MQL_DT) | No |
 
 **Deduplication Standard**: Always use `COALESCE(OpportunityID, LeadId, ContactId)` for POR or `COALESCE(OpportunityID, LeadId, Email)` for R360. Do NOT use email-only deduplication as it misses records with NULL email but valid OpportunityID.
+
+## 7-Tier Opportunity Linking: Status vs Display (Updated 2026-02-04)
+
+**CRITICAL: Separate status fields from display fields when using 7-tier linking.**
+
+| Field Type | Tiers to Use | Why |
+|------------|-------------|-----|
+| **Status** (sql_status, sal_status, sqo_status) | Tier 1-2 only (`o` alias) | Tiers 3-7 can link to unrelated WON opps on same account |
+| **Display** (opportunity_name, stage, ACV, salesforce_url) | All tiers (o through o6) | Safe to show best available match |
+| **Dedup sort** (ROW_NUMBER ORDER BY) | Tier 1-2 only (`o.Won`) | Avoid promoting loosely-matched WON records |
+
+**Status CASE pattern (correct):**
+```sql
+CASE
+  WHEN o.Won = true THEN 'WON'
+  WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
+  WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+  WHEN f.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
+  WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 21 THEN 'STALLED'
+  ELSE 'ACTIVE'
+END AS sql_status
+```
+
+## Won_DT Is Unreliable for Status (2026-02-04)
+
+**Problem:** 39 of 66 R360 SQL records showed as "WON" — most hadn't reached SQO stage.
+
+**Root Cause:** `Won_DT IS NOT NULL THEN 'WON'` in non-inbound/expansion/migration CTEs. Records at "Discovery" stage had `Won_DT` populated in NewLogoFunnel, ExpansionFunnel, MigrationFunnel.
+
+**Fix:** Only trust `OpportunityViewTable.Won = true` via direct JOIN (`o` alias). Removed all 8 `Won_DT` fallbacks across SQL/SAL/SQO queries.
+
+## NULLIF Type Safety in BigQuery (2026-02-04)
+
+**Problem:** `getSQLDetails()` silently returned `{ POR: [], R360: [] }` after deployment.
+
+**Root Cause:** `NULLIF(m.MigrationCase, '')` failed because `MigrationCase` is BOOL, not STRING. BigQuery error: `No matching signature for function NULLIF, Argument types: BOOL, STRING`.
+
+**Fix:** `NULLIF(CAST(m.MigrationCase AS STRING), '')`
+
+**Rule:** Always verify column types when using NULLIF. Funnel table schemas can have unexpected types (BOOL instead of STRING).
+
+## STALLED Threshold Must Fit Date Range (2026-02-04)
+
+**Problem:** SQL STALLED count was 0 despite having old records.
+
+**Root Cause:** Threshold was 45 days, but Q1 starts Jan 1 — max record age on Feb 4 is only 34 days. Threshold was unreachable.
+
+**Fix:** Lowered to 21 days across all 7 SQL CTE locations. POR STALLED went from 0 to 6.
+
+**Rule:** STALLED threshold must be less than the maximum possible record age in the date range. For Q1 (Jan-Mar), 21 days is appropriate.
+
+## R360 Company Name: Use AccountName (2026-02-04)
+
+**Problem:** R360 records showed auto-generated Salesforce names like "New Pending Record360 System for..." as company names.
+
+**Root Cause:** `non_inbound_r360_sqls` and `non_inbound_r360_sqos` used `COALESCE(nl.OpportunityName, 'Unknown')` — OpportunityName contains auto-generated names.
+
+**Fix:** `COALESCE(o.AccountName, nl.OpportunityName, 'Unknown')` — prefer real account name from linked opportunity.
+
+## Silent BigQuery Failures: Check Vercel Logs (2026-02-04)
+
+**Problem:** API returned valid response with 0 SQL records — no error visible to client.
+
+**Root Cause:** `getSQLDetails()` wraps queries in try/catch and returns `{ POR: [], R360: [] }` on any error. Both POR and R360 run in Promise.all.
+
+**Debugging:** Use `vercel logs <production-url> --json` to stream runtime logs. Look for `"SQL details query failed:"` messages with actual BigQuery error details.
 
 ## 7-Tier Opportunity Linking Strategy (Updated 2026-01-20)
 
