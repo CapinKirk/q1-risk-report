@@ -1968,11 +1968,10 @@ async function getSQLDetails(filters: ReportFilters) {
         CASE WHEN nl.SAL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
         CASE WHEN nl.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
         CASE WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
-        -- Use OpportunityViewTable Won status if available
+        -- Status from direct-linked opportunity only
         CASE
           WHEN o.Won = true THEN 'WON'
-          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
-          WHEN nl.Won_DT IS NOT NULL THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN nl.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
@@ -2031,8 +2030,7 @@ async function getSQLDetails(filters: ReportFilters) {
         CASE WHEN e.OpportunityID IS NOT NULL AND e.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
           WHEN o.Won = true THEN 'WON'
-          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
-          WHEN e.Won_DT IS NOT NULL THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN e.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(e.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
@@ -2082,8 +2080,7 @@ async function getSQLDetails(filters: ReportFilters) {
         CASE WHEN m.OpportunityID IS NOT NULL AND m.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
           WHEN o.Won = true THEN 'WON'
-          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
-          WHEN m.Won_DT IS NOT NULL THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN m.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN m.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(m.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
@@ -2303,11 +2300,10 @@ async function getSQLDetails(filters: ReportFilters) {
         'No' AS converted_to_sal,
         CASE WHEN nl.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
         CASE WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
-        -- Use OpportunityViewTable Won status if available
+        -- Status from direct-linked opportunity only
         CASE
           WHEN o.Won = true THEN 'WON'
-          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
-          WHEN nl.Won_DT IS NOT NULL THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
@@ -2361,8 +2357,7 @@ async function getSQLDetails(filters: ReportFilters) {
         CASE WHEN e.OpportunityID IS NOT NULL AND e.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
         CASE
           WHEN o.Won = true THEN 'WON'
-          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
-          WHEN e.Won_DT IS NOT NULL THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN e.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(e.SQL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
@@ -2678,8 +2673,7 @@ async function getSALDetails(filters: ReportFilters) {
         -- Use OpportunityViewTable Won status if available
         CASE
           WHEN o.Won = true THEN 'WON'
-          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
-          WHEN nl.Won_DT IS NOT NULL THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SAL_DT AS DATE), DAY) > 45 THEN 'STALLED'
           ELSE 'ACTIVE'
@@ -2976,8 +2970,7 @@ async function getSQODetails(filters: ReportFilters) {
         -- Use OpportunityViewTable Won status if available, fall back to funnel Won_DT
         CASE
           WHEN o.Won = true THEN 'WON'
-          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
-          WHEN nl.Won_DT IS NOT NULL THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
@@ -3191,8 +3184,7 @@ async function getSQODetails(filters: ReportFilters) {
         -- Use OpportunityViewTable Won status if available, fall back to funnel Won_DT
         CASE
           WHEN o.Won = true THEN 'WON'
-          WHEN o.IsClosed = true AND o.Won = false THEN 'LOST'
-          WHEN nl.Won_DT IS NOT NULL THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
           WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
