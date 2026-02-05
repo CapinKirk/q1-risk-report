@@ -2070,7 +2070,7 @@ async function getSQLDetails(filters: ReportFilters) {
         END AS salesforce_url,
         COALESCE(m.Company, 'Unknown') AS company_name,
         'N/A' AS email,
-        UPPER(COALESCE(NULLIF(m.MigrationCase, ''), 'AM SOURCED')) AS source,
+        UPPER(COALESCE(NULLIF(CAST(m.MigrationCase AS STRING), ''), 'AM SOURCED')) AS source,
         CAST(m.SQL_DT AS STRING) AS sql_date,
         CAST(m.EQL_DT AS STRING) AS mql_date,
         CASE WHEN m.EQL_DT IS NOT NULL AND m.SQL_DT IS NOT NULL
