@@ -64,18 +64,40 @@ curl ... | jq '.sqo_details.POR | length'
 
 **Note:** Renewal targets use `COALESCE(Q1_Plan_2026, Q1_Actual_2025, 0)` because new products like R360 have no prior year renewal history.
 
-## Funnel Detail Data Sources
+## Funnel Detail Data Sources (Updated 2026-02-08)
 
-| Detail Type | Category | Data Source | Filter Criteria |
-|-------------|----------|-------------|-----------------|
-| SAL Details | NEW LOGO | `InboundFunnel` | `SAL_DT IS NOT NULL` |
-| SAL Details | EXPANSION | `OpportunityViewTable` | `Type='Existing Business'` + past Needs Analysis stage |
-| SAL Details | MIGRATION | `OpportunityViewTable` | `Type='Migration'` + past Needs Analysis stage |
-| SQO Details | All | `InboundFunnel` + `OpportunityViewTable` | `SQO_DT IS NOT NULL` or Won/Proposal stage |
-| SQL Details | All | `InboundFunnel` | `SQL_DT IS NOT NULL` |
-| MQL Details | NEW LOGO | `InboundFunnel` | `MQL_DT IS NOT NULL` |
+All funnel detail queries now use `DailyRevenueFunnel` (DRF) as the authoritative base, matching pacing counts exactly. Raw funnel tables are JOINed for enrichment only.
 
-**SAL Stage Criteria for EXPANSION/MIGRATION:**
+| Detail Type | Category | Base Source | Enrichment JOIN | Filter Criteria |
+|-------------|----------|-------------|-----------------|-----------------|
+| MQL Details | INBOUND | `DailyRevenueFunnel` | `InboundFunnel` | `d.MQL = 1` |
+| MQL Details | EQL | `DailyRevenueFunnel` | `ExpansionFunnel`/`MigrationFunnel` | `d.MQL = 1, FunnelType IN ('EXPANSION','MIGRATION')` |
+| MQL Details | STRATEGIC | `OpportunityViewTable` | — | `Type='New Business', ACV > 100000` |
+| SQL Details | INBOUND | `DailyRevenueFunnel` | `InboundFunnel` + `OpportunityViewTable` | `d.SQL = 1` |
+| SQL Details | NON-INBOUND | `DailyRevenueFunnel` | `NewLogoFunnel`/`ExpansionFunnel`/`MigrationFunnel` | `d.SQL = 1, FunnelType IN (...)` |
+| SQL Details | STRATEGIC | `OpportunityViewTable` | — | Stage past Qualification |
+| SAL Details | INBOUND | `DailyRevenueFunnel` | `InboundFunnel` + `OpportunityViewTable` | `d.SAL = 1` |
+| SAL Details | EXPANSION | `OpportunityViewTable` | — | `Type='Existing Business'` + past Needs Analysis stage |
+| SAL Details | MIGRATION | `OpportunityViewTable` | — | `Type='Migration'` + past Needs Analysis stage |
+| SAL Details | STRATEGIC | `OpportunityViewTable` | — | Stage past Needs Analysis |
+| SQO Details | INBOUND | `DailyRevenueFunnel` | `InboundFunnel` + `OpportunityViewTable` | `d.SQO = 1` |
+| SQO Details | NON-INBOUND | `DailyRevenueFunnel` | `NewLogoFunnel`/`ExpansionFunnel`/`MigrationFunnel` | `d.SQO = 1, FunnelType IN (...)` |
+| SQO Details | STRATEGIC | `OpportunityViewTable` | — | Stage at Proposal+ |
+
+**DRF-Based Query Pattern:**
+```sql
+FROM DailyRevenueFunnel d
+LEFT JOIN InboundFunnel f ON d.OpportunityID = f.OpportunityID
+LEFT JOIN OpportunityViewTable o ON d.OpportunityID = o.Id
+WHERE d.RecordType = 'POR'
+  AND UPPER(d.FunnelType) = 'INBOUND'
+  AND d.SQL = 1  -- or SAL = 1, SQO = 1
+  AND d.CaptureDate BETWEEN startDate AND endDate
+```
+
+**STRATEGIC category** uses `DRF.Segment = 'Strategic'` for INBOUND, or `OVT.Type = 'New Business' AND ACV > 100000` for direct OVT queries.
+
+**SAL Stage Criteria for EXPANSION/MIGRATION (OVT-based):**
 ```sql
 -- Opportunities past Needs Analysis stage (Stage 3) OR Won
 WHERE (StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') OR Won)

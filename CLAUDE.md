@@ -152,7 +152,7 @@ npx playwright test  # Run E2E tests
 
 | Module | Purpose | Key Exports |
 |--------|---------|-------------|
-| `lib/constants/dimensions.ts` | Single source of truth for mappings | `REGION_MAP`, `CATEGORY_MAP`, `BIGQUERY_CONFIG`, `getRAGStatus()` |
+| `lib/constants/dimensions.ts` | Single source of truth for mappings | `REGION_MAP`, `CATEGORY_MAP`, `BIGQUERY_CONFIG`, `getRAGStatus()`, `getWinRateColor()`, `WIN_RATE_BENCHMARKS` |
 | `lib/bigquery-client.ts` | Shared BigQuery client | `getBigQueryClient()`, `executeQuery()`, `buildFilterClause()` |
 | `lib/formatters.ts` | UI formatting functions | `formatCurrency()`, `formatPercent()`, `getRAGColor()` |
 | `lib/types.ts` | TypeScript interfaces | `Region`, `Product`, `Category`, `ReportData` |

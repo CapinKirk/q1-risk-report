@@ -11,6 +11,14 @@
 - `MarketingFunnel.ExpansionFunnel` - Raw records with `SQO_DT`
 - `MarketingFunnel.MigrationFunnel` - Raw records with `SQO_DT`
 
+**DRF→OVT Join Path (Verified 2026-02-08):**
+- **100% match rate** for all stages (SQL, SAL, SQO)
+- Use `LEFT JOIN OpportunityViewTable o ON d.OpportunityID = o.Id`
+- All 127 DRF INBOUND SQL records matched to OVT
+- All 100 DRF INBOUND SAL records matched to OVT
+- All 35 DRF INBOUND SQO records matched to OVT
+- See: `.claude/diagnostics/drf-ovt-join-analysis.md`
+
 **Verified Values (as of 2026-01-18):**
 | Source | POR EXPANSION | POR MIGRATION |
 |--------|---------------|---------------|
@@ -344,6 +352,47 @@ WHERE LOWER(Booking_Type) = 'renewal'
 
 **Key insight:** Status-based summaries should filter by status alone. Missing metadata (like loss_reason) shouldn't exclude records from the summary.
 
+## DailyRevenueFunnel Join Diagnostics (Verified 2026-02-08)
+
+**CRITICAL FINDING: 100% Match Rate on DRF→OVT Join**
+
+Diagnostic testing on Q1 2026 POR AMER data confirmed perfect join reliability:
+
+### Join Match Rates
+| Stage | DRF Records | Matched to OVT | Match Rate |
+|-------|-------------|----------------|------------|
+| SQL | 127 | 127 | **100%** ✅ |
+| SAL | 100 | 100 | **100%** ✅ |
+| SQO | 35 | 35 | **100%** ✅ |
+
+### OVT Data Availability
+| Metric | Value |
+|--------|-------|
+| Total Q1 Opportunities | 628 |
+| With ACV > 0 | 313 (49.8%) |
+| Won | 135 (21.5%) |
+| Lost | 110 (17.5%) |
+| Open | 383 (61.0%) |
+| Avg ACV | $3,117.64 |
+
+### Stage Distribution (All Q1 OVT)
+- Discovery: 206 (32.8%)
+- Closed Won: 135 (21.5%)
+- Closed Lost: 108 (17.2%)
+- Proposal: 58 (9.2%)
+- Other: 121 (19.3%)
+
+### Implementation Pattern
+```sql
+-- Safe to use directly for all funnel detail queries
+LEFT JOIN `sfdc.OpportunityViewTable` o
+  ON d.OpportunityID = o.Id
+  AND o.Division = 'US'
+  AND o.por_record__c = true
+```
+
+**No fallback needed.** OpportunityID is reliable primary key for funnel→opportunity linkage.
+
 ## Verified Q1 2026 Targets (2026-01-20)
 
 **Source:** `Staging.RevOpsReport` with `RiskProfile='P90'`, `Horizon='QTD'`, `Period_Start_Date='2026-01-01'`
@@ -424,6 +473,93 @@ CASE
   ELSE 'NEW LOGO'
 END AS category
 ```
+
+## Win Rate Color Coding: Per-Category Historical Benchmarks (2026-02-08)
+
+**Problem:** Win rate was colored using attainment thresholds (90/70) which don't apply to win rates. A 40% win rate showed the same color as 40% attainment, but 40% is near-average for New Logo while far below average for Expansion.
+
+**Root Cause:** `getAttainmentColor()` was used for win rate cells in AttainmentTable, HitsMisses, and BrightSpots. Win rates vary enormously by product/category (23% R360 New Logo vs 85% R360 Expansion), so a single fixed scale is meaningless.
+
+**Solution:** Created `getWinRateColor()` in `lib/constants/dimensions.ts` using 2024-2025 historical benchmarks from `OpportunityViewTable` with ±15 percentage point bands:
+
+| Product | Category | Historical Avg | Yellow Band | Green Above |
+|---------|----------|---------------|-------------|-------------|
+| POR | NEW LOGO | 46% | 31-61% | >61% |
+| POR | EXPANSION | 63% | 48-78% | >78% |
+| POR | MIGRATION | 42% | 27-57% | >57% |
+| R360 | NEW LOGO | 23% | 8-38% | >38% |
+| R360 | EXPANSION | 85% | 70-100% | N/A (use absolute) |
+| ALL RENEWAL | ~100% | Absolute: ≥90% green | ≥70% yellow | <70% red |
+
+**Edge Cases:**
+- `winRate === 0` → gray (N/A, likely no closed deals)
+- `winRate == null` → gray
+- Benchmarks ≥90% (renewals) → absolute thresholds instead of relative bands
+- No deals (won + lost = 0) → display "N/A" text, not 0%
+
+**Key Insights:**
+1. **Never use attainment thresholds for win rates** — they are fundamentally different metrics
+2. **Per-category benchmarks are essential** — 43% is terrible for Expansion (avg 63%) but near-average for Migration (avg 42%)
+3. **Use additive (±pp) not multiplicative (±%)** bands — ±10% of 99.9% renewal benchmark made 100% "yellow"
+4. **Show benchmarks in UI legend** — users can't interpret relative colors without seeing the baseline
+5. **Query historical data periodically** — benchmarks should be refreshed annually from `OpportunityViewTable WHERE EXTRACT(YEAR FROM CloseDate) BETWEEN 2024 AND 2025`
+
+**Applied To:** `getWinRateColor()` and `getWinRateClass()` in `lib/constants/dimensions.ts`, consumed by AttainmentTable, ExecutiveSummary, HitsMisses, BrightSpots, SQODetails.
+
+## Dark Mode CSS Specificity: !important Overrides Inline Styles (2026-02-08)
+
+**Problem:** Win rate colors rendered correctly in light mode but showed default text color in dark mode.
+
+**Root Cause:** Global CSS rule `[data-theme="dark"] table td { color: var(--text-primary) !important; }` (specificity 0-1-2) overrides ALL inline `style={{ color: ... }}` on `td` elements. The `!important` flag means inline styles lose regardless of normal specificity rules.
+
+**Solution:** Use CSS custom properties with dedicated class selectors that include dark mode variants:
+
+```css
+/* Base rule */
+td.win-rate-color {
+  color: var(--win-rate-color) !important;
+  font-weight: 600;
+}
+/* Dark mode override with HIGHER specificity (0-2-2 > 0-1-2) */
+[data-theme="dark"] table td.win-rate-color,
+[data-theme="dark"] .data-table td.win-rate-color {
+  color: var(--win-rate-color) !important;
+  font-weight: 600;
+}
+```
+
+Then in JSX: `<td className="win-rate-color" style={{ '--win-rate-color': color } as React.CSSProperties}>`
+
+**Key Insights:**
+1. **Inline styles lose to `!important`** — even though inline styles normally have highest specificity, `!important` in stylesheets overrides them
+2. **CSS custom properties work** — set `--var-name` inline, read with `var(--var-name)` in stylesheet that has matching `!important`
+3. **Dark mode selectors need to match or exceed** the specificity of the blanket dark mode td rule
+4. **Existing pattern already solved this** — `td.attainment-color` and `td.variance-color` in `globals.css` used the same CSS variable approach. Follow existing patterns.
+5. **`<span>` inside `<td>` bypasses the issue** — the `!important` targets `td` elements. Inline styles on `<span>` children work fine (used in ExecutiveSummary summary table).
+
+**Applied To:** `globals.css` (added `td.win-rate-color` rule), `AttainmentTable.tsx`, `ExecutiveSummary.tsx` regional breakdown, `HitsMisses.tsx`.
+
+## DRF Segment Column for STRATEGIC Categorization (2026-02-08)
+
+**Problem:** Pacing showed 221 MQL (inbound, new business only) but detail showed 222. Off by 1 for MQL and SQL across all stages.
+
+**Root Cause:** RevOpsPerformance uses `DailyRevenueFunnel.Segment` to split NEW LOGO vs STRATEGIC. The detail queries used `OpportunityViewTable.Type = 'Strategic'` — but Salesforce doesn't have a 'Strategic' type. Strategic deals have `Type = 'New Business'` with `ACV > 100000`. All records fell into NEW LOGO.
+
+**Solution:** Use `CASE WHEN d.Segment = 'Strategic' THEN 'STRATEGIC' ELSE 'NEW LOGO' END AS category` in all DRF-based INBOUND CTEs.
+
+**DRF Segment Values:**
+- `SMB` → maps to NEW LOGO category
+- `Strategic` → maps to STRATEGIC category
+
+**Verified Counts (POR AMER INBOUND Q1 2026):**
+| Stage | SMB (NEW LOGO) | Strategic | Total |
+|-------|---------------|-----------|-------|
+| MQL | 221 | 1 | 222 |
+| SQL | 126 | 1 | 127 |
+| SAL | 100 | 0 | 100 |
+| SQO | 35 | 0 | 35 |
+
+**Applied To:** `getMQLDetails()`, `getSQLDetails()`, `getSALDetails()`, `getSQODetails()` — all DRF-based INBOUND CTEs.
 
 ## RAW_2026_Plan_by_Month Division Format
 
