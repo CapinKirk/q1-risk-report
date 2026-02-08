@@ -1827,7 +1827,7 @@ async function getMQLDetails(filters: ReportFilters) {
         false AS was_reverted,
         DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         'MQL' AS lead_type,
-        'NEW LOGO' AS category,
+        CASE WHEN d.Segment = 'Strategic' THEN 'STRATEGIC' ELSE 'NEW LOGO' END AS category,
         ROW_NUMBER() OVER (
           PARTITION BY COALESCE(d.LeadID, d.ContactID)
           ORDER BY d.CaptureDate DESC
@@ -2112,12 +2112,7 @@ async function getSQLDetails(filters: ReportFilters) {
         o.ACV AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
-        CASE
-          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
-          WHEN o.Type = 'Migration' THEN 'MIGRATION'
-          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
-          ELSE 'NEW LOGO'
-        END AS category,
+        CASE WHEN d.Segment = 'Strategic' THEN 'STRATEGIC' ELSE 'NEW LOGO' END AS category,
         ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
@@ -2165,12 +2160,7 @@ async function getSQLDetails(filters: ReportFilters) {
         COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
-        CASE
-          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
-          WHEN o.Type = 'Migration' THEN 'MIGRATION'
-          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
-          ELSE 'NEW LOGO'
-        END AS category,
+        CASE WHEN d.Segment = 'Strategic' THEN 'STRATEGIC' ELSE 'NEW LOGO' END AS category,
         ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
@@ -2322,12 +2312,7 @@ async function getSQLDetails(filters: ReportFilters) {
         o.ACV AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
-        CASE
-          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
-          WHEN o.Type = 'Migration' THEN 'MIGRATION'
-          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
-          ELSE 'NEW LOGO'
-        END AS category,
+        CASE WHEN d.Segment = 'Strategic' THEN 'STRATEGIC' ELSE 'NEW LOGO' END AS category,
         ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
@@ -2373,12 +2358,7 @@ async function getSQLDetails(filters: ReportFilters) {
         COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
-        CASE
-          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
-          WHEN o.Type = 'Migration' THEN 'MIGRATION'
-          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
-          ELSE 'NEW LOGO'
-        END AS category,
+        CASE WHEN d.Segment = 'Strategic' THEN 'STRATEGIC' ELSE 'NEW LOGO' END AS category,
         ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
@@ -2572,10 +2552,7 @@ async function getSALDetails(filters: ReportFilters) {
         DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         CASE
           WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
-          WHEN o.Type = 'Migration' THEN 'MIGRATION'
-          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
-          ELSE 'NEW LOGO'
-        END AS category,
+        CASE WHEN d.Segment = 'Strategic' THEN 'STRATEGIC' ELSE 'NEW LOGO' END AS category,
         ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
@@ -2810,12 +2787,7 @@ async function getSQODetails(filters: ReportFilters) {
         o.ACV AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
-        CASE
-          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
-          WHEN o.Type = 'Migration' THEN 'MIGRATION'
-          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
-          ELSE 'NEW LOGO'
-        END AS category,
+        CASE WHEN d.Segment = 'Strategic' THEN 'STRATEGIC' ELSE 'NEW LOGO' END AS category,
         ROW_NUMBER() OVER (
           PARTITION BY d.OpportunityID
           ORDER BY CASE WHEN o.Won = true THEN 0 ELSE 1 END, d.CaptureDate DESC
@@ -2974,12 +2946,7 @@ async function getSQODetails(filters: ReportFilters) {
         o.ACV AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
-        CASE
-          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
-          WHEN o.Type = 'Migration' THEN 'MIGRATION'
-          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
-          ELSE 'NEW LOGO'
-        END AS category,
+        CASE WHEN d.Segment = 'Strategic' THEN 'STRATEGIC' ELSE 'NEW LOGO' END AS category,
         ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY CASE WHEN o.Won = true THEN 0 ELSE 1 END, d.CaptureDate DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
