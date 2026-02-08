@@ -729,7 +729,9 @@ td.variance-color {
   font-weight: 600;
 }
 
-td.win-rate-color {
+td.win-rate-color,
+[data-theme="dark"] table td.win-rate-color,
+[data-theme="dark"] .data-table td.win-rate-color {
   color: var(--win-rate-color) !important;
   font-weight: 600;
 }
