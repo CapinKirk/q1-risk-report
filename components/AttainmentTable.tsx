@@ -80,8 +80,8 @@ function ProductAttainmentTable({
               <SortableHeader label="QTD Var" column="qtd_gap" sortDirection={getSortDirection('qtd_gap')} onSort={handleSort} className="right" />
               <SortableHeader label="Lost" column="qtd_lost_acv" sortDirection={getSortDirection('qtd_lost_acv')} onSort={handleSort} className="right" />
               <SortableHeader label="Pipe" column="pipeline_acv" sortDirection={getSortDirection('pipeline_acv')} onSort={handleSort} className="right" />
-              <SortableHeader label="Cov" column="pipeline_coverage_x" sortDirection={getSortDirection('pipeline_coverage_x')} onSort={handleSort} className="right" />
-              <SortableHeader label="Win%" column="win_rate_pct" sortDirection={getSortDirection('win_rate_pct')} onSort={handleSort} className="right" />
+              <SortableHeader label="Coverage" column="pipeline_coverage_x" sortDirection={getSortDirection('pipeline_coverage_x')} onSort={handleSort} className="right" />
+              <SortableHeader label="Win Rate" column="win_rate_pct" sortDirection={getSortDirection('win_rate_pct')} onSort={handleSort} className="right" />
               <SortableHeader label="RAG" column="rag_status" sortDirection={getSortDirection('rag_status')} onSort={handleSort} className="center" />
             </tr>
           </thead>
@@ -132,7 +132,9 @@ function ProductAttainmentTable({
                     {formatCurrency(row.pipeline_acv)}
                     {hasDeals && ' 📋'}
                   </td>
-                  <td className="right">{formatCoverage(coverage)}</td>
+                  <td className={`right coverage-cell ${coverage >= 3 ? 'status-green' : coverage >= 2 ? 'status-yellow' : 'status-red'}`}>
+                    <strong>{formatCoverage(coverage)}</strong>
+                  </td>
                   <td className="right attainment-color" style={{ '--att-color': getWinRateColor(winRate, row.product, row.category) } as React.CSSProperties}>
                     {formatPercent(winRate)}
                   </td>
