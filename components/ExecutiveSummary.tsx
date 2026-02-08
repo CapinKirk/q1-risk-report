@@ -271,13 +271,22 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
           </tr>
         </tbody>
       </table>
-      <p style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '4px', lineHeight: 1.4 }}>
-        <strong>Attainment:</strong> <span style={{ color: '#16a34a' }}>Green</span> {'\u2265'} 90% | <span style={{ color: '#ca8a04' }}>Yellow</span> {'\u2265'} 70% | <span style={{ color: '#dc2626' }}>Red</span> {'<'} 70%
-        {' \u00A0\u00A0 '}
-        <strong>Coverage:</strong> <span style={{ color: '#16a34a' }}>Green</span> {'\u2265'} 3.0x | <span style={{ color: '#ca8a04' }}>Yellow</span> {'\u2265'} 2.0x | <span style={{ color: '#dc2626' }}>Red</span> {'<'} 2.0x
-        {' \u00A0\u00A0 '}
-        <strong>Win Rate:</strong> <span style={{ color: '#16a34a' }}>Green</span> above historical avg | <span style={{ color: '#ca8a04' }}>Yellow</span> near avg | <span style={{ color: '#dc2626' }}>Red</span> below avg
-      </p>
+      <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '4px', lineHeight: 1.6 }}>
+        <div>
+          <strong>Attainment:</strong> <span style={{ color: '#16a34a' }}>Green</span> {'\u2265'} 90% | <span style={{ color: '#ca8a04' }}>Yellow</span> {'\u2265'} 70% | <span style={{ color: '#dc2626' }}>Red</span> {'<'} 70%
+          {' \u00A0\u00A0 '}
+          <strong>Coverage:</strong> <span style={{ color: '#16a34a' }}>Green</span> {'\u2265'} 3.0x | <span style={{ color: '#ca8a04' }}>Yellow</span> {'\u2265'} 2.0x | <span style={{ color: '#dc2626' }}>Red</span> {'<'} 2.0x
+        </div>
+        <div style={{ marginTop: '2px' }}>
+          <strong>Win Rate</strong> {'\u2014'} colored vs. 2024{'\u2013'}2025 historical avg ({'\u00B1'}15pp = <span style={{ color: '#ca8a04' }}>Yellow</span>):
+          {' \u00A0 '}
+          POR: New Logo <strong>46%</strong> | Expansion <strong>63%</strong> | Migration <strong>42%</strong>
+          {' \u00A0\u00A0 '}
+          R360: New Logo <strong>23%</strong> | Expansion <strong>85%</strong>
+          {' \u00A0\u00A0 '}
+          <span style={{ color: '#6b7280' }}>Gray</span> = N/A (no closed deals)
+        </div>
+      </div>
 
       {detailRows.length > 0 && (
         <>
