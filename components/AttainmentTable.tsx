@@ -238,10 +238,19 @@ export default function AttainmentTable({ data }: AttainmentTableProps) {
     <section>
       <h2>2. Attainment by Region & Product</h2>
       {hasDeals && (
-        <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
+        <p style={{ fontSize: '10px', color: '#6b7280', marginBottom: '4px' }}>
           Click on QTD Actual, Lost, or Pipeline values to view deal details
         </p>
       )}
+      <p style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginBottom: '8px', lineHeight: 1.4 }}>
+        <strong>Attainment / Variance:</strong> <span style={{ color: '#16a34a' }}>Green</span> {'\u2265'} 90% | <span style={{ color: '#ca8a04' }}>Yellow</span> {'\u2265'} 70% | <span style={{ color: '#dc2626' }}>Red</span> {'<'} 70%
+        {' \u00A0\u00A0 '}
+        <strong>Coverage:</strong> <span style={{ color: '#16a34a' }}>Green</span> {'\u2265'} 3.0x | <span style={{ color: '#ca8a04' }}>Yellow</span> {'\u2265'} 2.0x | <span style={{ color: '#dc2626' }}>Red</span> {'<'} 2.0x
+        {' \u00A0\u00A0 '}
+        <strong>Win Rate:</strong> <span style={{ color: '#16a34a' }}>Green</span> above historical avg | <span style={{ color: '#ca8a04' }}>Yellow</span> near avg ({'\u00B1'}15pp) | <span style={{ color: '#dc2626' }}>Red</span> below avg
+        {' \u00A0\u00A0 '}
+        <strong>RAG:</strong> composite of attainment + coverage + pipeline health
+      </p>
       {hasPORData && (
         <ProductAttainmentTable
           product="POR"

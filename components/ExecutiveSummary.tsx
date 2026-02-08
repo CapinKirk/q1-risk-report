@@ -271,6 +271,13 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
           </tr>
         </tbody>
       </table>
+      <p style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '4px', lineHeight: 1.4 }}>
+        <strong>Attainment:</strong> <span style={{ color: '#16a34a' }}>Green</span> {'\u2265'} 90% | <span style={{ color: '#ca8a04' }}>Yellow</span> {'\u2265'} 70% | <span style={{ color: '#dc2626' }}>Red</span> {'<'} 70%
+        {' \u00A0\u00A0 '}
+        <strong>Coverage:</strong> <span style={{ color: '#16a34a' }}>Green</span> {'\u2265'} 3.0x | <span style={{ color: '#ca8a04' }}>Yellow</span> {'\u2265'} 2.0x | <span style={{ color: '#dc2626' }}>Red</span> {'<'} 2.0x
+        {' \u00A0\u00A0 '}
+        <strong>Win Rate:</strong> <span style={{ color: '#16a34a' }}>Green</span> above historical avg | <span style={{ color: '#ca8a04' }}>Yellow</span> near avg | <span style={{ color: '#dc2626' }}>Red</span> below avg
+      </p>
 
       {detailRows.length > 0 && (
         <>
@@ -393,7 +400,9 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
                         <strong>{formatCoverage(row.pipeline_coverage)}</strong>
                       </td>
                       <td className="right win-rate-color" style={{ '--win-rate-color': winRateColor } as React.CSSProperties}>
-                        {formatPercent(row.win_rate_pct)}
+                        {row.win_rate_pct === 0
+                          ? <span style={{ fontSize: '0.8em' }}>N/A</span>
+                          : formatPercent(row.win_rate_pct)}
                       </td>
                     </tr>
                   );

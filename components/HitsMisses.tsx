@@ -3,6 +3,7 @@
 import { useMemo, useCallback } from 'react';
 import { ReportData, AttainmentRow } from '@/lib/types';
 import { formatCurrency, formatPercent, formatCoverage, getRAGClass, getAttainmentColor, getRAGBadgeColor } from '@/lib/formatters';
+import { getWinRateColor } from '@/lib/constants/dimensions';
 import { useSortableTable } from '@/lib/useSortableTable';
 import SortableHeader from './SortableHeader';
 import RegionBadge from './RegionBadge';
@@ -49,8 +50,8 @@ function HitsTable({ hits }: { hits: AttainmentWithProduct[] }) {
               <SortableHeader label="Cat" column="category" sortDirection={getSortDirection('category')} onSort={handleSort} />
               <SortableHeader label="Att%" column="qtd_attainment_pct" sortDirection={getSortDirection('qtd_attainment_pct')} onSort={handleSort} className="right" />
               <SortableHeader label="QTD Act" column="qtd_acv" sortDirection={getSortDirection('qtd_acv')} onSort={handleSort} className="right" />
-              <SortableHeader label="Cov" column="pipeline_coverage_x" sortDirection={getSortDirection('pipeline_coverage_x')} onSort={handleSort} className="right" />
-              <SortableHeader label="Win%" column="win_rate_pct" sortDirection={getSortDirection('win_rate_pct')} onSort={handleSort} className="right" />
+              <SortableHeader label="Coverage" column="pipeline_coverage_x" sortDirection={getSortDirection('pipeline_coverage_x')} onSort={handleSort} className="right" />
+              <SortableHeader label="Win Rate" column="win_rate_pct" sortDirection={getSortDirection('win_rate_pct')} onSort={handleSort} className="right" />
             </tr>
           </thead>
           <tbody>
@@ -75,8 +76,10 @@ function HitsTable({ hits }: { hits: AttainmentWithProduct[] }) {
                   {formatPercent(h.qtd_attainment_pct)}
                 </td>
                 <td className="right">{formatCurrency(h.qtd_acv)}</td>
-                <td className="right">{formatCoverage(h.pipeline_coverage_x)}</td>
-                <td className="right" style={{ color: getAttainmentColor(h.win_rate_pct), fontWeight: 600 }}>
+                <td className={`right coverage-cell ${(h.pipeline_coverage_x || 0) >= 3 ? 'status-green' : (h.pipeline_coverage_x || 0) >= 2 ? 'status-yellow' : 'status-red'}`}>
+                  <strong>{formatCoverage(h.pipeline_coverage_x)}</strong>
+                </td>
+                <td className="right win-rate-color" style={{ '--win-rate-color': getWinRateColor(h.win_rate_pct, h.product, h.category) } as React.CSSProperties}>
                   {formatPercent(h.win_rate_pct)}
                 </td>
               </tr>

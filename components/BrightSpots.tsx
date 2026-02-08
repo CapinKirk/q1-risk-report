@@ -1,5 +1,6 @@
 import { WinBrightSpot } from '@/lib/types';
-import { formatCurrency, formatPercent, getAttainmentColor } from '@/lib/formatters';
+import { formatCurrency, formatPercent } from '@/lib/formatters';
+import { getWinRateColor } from '@/lib/constants/dimensions';
 
 interface BrightSpotsProps {
   wins: {
@@ -63,7 +64,7 @@ export default function BrightSpots({ wins }: BrightSpotsProps) {
                 <span className="metric-label">QTD ACV</span>
               </div>
               <div className="metric">
-                <span className="metric-value" style={{ color: getAttainmentColor(win.win_rate_pct) }}>{win.win_rate_pct}%</span>
+                <span className="metric-value" style={{ color: getWinRateColor(win.win_rate_pct, win.product, win.category) }}>{win.win_rate_pct}%</span>
                 <span className="metric-label">Win Rate</span>
               </div>
             </div>
