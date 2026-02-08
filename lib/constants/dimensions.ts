@@ -89,14 +89,16 @@ export function getRAGStatus(attainmentPct: number): RAGStatus {
 // Historical win rate benchmarks (2024-2025 average from OpportunityViewTable)
 // Used for win-rate-specific RAG coloring: green = above avg, yellow = near avg, red = below avg
 export const WIN_RATE_BENCHMARKS: Record<string, number> = {
-  'POR-NEW LOGO': 46,
-  'POR-EXPANSION': 63,
-  'POR-MIGRATION': 42,
-  'R360-NEW LOGO': 23,
-  'R360-EXPANSION': 85,
-  'POR': 56,     // weighted average across POR categories
-  'R360': 46,    // weighted average across R360 categories
-  'ALL': 53,     // overall weighted average
+  'POR-NEW LOGO': 46.4,    // 613/1322
+  'POR-EXPANSION': 62.8,   // 2432/3870
+  'POR-MIGRATION': 42.3,   // 360/852
+  'POR-RENEWAL': 99.9,     // 8449/8459
+  'R360-NEW LOGO': 23.4,   // 391/1668
+  'R360-EXPANSION': 84.8,  // 792/934
+  'R360-RENEWAL': 100.0,   // 343/343
+  'POR': 56.3,     // weighted average across POR non-renewal categories
+  'R360': 45.5,    // weighted average across R360 non-renewal categories
+  'ALL': 53,       // overall weighted average
 };
 
 // Get win rate color based on historical benchmark (±10% of average = yellow band)
