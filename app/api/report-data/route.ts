@@ -2550,8 +2550,6 @@ async function getSALDetails(filters: ReportFilters) {
           'N/A'
         ) AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
-        CASE
-          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
         CASE WHEN d.Segment = 'Strategic' THEN 'STRATEGIC' ELSE 'NEW LOGO' END AS category,
         ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
