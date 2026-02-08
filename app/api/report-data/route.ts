@@ -222,6 +222,219 @@ async function getRevOpsPerformanceData(filters: ReportFilters): Promise<{
 }
 
 /**
+ * Get unique opportunity counts for EXPANSION/MIGRATION funnels from DailyRevenueFunnel.
+ * DRF is a daily snapshot — the same OpportunityID appears on multiple CaptureDate rows.
+ * RevOpsPerformance uses SUM(MQL) which counts person-days (inflated).
+ * This query counts DISTINCT OpportunityIDs at each stage for accurate summary counts.
+ * Returns Map<key, { mql, sql, sal, sqo }> where key = "product-region-category"
+ */
+async function getExpMigUniqueOppCounts(filters: ReportFilters): Promise<Map<string, { mql: number; sql: number; sal: number; sqo: number }>> {
+  try {
+    const regionFilter = filters.regions && filters.regions.length > 0
+      ? `AND d.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+      : '';
+    const productFilter = filters.products && filters.products.length > 0
+      ? `AND d.RecordType IN (${filters.products.map(p => `'${p}'`).join(', ')})`
+      : '';
+
+    const query = `
+      SELECT
+        CASE d.RecordType WHEN 'POR' THEN 'POR' ELSE 'R360' END AS product,
+        d.Region AS region,
+        CASE
+          WHEN UPPER(d.FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
+          WHEN UPPER(d.FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
+        END AS category,
+        COUNT(DISTINCT CASE WHEN d.MQL = 1 THEN d.OpportunityID END) AS unique_mql,
+        COUNT(DISTINCT CASE WHEN d.\`SQL\` = 1 THEN d.OpportunityID END) AS unique_sql,
+        COUNT(DISTINCT CASE WHEN d.SAL = 1 THEN d.OpportunityID END) AS unique_sal,
+        COUNT(DISTINCT CASE WHEN d.SQO = 1 THEN d.OpportunityID END) AS unique_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\` d
+      WHERE UPPER(d.FunnelType) IN ('EXPANSION', 'R360 EXPANSION', 'MIGRATION', 'R360 MIGRATION')
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${productFilter}
+        ${regionFilter}
+      GROUP BY 1, 2, 3
+    `;
+
+    const [rows] = await getBigQuery().query({ query });
+    const result = new Map<string, { mql: number; sql: number; sal: number; sqo: number }>();
+    for (const row of rows as any[]) {
+      const key = `${row.product}-${row.region}-${row.category}`;
+      result.set(key, {
+        mql: parseInt(row.unique_mql) || 0,
+        sql: parseInt(row.unique_sql) || 0,
+        sal: parseInt(row.unique_sal) || 0,
+        sqo: parseInt(row.unique_sqo) || 0,
+      });
+    }
+    return result;
+  } catch (error: any) {
+    console.warn('ExpMig unique opp counts query failed:', error?.message || error);
+    return new Map();
+  }
+}
+
+/**
+ * Get EXPANSION/MIGRATION unique opp counts grouped by SOURCE for funnel_by_source data.
+ * Uses COUNT(DISTINCT OpportunityID) instead of SUM() to avoid person-day inflation.
+ * Returns Map<key, { mql, sql, sal, sqo }> where key = "product-region-category-source"
+ */
+async function getExpMigSourceCounts(filters: ReportFilters): Promise<Map<string, { mql: number; sql: number; sal: number; sqo: number }>> {
+  try {
+    const regionFilter = filters.regions && filters.regions.length > 0
+      ? `AND d.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+      : '';
+    const productFilter = filters.products && filters.products.length > 0
+      ? `AND d.RecordType IN (${filters.products.map(p => `'${p}'`).join(', ')})`
+      : '';
+
+    const query = `
+      SELECT
+        CASE d.RecordType WHEN 'POR' THEN 'POR' ELSE 'R360' END AS product,
+        d.Region AS region,
+        CASE
+          WHEN UPPER(d.FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
+          WHEN UPPER(d.FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
+        END AS category,
+        UPPER(COALESCE(NULLIF(d.Source, ''), 'AM SOURCED')) AS source,
+        COUNT(DISTINCT CASE WHEN d.MQL = 1 THEN d.OpportunityID END) AS unique_mql,
+        COUNT(DISTINCT CASE WHEN d.\`SQL\` = 1 THEN d.OpportunityID END) AS unique_sql,
+        COUNT(DISTINCT CASE WHEN d.SAL = 1 THEN d.OpportunityID END) AS unique_sal,
+        COUNT(DISTINCT CASE WHEN d.SQO = 1 THEN d.OpportunityID END) AS unique_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\` d
+      WHERE UPPER(d.FunnelType) IN ('EXPANSION', 'R360 EXPANSION', 'MIGRATION', 'R360 MIGRATION')
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${productFilter}
+        ${regionFilter}
+      GROUP BY 1, 2, 3, 4
+    `;
+
+    const [rows] = await getBigQuery().query({ query });
+    const result = new Map<string, { mql: number; sql: number; sal: number; sqo: number }>();
+    for (const row of rows as any[]) {
+      const key = `${row.product}-${row.region}-${row.category}-${row.source}`;
+      result.set(key, {
+        mql: parseInt(row.unique_mql) || 0,
+        sql: parseInt(row.unique_sql) || 0,
+        sal: parseInt(row.unique_sal) || 0,
+        sqo: parseInt(row.unique_sqo) || 0,
+      });
+    }
+    return result;
+  } catch (error: any) {
+    console.warn('ExpMig source counts query failed:', error?.message || error);
+    return new Map();
+  }
+}
+
+/**
+ * Get unique lead counts for INBOUND (NEW LOGO) funnels from DailyRevenueFunnel.
+ * DRF is a daily snapshot — the same LeadID/ContactID appears on multiple CaptureDate rows.
+ * RevOpsPerformance uses SUM(Actual_MQL) which counts person-days (inflated).
+ * This query counts DISTINCT COALESCE(LeadID, ContactID) at each stage for accurate summary counts.
+ * Returns Map<key, { mql, sql, sal, sqo }> where key = "product-region"
+ */
+async function getInboundUniqueCounts(filters: ReportFilters): Promise<Map<string, { mql: number; sql: number; sal: number; sqo: number }>> {
+  try {
+    const regionFilter = filters.regions && filters.regions.length > 0
+      ? `AND d.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+      : '';
+    const productFilter = filters.products && filters.products.length > 0
+      ? `AND d.RecordType IN (${filters.products.map(p => `'${p}'`).join(', ')})`
+      : '';
+
+    const query = `
+      SELECT
+        CASE d.RecordType WHEN 'POR' THEN 'POR' ELSE 'R360' END AS product,
+        d.Region AS region,
+        COUNT(DISTINCT CASE WHEN d.MQL = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_mql,
+        COUNT(DISTINCT CASE WHEN d.\`SQL\` = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sql,
+        COUNT(DISTINCT CASE WHEN d.SAL = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sal,
+        COUNT(DISTINCT CASE WHEN d.SQO = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\` d
+      WHERE UPPER(d.FunnelType) IN ('INBOUND', 'R360 INBOUND')
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${productFilter}
+        ${regionFilter}
+      GROUP BY 1, 2
+    `;
+
+    const [rows] = await getBigQuery().query({ query });
+    const result = new Map<string, { mql: number; sql: number; sal: number; sqo: number }>();
+    for (const row of rows as any[]) {
+      const key = `${row.product}-${row.region}`;
+      result.set(key, {
+        mql: parseInt(row.unique_mql) || 0,
+        sql: parseInt(row.unique_sql) || 0,
+        sal: parseInt(row.unique_sal) || 0,
+        sqo: parseInt(row.unique_sqo) || 0,
+      });
+    }
+    return result;
+  } catch (error: any) {
+    console.warn('Inbound unique lead counts query failed:', error?.message || error);
+    return new Map();
+  }
+}
+
+/**
+ * Get INBOUND (NEW LOGO) unique lead counts grouped by SOURCE for funnel_by_source data.
+ * Uses COUNT(DISTINCT COALESCE(LeadID, ContactID)) instead of SUM() to avoid person-day inflation.
+ * Returns Map<key, { mql, sql, sal, sqo }> where key = "product-region-source-NEW LOGO"
+ */
+async function getInboundSourceCounts(filters: ReportFilters): Promise<Map<string, { mql: number; sql: number; sal: number; sqo: number }>> {
+  try {
+    const regionFilter = filters.regions && filters.regions.length > 0
+      ? `AND d.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+      : '';
+    const productFilter = filters.products && filters.products.length > 0
+      ? `AND d.RecordType IN (${filters.products.map(p => `'${p}'`).join(', ')})`
+      : '';
+
+    const query = `
+      SELECT
+        CASE d.RecordType WHEN 'POR' THEN 'POR' ELSE 'R360' END AS product,
+        d.Region AS region,
+        CASE
+          WHEN d.Source IS NULL OR TRIM(d.Source) = '' OR UPPER(TRIM(d.Source)) = 'N/A' THEN 'INBOUND'
+          ELSE UPPER(TRIM(d.Source))
+        END AS source,
+        COUNT(DISTINCT CASE WHEN d.MQL = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_mql,
+        COUNT(DISTINCT CASE WHEN d.\`SQL\` = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sql,
+        COUNT(DISTINCT CASE WHEN d.SAL = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sal,
+        COUNT(DISTINCT CASE WHEN d.SQO = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\` d
+      WHERE UPPER(d.FunnelType) IN ('INBOUND', 'R360 INBOUND')
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${productFilter}
+        ${regionFilter}
+      GROUP BY 1, 2, 3
+    `;
+
+    const [rows] = await getBigQuery().query({ query });
+    const result = new Map<string, { mql: number; sql: number; sal: number; sqo: number }>();
+    for (const row of rows as any[]) {
+      const key = `${row.product}-${row.region}-${row.source}-NEW LOGO`;
+      result.set(key, {
+        mql: parseInt(row.unique_mql) || 0,
+        sql: parseInt(row.unique_sql) || 0,
+        sal: parseInt(row.unique_sal) || 0,
+        sqo: parseInt(row.unique_sqo) || 0,
+      });
+    }
+    return result;
+  } catch (error: any) {
+    console.warn('Inbound source counts query failed:', error?.message || error);
+    return new Map();
+  }
+}
+
+/**
  * Get FY (Full Year) targets from RAW_2026_Plan_by_Month
  * This is the source of truth for annual bookings targets from the Excel plan
  * Returns Map<key, fy_target> where key = "product-region-category"
@@ -1578,60 +1791,62 @@ async function getMQLDetails(filters: ReportFilters) {
       }).join(', ')})`
     : '';
 
-  // MQL Query - NEW LOGO from InboundFunnel (deduplicated by Company + Date + Division)
-  // Uses ROW_NUMBER() to pick one record per company per day, preferring records with LeadId/ContactId
+  // MQL Query - NEW LOGO from DailyRevenueFunnel (authoritative source, matches summary counts)
+  // JOINs Lead/Contact/Account for detail fields, InboundFunnel for conversion status
   const porMqlQuery = `
-    WITH ranked_mqls AS (
+    WITH funnel_status AS (
       SELECT
-        'POR' AS product,
-        CASE Division
-          WHEN 'US' THEN 'AMER'
-          WHEN 'UK' THEN 'EMEA'
-          WHEN 'AU' THEN 'APAC'
-        END AS region,
-        COALESCE(LeadId, ContactId) AS record_id,
-        CASE
-          WHEN LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', LeadId)
-          WHEN ContactId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', ContactId)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(Company, 'Unknown') AS company_name,
-        COALESCE(LeadEmail, ContactEmail, 'N/A') AS email,
-        COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
-        CAST(MQL_DT AS STRING) AS mql_date,
-        CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
-        CASE
-          WHEN MQL_Reverted = true THEN 'REVERTED'
-          WHEN SQL_DT IS NOT NULL THEN 'CONVERTED'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) > 30 THEN 'STALLED'
-          ELSE 'ACTIVE'
-        END AS mql_status,
-        COALESCE(MQL_Reverted, false) AS was_reverted,
-        DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage,
-        'MQL' AS lead_type,
-        'NEW LOGO' AS category,
-        -- Prioritize records with LeadId/ContactId, then by most recent
-        ROW_NUMBER() OVER (
-          PARTITION BY COALESCE(Company, 'Unknown'), CAST(MQL_DT AS DATE), Division
-          ORDER BY
-            CASE WHEN LeadId IS NOT NULL OR ContactId IS NOT NULL THEN 0 ELSE 1 END,
-            CASE WHEN SQL_DT IS NOT NULL THEN 0 ELSE 1 END
-        ) AS rn
+        LeadId, ContactId,
+        MAX(CASE WHEN SQL_DT IS NOT NULL THEN 1 ELSE 0 END) AS has_sql,
+        MAX(CASE WHEN SAL_DT IS NOT NULL THEN 1 ELSE 0 END) AS has_sal,
+        MAX(CASE WHEN SQO_DT IS NOT NULL THEN 1 ELSE 0 END) AS has_sqo
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\`
       WHERE Division IN ('US', 'UK', 'AU')
         AND (SpiralyzeTest IS NULL OR SpiralyzeTest = false)
-        -- Include reverted MQLs for disqualification analysis
-        AND MQL_DT IS NOT NULL
-        -- Filter to INBOUND source only to match summary counts (funnel_by_category)
-        AND (SDRSource IS NULL OR SDRSource = '' OR UPPER(SDRSource) = 'INBOUND')
-        AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
-        ${regionClause}
+        AND (MQL_Reverted IS NULL OR MQL_Reverted = false)
+      GROUP BY LeadId, ContactId
+    ),
+    raw_mqls AS (
+      SELECT
+        'POR' AS product,
+        d.Region AS region,
+        COALESCE(d.LeadID, d.ContactID) AS record_id,
+        CONCAT('https://por.my.salesforce.com/', COALESCE(d.LeadID, d.ContactID)) AS salesforce_url,
+        COALESCE(l.company, a.Name, 'Unknown') AS company_name,
+        COALESCE(l.email, c.email, 'N/A') AS email,
+        UPPER(COALESCE(NULLIF(d.Source, ''), 'INBOUND')) AS source,
+        CAST(d.CaptureDate AS STRING) AS mql_date,
+        CASE WHEN COALESCE(fs.has_sql, 0) = 1 OR l.convertedopportunityid IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
+        CASE
+          WHEN COALESCE(fs.has_sqo, 0) = 1 THEN 'CONVERTED_SQO'
+          WHEN COALESCE(fs.has_sal, 0) = 1 THEN 'CONVERTED_SAL'
+          WHEN COALESCE(fs.has_sql, 0) = 1 OR l.convertedopportunityid IS NOT NULL THEN 'CONVERTED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS mql_status,
+        false AS was_reverted,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
+        'MQL' AS lead_type,
+        'NEW LOGO' AS category,
+        ROW_NUMBER() OVER (
+          PARTITION BY COALESCE(d.LeadID, d.ContactID)
+          ORDER BY d.CaptureDate DESC
+        ) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l ON d.LeadID = l.id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c ON d.ContactID = c.id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a ON c.accountid = a.Id
+      LEFT JOIN funnel_status fs
+        ON (d.LeadID IS NOT NULL AND d.LeadID = fs.LeadId)
+        OR (d.ContactID IS NOT NULL AND d.ContactID = fs.ContactId)
+      WHERE d.RecordType = 'POR'
+        AND UPPER(d.FunnelType) = 'INBOUND'
+        AND d.MQL = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${filters.regions && filters.regions.length > 0 ? `AND d.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})` : ''}
     )
-    SELECT product, region, record_id, salesforce_url, company_name, email, source,
-           mql_date, converted_to_sql, mql_status, was_reverted, days_in_stage, lead_type, category
-    FROM ranked_mqls
-    WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM raw_mqls WHERE rn = 1
     ORDER BY mql_date DESC
   `;
 
@@ -1639,63 +1854,125 @@ async function getMQLDetails(filters: ReportFilters) {
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
-  // R360 MQL Query - deduplicated by Company + Date + Region
+  // R360 MQL Query - from DailyRevenueFunnel (authoritative source, matches summary counts)
   const r360MqlQuery = `
-    WITH ranked_mqls AS (
+    WITH funnel_status AS (
+      SELECT
+        COALESCE(LeadId, Email) AS match_key,
+        MAX(CASE WHEN SQL_DT IS NOT NULL THEN 1 ELSE 0 END) AS has_sql,
+        MAX(CASE WHEN SQO_DT IS NOT NULL THEN 1 ELSE 0 END) AS has_sqo
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
+      WHERE MQL_Reverted = false AND Region IS NOT NULL
+      GROUP BY 1
+    ),
+    raw_mqls AS (
       SELECT
         'R360' AS product,
-        Region AS region,
-        LeadId AS record_id,
+        d.Region AS region,
+        COALESCE(d.LeadID, d.ContactID) AS record_id,
+        CONCAT('https://por.my.salesforce.com/', COALESCE(d.LeadID, d.ContactID)) AS salesforce_url,
+        COALESCE(l.company, a.Name, 'Unknown') AS company_name,
+        COALESCE(l.email, c.email, 'N/A') AS email,
+        UPPER(COALESCE(NULLIF(d.Source, ''), 'INBOUND')) AS source,
+        CAST(d.CaptureDate AS STRING) AS mql_date,
+        CASE WHEN COALESCE(fs.has_sql, 0) = 1 OR l.convertedopportunityid IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
         CASE
-          WHEN LeadId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', LeadId)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(Company, 'Unknown') AS company_name,
-        Email AS email,
-        COALESCE(NULLIF(SDRSource, ''), 'INBOUND') AS source,
-        CAST(MQL_DT AS STRING) AS mql_date,
-        CASE WHEN SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
-        CASE
-          WHEN MQL_Reverted = true THEN 'REVERTED'
-          WHEN SQL_DT IS NOT NULL THEN 'CONVERTED'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) > 30 THEN 'STALLED'
+          WHEN COALESCE(fs.has_sqo, 0) = 1 THEN 'CONVERTED_SQO'
+          WHEN COALESCE(fs.has_sql, 0) = 1 OR l.convertedopportunityid IS NOT NULL THEN 'CONVERTED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS mql_status,
-        COALESCE(MQL_Reverted, false) AS was_reverted,
-        DATE_DIFF(CURRENT_DATE(), CAST(MQL_DT AS DATE), DAY) AS days_in_stage,
+        false AS was_reverted,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         'MQL' AS lead_type,
         'NEW LOGO' AS category,
-        -- Prioritize records with LeadId, then by conversion status
         ROW_NUMBER() OVER (
-          PARTITION BY COALESCE(Company, 'Unknown'), CAST(MQL_DT AS DATE), Region
-          ORDER BY
-            CASE WHEN LeadId IS NOT NULL THEN 0 ELSE 1 END,
-            CASE WHEN SQL_DT IS NOT NULL THEN 0 ELSE 1 END
+          PARTITION BY COALESCE(d.LeadID, d.ContactID)
+          ORDER BY d.CaptureDate DESC
         ) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
-      WHERE Region IS NOT NULL
-        -- Include reverted MQLs for disqualification analysis
-        AND MQL_DT IS NOT NULL
-        -- Filter to INBOUND source only to match summary counts (funnel_by_category)
-        AND (SDRSource IS NULL OR SDRSource = '' OR UPPER(SDRSource) = 'INBOUND')
-        AND CAST(MQL_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(MQL_DT AS DATE) <= '${filters.endDate}'
-        ${r360RegionClause}
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l ON d.LeadID = l.id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c ON d.ContactID = c.id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a ON c.accountid = a.Id
+      LEFT JOIN funnel_status fs ON COALESCE(d.LeadID, d.ContactID) = fs.match_key
+      WHERE d.RecordType = 'R360'
+        AND UPPER(d.FunnelType) IN ('INBOUND', 'R360 INBOUND')
+        AND d.MQL = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${r360RegionClause ? r360RegionClause.replace('Region', 'd.Region') : ''}
     )
-    SELECT product, region, record_id, salesforce_url, company_name, email, source,
-           mql_date, converted_to_sql, mql_status, was_reverted, days_in_stage, lead_type, category
-    FROM ranked_mqls
-    WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM raw_mqls WHERE rn = 1
     ORDER BY mql_date DESC
   `;
 
-  // EQL Query - EXPANSION/MIGRATION from OpportunityViewTable
-  // EQLs are qualified opportunities from existing customers (tracked by CreatedDate)
-  const { productClause, regionClause: oppRegionClause } = buildOpportunityFilterClause(filters);
-
+  // EQL Query - EXPANSION/MIGRATION from DailyRevenueFunnel (authoritative source, matches summary counts)
+  // Deduplicates by OpportunityID, JOINs OpportunityViewTable for detail fields
   const eqlQuery = `
+    WITH ranked_eqls AS (
+      SELECT
+        d.OpportunityID,
+        CASE d.RecordType WHEN 'POR' THEN 'POR' ELSE 'R360' END AS product,
+        d.Region AS region,
+        UPPER(COALESCE(NULLIF(d.Source, ''), 'AM SOURCED')) AS source,
+        FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE)) AS mql_date,
+        CASE
+          WHEN UPPER(d.FunnelType) IN ('EXPANSION', 'R360 EXPANSION') THEN 'EXPANSION'
+          WHEN UPPER(d.FunnelType) IN ('MIGRATION', 'R360 MIGRATION') THEN 'MIGRATION'
+        END AS category,
+        -- Keep most progressed stage per opportunity (backtick-escape SQL reserved word)
+        d.Won AS drf_won, d.SQO AS drf_sqo, d.SAL AS drf_sal, d.\`SQL\` AS drf_sql,
+        ROW_NUMBER() OVER (
+          PARTITION BY d.OpportunityID
+          ORDER BY d.Won DESC, d.SQO DESC, d.SAL DESC, d.\`SQL\` DESC, d.CaptureDate DESC
+        ) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
+      WHERE UPPER(d.FunnelType) IN ('EXPANSION', 'R360 EXPANSION', 'MIGRATION', 'R360 MIGRATION')
+        AND d.MQL = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${filters.products && filters.products.length > 0 ? `AND d.RecordType IN (${filters.products.map(p => `'${p}'`).join(', ')})` : ''}
+        ${filters.regions && filters.regions.length > 0 ? `AND d.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})` : ''}
+    )
     SELECT
-      CASE WHEN por_record__c THEN 'POR' ELSE 'R360' END AS product,
+      e.product,
+      e.region,
+      e.OpportunityID AS record_id,
+      CONCAT('https://por.my.salesforce.com/', e.OpportunityID) AS salesforce_url,
+      COALESCE(o.AccountName, 'Unknown') AS company_name,
+      'N/A' AS email,
+      COALESCE(NULLIF(UPPER(COALESCE(o.SDRSource, o.POR_SDRSource)), ''), e.source) AS source,
+      e.mql_date,
+      CASE
+        WHEN e.drf_won = 1 OR o.Won THEN 'Yes'
+        WHEN e.drf_sqo = 1 THEN 'Yes'
+        WHEN e.drf_sql = 1 THEN 'Yes'
+        ELSE 'No'
+      END AS converted_to_sql,
+      CASE
+        WHEN e.drf_won = 1 OR COALESCE(o.Won, false) THEN 'WON'
+        WHEN COALESCE(o.IsClosed, false) AND NOT COALESCE(o.Won, false) THEN 'LOST'
+        WHEN e.drf_sqo = 1 THEN 'CONVERTED_SQO'
+        WHEN e.drf_sal = 1 THEN 'CONVERTED_SAL'
+        WHEN e.drf_sql = 1 THEN 'CONVERTED'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(e.mql_date AS DATE), DAY) > 21 AND NOT COALESCE(o.IsClosed, false) THEN 'STALLED'
+        ELSE 'ACTIVE'
+      END AS mql_status,
+      CASE WHEN COALESCE(o.IsClosed, false) AND NOT COALESCE(o.Won, false) THEN true ELSE false END AS was_reverted,
+      DATE_DIFF(CURRENT_DATE(), CAST(e.mql_date AS DATE), DAY) AS days_in_stage,
+      'EQL' AS lead_type,
+      e.category
+    FROM ranked_eqls e
+    LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o ON e.OpportunityID = o.Id
+    WHERE e.rn = 1
+    ORDER BY e.mql_date DESC
+  `;
+
+  // STRATEGIC MQL Query - New Business opps with ACV > $100K from OpportunityViewTable
+  // Matches the summary-level strategic query pattern (line ~1228) but returns individual records
+  const strategicMqlQuery = `
+    SELECT
+      CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
       CASE Division
         WHEN 'US' THEN 'AMER'
         WHEN 'UK' THEN 'EMEA'
@@ -1705,61 +1982,91 @@ async function getMQLDetails(filters: ReportFilters) {
       CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url,
       COALESCE(AccountName, 'Unknown') AS company_name,
       'N/A' AS email,
-      COALESCE(NULLIF(COALESCE(SDRSource, POR_SDRSource), ''), 'INBOUND') AS source,
-      CAST(CreatedDate AS STRING) AS mql_date,
-      CASE WHEN Won THEN 'Yes' WHEN StageName LIKE '%SQL%' OR StageName LIKE '%SAL%' OR StageName LIKE '%SQO%' THEN 'Yes' ELSE 'No' END AS converted_to_sql,
+      UPPER(COALESCE(NULLIF(SDRSource, ''), NULLIF(POR_SDRSource, ''), 'INBOUND')) AS source,
+      FORMAT_DATE('%Y-%m-%d', CAST(CreatedDate AS DATE)) AS mql_date,
       CASE
-        WHEN Won THEN 'CONVERTED'
-        WHEN IsClosed AND NOT Won THEN 'REVERTED'
-        WHEN DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY) > 30 AND NOT IsClosed THEN 'STALLED'
+        WHEN Won THEN 'Yes'
+        WHEN StageName NOT IN ('Discovery', 'Qualification') THEN 'Yes'
+        ELSE 'No'
+      END AS converted_to_sql,
+      CASE
+        WHEN Won THEN 'WON'
+        WHEN IsClosed AND NOT COALESCE(Won, false) THEN 'LOST'
+        WHEN StageName IN ('Proposal', 'Negotiation', 'Closed Won') THEN 'CONVERTED_SQO'
+        WHEN StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') THEN 'CONVERTED_SAL'
+        WHEN StageName NOT IN ('Discovery', 'Qualification') THEN 'CONVERTED'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY) > 21 THEN 'STALLED'
         ELSE 'ACTIVE'
       END AS mql_status,
-      CASE WHEN IsClosed AND NOT Won THEN true ELSE false END AS was_reverted,
+      CASE WHEN IsClosed AND NOT COALESCE(Won, false) THEN true ELSE false END AS was_reverted,
       DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY) AS days_in_stage,
-      'EQL' AS lead_type,
-      CASE Type
-        WHEN 'Existing Business' THEN 'EXPANSION'
-        WHEN 'Migration' THEN 'MIGRATION'
-      END AS category
+      'MQL' AS lead_type,
+      'STRATEGIC' AS category
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
     WHERE Division IN ('US', 'UK', 'AU')
-      AND Type IN ('Existing Business', 'Migration')
-      AND ACV > 0
+      AND Type = 'New Business'
+      AND ACV > 100000
       AND CAST(CreatedDate AS DATE) >= '${filters.startDate}'
       AND CAST(CreatedDate AS DATE) <= '${filters.endDate}'
-      ${productClause}
-      ${oppRegionClause}
-    ORDER BY CreatedDate DESC
+      ${filters.products && filters.products.length > 0 ? `AND CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END IN (${filters.products.map(p => `'${p}'`).join(', ')})` : ''}
+      ${filters.regions && filters.regions.length > 0 ? `AND CASE Division WHEN 'US' THEN 'AMER' WHEN 'UK' THEN 'EMEA' WHEN 'AU' THEN 'APAC' END IN (${filters.regions.map(r => `'${r}'`).join(', ')})` : ''}
+    ORDER BY mql_date DESC
   `;
 
+  const shouldFetchPOR = filters.products.length === 0 || filters.products.includes('POR');
+  const shouldFetchR360 = filters.products.length === 0 || filters.products.includes('R360');
+
+  let porMqlRows: any[] = [];
+  let r360MqlRows: any[] = [];
+  let eqlRows: any[] = [];
+  let strategicMqlRows: any[] = [];
+
   try {
-    const shouldFetchPOR = filters.products.length === 0 || filters.products.includes('POR');
-    const shouldFetchR360 = filters.products.length === 0 || filters.products.includes('R360');
-
-    const [porMqlRows, r360MqlRows, eqlRows] = await Promise.all([
-      shouldFetchPOR ? getBigQuery().query({ query: porMqlQuery }).then(r => r[0]) : Promise.resolve([]),
-      shouldFetchR360 ? getBigQuery().query({ query: r360MqlQuery }).then(r => r[0]) : Promise.resolve([]),
-      getBigQuery().query({ query: eqlQuery }).then(r => r[0]),
-    ]);
-
-    // Combine MQL and EQL data, split by product
-    const porData = [
-      ...(porMqlRows as any[]),
-      ...(eqlRows as any[]).filter((r: any) => r.product === 'POR'),
-    ];
-    const r360Data = [
-      ...(r360MqlRows as any[]),
-      ...(eqlRows as any[]).filter((r: any) => r.product === 'R360'),
-    ];
-
-    return {
-      POR: porData,
-      R360: r360Data,
-    };
+    porMqlRows = shouldFetchPOR
+      ? (await getBigQuery().query({ query: porMqlQuery }))[0] as any[]
+      : [];
   } catch (error) {
-    console.warn('MQL/EQL details query failed:', error);
-    return { POR: [], R360: [] };
+    console.warn('POR MQL details query failed:', error);
   }
+
+  try {
+    r360MqlRows = shouldFetchR360
+      ? (await getBigQuery().query({ query: r360MqlQuery }))[0] as any[]
+      : [];
+  } catch (error) {
+    console.warn('R360 MQL details query failed:', error);
+  }
+
+  try {
+    eqlRows = (await getBigQuery().query({ query: eqlQuery }))[0] as any[];
+  } catch (error: any) {
+    console.warn('EQL details query failed:', error?.message || error);
+    eqlRows = [];
+  }
+
+  try {
+    strategicMqlRows = (await getBigQuery().query({ query: strategicMqlQuery }))[0] as any[];
+  } catch (error: any) {
+    console.warn('Strategic MQL details query failed:', error?.message || error);
+    strategicMqlRows = [];
+  }
+
+  // Combine MQL, EQL, and Strategic data, split by product
+  const porData = [
+    ...porMqlRows,
+    ...eqlRows.filter((r: any) => r.product === 'POR'),
+    ...strategicMqlRows.filter((r: any) => r.product === 'POR'),
+  ];
+  const r360Data = [
+    ...r360MqlRows,
+    ...eqlRows.filter((r: any) => r.product === 'R360'),
+    ...strategicMqlRows.filter((r: any) => r.product === 'R360'),
+  ];
+
+  return {
+    POR: porData,
+    R360: r360Data,
+  };
 }
 
 // Query for SQL details
@@ -2412,184 +2719,67 @@ async function getSQLDetails(filters: ReportFilters) {
 // Enhanced: Uses OpportunityName lookup as fallback when OpportunityID and ConvertedOpportunityId are NULL
 async function getSALDetails(filters: ReportFilters) {
   const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND f.Division IN (${filters.regions.map(r => {
-        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
-        return `'${map[r]}'`;
-      }).join(', ')})`
+    ? `AND d.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
-  // POR SAL query - deduplicates by email, JOINs to get opportunity details
+  // POR SAL query - uses DailyRevenueFunnel as primary source to match pacing counts
   // Note: R360 doesn't have SAL stage, so only POR query needed
-  // 6-tier enhanced linking: OpportunityID → ConvertedOpportunityId → Name match → ContactId-Account → Email-Account → Fuzzy name
+  // DRF→OpportunityViewTable JOIN via OpportunityID is 100% reliable for INBOUND
   const porQuery = `
-    WITH name_matched_opps AS (
-      -- Tier 3: Pre-compute opportunity lookups by exact name
-      SELECT DISTINCT
-        OpportunityName,
-        FIRST_VALUE(Id) OVER (PARTITION BY OpportunityName ORDER BY CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
-      WHERE OpportunityName IS NOT NULL AND OpportunityName != ''
-        AND por_record__c = true AND Division IN ('US', 'UK', 'AU')
-    ),
-    contact_account_opps AS (
-      -- Tier 4: Match via ContactId → Contact.AccountId → Opportunity
-      SELECT DISTINCT
-        c.Id AS contact_id,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY c.Id ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON c.AccountId = o.AccountId
-      WHERE c.AccountId IS NOT NULL
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    email_matched_opps AS (
-      -- Tier 5: Match via Email → Contact → Account → Opportunity
-      SELECT DISTINCT
-        LOWER(TRIM(c.Email)) AS email,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY LOWER(TRIM(c.Email)) ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON c.AccountId = o.AccountId
-      WHERE c.Email IS NOT NULL AND c.Email != '' AND c.AccountId IS NOT NULL
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    fuzzy_name_matched_opps AS (
-      -- Tier 6: Fuzzy company name match (remove Inc, LLC, Ltd, etc.)
-      SELECT DISTINCT
-        REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') AS normalized_name,
-        FIRST_VALUE(o.Id) OVER (
-          PARTITION BY REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '')
-          ORDER BY o.CreatedDate DESC
-        ) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-      WHERE o.AccountName IS NOT NULL AND o.AccountName != ''
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    account_matched_opps AS (
-      -- Tier 7: Direct Account.Name match → find any Opportunity on that Account
-      SELECT DISTINCT
-        LOWER(TRIM(a.Name)) AS account_name,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY a.Id ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON a.Id = o.AccountId
-      WHERE a.Name IS NOT NULL AND a.Name != ''
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    ranked_sals AS (
+    WITH ranked_sals AS (
       SELECT
         'POR' AS product,
-        CASE f.Division
-          WHEN 'US' THEN 'AMER'
-          WHEN 'UK' THEN 'EMEA'
-          WHEN 'AU' THEN 'APAC'
-        END AS region,
-        COALESCE(f.LeadId, f.ContactId) AS record_id,
-        -- 7-tier URL resolution
-        CASE
-          WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
-          WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
-          WHEN nmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', nmo.opp_id)
-          WHEN cao.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', cao.opp_id)
-          WHEN emo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', emo.opp_id)
-          WHEN fnmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', fnmo.opp_id)
-          WHEN amo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', amo.opp_id)
-          WHEN NULLIF(f.LeadId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
-          WHEN NULLIF(f.ContactId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.ContactId)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(f.Company, 'Unknown') AS company_name,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, f.Company, 'Unknown') AS company_name,
         COALESCE(f.LeadEmail, f.ContactEmail, 'N/A') AS email,
-        UPPER(COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
-        CAST(f.SAL_DT AS STRING) AS sal_date,
+        UPPER(COALESCE(NULLIF(d.Source, ''), NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
+        COALESCE(CAST(f.SAL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sal_date,
         CAST(f.SQL_DT AS STRING) AS sql_date,
         CAST(f.MQL_DT AS STRING) AS mql_date,
-        DATE_DIFF(CAST(f.SAL_DT AS DATE), CAST(f.SQL_DT AS DATE), DAY) AS days_sql_to_sal,
-        CASE WHEN f.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        -- 7-tier has_opportunity check
-        CASE WHEN (f.OpportunityID IS NOT NULL AND f.OpportunityID != '')
-               OR l.ConvertedOpportunityId IS NOT NULL
-               OR nmo.opp_id IS NOT NULL
-               OR cao.opp_id IS NOT NULL
-               OR emo.opp_id IS NOT NULL
-               OR fnmo.opp_id IS NOT NULL
-               OR amo.opp_id IS NOT NULL
-        THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        CASE WHEN f.SQL_DT IS NOT NULL AND f.SAL_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(f.SAL_DT AS DATE), CAST(f.SQL_DT AS DATE), DAY)
+          ELSE 0
+        END AS days_sql_to_sal,
+        CASE WHEN f.SQO_DT IS NOT NULL OR d.SQO = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        'Yes' AS has_opportunity,
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SAL_DT AS DATE), DAY) > 45 THEN 'STALLED'
+          WHEN d.SQO = 1 OR f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sal_status,
-        -- 7-tier opportunity_id
-        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id) AS opportunity_id,
-        COALESCE(f.OpportunityName, o.OpportunityName, o2.OpportunityName, o3.OpportunityName, o4.OpportunityName, o5.OpportunityName, o6.OpportunityName) AS opportunity_name,
-        COALESCE(o.StageName, o2.StageName, o3.StageName, o4.StageName, o5.StageName, o6.StageName) AS opportunity_stage,
-        COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
-        -- Prefer RejectedReason over ClosedLostReason for SAL rejection tracking
+        d.OpportunityID AS opportunity_id,
+        COALESCE(o.OpportunityName, f.OpportunityName) AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        o.ACV AS opportunity_acv,
         COALESCE(
-          NULLIF(COALESCE(o.RejectedReason, o2.RejectedReason, o3.RejectedReason, o4.RejectedReason, o5.RejectedReason, o6.RejectedReason), ''),
-          NULLIF(COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason), ''),
+          NULLIF(o.RejectedReason, ''),
+          NULLIF(o.ClosedLostReason, ''),
           'N/A'
         ) AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(f.SAL_DT AS DATE), DAY) AS days_in_stage,
-        -- Derive category from opportunity Type field
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         CASE
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Existing Business' THEN 'EXPANSION'
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Migration' THEN 'MIGRATION'
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Strategic' THEN 'STRATEGIC'
+          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN o.Type = 'Migration' THEN 'MIGRATION'
+          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
           ELSE 'NEW LOGO'
         END AS category,
-        -- Deduplicate by email to match summary
-        ROW_NUMBER() OVER (
-          PARTITION BY COALESCE(f.LeadEmail, f.ContactEmail)
-          ORDER BY
-            CASE WHEN f.SQO_DT IS NOT NULL THEN 0 ELSE 1 END,
-            f.SAL_DT DESC
-        ) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\` f
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
-        ON f.LeadId = l.Id
-      -- Tier 1-2: Direct OpportunityID or ConvertedOpportunityId
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
-      -- Tier 3: Name match (only if tiers 1-2 failed)
-      LEFT JOIN name_matched_opps nmo
-        ON f.OpportunityName = nmo.OpportunityName
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o2
-        ON nmo.opp_id = o2.Id
-      -- Tier 4: ContactId → Account (only if tiers 1-3 failed)
-      LEFT JOIN contact_account_opps cao
-        ON f.ContactId = cao.contact_id
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o3
-        ON cao.opp_id = o3.Id
-      -- Tier 5: Email → Contact → Account (only if tiers 1-4 failed)
-      LEFT JOIN email_matched_opps emo
-        ON LOWER(TRIM(COALESCE(f.LeadEmail, f.ContactEmail))) = emo.email
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o4
-        ON emo.opp_id = o4.Id
-      -- Tier 6: Fuzzy name match (only if all other tiers failed)
-      LEFT JOIN fuzzy_name_matched_opps fnmo
-        ON REGEXP_REPLACE(LOWER(TRIM(f.Company)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') = fnmo.normalized_name
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o5
-        ON fnmo.opp_id = o5.Id
-      -- Tier 7: Account.Name direct match (only if all other tiers failed)
-      LEFT JOIN account_matched_opps amo
-        ON LOWER(TRIM(f.Company)) = amo.account_name
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL AND fnmo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o6
-        ON amo.opp_id = o6.Id
-      WHERE f.Division IN ('US', 'UK', 'AU')
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\` f
+        ON d.OpportunityID = f.OpportunityID
         AND (f.SpiralyzeTest IS NULL OR f.SpiralyzeTest = false)
         AND (f.MQL_Reverted IS NULL OR f.MQL_Reverted = false)
-        AND f.SAL_DT IS NOT NULL
-        AND CAST(f.SAL_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(f.SAL_DT AS DATE) <= '${filters.endDate}'
+      WHERE d.RecordType = 'POR'
+        AND UPPER(d.FunnelType) = 'INBOUND'
+        AND d.SAL = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
         ${regionClause}
     ),
     -- EXPANSION and MIGRATION opportunities that have reached SAL stage
@@ -2617,14 +2807,13 @@ async function getSALDetails(filters: ReportFilters) {
           WHEN o.Won THEN 'WON'
           WHEN o.StageName IN ('Proposal', 'Negotiation', 'Closed Won') THEN 'CONVERTED_SQO'
           WHEN o.IsClosed AND NOT o.Won THEN 'LOST'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) > 45 THEN 'STALLED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sal_status,
         o.Id AS opportunity_id,
         o.OpportunityName AS opportunity_name,
         o.StageName AS opportunity_stage,
         o.ACV AS opportunity_acv,
-        -- Prefer RejectedReason over ClosedLostReason for SAL rejection tracking
         COALESCE(NULLIF(o.RejectedReason, ''), NULLIF(o.ClosedLostReason, ''), 'N/A') AS loss_reason,
         DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) AS days_in_stage,
         CASE
@@ -2637,66 +2826,56 @@ async function getSALDetails(filters: ReportFilters) {
         AND o.Division IN ('US', 'UK', 'AU')
         AND o.Type IN ('Existing Business', 'Migration')
         AND o.ACV > 0
-        -- SAL stage = past Needs Analysis stage OR Won
         AND (o.StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') OR o.Won)
         AND CAST(o.CreatedDate AS DATE) >= '${filters.startDate}'
         AND CAST(o.CreatedDate AS DATE) <= '${filters.endDate}'
-        ${regionClause.replace(/f\.Division/g, 'o.Division')}
+        ${regionClause.replace(/d\.Region/g, 'o.Division').replace(/'AMER'/g, "'US'").replace(/'EMEA'/g, "'UK'").replace(/'APAC'/g, "'AU'")}
     ),
-    -- Non-inbound funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from NewLogoFunnel
-    -- JOIN to OpportunityViewTable to get accurate ACV (funnel WonACV is often NULL)
+    -- Non-inbound funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from DailyRevenueFunnel
     non_inbound_sals AS (
       SELECT
         'POR' AS product,
-        CASE nl.Division
-          WHEN 'US' THEN 'AMER'
-          WHEN 'UK' THEN 'EMEA'
-          WHEN 'AU' THEN 'APAC'
-        END AS region,
-        COALESCE(nl.OpportunityID, CAST(nl.SAL_DT AS STRING)) AS record_id,
-        CASE
-          WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(nl.Company, 'Unknown') AS company_name,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, nl.Company, 'Unknown') AS company_name,
         'N/A' AS email,
-        UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
-        CAST(nl.SAL_DT AS STRING) AS sal_date,
+        UPPER(COALESCE(NULLIF(d.Source, ''), NULLIF(nl.SDRSource, ''), 'OUTBOUND')) AS source,
+        COALESCE(CAST(nl.SAL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sal_date,
         CAST(nl.SQL_DT AS STRING) AS sql_date,
         CAST(nl.MQL_DT AS STRING) AS mql_date,
         CASE WHEN nl.SQL_DT IS NOT NULL AND nl.SAL_DT IS NOT NULL
           THEN DATE_DIFF(CAST(nl.SAL_DT AS DATE), CAST(nl.SQL_DT AS DATE), DAY)
           ELSE 0
         END AS days_sql_to_sal,
-        CASE WHEN nl.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        CASE WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
-        -- Use OpportunityViewTable Won status if available
+        CASE WHEN nl.SQO_DT IS NOT NULL OR d.SQO = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        'Yes' AS has_opportunity,
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SAL_DT AS DATE), DAY) > 45 THEN 'STALLED'
+          WHEN d.SQO = 1 OR nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sal_status,
-        nl.OpportunityID AS opportunity_id,
+        d.OpportunityID AS opportunity_id,
         COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
         o.StageName AS opportunity_stage,
-        -- Use OpportunityViewTable ACV if available, fall back to funnel WonACV
         COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(nl.SAL_DT AS DATE), DAY) AS days_in_stage,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         'NEW LOGO' AS category,
-        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SAL_DT DESC) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
-      -- JOIN to get accurate ACV from OpportunityViewTable
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON nl.OpportunityID = o.Id
-      WHERE nl.Division IN ('US', 'UK', 'AU')
-        AND nl.SAL_DT IS NOT NULL
-        AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
-        AND CAST(nl.SAL_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(nl.SAL_DT AS DATE) <= '${filters.endDate}'
-        ${regionClause.replace(/f\.Division/g, 'nl.Division')}
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
+        ON d.OpportunityID = nl.OpportunityID
+      WHERE d.RecordType = 'POR'
+        AND UPPER(d.FunnelType) = 'NEW LOGO'
+        AND d.SAL = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${regionClause}
     )
     SELECT * EXCEPT(rn) FROM ranked_sals WHERE rn = 1
     UNION ALL
@@ -2706,11 +2885,68 @@ async function getSALDetails(filters: ReportFilters) {
     ORDER BY sal_date DESC
   `;
 
+  // STRATEGIC SAL query - high-value NEW LOGO deals (ACV > $100k)
+  const strategicQuery = `
+    SELECT
+      'POR' AS product,
+      CASE o.Division
+        WHEN 'US' THEN 'AMER'
+        WHEN 'UK' THEN 'EMEA'
+        WHEN 'AU' THEN 'APAC'
+      END AS region,
+      o.Id AS record_id,
+      CONCAT('https://por.my.salesforce.com/', o.Id) AS salesforce_url,
+      COALESCE(o.AccountName, 'Unknown') AS company_name,
+      'N/A' AS email,
+      UPPER(COALESCE(NULLIF(COALESCE(o.SDRSource, o.POR_SDRSource), ''), 'INBOUND')) AS source,
+      FORMAT_DATE('%Y-%m-%d', CAST(o.CreatedDate AS DATE)) AS sal_date,
+      CAST(NULL AS STRING) AS sql_date,
+      CAST(NULL AS STRING) AS mql_date,
+      0 AS days_sql_to_sal,
+      CASE WHEN o.StageName IN ('Proposal', 'Negotiation', 'Closed Won', 'Closed Lost') OR o.Won OR o.IsClosed THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+      'Yes' AS has_opportunity,
+      CASE
+        WHEN o.Won THEN 'WON'
+        WHEN o.IsClosed AND NOT COALESCE(o.Won, false) THEN 'LOST'
+        WHEN o.StageName IN ('Proposal', 'Negotiation', 'Closed Won') THEN 'CONVERTED_SQO'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) > 21 THEN 'STALLED'
+        ELSE 'ACTIVE'
+      END AS sal_status,
+      o.Id AS opportunity_id,
+      o.OpportunityName AS opportunity_name,
+      o.StageName AS opportunity_stage,
+      o.ACV AS opportunity_acv,
+      COALESCE(NULLIF(o.RejectedReason, ''), NULLIF(o.ClosedLostReason, ''), 'N/A') AS loss_reason,
+      DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) AS days_in_stage,
+      'STRATEGIC' AS category
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+    WHERE o.por_record__c = true
+      AND o.Division IN ('US', 'UK', 'AU')
+      AND o.Type = 'New Business'
+      AND o.ACV > 100000
+      AND (o.StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') OR o.Won)
+      AND CAST(o.CreatedDate AS DATE) >= '${filters.startDate}'
+      AND CAST(o.CreatedDate AS DATE) <= '${filters.endDate}'
+      ${regionClause.replace(/d\.Region/g, 'o.Division').replace(/'AMER'/g, "'US'").replace(/'EMEA'/g, "'UK'").replace(/'APAC'/g, "'AU'")}
+    ORDER BY sal_date DESC
+  `;
+
   try {
-    const [porRows] = await getBigQuery().query({ query: porQuery });
-    console.log(`SAL query returned ${porRows?.length || 0} rows`);
+    // Execute main POR query and strategic query in parallel
+    const [porRowsResult, strategicRowsResult] = await Promise.all([
+      getBigQuery().query({ query: porQuery }),
+      getBigQuery().query({ query: strategicQuery })
+    ]);
+
+    const porRows = porRowsResult[0] as any[];
+    const strategicRows = strategicRowsResult[0] as any[];
+
+    // Combine results
+    const allPorRows = [...porRows, ...strategicRows];
+
+    console.log(`SAL query returned ${porRows?.length || 0} standard rows + ${strategicRows?.length || 0} strategic rows = ${allPorRows.length} total`);
     return {
-      POR: porRows as any[],
+      POR: allPorRows,
       R360: [] as any[], // R360 doesn't have SAL stage
     };
   } catch (error) {
@@ -2821,7 +3057,7 @@ async function getSQODetails(filters: ReportFilters) {
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
         -- 7-tier opportunity_id
@@ -2912,7 +3148,7 @@ async function getSQODetails(filters: ReportFilters) {
         CASE
           WHEN o.Won THEN 'WON'
           WHEN o.IsClosed AND NOT o.Won THEN 'LOST'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) > 60 THEN 'STALLED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
         o.Id AS opportunity_id,
@@ -2971,7 +3207,7 @@ async function getSQODetails(filters: ReportFilters) {
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
         nl.OpportunityID AS opportunity_id,
@@ -3091,7 +3327,7 @@ async function getSQODetails(filters: ReportFilters) {
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
         -- 7-tier opportunity_id
@@ -3185,7 +3421,7 @@ async function getSQODetails(filters: ReportFilters) {
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 60 THEN 'STALLED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
         nl.OpportunityID AS opportunity_id,
@@ -3231,7 +3467,7 @@ async function getSQODetails(filters: ReportFilters) {
         CASE
           WHEN o.Won THEN 'WON'
           WHEN o.IsClosed AND NOT o.Won THEN 'LOST'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) > 60 THEN 'STALLED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(o.CreatedDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
         o.Id AS opportunity_id,
@@ -3693,8 +3929,8 @@ export async function POST(request: Request) {
     const [
       revOpsData,
       revenueActuals,
-      porFunnel,
-      r360Funnel,
+      _porFunnelDeprecated,
+      _r360FunnelDeprecated,
       revOpsPerformance,
       wonDeals,
       lostDeals,
@@ -3711,21 +3947,21 @@ export async function POST(request: Request) {
       renewalTargetsMap,
       fyTargetsMap,
       utmBreakdownData,
+      expMigUniqueCounts,
+      expMigSourceCounts,
+      inboundUniqueCounts,
+      inboundSourceCounts,
     ] = await Promise.all([
       getRevOpsQTDData(filters),
       getRevenueActuals(filters),
-      filters.products.length === 0 || filters.products.includes('POR')
-        ? getPORFunnelActuals(filters)
-        : Promise.resolve([]),
-      filters.products.length === 0 || filters.products.includes('R360')
-        ? getR360FunnelActuals(filters)
-        : Promise.resolve([]),
+      Promise.resolve([]), // porFunnel — deprecated: DailyRevenueFunnel values flow via RevOpsPerformance
+      Promise.resolve([]), // r360Funnel — deprecated: DailyRevenueFunnel values flow via RevOpsPerformance
       getRevOpsPerformanceData(filters),
       getWonDeals(filters),
       getLostDeals(filters),
       getPipelineDeals(filters),
       getGoogleAds(filters),
-      getSourceActuals(filters),
+      Promise.resolve([]), // sourceActuals now derived from perfPeriod
       getPipelineAge(filters),
       getLossReasonRCA(filters),
       getMQLDetails(filters),
@@ -3736,6 +3972,10 @@ export async function POST(request: Request) {
       getRenewalTargetsFromRawPlan(filters.riskProfile),
       getFYTargetsFromPlan(),
       getUtmBreakdown(filters),
+      getExpMigUniqueOppCounts(filters),
+      getExpMigSourceCounts(filters),
+      getInboundUniqueCounts(filters),
+      getInboundSourceCounts(filters),
     ]);
 
     // Calculate period info
@@ -4080,11 +4320,8 @@ export async function POST(request: Request) {
       // DailyRevenueFunnel tracks "Inbound" (MQL→SQL→SAL→SQO) and "New Logo" (outbound SQL→SQO)
       // as separate funnels. The category view shows the Inbound funnel flow.
       // Outbound records appear in the source view only.
-      // STRATEGIC INBOUND actuals are merged into NEW LOGO (DailyRevenueFunnel "Inbound"
-      // includes both SMB and Strategic; RevOpsPerformance splits them).
-      const actualsKey = (isNewLogoCategory && isInboundSource && row.category === 'STRATEGIC')
-        ? `${row.product}-${row.region}-NEW LOGO`  // Merge Strategic INBOUND actuals into NEW LOGO
-        : `${row.product}-${row.region}-${row.category}`;
+      // STRATEGIC has its own tab and actuals — no longer merged into NEW LOGO.
+      const actualsKey = `${row.product}-${row.region}-${row.category}`;
       const targetsKey = `${row.product}-${row.region}-${row.category}`;
 
       // Ensure both keys exist
@@ -4098,10 +4335,16 @@ export async function POST(request: Request) {
         }
       }
 
-      // Actuals: NEW LOGO/STRATEGIC only from INBOUND; EXPANSION/MIGRATION from all sources
-      if (!isNewLogoCategory || isInboundSource) {
+      // Actuals: SQL/SAL/SQO always from all sources. MQL: INBOUND-only for NEW LOGO/STRATEGIC.
+      // Leads enter through INBOUND (MQL) but convert through OUTBOUND/AE SOURCED/TRADESHOW paths.
+      // Targets include all sources, so actuals must too for SQL/SAL/SQO to avoid false 0% pacing.
+      {
         const actualsEntry = funnelDataMap.get(actualsKey)!;
-        actualsEntry.actual_mql += parseInt(row.actual_mql) || 0;
+        // MQL: INBOUND-only for NEW LOGO (separate funnel paths); all sources for EXPANSION/MIGRATION
+        if (!isNewLogoCategory || isInboundSource) {
+          actualsEntry.actual_mql += parseInt(row.actual_mql) || 0;
+        }
+        // SQL/SAL/SQO: always include all sources (conversions span all source attributions)
         actualsEntry.actual_sql += parseInt(row.actual_sql) || 0;
         actualsEntry.actual_sal += parseInt(row.actual_sal) || 0;
         actualsEntry.actual_sqo += parseInt(row.actual_sqo) || 0;
@@ -4134,37 +4377,40 @@ export async function POST(request: Request) {
       existing.q1_target_sqo += parseInt(row.q1_target_sqo) || 0;
     }
 
-    // OVERRIDE: Replace actual_mql with counts from mqlDetailsData to ensure summary matches details
-    // Summary comes from RevOpsPerformance (DailyRevenueFunnel) which differs from InboundFunnel detail records
-    // Count MQL records (lead_type='MQL') by product-region from detail data
-    const mqlCountByProductRegion = new Map<string, number>();
-    const mqlDetails = mqlDetailsData as { POR: any[]; R360: any[] };
-
-    // Count POR MQL records by region (MQL = NEW LOGO, EQL = EXPANSION/MIGRATION)
-    for (const record of mqlDetails.POR) {
-      if (record.lead_type === 'MQL') {
-        const key = `POR-${record.region}-NEW LOGO`;
-        mqlCountByProductRegion.set(key, (mqlCountByProductRegion.get(key) || 0) + 1);
+    // Override EXPANSION/MIGRATION actuals with unique-opp counts from DailyRevenueFunnel.
+    // RevOpsPerformance uses SUM(MQL/SQL/SAL/SQO) from DRF = person-days (inflated for daily snapshots).
+    // getExpMigUniqueOppCounts uses COUNT(DISTINCT OpportunityID) = unique opportunities (correct).
+    for (const [key, counts] of Array.from((expMigUniqueCounts as Map<string, { mql: number; sql: number; sal: number; sqo: number }>).entries())) {
+      const existing = funnelDataMap.get(key);
+      if (existing) {
+        existing.actual_mql = counts.mql;
+        existing.actual_sql = counts.sql;
+        existing.actual_sal = counts.sal;
+        existing.actual_sqo = counts.sqo;
       }
     }
 
-    // Count R360 MQL records by region
-    for (const record of mqlDetails.R360) {
-      if (record.lead_type === 'MQL') {
-        const key = `R360-${record.region}-NEW LOGO`;
-        mqlCountByProductRegion.set(key, (mqlCountByProductRegion.get(key) || 0) + 1);
+    // Override NEW LOGO (INBOUND) MQL actuals with unique-lead counts from DailyRevenueFunnel.
+    // RevOpsPerformance uses SUM(Actual_MQL) = person-days (can inflate from daily snapshots).
+    // getInboundUniqueCounts uses COUNT(DISTINCT LeadID/ContactID) = unique leads (correct).
+    // Only override MQL — SQL/SAL/SQO for NEW LOGO come from RevOpsPerformance (correct source).
+    // DRF INBOUND FunnelType only tracks MQL stage; later stages use different data paths.
+    for (const [key, counts] of Array.from((inboundUniqueCounts as Map<string, { mql: number; sql: number; sal: number; sqo: number }>).entries())) {
+      const newLogoKey = `${key}-NEW LOGO`;
+      const existing = funnelDataMap.get(newLogoKey);
+      if (existing) {
+        existing.actual_mql = counts.mql;
       }
     }
 
-    // Override funnelDataMap actual_mql for NEW LOGO with detail counts
-    for (const [key, count] of Array.from(mqlCountByProductRegion.entries())) {
-      if (funnelDataMap.has(key)) {
-        const existing = funnelDataMap.get(key)!;
-        const oldCount = existing.actual_mql;
-        existing.actual_mql = count;
-        if (oldCount !== count) {
-          console.log(`MQL override: ${key} = ${count} (was ${oldCount} from RevOpsPerformance)`);
-        }
+    // Subtract STRATEGIC actuals from NEW LOGO to avoid double-counting.
+    // getInboundUniqueCounts counts ALL INBOUND leads (includes STRATEGIC).
+    // STRATEGIC gets its own actuals from RevOpsPerformance above.
+    for (const [key, counts] of Array.from((inboundUniqueCounts as Map<string, { mql: number; sql: number; sal: number; sqo: number }>).entries())) {
+      const newLogoEntry = funnelDataMap.get(`${key}-NEW LOGO`);
+      const strategicEntry = funnelDataMap.get(`${key}-STRATEGIC`);
+      if (newLogoEntry && strategicEntry) {
+        newLogoEntry.actual_mql = Math.max(0, newLogoEntry.actual_mql - strategicEntry.actual_mql);
       }
     }
 
@@ -4326,9 +4572,11 @@ export async function POST(request: Request) {
     // Build source attainment from won deals with RevOpsReport targets
     const sourceAttainment: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
     const sourceActualsMap = new Map<string, number>();
-    for (const a of sourceActualsRaw as any[]) {
-      const key = `${a.product}-${a.region}-${a.source}`;
-      sourceActualsMap.set(key, parseFloat(a.total_acv) || 0);
+    for (const row of perfPeriod) {
+      if (!row.source || row.source === 'N/A' || row.source === '' || row.category === 'RENEWAL') continue;
+      const key = `${row.product}-${row.region}-${row.source}`;
+      const actualAcv = parseFloat(row.actual_acv) || 0;
+      sourceActualsMap.set(key, (sourceActualsMap.get(key) || 0) + actualAcv);
     }
 
     // Get source-level Q1 ACV targets from RevOpsPerformance Q1 data
@@ -4385,25 +4633,21 @@ export async function POST(request: Request) {
 
     // Build funnel by source data from RevOpsPerformance
     // Actuals and targets come directly — no proportional allocation needed
+    // Now includes ALL categories (except RENEWAL) with category field for tab filtering
     const funnelBySource: { POR: any[]; R360: any[] } = { POR: [], R360: [] };
 
-    // Group RevOpsPerformance period data by (product, region, source) for source view
-    // and build Q1 target lookup by (product, region, source)
+    // Group RevOpsPerformance period data by (product, region, source, category) for source view
+    // and build Q1 target lookup by (product, region, source, category)
     const sourceMap = new Map<string, any>();
     const sourceQ1Map = new Map<string, any>();
 
-    // Source view only includes NEW LOGO + STRATEGIC categories.
-    // EXPANSION/MIGRATION have their own category rows and should not inflate source totals
-    // (e.g., INBOUND source would mix MQLs from NEW LOGO with EQLs from EXPANSION).
-    const sourceCategories = ['NEW LOGO', 'STRATEGIC'];
-
     for (const row of perfPeriod) {
       if (!row.source || row.source === 'N/A' || row.source === '' || !row.category) continue;
-      if (!sourceCategories.includes(row.category)) continue;
-      const key = `${row.product}-${row.region}-${row.source}`;
+      if (row.category === 'RENEWAL') continue;
+      const key = `${row.product}-${row.region}-${row.source}-${row.category}`;
       if (!sourceMap.has(key)) {
         sourceMap.set(key, {
-          product: row.product, region: row.region, source: row.source,
+          product: row.product, region: row.region, source: row.source, category: row.category,
           actual_mql: 0, actual_sql: 0, actual_sal: 0, actual_sqo: 0, actual_acv: 0,
           period_target_mql: 0, period_target_sql: 0, period_target_sal: 0, period_target_sqo: 0, period_target_acv: 0,
         });
@@ -4423,8 +4667,8 @@ export async function POST(request: Request) {
 
     for (const row of perfQ1) {
       if (!row.source || row.source === 'N/A' || row.source === '' || !row.category) continue;
-      if (!sourceCategories.includes(row.category)) continue;
-      const key = `${row.product}-${row.region}-${row.source}`;
+      if (row.category === 'RENEWAL') continue;
+      const key = `${row.product}-${row.region}-${row.source}-${row.category}`;
       if (!sourceQ1Map.has(key)) {
         sourceQ1Map.set(key, {
           q1_target_mql: 0, q1_target_sql: 0, q1_target_sal: 0, q1_target_sqo: 0, q1_target_acv: 0,
@@ -4436,6 +4680,41 @@ export async function POST(request: Request) {
       s.q1_target_sal += parseInt(row.q1_target_sal) || 0;
       s.q1_target_sqo += parseInt(row.q1_target_sqo) || 0;
       s.q1_target_acv += parseFloat(row.q1_target_acv) || 0;
+    }
+
+    // Override EXPANSION/MIGRATION source actuals with unique-opp counts (not person-day inflated)
+    const expMigSrcCounts = expMigSourceCounts as Map<string, { mql: number; sql: number; sal: number; sqo: number }>;
+    for (const [emKey, counts] of Array.from(expMigSrcCounts.entries())) {
+      const sourceEntry = sourceMap.get(emKey);
+      if (sourceEntry) {
+        sourceEntry.actual_mql = counts.mql;
+        sourceEntry.actual_sql = counts.sql;
+        sourceEntry.actual_sal = counts.sal;
+        sourceEntry.actual_sqo = counts.sqo;
+      }
+    }
+
+    // Override INBOUND NEW LOGO source MQL actuals with unique-lead counts (not person-day inflated)
+    // Only override MQL — SQL/SAL/SQO use different data paths and are correct from RevOpsPerformance.
+    const ibSrcCounts = inboundSourceCounts as Map<string, { mql: number; sql: number; sal: number; sqo: number }>;
+    for (const [ibKey, counts] of Array.from(ibSrcCounts.entries())) {
+      const sourceEntry = sourceMap.get(ibKey);
+      if (sourceEntry) {
+        sourceEntry.actual_mql = counts.mql;
+      }
+    }
+
+    // Subtract STRATEGIC INBOUND actuals from NEW LOGO INBOUND to avoid double-count.
+    // getInboundSourceCounts counts ALL INBOUND leads under the NEW LOGO key.
+    // STRATEGIC INBOUND keeps its own actuals from RevOpsPerformance.
+    for (const [key, s] of Array.from(sourceMap.entries())) {
+      if (s.category === 'STRATEGIC' && s.source === 'INBOUND') {
+        const newLogoKey = `${s.product}-${s.region}-INBOUND-NEW LOGO`;
+        const newLogoEntry = sourceMap.get(newLogoKey);
+        if (newLogoEntry) {
+          newLogoEntry.actual_mql = Math.max(0, newLogoEntry.actual_mql - s.actual_mql);
+        }
+      }
     }
 
     for (const [key, s] of Array.from(sourceMap.entries())) {
@@ -4453,6 +4732,7 @@ export async function POST(request: Request) {
       const entry = {
         region: s.region,
         source: s.source,
+        category: s.category,
         target_acv: Math.round(q1.q1_target_acv),
         actual_mql: s.actual_mql,
         actual_sql: s.actual_sql,
