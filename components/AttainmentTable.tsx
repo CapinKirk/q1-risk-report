@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { ReportData, AttainmentRow, Product, DealDetail, Region, Category } from '@/lib/types';
 import { formatCurrency, formatPercent, formatCoverage, getRAGClass, getGapColor, getAttainmentColor, getRAGBadgeColor } from '@/lib/formatters';
+import { getWinRateColor } from '@/lib/constants/dimensions';
 import { useSortableTable } from '@/lib/useSortableTable';
 import SortableHeader from './SortableHeader';
 import DealListModal from './DealListModal';
@@ -132,7 +133,7 @@ function ProductAttainmentTable({
                     {hasDeals && ' 📋'}
                   </td>
                   <td className="right">{formatCoverage(coverage)}</td>
-                  <td className="right attainment-color" style={{ '--att-color': getAttainmentColor(winRate) } as React.CSSProperties}>
+                  <td className="right attainment-color" style={{ '--att-color': getWinRateColor(winRate, row.product, row.category) } as React.CSSProperties}>
                     {formatPercent(winRate)}
                   </td>
                   <td className="center">

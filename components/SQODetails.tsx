@@ -5,6 +5,7 @@ import { SQODetailRow, Product, Region } from '@/lib/types';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
 import { formatCurrency } from '@/lib/formatters';
+import { getWinRateColor } from '@/lib/constants/dimensions';
 import RegionBadge from './RegionBadge';
 
 const ITEMS_PER_PAGE = 25;
@@ -19,9 +20,11 @@ interface SQODetailsProps {
   };
 }
 
-type BusinessTab = 'New Business' | 'Expansion' | 'Migration';
+type BusinessTab = 'New Business + Strategic' | 'New Business' | 'Strategic' | 'Expansion' | 'Migration';
 const TAB_CATEGORIES: Record<BusinessTab, string[]> = {
-  'New Business': ['NEW LOGO', 'STRATEGIC'],
+  'New Business + Strategic': ['NEW LOGO', 'STRATEGIC'],
+  'New Business': ['NEW LOGO'],
+  'Strategic': ['STRATEGIC'],
   'Expansion': ['EXPANSION'],
   'Migration': ['MIGRATION'],
 };
@@ -30,7 +33,7 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | 'ALL'>('ALL');
   const [selectedRegion, setSelectedRegion] = useState<Region | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
-  const [activeTab, setActiveTab] = useState<BusinessTab>('New Business');
+  const [activeTab, setActiveTab] = useState<BusinessTab>('New Business + Strategic');
   const [selectedSources, setSelectedSources] = useState<SourceType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -204,7 +207,7 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
         <>
           {/* Business Type Tabs */}
           <div className="business-tab-bar">
-            {(['New Business', 'Expansion', 'Migration'] as BusinessTab[]).map(tab => (
+            {(['New Business + Strategic', 'New Business', 'Strategic', 'Expansion', 'Migration'] as BusinessTab[]).map(tab => (
               <button
                 key={tab}
                 className={`business-tab ${activeTab === tab ? 'active' : ''}`}
@@ -238,7 +241,7 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
               <span className="stat-label">Stalled</span>
             </div>
             <div className="stat-card">
-              <span className="stat-value" style={{ color: stats.winRate >= 50 ? '#16a34a' : stats.winRate >= 25 ? '#ca8a04' : '#dc2626' }}>
+              <span className="stat-value" style={{ color: getWinRateColor(stats.winRate, selectedProduct === 'ALL' ? undefined : selectedProduct, activeTab === 'New Business' || activeTab === 'New Business + Strategic' || activeTab === 'Strategic' ? 'NEW LOGO' : activeTab === 'Expansion' ? 'EXPANSION' : activeTab === 'Migration' ? 'MIGRATION' : undefined) }}>
                 {stats.winRate.toFixed(1)}%
               </span>
               <span className="stat-label">Win Rate</span>
@@ -716,6 +719,10 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
             .category-badge.migration {
               background-color: var(--bg-tertiary);
               color: #c2410c;
+            }
+            .category-badge.strategic {
+              background-color: #fef3c7;
+              color: #92400e;
             }
             .company-cell {
               max-width: 130px;

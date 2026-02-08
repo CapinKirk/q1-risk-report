@@ -86,6 +86,43 @@ export function getRAGStatus(attainmentPct: number): RAGStatus {
   return 'RED';
 }
 
+// Historical win rate benchmarks (2024-2025 average from OpportunityViewTable)
+// Used for win-rate-specific RAG coloring: green = above avg, yellow = near avg, red = below avg
+export const WIN_RATE_BENCHMARKS: Record<string, number> = {
+  'POR-NEW LOGO': 46,
+  'POR-EXPANSION': 63,
+  'POR-MIGRATION': 42,
+  'R360-NEW LOGO': 23,
+  'R360-EXPANSION': 85,
+  'POR': 56,     // weighted average across POR categories
+  'R360': 46,    // weighted average across R360 categories
+  'ALL': 53,     // overall weighted average
+};
+
+// Get win rate color based on historical benchmark (±10% of average = yellow band)
+export function getWinRateColor(winRate: number | null | undefined, product?: string, category?: string): string {
+  if (winRate == null) return '#6b7280'; // gray for no data
+  const key = product && category ? `${product}-${category}` : product || 'ALL';
+  const benchmark = WIN_RATE_BENCHMARKS[key] ?? WIN_RATE_BENCHMARKS['ALL'];
+  const upperBand = benchmark * 1.10; // 10% above average
+  const lowerBand = benchmark * 0.90; // 10% below average
+  if (winRate >= upperBand) return '#16a34a';  // green - above average
+  if (winRate >= lowerBand) return '#ca8a04';  // yellow - near average
+  return '#dc2626';                             // red - below average
+}
+
+// Get win rate CSS class based on historical benchmark
+export function getWinRateClass(winRate: number | null | undefined, product?: string, category?: string): string {
+  if (winRate == null) return 'gray';
+  const key = product && category ? `${product}-${category}` : product || 'ALL';
+  const benchmark = WIN_RATE_BENCHMARKS[key] ?? WIN_RATE_BENCHMARKS['ALL'];
+  const upperBand = benchmark * 1.10;
+  const lowerBand = benchmark * 0.90;
+  if (winRate >= upperBand) return 'green';
+  if (winRate >= lowerBand) return 'yellow';
+  return 'red';
+}
+
 // Color constants for UI
 export const COLORS = {
   GREEN: '#16a34a',
