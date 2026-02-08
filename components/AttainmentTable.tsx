@@ -135,7 +135,7 @@ function ProductAttainmentTable({
                   <td className={`right coverage-cell ${coverage >= 3 ? 'status-green' : coverage >= 2 ? 'status-yellow' : 'status-red'}`}>
                     <strong>{formatCoverage(coverage)}</strong>
                   </td>
-                  <td className="right" style={{ color: getWinRateColor(winRate, row.product, row.category), fontWeight: 600 }}>
+                  <td className="right win-rate-color" style={{ '--win-rate-color': getWinRateColor(winRate, row.product, row.category) } as React.CSSProperties}>
                     {formatPercent(winRate)}
                   </td>
                   <td className="center">

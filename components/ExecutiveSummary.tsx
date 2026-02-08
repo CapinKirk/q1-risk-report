@@ -392,7 +392,7 @@ export default function ExecutiveSummary({ data }: ExecutiveSummaryProps) {
                       <td className={`right coverage-cell ${covClass}`}>
                         <strong>{formatCoverage(row.pipeline_coverage)}</strong>
                       </td>
-                      <td className="right" style={{ color: winRateColor, fontWeight: 600 }}>
+                      <td className="right win-rate-color" style={{ '--win-rate-color': winRateColor } as React.CSSProperties}>
                         {formatPercent(row.win_rate_pct)}
                       </td>
                     </tr>

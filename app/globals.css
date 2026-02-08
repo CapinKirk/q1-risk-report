@@ -729,6 +729,11 @@ td.variance-color {
   font-weight: 600;
 }
 
+td.win-rate-color {
+  color: var(--win-rate-color) !important;
+  font-weight: 600;
+}
+
 /* Enhanced alternating row colors - more visible */
 tr:nth-child(odd) {
   background: var(--bg-secondary);
