@@ -101,13 +101,23 @@ export const WIN_RATE_BENCHMARKS: Record<string, number> = {
   'ALL': 53,       // overall weighted average
 };
 
-// Get win rate color based on historical benchmark (±10% of average = yellow band)
+// Get win rate color based on historical benchmark (±15pp of average = yellow band)
 export function getWinRateColor(winRate: number | null | undefined, product?: string, category?: string): string {
-  if (winRate == null) return '#6b7280'; // gray for no data
+  if (winRate == null || winRate === 0) return '#6b7280'; // gray for no data / no deals
+
   const key = product && category ? `${product}-${category}` : product || 'ALL';
-  const benchmark = WIN_RATE_BENCHMARKS[key] ?? WIN_RATE_BENCHMARKS['ALL'];
-  const upperBand = benchmark * 1.10; // 10% above average
-  const lowerBand = benchmark * 0.90; // 10% below average
+  const benchmark = WIN_RATE_BENCHMARKS[key] ?? WIN_RATE_BENCHMARKS[product || 'ALL'] ?? WIN_RATE_BENCHMARKS['ALL'];
+
+  // Renewals / very high benchmarks: use absolute thresholds
+  if (benchmark >= 90) {
+    if (winRate >= 90) return '#16a34a';   // green
+    if (winRate >= 70) return '#ca8a04';   // yellow
+    return '#dc2626';                       // red
+  }
+
+  // ±15 percentage points around the historical average
+  const upperBand = benchmark + 15;
+  const lowerBand = benchmark - 15;
   if (winRate >= upperBand) return '#16a34a';  // green - above average
   if (winRate >= lowerBand) return '#ca8a04';  // yellow - near average
   return '#dc2626';                             // red - below average
@@ -115,11 +125,19 @@ export function getWinRateColor(winRate: number | null | undefined, product?: st
 
 // Get win rate CSS class based on historical benchmark
 export function getWinRateClass(winRate: number | null | undefined, product?: string, category?: string): string {
-  if (winRate == null) return 'gray';
+  if (winRate == null || winRate === 0) return 'gray';
+
   const key = product && category ? `${product}-${category}` : product || 'ALL';
-  const benchmark = WIN_RATE_BENCHMARKS[key] ?? WIN_RATE_BENCHMARKS['ALL'];
-  const upperBand = benchmark * 1.10;
-  const lowerBand = benchmark * 0.90;
+  const benchmark = WIN_RATE_BENCHMARKS[key] ?? WIN_RATE_BENCHMARKS[product || 'ALL'] ?? WIN_RATE_BENCHMARKS['ALL'];
+
+  if (benchmark >= 90) {
+    if (winRate >= 90) return 'green';
+    if (winRate >= 70) return 'yellow';
+    return 'red';
+  }
+
+  const upperBand = benchmark + 15;
+  const lowerBand = benchmark - 15;
   if (winRate >= upperBand) return 'green';
   if (winRate >= lowerBand) return 'yellow';
   return 'red';

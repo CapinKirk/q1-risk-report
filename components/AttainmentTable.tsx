@@ -90,6 +90,7 @@ function ProductAttainmentTable({
               const rag = row.rag_status || 'RED';
               const coverage = row.pipeline_coverage_x || 0;
               const winRate = row.win_rate_pct || 0;
+              const totalDeals = (row.qtd_deals || 0) + (row.qtd_lost_deals || 0);
               const gap = row.qtd_gap || 0;
               const lostAcv = row.qtd_lost_acv || 0;
               const ragBgColor = rag === 'GREEN' ? '#16a34a' : rag === 'YELLOW' ? '#ca8a04' : '#dc2626';
@@ -135,8 +136,10 @@ function ProductAttainmentTable({
                   <td className={`right coverage-cell ${coverage >= 3 ? 'status-green' : coverage >= 2 ? 'status-yellow' : 'status-red'}`}>
                     <strong>{formatCoverage(coverage)}</strong>
                   </td>
-                  <td className="right win-rate-color" style={{ '--win-rate-color': getWinRateColor(winRate, row.product, row.category) } as React.CSSProperties}>
-                    {formatPercent(winRate)}
+                  <td className="right win-rate-color" style={{ '--win-rate-color': totalDeals === 0 ? '#6b7280' : getWinRateColor(winRate, row.product, row.category) } as React.CSSProperties}>
+                    {totalDeals === 0
+                      ? <span style={{ fontSize: '0.8em' }}>N/A</span>
+                      : formatPercent(winRate)}
                   </td>
                   <td className="center">
                     <span className="rag-tile" style={{ backgroundColor: getRAGBadgeColor(rag) }}>
