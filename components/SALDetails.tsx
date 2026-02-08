@@ -16,8 +16,14 @@ interface SALDetailsProps {
   };
 }
 
-type Category = 'NEW LOGO' | 'STRATEGIC' | 'EXPANSION' | 'MIGRATION';
 type SourceType = 'INBOUND' | 'OUTBOUND' | 'AE SOURCED' | 'AM SOURCED' | 'TRADESHOW' | 'PARTNERSHIPS';
+
+type BusinessTab = 'New Business' | 'Expansion' | 'Migration';
+const TAB_CATEGORIES: Record<BusinessTab, string[]> = {
+  'New Business': ['NEW LOGO', 'STRATEGIC'],
+  'Expansion': ['EXPANSION'],
+  'Migration': ['MIGRATION'],
+};
 
 const ALL_SOURCES: SourceType[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];
 
@@ -25,7 +31,7 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | 'ALL'>('ALL');
   const [selectedRegion, setSelectedRegion] = useState<Region | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
-  const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
+  const [activeTab, setActiveTab] = useState<BusinessTab>('New Business');
   const [selectedSources, setSelectedSources] = useState<SourceType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,6 +47,9 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
       allSALs = [...allSALs, ...salDetails.R360];
     }
 
+    // Apply tab filter
+    allSALs = allSALs.filter(s => TAB_CATEGORIES[activeTab].includes(s.category || 'NEW LOGO'));
+
     // Apply region filter
     if (selectedRegion !== 'ALL') {
       allSALs = allSALs.filter(s => s.region === selectedRegion);
@@ -49,11 +58,6 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
     // Apply status filter
     if (selectedStatus !== 'ALL') {
       allSALs = allSALs.filter(s => s.sal_status === selectedStatus);
-    }
-
-    // Apply category filter (multi-select)
-    if (selectedCategories.length > 0) {
-      allSALs = allSALs.filter(s => selectedCategories.includes(s.category as Category));
     }
 
     // Apply source filter (multi-select)
@@ -76,7 +80,7 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
     }
 
     return allSALs;
-  }, [salDetails, selectedProduct, selectedRegion, selectedStatus, selectedCategories, selectedSources, searchTerm]);
+  }, [salDetails, selectedProduct, selectedRegion, selectedStatus, activeTab, selectedSources, searchTerm]);
 
   // Setup sorting
   const { sortedData, handleSort, getSortDirection } = useSortableTable(
@@ -160,6 +164,19 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
 
       {hasData && (
         <>
+          {/* Business Type Tabs */}
+          <div className="business-tab-bar">
+            {(['New Business', 'Expansion', 'Migration'] as BusinessTab[]).map(tab => (
+              <button
+                key={tab}
+                className={`business-tab ${activeTab === tab ? 'active' : ''}`}
+                onClick={() => { setActiveTab(tab); setCurrentPage(1); }}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
           {/* Summary Stats */}
           <div className="sal-stats">
             <div className="stat-card">
@@ -177,6 +194,10 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
             <div className="stat-card">
               <span className="stat-value" style={{ color: '#2563eb' }}>{stats.convertedSqo}</span>
               <span className="stat-label">Converted SQO</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value" style={{ color: '#ca8a04' }}>{stats.stalled}</span>
+              <span className="stat-label">Stalled</span>
             </div>
             <div className="stat-card">
               <span className="stat-value" style={{ color: stats.conversionRate >= 50 ? '#16a34a' : stats.conversionRate >= 25 ? '#ca8a04' : '#dc2626' }}>
@@ -215,27 +236,6 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
                 <option value="LOST">Lost</option>
                 <option value="STALLED">Stalled</option>
               </select>
-            </div>
-            <div className="filter-group category-filter">
-              <label>Opp Type:</label>
-              <div className="category-pills">
-                {(['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'] as Category[]).map((cat) => (
-                  <button
-                    key={cat}
-                    className={`category-pill ${selectedCategories.includes(cat) ? 'active' : ''}`}
-                    onClick={() => {
-                      setCurrentPage(1);
-                      setSelectedCategories(prev =>
-                        prev.includes(cat)
-                          ? prev.filter(c => c !== cat)
-                          : [...prev, cat]
-                      );
-                    }}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
             </div>
             <div className="filter-group source-filter">
               <label>Source:</label>
@@ -477,6 +477,35 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
             .sal-details-section {
               margin-top: 24px;
             }
+            .business-tab-bar {
+              display: flex;
+              gap: 4px;
+              margin: 0 0 12px 0;
+              border-bottom: 1px solid var(--border-primary);
+            }
+            .business-tab {
+              padding: 6px 16px;
+              border: 1px solid var(--border-primary);
+              border-bottom: none;
+              border-radius: 6px 6px 0 0;
+              background: var(--bg-secondary);
+              color: var(--text-secondary);
+              font-size: 0.75rem;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.15s;
+            }
+            .business-tab:hover {
+              background: var(--bg-hover);
+              color: var(--text-primary);
+            }
+            .business-tab.active {
+              background: var(--bg-primary);
+              color: var(--text-primary);
+              border-bottom: 2px solid var(--bg-primary);
+              margin-bottom: -1px;
+              font-weight: 600;
+            }
             .sal-stats {
               display: flex;
               gap: 12px;
@@ -531,35 +560,6 @@ export default function SALDetails({ salDetails }: SALDetailsProps) {
             }
             .filter-group.search input {
               width: 180px;
-            }
-            .filter-group.category-filter {
-              display: flex;
-              align-items: center;
-              gap: 6px;
-            }
-            .category-pills {
-              display: flex;
-              gap: 4px;
-            }
-            .category-pill {
-              font-size: 0.65rem;
-              padding: 3px 8px;
-              border: 1px solid var(--border-primary);
-              border-radius: 12px;
-              background: var(--bg-secondary);
-              color: var(--text-tertiary);
-              cursor: pointer;
-              transition: all 0.15s;
-              font-weight: 500;
-            }
-            .category-pill:hover {
-              background: var(--bg-hover);
-              border-color: #10b981;
-            }
-            .category-pill.active {
-              background: #10b981;
-              color: white;
-              border-color: #10b981;
             }
             .filter-group.source-filter {
               display: flex;

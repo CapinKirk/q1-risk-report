@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { MQLDetailRow, Product, Region, LeadType } from '@/lib/types';
+import { MQLDetailRow, Product, Region } from '@/lib/types';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
 import RegionBadge from './RegionBadge';
@@ -11,8 +11,12 @@ const ITEMS_PER_PAGE = 25;
 type SourceType = 'INBOUND' | 'OUTBOUND' | 'AE SOURCED' | 'AM SOURCED' | 'TRADESHOW' | 'PARTNERSHIPS';
 const ALL_SOURCES: SourceType[] = ['INBOUND', 'OUTBOUND', 'AE SOURCED', 'AM SOURCED', 'TRADESHOW', 'PARTNERSHIPS'];
 
-type Category = 'NEW LOGO' | 'STRATEGIC' | 'EXPANSION' | 'MIGRATION';
-const ALL_CATEGORIES: Category[] = ['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'];
+type BusinessTab = 'New Business' | 'Expansion' | 'Migration';
+const TAB_CATEGORIES: Record<BusinessTab, string[]> = {
+  'New Business': ['NEW LOGO', 'STRATEGIC'],
+  'Expansion': ['EXPANSION'],
+  'Migration': ['MIGRATION'],
+};
 
 interface MQLDetailsProps {
   mqlDetails: {
@@ -25,24 +29,10 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | 'ALL'>('ALL');
   const [selectedRegion, setSelectedRegion] = useState<Region | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
-  const [selectedLeadTypes, setSelectedLeadTypes] = useState<LeadType[]>(['MQL', 'EQL']); // Both enabled by default
+  const [activeTab, setActiveTab] = useState<BusinessTab>('New Business');
   const [selectedSources, setSelectedSources] = useState<SourceType[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Toggle lead type filter
-  const toggleLeadType = (type: LeadType) => {
-    setSelectedLeadTypes(prev => {
-      if (prev.includes(type)) {
-        // Don't allow deselecting all - keep at least one
-        if (prev.length === 1) return prev;
-        return prev.filter(t => t !== type);
-      }
-      return [...prev, type];
-    });
-    setCurrentPage(1);
-  };
 
   // Combine and filter MQL data
   const filteredMQLs = useMemo(() => {
@@ -55,8 +45,8 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
       allMQLs = [...allMQLs, ...mqlDetails.R360];
     }
 
-    // Apply lead type filter (MQL/EQL)
-    allMQLs = allMQLs.filter(m => selectedLeadTypes.includes(m.lead_type || 'MQL'));
+    // Apply tab filter
+    allMQLs = allMQLs.filter(m => TAB_CATEGORIES[activeTab].includes(m.category || 'NEW LOGO'));
 
     // Apply region filter
     if (selectedRegion !== 'ALL') {
@@ -76,11 +66,6 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
       });
     }
 
-    // Apply category filter (multi-select)
-    if (selectedCategories.length > 0) {
-      allMQLs = allMQLs.filter(m => selectedCategories.includes((m.category || 'NEW LOGO') as Category));
-    }
-
     // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -93,7 +78,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
     }
 
     return allMQLs;
-  }, [mqlDetails, selectedProduct, selectedRegion, selectedStatus, selectedLeadTypes, selectedSources, selectedCategories, searchTerm]);
+  }, [mqlDetails, selectedProduct, selectedRegion, selectedStatus, activeTab, selectedSources, searchTerm]);
 
   // Sorting
   const { sortedData, handleSort, getSortDirection } = useSortableTable(
@@ -116,19 +101,10 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
   // Calculate summary stats
   const stats = useMemo(() => {
     const total = filteredMQLs.length;
-    const mqlCount = filteredMQLs.filter(m => (m.lead_type || 'MQL') === 'MQL').length;
-    const eqlCount = filteredMQLs.filter(m => m.lead_type === 'EQL').length;
     const converted = filteredMQLs.filter(m => m.converted_to_sql === 'Yes' || m.mql_status === 'CONVERTED').length;
-    const reverted = filteredMQLs.filter(m => m.mql_status === 'REVERTED' || m.was_reverted === true).length;
     const stalled = filteredMQLs.filter(m => m.mql_status === 'STALLED').length;
-    const active = filteredMQLs.filter(m => m.mql_status === 'ACTIVE').length;
     const conversionRate = total > 0 ? (converted / total) * 100 : 0;
-    const revertedRate = total > 0 ? (reverted / total) * 100 : 0;
-    // Category breakdown
-    const newLogo = filteredMQLs.filter(m => m.category === 'NEW LOGO').length;
-    const expansion = filteredMQLs.filter(m => m.category === 'EXPANSION').length;
-    const migration = filteredMQLs.filter(m => m.category === 'MIGRATION').length;
-    return { total, mqlCount, eqlCount, converted, reverted, stalled, active, conversionRate, revertedRate, newLogo, expansion, migration };
+    return { total, converted, stalled, conversionRate };
   }, [filteredMQLs]);
 
   // Pagination - memoized to ensure proper re-rendering
@@ -171,21 +147,17 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
       {hasData && (
         <>
 
-      {/* Lead Type Toggle */}
-      <div className="lead-type-toggle">
-        <span className="toggle-label">Lead Type:</span>
-        <button
-          className={`toggle-btn mql ${selectedLeadTypes.includes('MQL') ? 'active' : ''}`}
-          onClick={() => toggleLeadType('MQL')}
-        >
-          MQL ({stats.mqlCount})
-        </button>
-        <button
-          className={`toggle-btn eql ${selectedLeadTypes.includes('EQL') ? 'active' : ''}`}
-          onClick={() => toggleLeadType('EQL')}
-        >
-          EQL ({stats.eqlCount})
-        </button>
+      {/* Business Type Tabs */}
+      <div className="business-tab-bar">
+        {(['New Business', 'Expansion', 'Migration'] as BusinessTab[]).map(tab => (
+          <button
+            key={tab}
+            className={`business-tab ${activeTab === tab ? 'active' : ''}`}
+            onClick={() => { setActiveTab(tab); setCurrentPage(1); }}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
       {/* Summary Stats */}
@@ -194,21 +166,13 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
           <span className="stat-value">{stats.total}</span>
           <span className="stat-label">Total Leads</span>
         </div>
-        <div className="stat-card blue">
-          <span className="stat-value">{stats.newLogo}</span>
-          <span className="stat-label">New Logo</span>
-        </div>
-        <div className="stat-card purple">
-          <span className="stat-value">{stats.expansion}</span>
-          <span className="stat-label">Expansion</span>
-        </div>
-        <div className="stat-card orange">
-          <span className="stat-value">{stats.migration}</span>
-          <span className="stat-label">Migration</span>
-        </div>
         <div className="stat-card">
           <span className="stat-value" style={{ color: '#16a34a' }}>{stats.converted}</span>
           <span className="stat-label">Converted</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-value" style={{ color: '#ca8a04' }}>{stats.stalled}</span>
+          <span className="stat-label">Stalled</span>
         </div>
         <div className="stat-card">
           <span className="stat-value" style={{ color: stats.conversionRate >= 30 ? '#16a34a' : stats.conversionRate >= 15 ? '#ca8a04' : '#dc2626' }}>
@@ -244,7 +208,7 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
             <option value="ACTIVE">Active</option>
             <option value="CONVERTED">Converted to SQL</option>
             <option value="REVERTED">Reverted/DQ</option>
-            <option value="STALLED">Stalled (30d+)</option>
+            <option value="STALLED">Stalled (21d+)</option>
           </select>
         </div>
         <div className="filter-group source-filter">
@@ -264,27 +228,6 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
                 }}
               >
                 {src}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="filter-group category-filter">
-          <label>Opp Type:</label>
-          <div className="category-pills">
-            {ALL_CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                className={`category-pill ${selectedCategories.includes(cat) ? 'active' : ''}`}
-                onClick={() => {
-                  setCurrentPage(1);
-                  setSelectedCategories(prev =>
-                    prev.includes(cat)
-                      ? prev.filter(c => c !== cat)
-                      : [...prev, cat]
-                  );
-                }}
-              >
-                {cat}
               </button>
             ))}
           </div>
@@ -463,43 +406,34 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
         .mql-details-section {
           margin-top: 24px;
         }
-        .lead-type-toggle {
+        .business-tab-bar {
           display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 12px;
+          gap: 4px;
+          margin: 0 0 12px 0;
+          border-bottom: 1px solid var(--border-primary);
         }
-        .toggle-label {
+        .business-tab {
+          padding: 6px 16px;
+          border: 1px solid var(--border-primary);
+          border-bottom: none;
+          border-radius: 6px 6px 0 0;
+          background: var(--bg-secondary);
+          color: var(--text-secondary);
           font-size: 0.75rem;
-          color: var(--text-tertiary);
           font-weight: 500;
-        }
-        .toggle-btn {
-          padding: 6px 14px;
-          border-radius: 20px;
-          font-size: 0.75rem;
-          font-weight: 600;
           cursor: pointer;
           transition: all 0.15s;
-          border: 2px solid;
         }
-        .toggle-btn.mql {
-          border-color: #3b82f6;
-          background: var(--bg-secondary);
-          color: #3b82f6;
+        .business-tab:hover {
+          background: var(--bg-hover);
+          color: var(--text-primary);
         }
-        .toggle-btn.mql.active {
-          background: #3b82f6;
-          color: white;
-        }
-        .toggle-btn.eql {
-          border-color: #8b5cf6;
-          background: var(--bg-secondary);
-          color: #8b5cf6;
-        }
-        .toggle-btn.eql.active {
-          background: #8b5cf6;
-          color: white;
+        .business-tab.active {
+          background: var(--bg-primary);
+          color: var(--text-primary);
+          border-bottom: 2px solid var(--bg-primary);
+          margin-bottom: -1px;
+          font-weight: 600;
         }
         .mql-stats {
           display: flex;
@@ -516,18 +450,6 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
           border-radius: 8px;
           border: 1px solid var(--border-primary);
           min-width: 80px;
-        }
-        .stat-card.blue {
-          background: var(--bg-tertiary);
-          border-color: #93c5fd;
-        }
-        .stat-card.purple {
-          background: var(--bg-tertiary);
-          border-color: #c4b5fd;
-        }
-        .stat-card.orange {
-          background: var(--bg-tertiary);
-          border-color: #fdba74;
         }
         .stat-value {
           font-size: 1.3rem;
@@ -597,36 +519,6 @@ export default function MQLDetails({ mqlDetails }: MQLDetailsProps) {
           background: #3b82f6;
           color: white;
           border-color: #3b82f6;
-        }
-        .filter-group.category-filter {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .category-pills {
-          display: flex;
-          gap: 3px;
-          flex-wrap: wrap;
-        }
-        .category-pill {
-          font-size: 0.6rem;
-          padding: 2px 6px;
-          border: 1px solid var(--border-primary);
-          border-radius: 10px;
-          background: var(--bg-secondary);
-          color: var(--text-tertiary);
-          cursor: pointer;
-          transition: all 0.15s;
-          font-weight: 500;
-        }
-        .category-pill:hover {
-          background: var(--bg-hover);
-          border-color: #8b5cf6;
-        }
-        .category-pill.active {
-          background: #8b5cf6;
-          color: white;
-          border-color: #8b5cf6;
         }
         .mql-table-container {
           overflow-x: auto;

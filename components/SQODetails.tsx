@@ -19,13 +19,18 @@ interface SQODetailsProps {
   };
 }
 
-type Category = 'NEW LOGO' | 'STRATEGIC' | 'EXPANSION' | 'MIGRATION';
+type BusinessTab = 'New Business' | 'Expansion' | 'Migration';
+const TAB_CATEGORIES: Record<BusinessTab, string[]> = {
+  'New Business': ['NEW LOGO', 'STRATEGIC'],
+  'Expansion': ['EXPANSION'],
+  'Migration': ['MIGRATION'],
+};
 
 export default function SQODetails({ sqoDetails }: SQODetailsProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | 'ALL'>('ALL');
   const [selectedRegion, setSelectedRegion] = useState<Region | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
-  const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
+  const [activeTab, setActiveTab] = useState<BusinessTab>('New Business');
   const [selectedSources, setSelectedSources] = useState<SourceType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -75,6 +80,9 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
       allSQOs = [...allSQOs, ...sqoDetails.R360];
     }
 
+    // Apply tab filter
+    allSQOs = allSQOs.filter(s => TAB_CATEGORIES[activeTab].includes(s.category || 'NEW LOGO'));
+
     // Apply region filter
     if (selectedRegion !== 'ALL') {
       allSQOs = allSQOs.filter(s => s.region === selectedRegion);
@@ -83,11 +91,6 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
     // Apply status filter
     if (selectedStatus !== 'ALL') {
       allSQOs = allSQOs.filter(s => s.sqo_status === selectedStatus);
-    }
-
-    // Apply category filter (multi-select)
-    if (selectedCategories.length > 0) {
-      allSQOs = allSQOs.filter(s => selectedCategories.includes(s.category as Category));
     }
 
     // Apply source filter (multi-select)
@@ -111,7 +114,7 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
     }
 
     return allSQOs;
-  }, [sqoDetails, selectedProduct, selectedRegion, selectedStatus, selectedCategories, selectedSources, searchTerm]);
+  }, [sqoDetails, selectedProduct, selectedRegion, selectedStatus, activeTab, selectedSources, searchTerm]);
 
   // Setup sorting
   const { sortedData, handleSort, getSortDirection } = useSortableTable(
@@ -199,6 +202,19 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
 
       {hasData && (
         <>
+          {/* Business Type Tabs */}
+          <div className="business-tab-bar">
+            {(['New Business', 'Expansion', 'Migration'] as BusinessTab[]).map(tab => (
+              <button
+                key={tab}
+                className={`business-tab ${activeTab === tab ? 'active' : ''}`}
+                onClick={() => { setActiveTab(tab); setCurrentPage(1); }}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
           {/* Summary Stats */}
           <div className="sqo-stats">
             <div className="stat-card">
@@ -216,6 +232,10 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
             <div className="stat-card">
               <span className="stat-value" style={{ color: '#2563eb' }}>{stats.active}</span>
               <span className="stat-label">Active</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value" style={{ color: '#ca8a04' }}>{stats.stalled}</span>
+              <span className="stat-label">Stalled</span>
             </div>
             <div className="stat-card">
               <span className="stat-value" style={{ color: stats.winRate >= 50 ? '#16a34a' : stats.winRate >= 25 ? '#ca8a04' : '#dc2626' }}>
@@ -263,27 +283,6 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
                 <option value="LOST">Lost</option>
                 <option value="STALLED">Stalled</option>
               </select>
-            </div>
-            <div className="filter-group category-filter">
-              <label>Opp Type:</label>
-              <div className="category-pills">
-                {(['NEW LOGO', 'STRATEGIC', 'EXPANSION', 'MIGRATION'] as Category[]).map((cat) => (
-                  <button
-                    key={cat}
-                    className={`category-pill ${selectedCategories.includes(cat) ? 'active' : ''}`}
-                    onClick={() => {
-                      setCurrentPage(1);
-                      setSelectedCategories(prev =>
-                        prev.includes(cat)
-                          ? prev.filter(c => c !== cat)
-                          : [...prev, cat]
-                      );
-                    }}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
             </div>
             <div className="filter-group source-filter">
               <label>Source:</label>
@@ -445,7 +444,11 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
                           </span>
                         </td>
                         <td className="loss-reason-cell" title={sqo.loss_reason || ''}>
-                          {sqo.sqo_status === 'LOST' ? (sqo.loss_reason && sqo.loss_reason !== 'N/A' ? (sqo.loss_reason.length > 15 ? sqo.loss_reason.substring(0, 15) + '...' : sqo.loss_reason) : '-') : '-'}
+                          {sqo.sqo_status === 'LOST' ? (sqo.loss_reason && sqo.loss_reason !== 'N/A' ? (sqo.loss_reason.length > 15 ? sqo.loss_reason.substring(0, 15) + '...' : sqo.loss_reason) : '-') : sqo.sqo_status === 'STALLED' ? (
+                            <span style={{ color: '#ca8a04' }}>
+                              {sqo.days_in_stage ? `${sqo.days_in_stage}d stalled` : 'Stalled'}
+                            </span>
+                          ) : '-'}
                         </td>
                         <td className="center">
                           <a
@@ -537,6 +540,35 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
             .sqo-details-section {
               margin-top: 24px;
             }
+            .business-tab-bar {
+              display: flex;
+              gap: 4px;
+              margin: 0 0 12px 0;
+              border-bottom: 1px solid var(--border-primary);
+            }
+            .business-tab {
+              padding: 6px 16px;
+              border: 1px solid var(--border-primary);
+              border-bottom: none;
+              border-radius: 6px 6px 0 0;
+              background: var(--bg-secondary);
+              color: var(--text-secondary);
+              font-size: 0.75rem;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.15s;
+            }
+            .business-tab:hover {
+              background: var(--bg-hover);
+              color: var(--text-primary);
+            }
+            .business-tab.active {
+              background: var(--bg-primary);
+              color: var(--text-primary);
+              border-bottom: 2px solid var(--bg-primary);
+              margin-bottom: -1px;
+              font-weight: 600;
+            }
             .sqo-stats {
               display: flex;
               gap: 12px;
@@ -591,35 +623,6 @@ export default function SQODetails({ sqoDetails }: SQODetailsProps) {
             }
             .filter-group.search input {
               width: 180px;
-            }
-            .filter-group.category-filter {
-              display: flex;
-              align-items: center;
-              gap: 6px;
-            }
-            .category-pills {
-              display: flex;
-              gap: 4px;
-            }
-            .category-pill {
-              font-size: 0.65rem;
-              padding: 3px 8px;
-              border: 1px solid var(--border-primary);
-              border-radius: 12px;
-              background: var(--bg-secondary);
-              color: var(--text-tertiary);
-              cursor: pointer;
-              transition: all 0.15s;
-              font-weight: 500;
-            }
-            .category-pill:hover {
-              background: var(--bg-hover);
-              border-color: #f59e0b;
-            }
-            .category-pill.active {
-              background: #f59e0b;
-              color: white;
-              border-color: #f59e0b;
             }
             .filter-group.source-filter {
               display: flex;
