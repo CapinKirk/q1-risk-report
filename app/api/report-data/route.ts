@@ -2071,348 +2071,213 @@ async function getMQLDetails(filters: ReportFilters) {
 
 // Query for SQL details
 async function getSQLDetails(filters: ReportFilters) {
-  const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND Division IN (${filters.regions.map(r => {
-        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
-        return `'${map[r]}'`;
-      }).join(', ')})`
+  // DRF region filter (uses Region directly as AMER/EMEA/APAC)
+  const drfRegionClause = filters.regions && filters.regions.length > 0
+    ? `AND d.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
-  // POR SQL query - deduplicates by email to match summary COUNT(DISTINCT email)
-  // 6-tier enhanced linking: OpportunityID → ConvertedOpportunityId → Name match → ContactId-Account → Email-Account → Fuzzy name
+  // POR SQL query - uses DailyRevenueFunnel as base (matches pacing counts)
+  // DRF has OpportunityID for all records, so simple direct JOIN to OVT
+  // LEFT JOIN to funnel tables for enrichment (email, dates, etc.)
   const porQuery = `
-    WITH name_matched_opps AS (
-      -- Tier 3: Pre-compute opportunity lookups by exact name
-      SELECT DISTINCT
-        OpportunityName,
-        FIRST_VALUE(Id) OVER (PARTITION BY OpportunityName ORDER BY CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
-      WHERE OpportunityName IS NOT NULL AND OpportunityName != ''
-        AND por_record__c = true AND Division IN ('US', 'UK', 'AU')
-    ),
-    contact_account_opps AS (
-      -- Tier 4: Match via ContactId → Contact.AccountId → Opportunity
-      SELECT DISTINCT
-        c.Id AS contact_id,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY c.Id ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON c.AccountId = o.AccountId
-      WHERE c.AccountId IS NOT NULL
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    email_matched_opps AS (
-      -- Tier 5: Match via Email → Contact → Account → Opportunity
-      SELECT DISTINCT
-        LOWER(TRIM(c.Email)) AS email,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY LOWER(TRIM(c.Email)) ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON c.AccountId = o.AccountId
-      WHERE c.Email IS NOT NULL AND c.Email != '' AND c.AccountId IS NOT NULL
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    fuzzy_name_matched_opps AS (
-      -- Tier 6: Fuzzy company name match (remove Inc, LLC, Ltd, etc.)
-      SELECT DISTINCT
-        REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') AS normalized_name,
-        FIRST_VALUE(o.Id) OVER (
-          PARTITION BY REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '')
-          ORDER BY o.CreatedDate DESC
-        ) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-      WHERE o.AccountName IS NOT NULL AND o.AccountName != ''
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    account_matched_opps AS (
-      -- Tier 7: Direct Account.Name match → find any Opportunity on that Account
-      SELECT DISTINCT
-        LOWER(TRIM(a.Name)) AS account_name,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY a.Id ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON a.Id = o.AccountId
-      WHERE a.Name IS NOT NULL AND a.Name != ''
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    ranked_sqls AS (
+    WITH inbound_sqls AS (
       SELECT
         'POR' AS product,
-        CASE f.Division
-          WHEN 'US' THEN 'AMER'
-          WHEN 'UK' THEN 'EMEA'
-          WHEN 'AU' THEN 'APAC'
-        END AS region,
-        COALESCE(f.LeadId, f.ContactId) AS record_id,
-        -- 7-tier URL resolution
-        CASE
-          WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
-          WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
-          WHEN nmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', nmo.opp_id)
-          WHEN cao.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', cao.opp_id)
-          WHEN emo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', emo.opp_id)
-          WHEN fnmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', fnmo.opp_id)
-          WHEN amo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', amo.opp_id)
-          WHEN NULLIF(f.LeadId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
-          WHEN NULLIF(f.ContactId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.ContactId)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(f.Company, 'Unknown') AS company_name,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, f.Company, 'Unknown') AS company_name,
         COALESCE(f.LeadEmail, f.ContactEmail, 'N/A') AS email,
-        UPPER(COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
-        CAST(f.SQL_DT AS STRING) AS sql_date,
-        CAST(f.MQL_DT AS STRING) AS mql_date,
-        DATE_DIFF(CAST(f.SQL_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_mql_to_sql,
-        CASE WHEN f.SAL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
-        CASE WHEN f.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        -- 7-tier has_opportunity check
-        CASE WHEN (f.OpportunityID IS NOT NULL AND f.OpportunityID != '')
-               OR l.ConvertedOpportunityId IS NOT NULL
-               OR nmo.opp_id IS NOT NULL
-               OR cao.opp_id IS NOT NULL
-               OR emo.opp_id IS NOT NULL
-               OR fnmo.opp_id IS NOT NULL
-               OR amo.opp_id IS NOT NULL
-        THEN 'Yes' ELSE 'No' END AS has_opportunity,
-        CASE
-          WHEN o.Won = true THEN 'WON'
-          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN f.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 21 THEN 'STALLED'
-          ELSE 'ACTIVE'
-        END AS sql_status,
-        -- 7-tier opportunity_id
-        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id) AS opportunity_id,
-        COALESCE(f.OpportunityName, o.OpportunityName, o2.OpportunityName, o3.OpportunityName, o4.OpportunityName, o5.OpportunityName, o6.OpportunityName) AS opportunity_name,
-        COALESCE(o.StageName, o2.StageName, o3.StageName, o4.StageName, o5.StageName, o6.StageName) AS opportunity_stage,
-        COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
-        COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) AS days_in_stage,
-        -- Category derived from opportunity Type (InboundFunnel is always New Business)
-        CASE
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Existing Business' THEN 'EXPANSION'
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Migration' THEN 'MIGRATION'
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Strategic' THEN 'STRATEGIC'
-          ELSE 'NEW LOGO'
-        END AS category,
-        -- Deduplicate by email to match summary COUNT(DISTINCT email)
-        ROW_NUMBER() OVER (
-          PARTITION BY COALESCE(f.LeadEmail, f.ContactEmail)
-          ORDER BY
-            CASE WHEN f.SQO_DT IS NOT NULL THEN 0 ELSE 1 END,
-            CASE WHEN f.SAL_DT IS NOT NULL THEN 0 ELSE 1 END,
-            f.SQL_DT DESC
-        ) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\` f
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
-        ON f.LeadId = l.Id
-      -- Tier 1-2: Direct OpportunityID or ConvertedOpportunityId
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
-      -- Tier 3: Name match (only if tiers 1-2 failed)
-      LEFT JOIN name_matched_opps nmo
-        ON f.OpportunityName = nmo.OpportunityName
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o2
-        ON nmo.opp_id = o2.Id
-      -- Tier 4: ContactId → Account (only if tiers 1-3 failed)
-      LEFT JOIN contact_account_opps cao
-        ON f.ContactId = cao.contact_id
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o3
-        ON cao.opp_id = o3.Id
-      -- Tier 5: Email → Contact → Account (only if tiers 1-4 failed)
-      LEFT JOIN email_matched_opps emo
-        ON LOWER(TRIM(COALESCE(f.LeadEmail, f.ContactEmail))) = emo.email
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o4
-        ON emo.opp_id = o4.Id
-      -- Tier 6: Fuzzy name match (only if all other tiers failed)
-      LEFT JOIN fuzzy_name_matched_opps fnmo
-        ON REGEXP_REPLACE(LOWER(TRIM(f.Company)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') = fnmo.normalized_name
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o5
-        ON fnmo.opp_id = o5.Id
-      -- Tier 7: Account.Name direct match (only if all other tiers failed)
-      LEFT JOIN account_matched_opps amo
-        ON LOWER(TRIM(f.Company)) = amo.account_name
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL AND fnmo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o6
-        ON amo.opp_id = o6.Id
-      WHERE f.Division IN ('US', 'UK', 'AU')
-        AND (f.SpiralyzeTest IS NULL OR f.SpiralyzeTest = false)
-        AND (f.MQL_Reverted IS NULL OR f.MQL_Reverted = false)
-        AND f.SQL_DT IS NOT NULL
-        AND CAST(f.SQL_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(f.SQL_DT AS DATE) <= '${filters.endDate}'
-        ${regionClause.replace(/Division/g, 'f.Division')}
-    ),
-    -- Non-inbound funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from NewLogoFunnel
-    -- JOIN to OpportunityViewTable to get accurate ACV (funnel WonACV is often NULL)
-    non_inbound_sqls AS (
-      SELECT
-        'POR' AS product,
-        CASE nl.Division
-          WHEN 'US' THEN 'AMER'
-          WHEN 'UK' THEN 'EMEA'
-          WHEN 'AU' THEN 'APAC'
-        END AS region,
-        COALESCE(nl.OpportunityID, CAST(nl.SQL_DT AS STRING)) AS record_id,
-        CASE
-          WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(nl.Company, 'Unknown') AS company_name,
-        'N/A' AS email,
-        UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
-        CAST(nl.SQL_DT AS STRING) AS sql_date,
-        CAST(nl.MQL_DT AS STRING) AS mql_date,
-        CASE WHEN nl.MQL_DT IS NOT NULL AND nl.SQL_DT IS NOT NULL
-          THEN DATE_DIFF(CAST(nl.SQL_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
+        UPPER(COALESCE(NULLIF(d.Source, ''), NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
+        COALESCE(CAST(f.SQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sql_date,
+        COALESCE(CAST(f.MQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS mql_date,
+        CASE WHEN f.MQL_DT IS NOT NULL AND f.SQL_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(f.SQL_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY)
           ELSE 0
         END AS days_mql_to_sql,
-        CASE WHEN nl.SAL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
-        CASE WHEN nl.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        CASE WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
-        -- Status from direct-linked opportunity only
+        CASE WHEN f.SAL_DT IS NOT NULL OR d.SAL = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sal,
+        CASE WHEN f.SQO_DT IS NOT NULL OR d.SQO = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        'Yes' AS has_opportunity,
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN nl.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) > 21 THEN 'STALLED'
+          WHEN d.SQO = 1 OR f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN d.SAL = 1 OR f.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
-        nl.OpportunityID AS opportunity_id,
-        COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
+        d.OpportunityID AS opportunity_id,
+        COALESCE(o.OpportunityName, f.OpportunityName) AS opportunity_name,
         o.StageName AS opportunity_stage,
-        -- Use OpportunityViewTable ACV if available, fall back to funnel WonACV
-        COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
+        o.ACV AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) AS days_in_stage,
-        -- Category from opportunity Type
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         CASE
           WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
           WHEN o.Type = 'Migration' THEN 'MIGRATION'
           WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
           ELSE 'NEW LOGO'
         END AS category,
-        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SQL_DT DESC) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
-      -- JOIN to get accurate ACV from OpportunityViewTable
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON nl.OpportunityID = o.Id
-      WHERE nl.Division IN ('US', 'UK', 'AU')
-        AND nl.SQL_DT IS NOT NULL
-        AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
-        AND CAST(nl.SQL_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(nl.SQL_DT AS DATE) <= '${filters.endDate}'
-        ${regionClause.replace(/Division/g, 'nl.Division')}
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\` f
+        ON d.OpportunityID = f.OpportunityID
+        AND (f.SpiralyzeTest IS NULL OR f.SpiralyzeTest = false)
+        AND (f.MQL_Reverted IS NULL OR f.MQL_Reverted = false)
+      WHERE d.RecordType = 'POR'
+        AND UPPER(d.FunnelType) = 'INBOUND'
+        AND d.\`SQL\` = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${drfRegionClause}
+    ),
+    new_logo_sqls AS (
+      SELECT
+        'POR' AS product,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, nl.Company, 'Unknown') AS company_name,
+        'N/A' AS email,
+        UPPER(COALESCE(NULLIF(d.Source, ''), nl.SDRSource, 'OUTBOUND')) AS source,
+        COALESCE(CAST(nl.SQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sql_date,
+        COALESCE(CAST(nl.MQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS mql_date,
+        CASE WHEN nl.MQL_DT IS NOT NULL AND nl.SQL_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(nl.SQL_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
+          ELSE 0
+        END AS days_mql_to_sql,
+        CASE WHEN nl.SAL_DT IS NOT NULL OR d.SAL = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sal,
+        CASE WHEN nl.SQO_DT IS NOT NULL OR d.SQO = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        'Yes' AS has_opportunity,
+        CASE
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
+          WHEN d.SQO = 1 OR nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN d.SAL = 1 OR nl.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sql_status,
+        d.OpportunityID AS opportunity_id,
+        COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
+        CASE
+          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN o.Type = 'Migration' THEN 'MIGRATION'
+          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
+          ELSE 'NEW LOGO'
+        END AS category,
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
+        ON d.OpportunityID = nl.OpportunityID
+      WHERE d.RecordType = 'POR'
+        AND UPPER(d.FunnelType) = 'NEW LOGO'
+        AND d.\`SQL\` = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${drfRegionClause}
     ),
     expansion_sqls AS (
       SELECT
         'POR' AS product,
-        CASE e.Division
-          WHEN 'US' THEN 'AMER'
-          WHEN 'UK' THEN 'EMEA'
-          WHEN 'AU' THEN 'APAC'
-        END AS region,
-        COALESCE(e.OpportunityID, CAST(e.SQL_DT AS STRING)) AS record_id,
-        CASE
-          WHEN e.OpportunityID IS NOT NULL AND e.OpportunityID != '' THEN COALESCE(e.OpportunityLink, CONCAT('https://por.my.salesforce.com/', e.OpportunityID))
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(e.Company, 'Unknown') AS company_name,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, e.Company, 'Unknown') AS company_name,
         'N/A' AS email,
-        UPPER(COALESCE(NULLIF(e.SQOSource, ''), 'AM SOURCED')) AS source,
-        CAST(e.SQL_DT AS STRING) AS sql_date,
-        CAST(e.EQL_DT AS STRING) AS mql_date,
+        UPPER(COALESCE(NULLIF(d.Source, ''), NULLIF(e.SQOSource, ''), 'AM SOURCED')) AS source,
+        COALESCE(CAST(e.SQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sql_date,
+        COALESCE(CAST(e.EQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS mql_date,
         CASE WHEN e.EQL_DT IS NOT NULL AND e.SQL_DT IS NOT NULL
           THEN DATE_DIFF(CAST(e.SQL_DT AS DATE), CAST(e.EQL_DT AS DATE), DAY)
           ELSE 0
         END AS days_mql_to_sql,
         'No' AS converted_to_sal,
-        CASE WHEN e.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        CASE WHEN e.OpportunityID IS NOT NULL AND e.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        CASE WHEN e.SQO_DT IS NOT NULL OR d.SQO = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        'Yes' AS has_opportunity,
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN e.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(e.SQL_DT AS DATE), DAY) > 21 THEN 'STALLED'
+          WHEN d.SQO = 1 OR e.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
-        e.OpportunityID AS opportunity_id,
+        d.OpportunityID AS opportunity_id,
         COALESCE(o.OpportunityName, e.OpportunityName) AS opportunity_name,
         o.StageName AS opportunity_stage,
         COALESCE(o.ACV, 0) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(e.SQL_DT AS DATE), DAY) AS days_in_stage,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         'EXPANSION' AS category,
-        ROW_NUMBER() OVER (PARTITION BY e.OpportunityID ORDER BY e.SQL_DT DESC) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.ExpansionFunnel\` e
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON e.OpportunityID = o.Id
-      WHERE e.Division IN ('US', 'UK', 'AU')
-        AND e.RecordType = 'POR'
-        AND e.SQL_DT IS NOT NULL
-        AND CAST(e.SQL_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(e.SQL_DT AS DATE) <= '${filters.endDate}'
-        ${regionClause.replace(/Division/g, 'e.Division')}
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.ExpansionFunnel\` e
+        ON d.OpportunityID = e.OpportunityID AND e.RecordType = 'POR'
+      WHERE d.RecordType = 'POR'
+        AND UPPER(d.FunnelType) = 'EXPANSION'
+        AND d.\`SQL\` = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${drfRegionClause}
     ),
     migration_sqls AS (
       SELECT
         'POR' AS product,
-        CASE m.Division
-          WHEN 'US' THEN 'AMER'
-          WHEN 'UK' THEN 'EMEA'
-          WHEN 'AU' THEN 'APAC'
-        END AS region,
-        COALESCE(m.OpportunityID, CAST(m.SQL_DT AS STRING)) AS record_id,
-        CASE
-          WHEN m.OpportunityID IS NOT NULL AND m.OpportunityID != '' THEN COALESCE(m.OpportunityLink, CONCAT('https://por.my.salesforce.com/', m.OpportunityID))
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(m.Company, 'Unknown') AS company_name,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, m.Company, 'Unknown') AS company_name,
         'N/A' AS email,
-        UPPER(COALESCE(NULLIF(CAST(m.MigrationCase AS STRING), ''), 'AM SOURCED')) AS source,
-        CAST(m.SQL_DT AS STRING) AS sql_date,
-        CAST(m.EQL_DT AS STRING) AS mql_date,
+        UPPER(COALESCE(NULLIF(d.Source, ''), NULLIF(CAST(m.MigrationCase AS STRING), ''), 'AM SOURCED')) AS source,
+        COALESCE(CAST(m.SQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sql_date,
+        COALESCE(CAST(m.EQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS mql_date,
         CASE WHEN m.EQL_DT IS NOT NULL AND m.SQL_DT IS NOT NULL
           THEN DATE_DIFF(CAST(m.SQL_DT AS DATE), CAST(m.EQL_DT AS DATE), DAY)
           ELSE 0
         END AS days_mql_to_sql,
-        CASE WHEN m.SAL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sal,
-        CASE WHEN m.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        CASE WHEN m.OpportunityID IS NOT NULL AND m.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        CASE WHEN m.SAL_DT IS NOT NULL OR d.SAL = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sal,
+        CASE WHEN m.SQO_DT IS NOT NULL OR d.SQO = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        'Yes' AS has_opportunity,
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN m.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN m.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(m.SQL_DT AS DATE), DAY) > 21 THEN 'STALLED'
+          WHEN d.SQO = 1 OR m.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN d.SAL = 1 OR m.SAL_DT IS NOT NULL THEN 'CONVERTED_SAL'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
-        m.OpportunityID AS opportunity_id,
+        d.OpportunityID AS opportunity_id,
         COALESCE(o.OpportunityName, m.OpportunityName) AS opportunity_name,
         o.StageName AS opportunity_stage,
         COALESCE(o.ACV, 0) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(m.SQL_DT AS DATE), DAY) AS days_in_stage,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         'MIGRATION' AS category,
-        ROW_NUMBER() OVER (PARTITION BY m.OpportunityID ORDER BY m.SQL_DT DESC) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.MigrationFunnel\` m
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON m.OpportunityID = o.Id
-      WHERE m.Division IN ('US', 'UK', 'AU')
-        AND m.SQL_DT IS NOT NULL
-        AND CAST(m.SQL_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(m.SQL_DT AS DATE) <= '${filters.endDate}'
-        ${regionClause.replace(/Division/g, 'm.Division')}
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.MigrationFunnel\` m
+        ON d.OpportunityID = m.OpportunityID
+      WHERE d.RecordType = 'POR'
+        AND UPPER(d.FunnelType) = 'MIGRATION'
+        AND d.\`SQL\` = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${drfRegionClause}
     )
-    SELECT * EXCEPT(rn) FROM ranked_sqls WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM inbound_sqls WHERE rn = 1
     UNION ALL
-    SELECT * EXCEPT(rn) FROM non_inbound_sqls WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM new_logo_sqls WHERE rn = 1
     UNION ALL
     SELECT * EXCEPT(rn) FROM expansion_sqls WHERE rn = 1
     UNION ALL
@@ -2421,277 +2286,210 @@ async function getSQLDetails(filters: ReportFilters) {
   `;
 
   const r360RegionClause = filters.regions && filters.regions.length > 0
-    ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+    ? `AND d.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
-  // R360 SQL query - deduplicates by email to match summary COUNT(DISTINCT email)
-  // 6-tier enhanced linking: OpportunityID → ConvertedOpportunityId → Name match → ContactId-Account → Email-Account → Fuzzy name
+  // R360 SQL query - uses DailyRevenueFunnel as base (matches pacing counts)
   const r360Query = `
-    WITH name_matched_opps AS (
-      -- Tier 3: Pre-compute opportunity lookups by exact name
-      SELECT DISTINCT
-        OpportunityName,
-        FIRST_VALUE(Id) OVER (PARTITION BY OpportunityName ORDER BY CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
-      WHERE OpportunityName IS NOT NULL AND OpportunityName != ''
-        AND por_record__c = false
-    ),
-    contact_account_opps AS (
-      -- Tier 4: Match via ContactId → Contact.AccountId → Opportunity
-      SELECT DISTINCT
-        c.Id AS contact_id,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY c.Id ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON c.AccountId = o.AccountId
-      WHERE c.AccountId IS NOT NULL AND o.por_record__c = false
-    ),
-    email_matched_opps AS (
-      -- Tier 5: Match via Email → Contact → Account → Opportunity
-      SELECT DISTINCT
-        LOWER(TRIM(c.Email)) AS email,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY LOWER(TRIM(c.Email)) ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON c.AccountId = o.AccountId
-      WHERE c.Email IS NOT NULL AND c.Email != '' AND c.AccountId IS NOT NULL
-        AND o.por_record__c = false
-    ),
-    fuzzy_name_matched_opps AS (
-      -- Tier 6: Fuzzy company name match (remove Inc, LLC, Ltd, etc.)
-      SELECT DISTINCT
-        REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') AS normalized_name,
-        FIRST_VALUE(o.Id) OVER (
-          PARTITION BY REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '')
-          ORDER BY o.CreatedDate DESC
-        ) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-      WHERE o.AccountName IS NOT NULL AND o.AccountName != '' AND o.por_record__c = false
-    ),
-    account_matched_opps AS (
-      -- Tier 7: Direct Account.Name match → find any Opportunity on that Account
-      SELECT DISTINCT
-        LOWER(TRIM(a.Name)) AS account_name,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY a.Id ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON a.Id = o.AccountId
-      WHERE a.Name IS NOT NULL AND a.Name != ''
-        AND o.por_record__c = false
-    ),
-    ranked_sqls AS (
+    WITH inbound_sqls AS (
       SELECT
         'R360' AS product,
-        f.Region AS region,
-        f.LeadId AS record_id,
-        -- 7-tier URL resolution
-        CASE
-          WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
-          WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
-          WHEN nmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', nmo.opp_id)
-          WHEN cao.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', cao.opp_id)
-          WHEN emo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', emo.opp_id)
-          WHEN fnmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', fnmo.opp_id)
-          WHEN amo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', amo.opp_id)
-          WHEN NULLIF(f.LeadId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(f.Company, 'Unknown') AS company_name,
-        f.Email AS email,
-        UPPER(COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
-        CAST(f.SQL_DT AS STRING) AS sql_date,
-        CAST(f.MQL_DT AS STRING) AS mql_date,
-        DATE_DIFF(CAST(f.SQL_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_mql_to_sql,
-        'N/A' AS converted_to_sal,
-        CASE WHEN f.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        -- 7-tier has_opportunity check
-        CASE WHEN (f.OpportunityID IS NOT NULL AND f.OpportunityID != '')
-               OR l.ConvertedOpportunityId IS NOT NULL
-               OR nmo.opp_id IS NOT NULL
-               OR cao.opp_id IS NOT NULL
-               OR emo.opp_id IS NOT NULL
-               OR fnmo.opp_id IS NOT NULL
-               OR amo.opp_id IS NOT NULL
-        THEN 'Yes' ELSE 'No' END AS has_opportunity,
-        CASE
-          WHEN o.Won = true THEN 'WON'
-          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) > 21 THEN 'STALLED'
-          ELSE 'ACTIVE'
-        END AS sql_status,
-        -- 7-tier opportunity_id
-        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id) AS opportunity_id,
-        COALESCE(f.OpportunityName, o.OpportunityName, o2.OpportunityName, o3.OpportunityName, o4.OpportunityName, o5.OpportunityName, o6.OpportunityName) AS opportunity_name,
-        COALESCE(o.StageName, o2.StageName, o3.StageName, o4.StageName, o5.StageName, o6.StageName) AS opportunity_stage,
-        COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
-        COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(f.SQL_DT AS DATE), DAY) AS days_in_stage,
-        -- Category derived from opportunity Type
-        CASE
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Existing Business' THEN 'EXPANSION'
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Migration' THEN 'MIGRATION'
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Strategic' THEN 'STRATEGIC'
-          ELSE 'NEW LOGO'
-        END AS category,
-        -- Deduplicate by email to match summary COUNT(DISTINCT email)
-        ROW_NUMBER() OVER (
-          PARTITION BY f.Email
-          ORDER BY
-            CASE WHEN f.SQO_DT IS NOT NULL THEN 0 ELSE 1 END,
-            f.SQL_DT DESC
-        ) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\` f
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
-        ON f.LeadId = l.Id
-      -- Tier 1-2: Direct OpportunityID or ConvertedOpportunityId
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
-      -- Tier 3: Name match (only if tiers 1-2 failed)
-      LEFT JOIN name_matched_opps nmo
-        ON f.OpportunityName = nmo.OpportunityName
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o2
-        ON nmo.opp_id = o2.Id
-      -- Tier 4: ContactId → Account (only if tiers 1-3 failed)
-      LEFT JOIN contact_account_opps cao
-        ON f.ContactId = cao.contact_id
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o3
-        ON cao.opp_id = o3.Id
-      -- Tier 5: Email → Contact → Account (only if tiers 1-4 failed)
-      LEFT JOIN email_matched_opps emo
-        ON LOWER(TRIM(f.Email)) = emo.email
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o4
-        ON emo.opp_id = o4.Id
-      -- Tier 6: Fuzzy name match (only if all other tiers failed)
-      LEFT JOIN fuzzy_name_matched_opps fnmo
-        ON REGEXP_REPLACE(LOWER(TRIM(f.Company)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') = fnmo.normalized_name
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o5
-        ON fnmo.opp_id = o5.Id
-      -- Tier 7: Account.Name direct match (only if all other tiers failed)
-      LEFT JOIN account_matched_opps amo
-        ON LOWER(TRIM(f.Company)) = amo.account_name
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL AND fnmo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o6
-        ON amo.opp_id = o6.Id
-      WHERE f.MQL_Reverted = false
-        AND f.Region IS NOT NULL
-        AND f.SQL_DT IS NOT NULL
-        AND CAST(f.SQL_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(f.SQL_DT AS DATE) <= '${filters.endDate}'
-        ${r360RegionClause.replace(/Region/g, 'f.Region')}
-    ),
-    -- Non-inbound R360 funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from R360NewLogoFunnel
-    -- JOIN to OpportunityViewTable to get accurate ACV (funnel WonACV is often NULL)
-    non_inbound_r360_sqls AS (
-      SELECT
-        'R360' AS product,
-        nl.Region AS region,
-        COALESCE(nl.OpportunityID, CAST(nl.SQL_DT AS STRING)) AS record_id,
-        CASE
-          WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(o.AccountName, nl.OpportunityName, 'Unknown') AS company_name,
-        'N/A' AS email,
-        UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
-        CAST(nl.SQL_DT AS STRING) AS sql_date,
-        CAST(nl.MQL_DT AS STRING) AS mql_date,
-        CASE WHEN nl.MQL_DT IS NOT NULL AND nl.SQL_DT IS NOT NULL
-          THEN DATE_DIFF(CAST(nl.SQL_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, f.Company, 'Unknown') AS company_name,
+        COALESCE(f.Email, 'N/A') AS email,
+        UPPER(COALESCE(NULLIF(d.Source, ''), NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
+        COALESCE(CAST(f.SQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sql_date,
+        COALESCE(CAST(f.MQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS mql_date,
+        CASE WHEN f.MQL_DT IS NOT NULL AND f.SQL_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(f.SQL_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY)
           ELSE 0
         END AS days_mql_to_sql,
-        'No' AS converted_to_sal,
-        CASE WHEN nl.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        CASE WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
-        -- Status from direct-linked opportunity only
+        'N/A' AS converted_to_sal,
+        CASE WHEN f.SQO_DT IS NOT NULL OR d.SQO = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        'Yes' AS has_opportunity,
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) > 21 THEN 'STALLED'
+          WHEN d.SQO = 1 OR f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
-        nl.OpportunityID AS opportunity_id,
-        COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
+        d.OpportunityID AS opportunity_id,
+        COALESCE(o.OpportunityName, f.OpportunityName) AS opportunity_name,
         o.StageName AS opportunity_stage,
-        -- Use OpportunityViewTable ACV if available, fall back to funnel WonACV
-        COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
+        o.ACV AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(nl.SQL_DT AS DATE), DAY) AS days_in_stage,
-        -- Category from opportunity Type
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         CASE
           WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
           WHEN o.Type = 'Migration' THEN 'MIGRATION'
           WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
           ELSE 'NEW LOGO'
         END AS category,
-        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.OpportunityName) ORDER BY nl.SQL_DT DESC) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360NewLogoFunnel\` nl
-      -- JOIN to get accurate ACV from OpportunityViewTable
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON nl.OpportunityID = o.Id
-      WHERE nl.Region IS NOT NULL
-        AND nl.SQL_DT IS NOT NULL
-        AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
-        AND CAST(nl.SQL_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(nl.SQL_DT AS DATE) <= '${filters.endDate}'
-        ${r360RegionClause.replace(/Region/g, 'nl.Region')}
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\` f
+        ON d.OpportunityID = f.OpportunityID
+        AND (f.MQL_Reverted IS NULL OR f.MQL_Reverted = false)
+      WHERE d.RecordType = 'R360'
+        AND UPPER(d.FunnelType) IN ('INBOUND', 'R360 INBOUND')
+        AND d.\`SQL\` = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${r360RegionClause}
+    ),
+    new_logo_sqls AS (
+      SELECT
+        'R360' AS product,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, nl.OpportunityName, 'Unknown') AS company_name,
+        'N/A' AS email,
+        UPPER(COALESCE(NULLIF(d.Source, ''), nl.SDRSource, 'OUTBOUND')) AS source,
+        COALESCE(CAST(nl.SQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sql_date,
+        COALESCE(CAST(nl.MQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS mql_date,
+        CASE WHEN nl.MQL_DT IS NOT NULL AND nl.SQL_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(nl.SQL_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
+          ELSE 0
+        END AS days_mql_to_sql,
+        'N/A' AS converted_to_sal,
+        CASE WHEN nl.SQO_DT IS NOT NULL OR d.SQO = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        'Yes' AS has_opportunity,
+        CASE
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
+          WHEN d.SQO = 1 OR nl.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sql_status,
+        d.OpportunityID AS opportunity_id,
+        COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
+        CASE
+          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN o.Type = 'Migration' THEN 'MIGRATION'
+          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
+          ELSE 'NEW LOGO'
+        END AS category,
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360NewLogoFunnel\` nl
+        ON d.OpportunityID = nl.OpportunityID
+      WHERE d.RecordType = 'R360'
+        AND UPPER(d.FunnelType) IN ('NEW LOGO', 'R360 NEW LOGO')
+        AND d.\`SQL\` = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${r360RegionClause}
     ),
     expansion_sqls AS (
       SELECT
         'R360' AS product,
-        e.Region AS region,
-        COALESCE(e.OpportunityID, CAST(e.SQL_DT AS STRING)) AS record_id,
-        CASE
-          WHEN e.OpportunityID IS NOT NULL AND e.OpportunityID != '' THEN COALESCE(e.OpportunityLink, CONCAT('https://por.my.salesforce.com/', e.OpportunityID))
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(e.Company, 'Unknown') AS company_name,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, e.Company, 'Unknown') AS company_name,
         'N/A' AS email,
-        UPPER(COALESCE(NULLIF(e.SQOSource, ''), 'AM SOURCED')) AS source,
-        CAST(e.SQL_DT AS STRING) AS sql_date,
-        CAST(e.EQL_DT AS STRING) AS mql_date,
+        UPPER(COALESCE(NULLIF(d.Source, ''), NULLIF(e.SQOSource, ''), 'AM SOURCED')) AS source,
+        COALESCE(CAST(e.SQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sql_date,
+        COALESCE(CAST(e.EQL_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS mql_date,
         CASE WHEN e.EQL_DT IS NOT NULL AND e.SQL_DT IS NOT NULL
           THEN DATE_DIFF(CAST(e.SQL_DT AS DATE), CAST(e.EQL_DT AS DATE), DAY)
           ELSE 0
         END AS days_mql_to_sql,
-        'No' AS converted_to_sal,
-        CASE WHEN e.SQO_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
-        CASE WHEN e.OpportunityID IS NOT NULL AND e.OpportunityID != '' THEN 'Yes' ELSE 'No' END AS has_opportunity,
+        'N/A' AS converted_to_sal,
+        CASE WHEN e.SQO_DT IS NOT NULL OR d.SQO = 1 THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+        'Yes' AS has_opportunity,
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN e.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(e.SQL_DT AS DATE), DAY) > 21 THEN 'STALLED'
+          WHEN d.SQO = 1 OR e.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sql_status,
-        e.OpportunityID AS opportunity_id,
+        d.OpportunityID AS opportunity_id,
         COALESCE(o.OpportunityName, e.OpportunityName) AS opportunity_name,
         o.StageName AS opportunity_stage,
         COALESCE(o.ACV, 0) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(e.SQL_DT AS DATE), DAY) AS days_in_stage,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         'EXPANSION' AS category,
-        ROW_NUMBER() OVER (PARTITION BY e.OpportunityID ORDER BY e.SQL_DT DESC) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.ExpansionFunnel\` e
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON e.OpportunityID = o.Id
-      WHERE e.Region IS NOT NULL
-        AND e.RecordType = 'R360'
-        AND e.SQL_DT IS NOT NULL
-        AND CAST(e.SQL_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(e.SQL_DT AS DATE) <= '${filters.endDate}'
-        ${r360RegionClause.replace(/Region/g, 'e.Region')}
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.ExpansionFunnel\` e
+        ON d.OpportunityID = e.OpportunityID AND e.RecordType = 'R360'
+      WHERE d.RecordType = 'R360'
+        AND UPPER(d.FunnelType) IN ('EXPANSION', 'R360 EXPANSION')
+        AND d.\`SQL\` = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${r360RegionClause}
     )
-    SELECT * EXCEPT(rn) FROM ranked_sqls WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM inbound_sqls WHERE rn = 1
     UNION ALL
-    SELECT * EXCEPT(rn) FROM non_inbound_r360_sqls WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM new_logo_sqls WHERE rn = 1
     UNION ALL
     SELECT * EXCEPT(rn) FROM expansion_sqls WHERE rn = 1
+    ORDER BY sql_date DESC
+  `;
+
+  // STRATEGIC query from OpportunityViewTable (Type='New Business' AND ACV>100000)
+  const strategicRegionClause = filters.regions && filters.regions.length > 0
+    ? `AND Division IN (${filters.regions.map(r => {
+        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
+        return `'${map[r]}'`;
+      }).join(', ')})`
+    : '';
+
+  const strategicSqlQuery = `
+    SELECT
+      CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
+      CASE Division WHEN 'US' THEN 'AMER' WHEN 'UK' THEN 'EMEA' WHEN 'AU' THEN 'APAC' END AS region,
+      Id AS record_id,
+      CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url,
+      COALESCE(AccountName, 'Unknown') AS company_name,
+      'N/A' AS email,
+      UPPER(COALESCE(NULLIF(SDRSource, ''), NULLIF(POR_SDRSource, ''), 'INBOUND')) AS source,
+      FORMAT_DATE('%Y-%m-%d', CAST(CreatedDate AS DATE)) AS sql_date,
+      FORMAT_DATE('%Y-%m-%d', CAST(CreatedDate AS DATE)) AS mql_date,
+      0 AS days_mql_to_sql,
+      CASE WHEN StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') OR Won THEN 'Yes' ELSE 'No' END AS converted_to_sal,
+      CASE WHEN StageName IN ('Proposal', 'Negotiation', 'Closed Won', 'Closed Lost') OR Won OR IsClosed THEN 'Yes' ELSE 'No' END AS converted_to_sqo,
+      'Yes' AS has_opportunity,
+      CASE
+        WHEN Won THEN 'WON'
+        WHEN IsClosed AND NOT COALESCE(Won, false) THEN 'LOST'
+        WHEN StageName IN ('Proposal', 'Negotiation', 'Closed Won') THEN 'CONVERTED_SQO'
+        WHEN StageName NOT IN ('Discovery', 'Qualification', 'Needs Analysis') THEN 'CONVERTED_SAL'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY) > 21 THEN 'STALLED'
+        ELSE 'ACTIVE'
+      END AS sql_status,
+      Id AS opportunity_id,
+      OpportunityName AS opportunity_name,
+      StageName AS opportunity_stage,
+      ACV AS opportunity_acv,
+      COALESCE(ClosedLostReason, 'N/A') AS loss_reason,
+      DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY) AS days_in_stage,
+      'STRATEGIC' AS category
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+    WHERE Division IN ('US', 'UK', 'AU')
+      AND Type = 'New Business' AND ACV > 100000
+      AND (StageName NOT IN ('Discovery', 'Qualification') OR Won)
+      AND CAST(CreatedDate AS DATE) >= '${filters.startDate}'
+      AND CAST(CreatedDate AS DATE) <= '${filters.endDate}'
+      ${strategicRegionClause}
     ORDER BY sql_date DESC
   `;
 
@@ -2699,15 +2497,26 @@ async function getSQLDetails(filters: ReportFilters) {
     const shouldFetchPOR = filters.products.length === 0 || filters.products.includes('POR');
     const shouldFetchR360 = filters.products.length === 0 || filters.products.includes('R360');
 
+    let strategicRows: any[] = [];
+    try {
+      [strategicRows] = await getBigQuery().query({ query: strategicSqlQuery }) as any[];
+    } catch (error) {
+      console.warn('Strategic SQL query failed:', error);
+    }
+
     const [[porRows], [r360Rows]] = await Promise.all([
       shouldFetchPOR ? getBigQuery().query({ query: porQuery }) : Promise.resolve([[]]),
       shouldFetchR360 ? getBigQuery().query({ query: r360Query }) : Promise.resolve([[]]),
     ]);
 
-    console.log(`SQL Details: POR=${porRows?.length || 0}, R360=${r360Rows?.length || 0}`);
+    // Combine results with strategic data
+    const porData = [...(porRows || []), ...(strategicRows || []).filter((r: any) => r.product === 'POR')];
+    const r360Data = [...(r360Rows || []), ...(strategicRows || []).filter((r: any) => r.product === 'R360')];
+
+    console.log(`SQL Details: POR=${porData.length}, R360=${r360Data.length}, Strategic=${strategicRows?.length || 0}`);
     return {
-      POR: porRows as any[],
-      R360: r360Rows as any[],
+      POR: porData as any[],
+      R360: r360Data as any[],
     };
   } catch (error) {
     console.warn('SQL details query failed:', error);
@@ -2955,174 +2764,122 @@ async function getSALDetails(filters: ReportFilters) {
   }
 }
 
-// SQO Details Query - Full implementation with JOINs and deduplication
-// Enhanced: Uses OpportunityName lookup as fallback when OpportunityID and ConvertedOpportunityId are NULL
+// SQO Details Query - DailyRevenueFunnel-based for INBOUND/NEW LOGO
+// Uses DRF WHERE SQO=1 as source of truth, matching pacing section
 async function getSQODetails(filters: ReportFilters) {
   const regionClause = filters.regions && filters.regions.length > 0
-    ? `AND f.Division IN (${filters.regions.map(r => {
-        const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
-        return `'${map[r]}'`;
-      }).join(', ')})`
+    ? `AND d.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
-  // POR SQO query - deduplicates by opportunity, JOINs for details
-  // 6-tier enhanced linking: OpportunityID → ConvertedOpportunityId → Name match → ContactId-Account → Email-Account → Fuzzy name
+  const shouldFetchPOR = filters.products.length === 0 || filters.products.includes('POR');
+  const shouldFetchR360 = filters.products.length === 0 || filters.products.includes('R360');
+
+  // POR SQO query - uses DailyRevenueFunnel for INBOUND and NEW LOGO
   const porQuery = `
-    WITH name_matched_opps AS (
-      -- Tier 3: Pre-compute opportunity lookups by exact name
-      SELECT DISTINCT
-        OpportunityName,
-        FIRST_VALUE(Id) OVER (PARTITION BY OpportunityName ORDER BY CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
-      WHERE OpportunityName IS NOT NULL AND OpportunityName != ''
-        AND por_record__c = true AND Division IN ('US', 'UK', 'AU')
-    ),
-    contact_account_opps AS (
-      -- Tier 4: Match via ContactId → Contact.AccountId → Opportunity
-      SELECT DISTINCT
-        c.Id AS contact_id,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY c.Id ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON c.AccountId = o.AccountId
-      WHERE c.AccountId IS NOT NULL
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    email_matched_opps AS (
-      -- Tier 5: Match via Email → Contact → Account → Opportunity
-      SELECT DISTINCT
-        LOWER(TRIM(c.Email)) AS email,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY LOWER(TRIM(c.Email)) ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON c.AccountId = o.AccountId
-      WHERE c.Email IS NOT NULL AND c.Email != '' AND c.AccountId IS NOT NULL
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    fuzzy_name_matched_opps AS (
-      -- Tier 6: Fuzzy company name match (remove Inc, LLC, Ltd, etc.)
-      SELECT DISTINCT
-        REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') AS normalized_name,
-        FIRST_VALUE(o.Id) OVER (
-          PARTITION BY REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '')
-          ORDER BY o.CreatedDate DESC
-        ) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-      WHERE o.AccountName IS NOT NULL AND o.AccountName != ''
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    account_matched_opps AS (
-      -- Tier 7: Direct Account.Name match → find any Opportunity on that Account
-      SELECT DISTINCT
-        LOWER(TRIM(a.Name)) AS account_name,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY a.Id ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON a.Id = o.AccountId
-      WHERE a.Name IS NOT NULL AND a.Name != ''
-        AND o.por_record__c = true AND o.Division IN ('US', 'UK', 'AU')
-    ),
-    ranked_sqos AS (
+    -- INBOUND SQO records from DailyRevenueFunnel (matches pacing counts)
+    WITH inbound_sqos AS (
       SELECT
         'POR' AS product,
-        CASE f.Division
-          WHEN 'US' THEN 'AMER'
-          WHEN 'UK' THEN 'EMEA'
-          WHEN 'AU' THEN 'APAC'
-        END AS region,
-        COALESCE(f.OpportunityID, f.LeadId, f.ContactId) AS record_id,
-        -- 7-tier URL resolution
-        CASE
-          WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
-          WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
-          WHEN nmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', nmo.opp_id)
-          WHEN cao.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', cao.opp_id)
-          WHEN emo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', emo.opp_id)
-          WHEN fnmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', fnmo.opp_id)
-          WHEN amo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', amo.opp_id)
-          WHEN NULLIF(f.LeadId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
-          WHEN NULLIF(f.ContactId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.ContactId)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(f.Company, 'Unknown') AS company_name,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, f.Company, 'Unknown') AS company_name,
         COALESCE(f.LeadEmail, f.ContactEmail, 'N/A') AS email,
-        UPPER(COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
-        CAST(f.SQO_DT AS STRING) AS sqo_date,
-        CAST(f.SAL_DT AS STRING) AS sal_date,
-        CAST(f.SQL_DT AS STRING) AS sql_date,
-        CAST(f.MQL_DT AS STRING) AS mql_date,
-        DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.SAL_DT AS DATE), DAY) AS days_sal_to_sqo,
-        DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_total_cycle,
-        -- Status from direct-linked opportunity only (Tier 1-2)
+        UPPER(COALESCE(NULLIF(d.Source, ''), NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
+        COALESCE(CAST(f.SQO_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sqo_date,
+        COALESCE(CAST(f.SAL_DT AS STRING), CAST(NULL AS STRING)) AS sal_date,
+        COALESCE(CAST(f.SQL_DT AS STRING), CAST(NULL AS STRING)) AS sql_date,
+        COALESCE(CAST(f.MQL_DT AS STRING), CAST(NULL AS STRING)) AS mql_date,
+        CASE WHEN f.SAL_DT IS NOT NULL AND f.SQO_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.SAL_DT AS DATE), DAY)
+          ELSE 0
+        END AS days_sal_to_sqo,
+        CASE WHEN f.MQL_DT IS NOT NULL AND f.SQO_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY)
+          ELSE DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY)
+        END AS days_total_cycle,
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) > 21 THEN 'STALLED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
-        -- 7-tier opportunity_id
-        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id) AS opportunity_id,
-        COALESCE(f.OpportunityName, o.OpportunityName, o2.OpportunityName, o3.OpportunityName, o4.OpportunityName, o5.OpportunityName, o6.OpportunityName) AS opportunity_name,
-        COALESCE(o.StageName, o2.StageName, o3.StageName, o4.StageName, o5.StageName, o6.StageName) AS opportunity_stage,
-        COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
-        COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) AS days_in_stage,
-        -- Derive category from opportunity Type field
+        d.OpportunityID AS opportunity_id,
+        COALESCE(o.OpportunityName, f.OpportunityName) AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        o.ACV AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         CASE
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Existing Business' THEN 'EXPANSION'
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Migration' THEN 'MIGRATION'
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Strategic' THEN 'STRATEGIC'
+          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN o.Type = 'Migration' THEN 'MIGRATION'
+          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
           ELSE 'NEW LOGO'
         END AS category,
-        -- Deduplicate by opportunity ID, preferring won deals
         ROW_NUMBER() OVER (
-          PARTITION BY COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id, COALESCE(f.LeadEmail, f.ContactEmail))
-          ORDER BY
-            CASE WHEN o.Won = true THEN 0 ELSE 1 END,
-            f.SQO_DT DESC
+          PARTITION BY d.OpportunityID
+          ORDER BY CASE WHEN o.Won = true THEN 0 ELSE 1 END, d.CaptureDate DESC
         ) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\` f
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
-        ON f.LeadId = l.Id
-      -- Tier 1-2: Direct OpportunityID or ConvertedOpportunityId
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
-      -- Tier 3: Name match (only if tiers 1-2 failed)
-      LEFT JOIN name_matched_opps nmo
-        ON f.OpportunityName = nmo.OpportunityName
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o2
-        ON nmo.opp_id = o2.Id
-      -- Tier 4: ContactId → Account (only if tiers 1-3 failed)
-      LEFT JOIN contact_account_opps cao
-        ON f.ContactId = cao.contact_id
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o3
-        ON cao.opp_id = o3.Id
-      -- Tier 5: Email → Contact → Account (only if tiers 1-4 failed)
-      LEFT JOIN email_matched_opps emo
-        ON LOWER(TRIM(COALESCE(f.LeadEmail, f.ContactEmail))) = emo.email
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o4
-        ON emo.opp_id = o4.Id
-      -- Tier 6: Fuzzy name match (only if all other tiers failed)
-      LEFT JOIN fuzzy_name_matched_opps fnmo
-        ON REGEXP_REPLACE(LOWER(TRIM(f.Company)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') = fnmo.normalized_name
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o5
-        ON fnmo.opp_id = o5.Id
-      -- Tier 7: Account.Name direct match (only if all other tiers failed)
-      LEFT JOIN account_matched_opps amo
-        ON LOWER(TRIM(f.Company)) = amo.account_name
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL AND fnmo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o6
-        ON amo.opp_id = o6.Id
-      WHERE f.Division IN ('US', 'UK', 'AU')
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.InboundFunnel\` f
+        ON d.OpportunityID = f.OpportunityID
         AND (f.SpiralyzeTest IS NULL OR f.SpiralyzeTest = false)
         AND (f.MQL_Reverted IS NULL OR f.MQL_Reverted = false)
-        AND f.SQO_DT IS NOT NULL
-        AND CAST(f.SQO_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(f.SQO_DT AS DATE) <= '${filters.endDate}'
+      WHERE d.RecordType = 'POR'
+        AND UPPER(d.FunnelType) = 'INBOUND'
+        AND d.SQO = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${regionClause}
+    ),
+    -- NEW LOGO (non-inbound) SQO records from DailyRevenueFunnel
+    newlogo_sqos AS (
+      SELECT
+        'POR' AS product,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, nl.Company, 'Unknown') AS company_name,
+        'N/A' AS email,
+        UPPER(COALESCE(NULLIF(d.Source, ''), NULLIF(nl.SDRSource, ''), 'OUTBOUND')) AS source,
+        COALESCE(CAST(nl.SQO_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sqo_date,
+        CAST(nl.SAL_DT AS STRING) AS sal_date,
+        CAST(nl.SQL_DT AS STRING) AS sql_date,
+        CAST(nl.MQL_DT AS STRING) AS mql_date,
+        CASE WHEN nl.SAL_DT IS NOT NULL AND nl.SQO_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(nl.SQO_DT AS DATE), CAST(nl.SAL_DT AS DATE), DAY)
+          ELSE 0
+        END AS days_sal_to_sqo,
+        CASE WHEN nl.MQL_DT IS NOT NULL AND nl.SQO_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(nl.SQO_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
+          ELSE DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY)
+        END AS days_total_cycle,
+        CASE
+          WHEN o.Won = true THEN 'WON'
+          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
+          ELSE 'ACTIVE'
+        END AS sqo_status,
+        d.OpportunityID AS opportunity_id,
+        COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
+        'NEW LOGO' AS category,
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
+        ON d.OpportunityID = nl.OpportunityID
+      WHERE d.RecordType = 'POR'
+        AND UPPER(d.FunnelType) = 'NEW LOGO'
+        AND d.SQO = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
         ${regionClause}
     ),
     -- EXPANSION and MIGRATION opportunities at SQO stage (Proposal+)
@@ -3167,285 +2924,122 @@ async function getSQODetails(filters: ReportFilters) {
         AND o.Division IN ('US', 'UK', 'AU')
         AND o.Type IN ('Existing Business', 'Migration')
         AND o.ACV > 0
-        -- SQO stage = Proposal stage or beyond OR Won
         AND (o.StageName IN ('Proposal', 'Negotiation', 'Closed Won', 'Closed Lost') OR o.Won OR o.IsClosed)
         AND CAST(o.CreatedDate AS DATE) >= '${filters.startDate}'
         AND CAST(o.CreatedDate AS DATE) <= '${filters.endDate}'
-        ${regionClause.replace(/f\.Division/g, 'o.Division')}
-    ),
-    -- Non-inbound funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from NewLogoFunnel
-    -- JOIN to OpportunityViewTable to get accurate ACV (funnel WonACV is often NULL)
-    non_inbound_sqos AS (
-      SELECT
-        'POR' AS product,
-        CASE nl.Division
-          WHEN 'US' THEN 'AMER'
-          WHEN 'UK' THEN 'EMEA'
-          WHEN 'AU' THEN 'APAC'
-        END AS region,
-        COALESCE(nl.OpportunityID, CAST(nl.SQO_DT AS STRING)) AS record_id,
-        CASE
-          WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(nl.Company, 'Unknown') AS company_name,
-        'N/A' AS email,
-        UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
-        CAST(nl.SQO_DT AS STRING) AS sqo_date,
-        CAST(nl.SAL_DT AS STRING) AS sal_date,
-        CAST(nl.SQL_DT AS STRING) AS sql_date,
-        CAST(nl.MQL_DT AS STRING) AS mql_date,
-        CASE WHEN nl.SAL_DT IS NOT NULL AND nl.SQO_DT IS NOT NULL
-          THEN DATE_DIFF(CAST(nl.SQO_DT AS DATE), CAST(nl.SAL_DT AS DATE), DAY)
-          ELSE 0
-        END AS days_sal_to_sqo,
-        CASE WHEN nl.MQL_DT IS NOT NULL AND nl.SQO_DT IS NOT NULL
-          THEN DATE_DIFF(CAST(nl.SQO_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
-          ELSE DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY)
-        END AS days_total_cycle,
-        -- Use OpportunityViewTable Won status if available, fall back to funnel Won_DT
-        CASE
-          WHEN o.Won = true THEN 'WON'
-          WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 21 THEN 'STALLED'
-          ELSE 'ACTIVE'
-        END AS sqo_status,
-        nl.OpportunityID AS opportunity_id,
-        COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
-        o.StageName AS opportunity_stage,
-        -- Use OpportunityViewTable ACV if available, fall back to funnel WonACV
-        COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
-        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) AS days_in_stage,
-        'NEW LOGO' AS category,
-        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.Company) ORDER BY nl.SQO_DT DESC) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.NewLogoFunnel\` nl
-      -- JOIN to get accurate ACV from OpportunityViewTable
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON nl.OpportunityID = o.Id
-      WHERE nl.Division IN ('US', 'UK', 'AU')
-        AND nl.SQO_DT IS NOT NULL
-        AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
-        AND CAST(nl.SQO_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(nl.SQO_DT AS DATE) <= '${filters.endDate}'
-        ${regionClause.replace(/f\.Division/g, 'nl.Division')}
+        ${regionClause.replace(/d\.Region/g, 'o.Division').replace(/'AMER'/g, "'US'").replace(/'EMEA'/g, "'UK'").replace(/'APAC'/g, "'AU'")}
     )
-    SELECT * EXCEPT(rn) FROM ranked_sqos WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM inbound_sqos WHERE rn = 1
+    UNION ALL
+    SELECT * EXCEPT(rn) FROM newlogo_sqos WHERE rn = 1
     UNION ALL
     SELECT * EXCEPT(rn) FROM expansion_migration_sqos WHERE rn = 1
-    UNION ALL
-    SELECT * EXCEPT(rn) FROM non_inbound_sqos WHERE rn = 1
     ORDER BY sqo_date DESC
   `;
 
   const r360RegionClause = filters.regions && filters.regions.length > 0
-    ? `AND f.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
+    ? `AND d.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
-  // R360 SQO query - deduplicates, JOINs for details (no SAL stage in R360)
-  // 6-tier enhanced linking: OpportunityID → ConvertedOpportunityId → Name match → ContactId-Account → Email-Account → Fuzzy name
+  // R360 SQO query - uses DailyRevenueFunnel for INBOUND/NEW LOGO
   const r360Query = `
-    WITH name_matched_opps AS (
-      -- Tier 3: Pre-compute opportunity lookups by exact name
-      SELECT DISTINCT
-        OpportunityName,
-        FIRST_VALUE(Id) OVER (PARTITION BY OpportunityName ORDER BY CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
-      WHERE OpportunityName IS NOT NULL AND OpportunityName != ''
-        AND por_record__c = false
-    ),
-    contact_account_opps AS (
-      -- Tier 4: Match via ContactId → Contact.AccountId → Opportunity
-      SELECT DISTINCT
-        c.Id AS contact_id,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY c.Id ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON c.AccountId = o.AccountId
-      WHERE c.AccountId IS NOT NULL AND o.por_record__c = false
-    ),
-    email_matched_opps AS (
-      -- Tier 5: Match via Email → Contact → Account → Opportunity
-      SELECT DISTINCT
-        LOWER(TRIM(c.Email)) AS email,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY LOWER(TRIM(c.Email)) ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON c.AccountId = o.AccountId
-      WHERE c.Email IS NOT NULL AND c.Email != '' AND c.AccountId IS NOT NULL
-        AND o.por_record__c = false
-    ),
-    fuzzy_name_matched_opps AS (
-      -- Tier 6: Fuzzy company name match (remove Inc, LLC, Ltd, etc.)
-      SELECT DISTINCT
-        REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') AS normalized_name,
-        FIRST_VALUE(o.Id) OVER (
-          PARTITION BY REGEXP_REPLACE(LOWER(TRIM(o.AccountName)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '')
-          ORDER BY o.CreatedDate DESC
-        ) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-      WHERE o.AccountName IS NOT NULL AND o.AccountName != '' AND o.por_record__c = false
-    ),
-    account_matched_opps AS (
-      -- Tier 7: Direct Account.Name match → find any Opportunity on that Account
-      SELECT DISTINCT
-        LOWER(TRIM(a.Name)) AS account_name,
-        FIRST_VALUE(o.Id) OVER (PARTITION BY a.Id ORDER BY o.CreatedDate DESC) AS opp_id
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a
-      INNER JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON a.Id = o.AccountId
-      WHERE a.Name IS NOT NULL AND a.Name != ''
-        AND o.por_record__c = false
-    ),
-    ranked_sqos AS (
+    -- INBOUND SQO records from DailyRevenueFunnel
+    WITH inbound_sqos AS (
       SELECT
         'R360' AS product,
-        f.Region AS region,
-        COALESCE(f.OpportunityID, f.LeadId) AS record_id,
-        -- 7-tier URL resolution
-        CASE
-          WHEN f.OpportunityID IS NOT NULL AND f.OpportunityID != '' THEN f.OpportunityLink
-          WHEN l.ConvertedOpportunityId IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', l.ConvertedOpportunityId)
-          WHEN nmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', nmo.opp_id)
-          WHEN cao.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', cao.opp_id)
-          WHEN emo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', emo.opp_id)
-          WHEN fnmo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', fnmo.opp_id)
-          WHEN amo.opp_id IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', amo.opp_id)
-          WHEN NULLIF(f.LeadId, '') IS NOT NULL THEN CONCAT('https://por.my.salesforce.com/', f.LeadId)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
-        COALESCE(f.Company, 'Unknown') AS company_name,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
+        COALESCE(o.AccountName, f.Company, 'Unknown') AS company_name,
         COALESCE(f.Email, 'N/A') AS email,
-        UPPER(COALESCE(NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
-        CAST(f.SQO_DT AS STRING) AS sqo_date,
+        UPPER(COALESCE(NULLIF(d.Source, ''), NULLIF(f.SDRSource, ''), 'INBOUND')) AS source,
+        COALESCE(CAST(f.SQO_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sqo_date,
         'N/A' AS sal_date,
-        CAST(f.SQL_DT AS STRING) AS sql_date,
-        CAST(f.MQL_DT AS STRING) AS mql_date,
+        COALESCE(CAST(f.SQL_DT AS STRING), CAST(NULL AS STRING)) AS sql_date,
+        COALESCE(CAST(f.MQL_DT AS STRING), CAST(NULL AS STRING)) AS mql_date,
         0 AS days_sal_to_sqo,
-        DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY) AS days_total_cycle,
-        -- Status from direct-linked opportunity only (Tier 1-2)
+        CASE WHEN f.MQL_DT IS NOT NULL AND f.SQO_DT IS NOT NULL
+          THEN DATE_DIFF(CAST(f.SQO_DT AS DATE), CAST(f.MQL_DT AS DATE), DAY)
+          ELSE DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY)
+        END AS days_total_cycle,
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) > 21 THEN 'STALLED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
-        -- 7-tier opportunity_id
-        COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id) AS opportunity_id,
-        COALESCE(f.OpportunityName, o.OpportunityName, o2.OpportunityName, o3.OpportunityName, o4.OpportunityName, o5.OpportunityName, o6.OpportunityName) AS opportunity_name,
-        COALESCE(o.StageName, o2.StageName, o3.StageName, o4.StageName, o5.StageName, o6.StageName) AS opportunity_stage,
-        COALESCE(o.ACV, o2.ACV, o3.ACV, o4.ACV, o5.ACV, o6.ACV) AS opportunity_acv,
-        COALESCE(o.ClosedLostReason, o2.ClosedLostReason, o3.ClosedLostReason, o4.ClosedLostReason, o5.ClosedLostReason, o6.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(f.SQO_DT AS DATE), DAY) AS days_in_stage,
-        -- Derive category from opportunity Type field
+        d.OpportunityID AS opportunity_id,
+        COALESCE(o.OpportunityName, f.OpportunityName) AS opportunity_name,
+        o.StageName AS opportunity_stage,
+        o.ACV AS opportunity_acv,
+        COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         CASE
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Existing Business' THEN 'EXPANSION'
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Migration' THEN 'MIGRATION'
-          WHEN COALESCE(o.Type, o2.Type, o3.Type, o4.Type, o5.Type, o6.Type) = 'Strategic' THEN 'STRATEGIC'
+          WHEN o.Type = 'Existing Business' THEN 'EXPANSION'
+          WHEN o.Type = 'Migration' THEN 'MIGRATION'
+          WHEN o.Type = 'Strategic' THEN 'STRATEGIC'
           ELSE 'NEW LOGO'
         END AS category,
-        -- Deduplicate by opportunity ID
-        ROW_NUMBER() OVER (
-          PARTITION BY COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId, nmo.opp_id, cao.opp_id, emo.opp_id, fnmo.opp_id, amo.opp_id, f.Email)
-          ORDER BY
-            CASE WHEN o.Won = true THEN 0 ELSE 1 END,
-            f.SQO_DT DESC
-        ) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\` f
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l
-        ON f.LeadId = l.Id
-      -- Tier 1-2: Direct OpportunityID or ConvertedOpportunityId
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY CASE WHEN o.Won = true THEN 0 ELSE 1 END, d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON COALESCE(NULLIF(f.OpportunityID, ''), l.ConvertedOpportunityId) = o.Id
-      -- Tier 3: Name match (only if tiers 1-2 failed)
-      LEFT JOIN name_matched_opps nmo
-        ON f.OpportunityName = nmo.OpportunityName
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o2
-        ON nmo.opp_id = o2.Id
-      -- Tier 4: ContactId → Account (only if tiers 1-3 failed)
-      LEFT JOIN contact_account_opps cao
-        ON f.ContactId = cao.contact_id
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o3
-        ON cao.opp_id = o3.Id
-      -- Tier 5: Email → Contact → Account (only if tiers 1-4 failed)
-      LEFT JOIN email_matched_opps emo
-        ON LOWER(TRIM(f.Email)) = emo.email
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o4
-        ON emo.opp_id = o4.Id
-      -- Tier 6: Fuzzy name match (only if all other tiers failed)
-      LEFT JOIN fuzzy_name_matched_opps fnmo
-        ON REGEXP_REPLACE(LOWER(TRIM(f.Company)), r'[,.]?\\s*(inc\\.?|llc\\.?|ltd\\.?|corp\\.?|co\\.?|company|corporation|limited|plc|l\\.?l\\.?c\\.?)\\s*$', '') = fnmo.normalized_name
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o5
-        ON fnmo.opp_id = o5.Id
-      -- Tier 7: Account.Name direct match (only if all other tiers failed)
-      LEFT JOIN account_matched_opps amo
-        ON LOWER(TRIM(f.Company)) = amo.account_name
-        AND NULLIF(f.OpportunityID, '') IS NULL AND l.ConvertedOpportunityId IS NULL AND nmo.opp_id IS NULL AND cao.opp_id IS NULL AND emo.opp_id IS NULL AND fnmo.opp_id IS NULL
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o6
-        ON amo.opp_id = o6.Id
-      WHERE f.Region IS NOT NULL
-        AND f.MQL_Reverted = false
-        AND f.SQO_DT IS NOT NULL
-        AND CAST(f.SQO_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(f.SQO_DT AS DATE) <= '${filters.endDate}'
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\` f
+        ON d.OpportunityID = f.OpportunityID AND f.MQL_Reverted = false
+      WHERE d.RecordType = 'R360'
+        AND UPPER(d.FunnelType) IN ('INBOUND', 'R360 INBOUND')
+        AND d.SQO = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
         ${r360RegionClause}
     ),
-    -- Non-inbound R360 funnel records (OUTBOUND, AE SOURCED, TRADESHOW, etc.) from R360NewLogoFunnel
-    -- JOIN to OpportunityViewTable to get accurate ACV (funnel WonACV is often NULL)
-    non_inbound_r360_sqos AS (
+    -- NEW LOGO (non-inbound) SQO records from DailyRevenueFunnel
+    newlogo_sqos AS (
       SELECT
         'R360' AS product,
-        nl.Region AS region,
-        COALESCE(nl.OpportunityID, CAST(nl.SQO_DT AS STRING)) AS record_id,
-        CASE
-          WHEN nl.OpportunityID IS NOT NULL AND nl.OpportunityID != '' THEN CONCAT('https://por.my.salesforce.com/', nl.OpportunityID)
-          ELSE 'https://por.my.salesforce.com/'
-        END AS salesforce_url,
+        d.Region AS region,
+        d.OpportunityID AS record_id,
+        CONCAT('https://por.my.salesforce.com/', d.OpportunityID) AS salesforce_url,
         COALESCE(o.AccountName, nl.OpportunityName, 'Unknown') AS company_name,
         'N/A' AS email,
-        UPPER(COALESCE(nl.SDRSource, 'OUTBOUND')) AS source,
-        CAST(nl.SQO_DT AS STRING) AS sqo_date,
+        UPPER(COALESCE(NULLIF(d.Source, ''), NULLIF(nl.SDRSource, ''), 'OUTBOUND')) AS source,
+        COALESCE(CAST(nl.SQO_DT AS STRING), FORMAT_DATE('%Y-%m-%d', CAST(d.CaptureDate AS DATE))) AS sqo_date,
         CAST(NULL AS STRING) AS sal_date,
         CAST(nl.SQL_DT AS STRING) AS sql_date,
         CAST(nl.MQL_DT AS STRING) AS mql_date,
         0 AS days_sal_to_sqo,
         CASE WHEN nl.MQL_DT IS NOT NULL AND nl.SQO_DT IS NOT NULL
           THEN DATE_DIFF(CAST(nl.SQO_DT AS DATE), CAST(nl.MQL_DT AS DATE), DAY)
-          ELSE DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY)
+          ELSE DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY)
         END AS days_total_cycle,
-        -- Use OpportunityViewTable Won status if available, fall back to funnel Won_DT
         CASE
           WHEN o.Won = true THEN 'WON'
           WHEN o.IsClosed = true AND (o.Won IS NULL OR o.Won = false) THEN 'LOST'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) > 21 THEN 'STALLED'
+          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS sqo_status,
-        nl.OpportunityID AS opportunity_id,
+        d.OpportunityID AS opportunity_id,
         COALESCE(o.OpportunityName, nl.OpportunityName) AS opportunity_name,
         o.StageName AS opportunity_stage,
-        -- Use OpportunityViewTable ACV if available, fall back to funnel WonACV
         COALESCE(o.ACV, nl.WonACV) AS opportunity_acv,
         COALESCE(o.ClosedLostReason, 'N/A') AS loss_reason,
-        DATE_DIFF(CURRENT_DATE(), CAST(nl.SQO_DT AS DATE), DAY) AS days_in_stage,
+        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
         'NEW LOGO' AS category,
-        ROW_NUMBER() OVER (PARTITION BY COALESCE(nl.OpportunityID, nl.OpportunityName) ORDER BY nl.SQO_DT DESC) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360NewLogoFunnel\` nl
-      -- JOIN to get accurate ACV from OpportunityViewTable
+        ROW_NUMBER() OVER (PARTITION BY d.OpportunityID ORDER BY d.CaptureDate DESC) AS rn
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
       LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\` o
-        ON nl.OpportunityID = o.Id
-      WHERE nl.Region IS NOT NULL
-        AND nl.SQO_DT IS NOT NULL
-        AND UPPER(COALESCE(nl.SDRSource, '')) NOT IN ('INBOUND', '')
-        AND CAST(nl.SQO_DT AS DATE) >= '${filters.startDate}'
-        AND CAST(nl.SQO_DT AS DATE) <= '${filters.endDate}'
-        ${r360RegionClause.replace(/f\.Region/g, 'nl.Region')}
+        ON d.OpportunityID = o.Id
+      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360NewLogoFunnel\` nl
+        ON d.OpportunityID = nl.OpportunityID
+      WHERE d.RecordType = 'R360'
+        AND UPPER(d.FunnelType) IN ('NEW LOGO', 'R360 NEW LOGO')
+        AND d.SQO = 1
+        AND d.CaptureDate >= '${filters.startDate}'
+        AND d.CaptureDate <= '${filters.endDate}'
+        ${r360RegionClause}
     ),
     -- EXPANSION and MIGRATION R360 opportunities at SQO stage (Proposal+)
-    expansion_migration_r360_sqos AS (
+    expansion_migration_sqos AS (
       SELECT
         'R360' AS product,
         CASE o.Division
@@ -3486,30 +3080,78 @@ async function getSQODetails(filters: ReportFilters) {
         AND o.Division IN ('US', 'UK', 'AU')
         AND o.Type IN ('Existing Business', 'Migration')
         AND o.ACV > 0
-        -- SQO stage = Proposal stage or beyond OR Won
         AND (o.StageName IN ('Proposal', 'Negotiation', 'Closed Won', 'Closed Lost') OR o.Won OR o.IsClosed)
         AND CAST(o.CreatedDate AS DATE) >= '${filters.startDate}'
         AND CAST(o.CreatedDate AS DATE) <= '${filters.endDate}'
-        ${regionClause.replace(/f\.Division/g, 'o.Division')}
+        ${r360RegionClause.replace(/d\.Region/g, 'o.Division').replace(/'AMER'/g, "'US'").replace(/'EMEA'/g, "'UK'").replace(/'APAC'/g, "'AU'")}
     )
-    SELECT * EXCEPT(rn) FROM ranked_sqos WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM inbound_sqos WHERE rn = 1
     UNION ALL
-    SELECT * EXCEPT(rn) FROM non_inbound_r360_sqos WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM newlogo_sqos WHERE rn = 1
     UNION ALL
-    SELECT * EXCEPT(rn) FROM expansion_migration_r360_sqos WHERE rn = 1
+    SELECT * EXCEPT(rn) FROM expansion_migration_sqos WHERE rn = 1
+    ORDER BY sqo_date DESC
+  `;
+
+  // STRATEGIC query - shared POR + R360
+  const strategicSqoQuery = `
+    SELECT
+      CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
+      CASE Division WHEN 'US' THEN 'AMER' WHEN 'UK' THEN 'EMEA' WHEN 'AU' THEN 'APAC' END AS region,
+      Id AS record_id,
+      CONCAT('https://por.my.salesforce.com/', Id) AS salesforce_url,
+      COALESCE(AccountName, 'Unknown') AS company_name,
+      'N/A' AS email,
+      UPPER(COALESCE(NULLIF(SDRSource, ''), NULLIF(POR_SDRSource, ''), 'INBOUND')) AS source,
+      FORMAT_DATE('%Y-%m-%d', CAST(CreatedDate AS DATE)) AS sqo_date,
+      CAST(NULL AS STRING) AS sal_date,
+      CAST(NULL AS STRING) AS sql_date,
+      CAST(NULL AS STRING) AS mql_date,
+      0 AS days_sal_to_sqo,
+      DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY) AS days_total_cycle,
+      CASE
+        WHEN Won THEN 'WON'
+        WHEN IsClosed AND NOT COALESCE(Won, false) THEN 'LOST'
+        WHEN DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY) > 21 THEN 'STALLED'
+        ELSE 'ACTIVE'
+      END AS sqo_status,
+      Id AS opportunity_id,
+      OpportunityName AS opportunity_name,
+      StageName AS opportunity_stage,
+      ACV AS opportunity_acv,
+      COALESCE(ClosedLostReason, 'N/A') AS loss_reason,
+      DATE_DIFF(CURRENT_DATE(), CAST(CreatedDate AS DATE), DAY) AS days_in_stage,
+      'STRATEGIC' AS category
+    FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.OpportunityViewTable\`
+    WHERE Division IN ('US', 'UK', 'AU')
+      AND Type = 'New Business' AND ACV > 100000
+      AND (StageName IN ('Proposal', 'Negotiation', 'Closed Won', 'Closed Lost') OR Won OR IsClosed)
+      AND CAST(CreatedDate AS DATE) >= '${filters.startDate}'
+      AND CAST(CreatedDate AS DATE) <= '${filters.endDate}'
+      ${regionClause.replace(/d\.Region/g, 'Division').replace(/'AMER'/g, "'US'").replace(/'EMEA'/g, "'UK'").replace(/'APAC'/g, "'AU'")}
     ORDER BY sqo_date DESC
   `;
 
   try {
     const [[porRows], [r360Rows]] = await Promise.all([
-      getBigQuery().query({ query: porQuery }),
-      getBigQuery().query({ query: r360Query }),
+      shouldFetchPOR ? getBigQuery().query({ query: porQuery }) : Promise.resolve([[]]),
+      shouldFetchR360 ? getBigQuery().query({ query: r360Query }) : Promise.resolve([[]]),
     ]);
-    console.log(`SQO query returned ${porRows?.length || 0} POR rows, ${r360Rows?.length || 0} R360 rows`);
+
+    // Fetch strategic separately (may error if table doesn't exist)
+    let strategicRows: any[] = [];
+    try {
+      const [rows] = await getBigQuery().query({ query: strategicSqoQuery });
+      strategicRows = rows as any[];
+    } catch (strategicError) {
+      console.warn('Strategic SQO query failed (table may not exist):', strategicError);
+    }
+
+    console.log(`SQO query returned ${porRows?.length || 0} POR rows, ${r360Rows?.length || 0} R360 rows, ${strategicRows?.length || 0} strategic rows`);
 
     return {
-      POR: porRows as any[],
-      R360: r360Rows as any[],
+      POR: [...(porRows as any[]), ...strategicRows.filter(r => r.product === 'POR')],
+      R360: [...(r360Rows as any[]), ...strategicRows.filter(r => r.product === 'R360')],
     };
   } catch (error) {
     console.error('SQO details query failed:', error);
