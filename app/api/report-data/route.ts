@@ -346,14 +346,21 @@ async function getInboundUniqueCounts(filters: ReportFilters): Promise<Map<strin
       ? `AND d.RecordType IN (${filters.products.map(p => `'${p}'`).join(', ')})`
       : '';
 
+    // R360 INBOUND records have NULL LeadID/ContactID — each row IS one unique MQL event.
+    // POR INBOUND records have LeadID/ContactID — same lead appears across multiple CaptureDate rows.
+    // Strategy: COUNT(DISTINCT) for records with identifiers + COUNT(*) for records without.
     const query = `
       SELECT
         CASE d.RecordType WHEN 'POR' THEN 'POR' ELSE 'R360' END AS product,
         d.Region AS region,
-        COUNT(DISTINCT CASE WHEN d.MQL = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_mql,
-        COUNT(DISTINCT CASE WHEN d.\`SQL\` = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sql,
-        COUNT(DISTINCT CASE WHEN d.SAL = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sal,
-        COUNT(DISTINCT CASE WHEN d.SQO = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sqo
+        COUNT(DISTINCT CASE WHEN d.MQL = 1 AND (d.LeadID IS NOT NULL OR d.ContactID IS NOT NULL) THEN COALESCE(d.LeadID, d.ContactID) END)
+          + COUNTIF(d.MQL = 1 AND d.LeadID IS NULL AND d.ContactID IS NULL) AS unique_mql,
+        COUNT(DISTINCT CASE WHEN d.\`SQL\` = 1 AND (d.LeadID IS NOT NULL OR d.ContactID IS NOT NULL) THEN COALESCE(d.LeadID, d.ContactID) END)
+          + COUNTIF(d.\`SQL\` = 1 AND d.LeadID IS NULL AND d.ContactID IS NULL) AS unique_sql,
+        COUNT(DISTINCT CASE WHEN d.SAL = 1 AND (d.LeadID IS NOT NULL OR d.ContactID IS NOT NULL) THEN COALESCE(d.LeadID, d.ContactID) END)
+          + COUNTIF(d.SAL = 1 AND d.LeadID IS NULL AND d.ContactID IS NULL) AS unique_sal,
+        COUNT(DISTINCT CASE WHEN d.SQO = 1 AND (d.LeadID IS NOT NULL OR d.ContactID IS NOT NULL) THEN COALESCE(d.LeadID, d.ContactID) END)
+          + COUNTIF(d.SQO = 1 AND d.LeadID IS NULL AND d.ContactID IS NULL) AS unique_sqo
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\` d
       WHERE UPPER(d.FunnelType) IN ('INBOUND', 'R360 INBOUND')
         AND d.CaptureDate >= '${filters.startDate}'
@@ -403,10 +410,14 @@ async function getInboundSourceCounts(filters: ReportFilters): Promise<Map<strin
           WHEN d.Source IS NULL OR TRIM(d.Source) = '' OR UPPER(TRIM(d.Source)) = 'N/A' THEN 'INBOUND'
           ELSE UPPER(TRIM(d.Source))
         END AS source,
-        COUNT(DISTINCT CASE WHEN d.MQL = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_mql,
-        COUNT(DISTINCT CASE WHEN d.\`SQL\` = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sql,
-        COUNT(DISTINCT CASE WHEN d.SAL = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sal,
-        COUNT(DISTINCT CASE WHEN d.SQO = 1 THEN COALESCE(d.LeadID, d.ContactID) END) AS unique_sqo
+        COUNT(DISTINCT CASE WHEN d.MQL = 1 AND (d.LeadID IS NOT NULL OR d.ContactID IS NOT NULL) THEN COALESCE(d.LeadID, d.ContactID) END)
+          + COUNTIF(d.MQL = 1 AND d.LeadID IS NULL AND d.ContactID IS NULL) AS unique_mql,
+        COUNT(DISTINCT CASE WHEN d.\`SQL\` = 1 AND (d.LeadID IS NOT NULL OR d.ContactID IS NOT NULL) THEN COALESCE(d.LeadID, d.ContactID) END)
+          + COUNTIF(d.\`SQL\` = 1 AND d.LeadID IS NULL AND d.ContactID IS NULL) AS unique_sql,
+        COUNT(DISTINCT CASE WHEN d.SAL = 1 AND (d.LeadID IS NOT NULL OR d.ContactID IS NOT NULL) THEN COALESCE(d.LeadID, d.ContactID) END)
+          + COUNTIF(d.SAL = 1 AND d.LeadID IS NULL AND d.ContactID IS NULL) AS unique_sal,
+        COUNT(DISTINCT CASE WHEN d.SQO = 1 AND (d.LeadID IS NOT NULL OR d.ContactID IS NOT NULL) THEN COALESCE(d.LeadID, d.ContactID) END)
+          + COUNTIF(d.SQO = 1 AND d.LeadID IS NULL AND d.ContactID IS NULL) AS unique_sqo
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.DailyRevenueFunnel\` d
       WHERE UPPER(d.FunnelType) IN ('INBOUND', 'R360 INBOUND')
         AND d.CaptureDate >= '${filters.startDate}'
@@ -1854,53 +1865,41 @@ async function getMQLDetails(filters: ReportFilters) {
     ? `AND Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`
     : '';
 
-  // R360 MQL Query - from DailyRevenueFunnel (authoritative source, matches summary counts)
+  // R360 MQL Query - from R360InboundFunnel directly (DRF has NULL LeadID/ContactID for R360)
+  // R360InboundFunnel has actual lead data (Email, Company, LeadID) for individual records.
+  // Count matches DRF SUM(MQL) since each DRF row corresponds to one R360InboundFunnel record.
   const r360MqlQuery = `
-    WITH funnel_status AS (
-      SELECT
-        COALESCE(LeadId, Email) AS match_key,
-        MAX(CASE WHEN SQL_DT IS NOT NULL THEN 1 ELSE 0 END) AS has_sql,
-        MAX(CASE WHEN SQO_DT IS NOT NULL THEN 1 ELSE 0 END) AS has_sqo
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\`
-      WHERE MQL_Reverted = false AND Region IS NOT NULL
-      GROUP BY 1
-    ),
-    raw_mqls AS (
+    WITH raw_mqls AS (
       SELECT
         'R360' AS product,
-        d.Region AS region,
-        COALESCE(d.LeadID, d.ContactID) AS record_id,
-        CONCAT('https://por.my.salesforce.com/', COALESCE(d.LeadID, d.ContactID)) AS salesforce_url,
-        COALESCE(l.company, a.Name, 'Unknown') AS company_name,
-        COALESCE(l.email, c.email, 'N/A') AS email,
-        UPPER(COALESCE(NULLIF(d.Source, ''), 'INBOUND')) AS source,
-        CAST(d.CaptureDate AS STRING) AS mql_date,
-        CASE WHEN COALESCE(fs.has_sql, 0) = 1 OR l.convertedopportunityid IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
+        f.Region AS region,
+        COALESCE(f.LeadID, f.ContactID, f.OpportunityID) AS record_id,
+        COALESCE(f.LeadLink, CONCAT('https://por.my.salesforce.com/', COALESCE(f.LeadID, f.ContactID, f.OpportunityID))) AS salesforce_url,
+        COALESCE(f.Company, 'Unknown') AS company_name,
+        COALESCE(f.Email, 'N/A') AS email,
+        UPPER(COALESCE(NULLIF(f.SDRSource, ''), NULLIF(f.R360LeadSource, ''), 'INBOUND')) AS source,
+        FORMAT_DATE('%Y-%m-%d', f.MQL_DT) AS mql_date,
+        CASE WHEN f.SQL_DT IS NOT NULL THEN 'Yes' ELSE 'No' END AS converted_to_sql,
         CASE
-          WHEN COALESCE(fs.has_sqo, 0) = 1 THEN 'CONVERTED_SQO'
-          WHEN COALESCE(fs.has_sql, 0) = 1 OR l.convertedopportunityid IS NOT NULL THEN 'CONVERTED'
-          WHEN DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) > 21 THEN 'STALLED'
+          WHEN f.SQO_DT IS NOT NULL THEN 'CONVERTED_SQO'
+          WHEN f.SQL_DT IS NOT NULL THEN 'CONVERTED'
+          WHEN DATE_DIFF(CURRENT_DATE(), f.MQL_DT, DAY) > 21 THEN 'STALLED'
           ELSE 'ACTIVE'
         END AS mql_status,
         false AS was_reverted,
-        DATE_DIFF(CURRENT_DATE(), CAST(d.CaptureDate AS DATE), DAY) AS days_in_stage,
+        DATE_DIFF(CURRENT_DATE(), f.MQL_DT, DAY) AS days_in_stage,
         'MQL' AS lead_type,
         'NEW LOGO' AS category,
         ROW_NUMBER() OVER (
-          PARTITION BY COALESCE(d.LeadID, d.ContactID)
-          ORDER BY d.CaptureDate DESC
+          PARTITION BY COALESCE(f.LeadID, f.Email, CAST(f.MQL_DT AS STRING))
+          ORDER BY f.MQL_DT DESC
         ) AS rn
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.DailyRevenueFunnel\` d
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Lead\` l ON d.LeadID = l.id
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Contact\` c ON d.ContactID = c.id
-      LEFT JOIN \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.Account\` a ON c.accountid = a.Id
-      LEFT JOIN funnel_status fs ON COALESCE(d.LeadID, d.ContactID) = fs.match_key
-      WHERE d.RecordType = 'R360'
-        AND UPPER(d.FunnelType) IN ('INBOUND', 'R360 INBOUND')
-        AND d.MQL = 1
-        AND d.CaptureDate >= '${filters.startDate}'
-        AND d.CaptureDate <= '${filters.endDate}'
-        ${r360RegionClause ? r360RegionClause.replace('Region', 'd.Region') : ''}
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.MARKETING_FUNNEL}.R360InboundFunnel\` f
+      WHERE f.MQL_Reverted = false
+        AND f.Region IS NOT NULL
+        AND f.MQL_DT >= '${filters.startDate}'
+        AND f.MQL_DT <= '${filters.endDate}'
+        ${filters.regions && filters.regions.length > 0 ? `AND f.Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})` : ''}
     )
     SELECT * EXCEPT(rn) FROM raw_mqls WHERE rn = 1
     ORDER BY mql_date DESC
