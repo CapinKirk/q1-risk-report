@@ -50,6 +50,11 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          hd: 'pointofrental.com', // Restrict to org domain on Google consent screen
+        },
+      },
     }),
     // Salesforce provider for data enrichment (optional secondary auth)
     ...(SALESFORCE_CLIENT_ID && SALESFORCE_CLIENT_SECRET ? [

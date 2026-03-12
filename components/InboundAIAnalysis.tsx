@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
 import { ReportData, Product, Region, Category, ProductTotal, AttainmentRow } from '@/lib/types';
 
 interface InboundAIAnalysisProps {
@@ -203,7 +204,11 @@ function formatInline(text: string): string {
   // Negative variances (not already in a span)
   result = result.replace(/(?<!<span[^>]*>)(-\$?[\d,]+\.?\d*%?)(?![^<]*<\/span>)/g, '<span class="text-red">$1</span>');
 
-  return result;
+  // Sanitize to prevent XSS from AI-generated content
+  return DOMPurify.sanitize(result, {
+    ALLOWED_TAGS: ['strong', 'em', 'code', 'span', 'li'],
+    ALLOWED_ATTR: ['class', 'value'],
+  });
 }
 
 // Detect section type from header text

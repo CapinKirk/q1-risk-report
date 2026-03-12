@@ -806,9 +806,13 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
+    const validProducts = ['POR', 'R360'];
+    const validRegions = ['AMER', 'EMEA', 'APAC'];
     const filters: RequestFilters = {
-      products: searchParams.get('products')?.split(',').filter(Boolean) || [],
-      regions: searchParams.get('regions')?.split(',').filter(Boolean) || [],
+      products: (searchParams.get('products')?.split(',').filter(Boolean) || [])
+        .filter(p => validProducts.includes(p)),
+      regions: (searchParams.get('regions')?.split(',').filter(Boolean) || [])
+        .filter(r => validRegions.includes(r)),
     };
 
     // Check if refresh from Salesforce is requested

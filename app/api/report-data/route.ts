@@ -3526,10 +3526,28 @@ export async function POST(request: Request) {
       );
     }
 
+    // Input validation — prevent SQL injection via string interpolation
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+      return NextResponse.json(
+        { error: 'startDate and endDate must be YYYY-MM-DD format' },
+        { status: 400 }
+      );
+    }
+
+    const validProducts = ['POR', 'R360'];
+    const validRegions = ['AMER', 'EMEA', 'APAC'];
+    const safeProducts = (Array.isArray(products) ? products : []).filter(
+      (p: unknown): p is string => typeof p === 'string' && validProducts.includes(p)
+    );
+    const safeRegions = (Array.isArray(regions) ? regions : []).filter(
+      (r: unknown): r is string => typeof r === 'string' && validRegions.includes(r)
+    );
+
     const validProfiles = ['P50', 'P75', 'P90'];
     const safeRiskProfile = validProfiles.includes(riskProfile) ? riskProfile : 'P90';
 
-    const filters: ReportFilters = { startDate, endDate, products, regions, riskProfile: safeRiskProfile };
+    const filters: ReportFilters = { startDate, endDate, products: safeProducts, regions: safeRegions, riskProfile: safeRiskProfile };
 
     // Execute all BigQuery queries in parallel
     const [

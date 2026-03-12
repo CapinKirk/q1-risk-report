@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
   try {
     // Check for test bypass header (for E2E testing)
     const testBypass = request.headers.get('x-playwright-test');
-    const isTestMode = testBypass === (process.env.PLAYWRIGHT_TEST_SECRET || 'e2e-test-bypass-2026');
+    const testSecret = process.env.PLAYWRIGHT_TEST_SECRET;
+    const isTestMode = !!(testSecret && testBypass === testSecret);
 
     // Get session and check for SF tokens
     const session = await getServerSession(authOptions);

@@ -19,7 +19,7 @@ export default defineConfig({
     trace: 'on-first-retry',
     // Test bypass header for E2E testing (bypasses auth middleware)
     extraHTTPHeaders: {
-      'x-playwright-test': process.env.PLAYWRIGHT_TEST_SECRET || 'e2e-test-bypass-2026',
+      'x-playwright-test': process.env.PLAYWRIGHT_TEST_SECRET || '',
     },
   },
   projects: [

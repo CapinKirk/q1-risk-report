@@ -940,10 +940,10 @@ export async function GET() {
     });
 
   } catch (error: any) {
+    console.error('bq-explore error:', error);
     return NextResponse.json({
       success: false,
-      error: error.message,
-      stack: error.stack,
-    });
+      error: 'Internal server error',
+    }, { status: 500 });
   }
 }

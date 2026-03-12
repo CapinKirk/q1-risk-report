@@ -1,32 +1,37 @@
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
-// Simple API key check for protection
+// API key required — fail closed if not configured
 const API_KEY = process.env.REFRESH_API_KEY;
 
 export async function POST(request: Request) {
-  // Check for API key if configured
-  if (API_KEY) {
-    const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${API_KEY}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+  // Require API key — reject if not configured
+  if (!API_KEY) {
+    return NextResponse.json(
+      { error: 'Refresh endpoint not configured' },
+      { status: 503 }
+    );
+  }
+
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${API_KEY}`) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
   }
 
   try {
     // Path to the generate-data script
     const scriptPath = path.join(process.cwd(), 'scripts', 'generate-data.py');
 
-    // Run the Python script
-    const { stdout, stderr } = await execAsync(`python3 ${scriptPath}`, {
+    // Run the Python script (execFile avoids shell interpretation)
+    const { stderr } = await execFileAsync('python3', [scriptPath], {
       timeout: 120000, // 2 minute timeout
     });
 
@@ -49,20 +54,12 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('Refresh error:', error);
     return NextResponse.json(
-      {
-        error: 'Failed to refresh data',
-        details: error.message,
-      },
+      { error: 'Failed to refresh data' },
       { status: 500 }
     );
   }
 }
 
 export async function GET() {
-  return NextResponse.json({
-    endpoint: '/api/refresh',
-    method: 'POST',
-    description: 'Refreshes report data from BigQuery',
-    auth: API_KEY ? 'Bearer token required' : 'No auth configured',
-  });
+  return NextResponse.json({ error: 'Method not allowed. Use POST.' }, { status: 405 });
 }

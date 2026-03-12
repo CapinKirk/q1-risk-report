@@ -1,13 +1,13 @@
 import { getToken } from 'next-auth/jwt';
 import { NextResponse, NextRequest } from 'next/server';
 
-// Test bypass for E2E testing - check for specific header
+// Test bypass for E2E testing - only enabled when env var is explicitly set
 const TEST_BYPASS_HEADER = 'x-playwright-test';
-const TEST_BYPASS_VALUE = process.env.PLAYWRIGHT_TEST_SECRET || 'e2e-test-bypass-2026';
+const TEST_BYPASS_VALUE = process.env.PLAYWRIGHT_TEST_SECRET; // No fallback — fail closed
 
 export default async function middleware(req: NextRequest) {
-  // Allow test bypass for E2E testing
-  if (req.headers.get(TEST_BYPASS_HEADER) === TEST_BYPASS_VALUE) {
+  // Allow test bypass for E2E testing (only if PLAYWRIGHT_TEST_SECRET is configured)
+  if (TEST_BYPASS_VALUE && req.headers.get(TEST_BYPASS_HEADER) === TEST_BYPASS_VALUE) {
     return NextResponse.next();
   }
 
