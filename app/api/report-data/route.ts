@@ -4875,33 +4875,5 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({
-    endpoint: '/api/report-data',
-    method: 'POST',
-    description: 'Fetch Q1 2026 Risk Report data using RevOps architecture with P90 targets',
-    data_sources: {
-      targets: 'Staging.RevOpsReport (RiskProfile=P90, Horizon=QTD)',
-      actuals: 'sfdc.OpportunityViewTable + RevOpsReport.Actual_ACV',
-      funnel: 'MarketingFunnel.InboundFunnel, R360InboundFunnel, DailyRevenueFunnel',
-      google_ads: 'GoogleAds_POR_*, GoogleAds_Record360_*',
-    },
-    parameters: {
-      startDate: 'YYYY-MM-DD (required)',
-      endDate: 'YYYY-MM-DD (required)',
-      products: 'Array of POR/R360 (optional)',
-      regions: 'Array of AMER/EMEA/APAC (optional)',
-    },
-    example: {
-      startDate: '2026-01-01',
-      endDate: '2026-01-16',
-      products: ['POR'],
-      regions: ['AMER', 'EMEA'],
-    },
-    notes: [
-      'Uses P90 risk profile for conservative/realistic targets',
-      'RevOpsReport provides pre-calculated QTD attainment',
-      'OpportunityType maps to Category (New Business -> NEW LOGO, etc.)',
-      'Renewal forecasts include expected uplift from auto-renewing contracts',
-    ],
-  });
+  return NextResponse.json({ error: 'Method not allowed. Use POST.' }, { status: 405 });
 }

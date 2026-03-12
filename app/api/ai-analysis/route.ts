@@ -1224,19 +1224,5 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
 }
 
 export async function GET() {
-  return NextResponse.json({
-    endpoint: '/api/ai-analysis',
-    method: 'POST',
-    description: 'Generate AI-powered analysis of bookings performance (two-stage: insights + formatting)',
-    parameters: {
-      reportData: 'Full report data object from /api/report-data',
-      analysisType: 'bookings_miss | pipeline_risk | full_report (optional)',
-      formats: 'Array of output formats: display | html | slack (default: ["display"])',
-    },
-    response: {
-      analysis: 'Primary formatted output (first format in array)',
-      raw_analysis: 'Raw unformatted insights from GPT-4o',
-      formatted: 'Object with all requested formats { display, html, slack }',
-    },
-  });
+  return NextResponse.json({ error: 'Method not allowed. Use POST.' }, { status: 405 });
 }

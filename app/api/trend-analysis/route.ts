@@ -1263,30 +1263,5 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({
-    endpoint: '/api/trend-analysis',
-    method: 'POST',
-    description: 'Runs comprehensive trend analysis comparing two date periods with full report details',
-    note: 'Currently using mock data generator. For production BigQuery integration, configure GOOGLE_APPLICATION_CREDENTIALS.',
-    sections: [
-      'revenueSummary', 'funnelSummary', 'executiveCounts', 'winsBrightSpots',
-      'momentumIndicators', 'topRiskPockets', 'revenueByDimension', 'funnelByDimension',
-      'attainmentDetail', 'sourceAttainment', 'funnelHealth', 'funnelByCategory',
-      'funnelBySource', 'funnelTrends', 'funnelRCAInsights', 'pipelineRCA',
-      'lossReasonRCA', 'googleAds', 'googleAdsRCA', 'actionItems',
-      'wonDeals', 'lostDeals', 'pipelineDeals', 'charts'
-    ],
-    parameters: {
-      startDate: 'YYYY-MM-DD (required)',
-      endDate: 'YYYY-MM-DD (required)',
-      products: 'Array of products ["POR", "R360"] (optional)',
-      regions: 'Array of regions ["AMER", "EMEA", "APAC"] (optional)',
-    },
-    example: {
-      startDate: '2026-01-08',
-      endDate: '2026-01-14',
-      products: ['POR'],
-      regions: ['AMER', 'EMEA'],
-    },
-  });
+  return NextResponse.json({ error: 'Method not allowed. Use POST.' }, { status: 405 });
 }
