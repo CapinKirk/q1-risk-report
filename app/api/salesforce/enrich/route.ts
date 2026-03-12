@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: EnrichRequest = await request.json();
-    const { opportunityIds, fields = DEFAULT_FIELDS } = body;
+    const { opportunityIds, fields } = body;
 
     if (!opportunityIds || !Array.isArray(opportunityIds) || opportunityIds.length === 0) {
       return NextResponse.json(
@@ -89,6 +89,24 @@ export async function POST(request: NextRequest) {
     if (opportunityIds.length > 200) {
       return NextResponse.json(
         { error: 'Maximum 200 opportunity IDs per request' },
+        { status: 400 }
+      );
+    }
+
+    // Validate fields against allowlist to prevent SOQL injection
+    const ALLOWED_FIELDS = new Set(DEFAULT_FIELDS);
+    const safeFields = (Array.isArray(fields) ? fields : [])
+      .filter((f: unknown): f is string => typeof f === 'string' && ALLOWED_FIELDS.has(f));
+    const validatedFields = safeFields.length > 0 ? safeFields : DEFAULT_FIELDS;
+
+    // Validate opportunity IDs — must be 15 or 18 char alphanumeric Salesforce IDs
+    const sfIdRegex = /^[a-zA-Z0-9]{15,18}$/;
+    const safeIds = opportunityIds.filter((id: unknown): id is string =>
+      typeof id === 'string' && sfIdRegex.test(id)
+    );
+    if (safeIds.length === 0) {
+      return NextResponse.json(
+        { error: 'No valid Salesforce IDs provided' },
         { status: 400 }
       );
     }
@@ -118,12 +136,12 @@ export async function POST(request: NextRequest) {
       version: '59.0',
     });
 
-    // Build SOQL query
-    const fieldList = fields.join(', ');
-    const idList = opportunityIds.map(id => `'${id}'`).join(', ');
+    // Build SOQL query with validated inputs
+    const fieldList = validatedFields.join(', ');
+    const idList = safeIds.map(id => `'${id}'`).join(', ');
     const soql = `SELECT ${fieldList} FROM Opportunity WHERE Id IN (${idList})`;
 
-    console.log(`Enriching ${opportunityIds.length} opportunities from Salesforce`);
+    console.log(`Enriching ${safeIds.length} opportunities from Salesforce`);
 
     // Execute query
     const result = await conn.query<EnrichedOpportunity>(soql);
@@ -157,7 +175,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to enrich data from Salesforce', details: error.message },
+      { error: 'Failed to enrich data from Salesforce' },
       { status: 500 }
     );
   }

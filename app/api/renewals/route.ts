@@ -958,8 +958,7 @@ export async function GET(request: Request) {
         pipelineRenewalsCount: 0,
         durationMs: Date.now() - startTime,
         generatedAt: new Date().toISOString(),
-        error: error.message,
-        note: 'Data unavailable - showing empty state',
+        note: 'Data temporarily unavailable',
       },
     });
   }

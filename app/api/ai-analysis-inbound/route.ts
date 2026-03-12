@@ -989,7 +989,7 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT output "---" horizontal
   } catch (error: any) {
     console.error('Inbound AI Analysis error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate analysis', details: error.message },
+      { error: 'Failed to generate analysis' },
       { status: 500 }
     );
   }

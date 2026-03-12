@@ -83,7 +83,7 @@ export const authOptions: NextAuthOptions = {
 
       // For Google (primary auth), check email domain
       if (!isAllowedEmail(user.email)) {
-        console.log(`Access denied for email: ${user.email}`);
+        console.log('Access denied: unauthorized email domain');
         return false;
       }
       return true;

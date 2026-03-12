@@ -4883,10 +4883,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('BigQuery error:', error);
     return NextResponse.json(
-      {
-        error: 'Failed to fetch data from BigQuery',
-        details: error.message,
-      },
+      { error: 'Failed to fetch data from BigQuery' },
       { status: 500 }
     );
   }

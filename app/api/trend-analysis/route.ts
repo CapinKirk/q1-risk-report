@@ -1253,10 +1253,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('Trend analysis error:', error);
     return NextResponse.json(
-      {
-        error: 'Failed to run trend analysis',
-        details: error.message,
-      },
+      { error: 'Failed to run trend analysis' },
       { status: 500 }
     );
   }

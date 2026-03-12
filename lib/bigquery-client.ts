@@ -88,25 +88,31 @@ export function buildFilterClause(
     includeRegionMapping = true,
   } = options;
 
+  // Defensive validation — reject unrecognized values regardless of caller
+  const VALID_REGIONS = new Set(['AMER', 'EMEA', 'APAC']);
+  const VALID_PRODUCTS = new Set(['POR', 'R360']);
+  const safeRegions = regions.filter(r => VALID_REGIONS.has(r));
+  const safeProducts = products.filter(p => VALID_PRODUCTS.has(p));
+
   const conditions: string[] = [];
 
   // Region filter
-  if (regions.length > 0 && regions.length < 3) {
+  if (safeRegions.length > 0 && safeRegions.length < 3) {
     if (includeRegionMapping) {
       // Map AMER/EMEA/APAC back to US/UK/AU for Salesforce queries
-      const divisionValues = regions.map(r => {
+      const divisionValues = safeRegions.map(r => {
         const map: Record<string, string> = { 'AMER': 'US', 'EMEA': 'UK', 'APAC': 'AU' };
         return `'${map[r] || r}'`;
       });
       conditions.push(`${regionColumn} IN (${divisionValues.join(', ')})`);
     } else {
-      conditions.push(`${regionColumn} IN (${regions.map(r => `'${r}'`).join(', ')})`);
+      conditions.push(`${regionColumn} IN (${safeRegions.map(r => `'${r}'`).join(', ')})`);
     }
   }
 
   // Product filter
-  if (products.length === 1) {
-    const isPOR = products[0] === 'POR';
+  if (safeProducts.length === 1) {
+    const isPOR = safeProducts[0] === 'POR';
     conditions.push(`${productColumn} = ${isPOR}`);
   }
 
