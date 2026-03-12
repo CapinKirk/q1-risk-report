@@ -16,7 +16,7 @@
     "test:report": "playwright show-report tests/test-results/html"
   },
   "dependencies": {
-    "@google-cloud/bigquery": "^8.1.1",
+    "@google-cloud/bigquery": "8.1.1",
     "isomorphic-dompurify": "^3.3.0",
     "jsforce": "^3.10.13",
     "next": "^14.0.0",
