@@ -169,7 +169,7 @@ async function getRenewalTargets(): Promise<RenewalTargets> {
       }
     }
 
-    console.log('Renewal targets (P90 from RevOpsReport):', JSON.stringify(targets, null, 2));
+    console.log('Renewal targets loaded:', Object.keys(targets).length, 'products');
     return targets;
   } catch (error: any) {
     console.error('Failed to fetch renewal targets from RevOpsReport:', error.message);
@@ -467,9 +467,13 @@ async function getRenewalOpportunities(filters: RequestFilters): Promise<{
 
     let regionClause = '';
     if (filters.regions && filters.regions.length > 0 && filters.regions.length < 3) {
+      const VALID_REGIONS = new Set(['AMER', 'EMEA', 'APAC']);
       const divisionMap: Record<string, string> = { AMER: 'US', EMEA: 'UK', APAC: 'AU' };
-      const divisions = filters.regions.map(r => `'${divisionMap[r]}'`).join(', ');
-      regionClause = `AND Division IN (${divisions})`;
+      const safeRegions = filters.regions.filter(r => VALID_REGIONS.has(r));
+      if (safeRegions.length > 0) {
+        const divisions = safeRegions.map(r => `'${divisionMap[r]}'`).join(', ');
+        regionClause = `AND Division IN (${divisions})`;
+      }
     }
 
     // Query for closed renewals (Q1 2026) - Updated 2026-01-22
@@ -850,8 +854,7 @@ export async function GET(request: Request) {
 
     const sfAvailable = contracts.length > 0;
     const isLiveData = dataSource === 'salesforce';
-    console.log(`Contracts from BQ: ${contracts.length}, BQ Renewals: won=${bqRenewals.won.length}, lost=${bqRenewals.lost.length}, pipeline=${bqRenewals.pipeline.length}`);
-    console.log('Renewal targets:', renewalTargets);
+    console.log(`Renewals: won=${bqRenewals.won.length}, lost=${bqRenewals.lost.length}, pipeline=${bqRenewals.pipeline.length}`);
 
     // Split by product
     const wonByProduct = splitByProduct(bqRenewals.won);

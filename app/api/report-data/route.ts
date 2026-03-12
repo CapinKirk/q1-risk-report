@@ -4841,11 +4841,6 @@ export async function POST(request: Request) {
       report_date: endDate,
       filters_applied: filters,
       period: periodInfo,
-      data_source: {
-        targets: 'RevOpsReport (P90)',
-        actuals: 'sfdc.OpportunityViewTable + RevOpsReport',
-        funnel: 'MarketingFunnel + DailyRevenueFunnel',
-      },
       grand_total: grandTotal,
       product_totals: productTotals,
       attainment_detail: attainmentDetail,

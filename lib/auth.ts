@@ -74,14 +74,7 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      // For Salesforce OAuth, store tokens but don't block sign-in
-      if (account?.provider === 'salesforce') {
-        // SF sign-in is for linking, not primary auth
-        // We'll handle token storage in the jwt callback
-        return true;
-      }
-
-      // For Google (primary auth), check email domain
+      // All providers must pass email domain check
       if (!isAllowedEmail(user.email)) {
         console.log('Access denied: unauthorized email domain');
         return false;

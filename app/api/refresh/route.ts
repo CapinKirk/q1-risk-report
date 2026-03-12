@@ -9,6 +9,10 @@ const execFileAsync = promisify(execFile);
 // API key required — fail closed if not configured
 const API_KEY = process.env.REFRESH_API_KEY;
 
+// Rate limiting: minimum 60 seconds between refresh calls
+let lastRefreshTime = 0;
+const RATE_LIMIT_MS = 60_000;
+
 export async function POST(request: Request) {
   // Require API key — reject if not configured
   if (!API_KEY) {
@@ -25,6 +29,16 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
+
+  // Rate limit check
+  const now = Date.now();
+  if (now - lastRefreshTime < RATE_LIMIT_MS) {
+    return NextResponse.json(
+      { error: 'Rate limited. Try again later.' },
+      { status: 429 }
+    );
+  }
+  lastRefreshTime = now;
 
   try {
     // Path to the generate-data script

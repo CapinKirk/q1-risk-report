@@ -1084,8 +1084,8 @@ Do NOT use numbered lists (no "1.", "2." prefix). Do NOT write flat bullet lists
         console.error(`OpenAI API error (insights, attempt ${attempt + 1}):`, errorData);
         if (attempt === MAX_RETRIES) {
           return NextResponse.json(
-            { error: 'Failed to generate insights', details: errorData },
-            { status: insightResponse.status }
+            { error: 'Failed to generate insights' },
+            { status: 502 }
           );
         }
         continue;
