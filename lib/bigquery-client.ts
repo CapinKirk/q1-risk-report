@@ -30,7 +30,7 @@ export function getBigQueryClient(): BigQuery {
       });
       // BigQuery credentials loaded from environment variable
     } catch (error) {
-      console.error('BigQuery: Failed to parse credentials JSON:', error);
+      console.error('BigQuery: Failed to parse credentials JSON:', error instanceof Error ? error.message : 'Parse error');
       // Fall back to default credentials
       bigQueryInstance = new BigQuery({
         projectId: BIGQUERY_CONFIG.PROJECT_ID,

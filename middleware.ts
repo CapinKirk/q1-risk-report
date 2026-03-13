@@ -24,7 +24,9 @@ export default async function middleware(req: NextRequest) {
     }
     // Page routes: redirect to sign-in
     const signInUrl = new URL('/auth/signin', req.url);
-    signInUrl.searchParams.set('callbackUrl', req.url);
+    const rawCallback = req.nextUrl.pathname + req.nextUrl.search;
+    const safeCallback = rawCallback.startsWith('/') && !rawCallback.startsWith('//') ? rawCallback : '/';
+    signInUrl.searchParams.set('callbackUrl', safeCallback);
     return NextResponse.redirect(signInUrl);
   }
 

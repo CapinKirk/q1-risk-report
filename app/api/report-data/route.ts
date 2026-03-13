@@ -219,7 +219,7 @@ async function getRevOpsPerformanceData(filters: ReportFilters): Promise<{
       q1: q1Rows as any[],
     };
   } catch (error) {
-    console.warn('RevOpsPerformance query failed:', error);
+    console.warn('RevOpsPerformance query failed:', error instanceof Error ? error.message : 'Unknown error');
     return { period: [], q1: [] };
   }
 }
@@ -274,7 +274,7 @@ async function getExpMigUniqueOppCounts(filters: ReportFilters): Promise<Map<str
     }
     return result;
   } catch (error: any) {
-    console.warn('ExpMig unique opp counts query failed:', error?.message || error);
+    console.warn('ExpMig unique opp counts query failed:', error instanceof Error ? error.message : 'Unknown error');
     return new Map();
   }
 }
@@ -328,7 +328,7 @@ async function getExpMigSourceCounts(filters: ReportFilters): Promise<Map<string
     }
     return result;
   } catch (error: any) {
-    console.warn('ExpMig source counts query failed:', error?.message || error);
+    console.warn('ExpMig source counts query failed:', error instanceof Error ? error.message : 'Unknown error');
     return new Map();
   }
 }
@@ -386,7 +386,7 @@ async function getInboundUniqueCounts(filters: ReportFilters): Promise<Map<strin
     }
     return result;
   } catch (error: any) {
-    console.warn('Inbound unique lead counts query failed:', error?.message || error);
+    console.warn('Inbound unique lead counts query failed:', error instanceof Error ? error.message : 'Unknown error');
     return new Map();
   }
 }
@@ -443,7 +443,7 @@ async function getInboundSourceCounts(filters: ReportFilters): Promise<Map<strin
     }
     return result;
   } catch (error: any) {
-    console.warn('Inbound source counts query failed:', error?.message || error);
+    console.warn('Inbound source counts query failed:', error instanceof Error ? error.message : 'Unknown error');
     return new Map();
   }
 }
@@ -1703,7 +1703,7 @@ async function getSourceActuals(filters: ReportFilters) {
     const [rows] = await getBigQuery().query({ query });
     return rows;
   } catch (error) {
-    console.warn('Source actuals query failed:', error);
+    console.warn('Source actuals query failed:', error instanceof Error ? error.message : 'Unknown error');
     return [];
   }
 }
@@ -1760,7 +1760,7 @@ async function getPipelineAge(filters: ReportFilters) {
     const [rows] = await getBigQuery().query({ query });
     return rows;
   } catch (error) {
-    console.warn('Pipeline age query failed:', error);
+    console.warn('Pipeline age query failed:', error instanceof Error ? error.message : 'Unknown error');
     return [];
   }
 }
@@ -1796,7 +1796,7 @@ async function getLossReasonRCA(filters: ReportFilters) {
     const [rows] = await getBigQuery().query({ query });
     return rows;
   } catch (error) {
-    console.warn('Loss reason RCA query failed:', error);
+    console.warn('Loss reason RCA query failed:', error instanceof Error ? error.message : 'Unknown error');
     return [];
   }
 }
@@ -2035,7 +2035,7 @@ async function getMQLDetails(filters: ReportFilters) {
       ? (await getBigQuery().query({ query: porMqlQuery }))[0] as any[]
       : [];
   } catch (error) {
-    console.warn('POR MQL details query failed:', error);
+    console.warn('POR MQL details query failed:', error instanceof Error ? error.message : 'Unknown error');
   }
 
   try {
@@ -2043,20 +2043,20 @@ async function getMQLDetails(filters: ReportFilters) {
       ? (await getBigQuery().query({ query: r360MqlQuery }))[0] as any[]
       : [];
   } catch (error) {
-    console.warn('R360 MQL details query failed:', error);
+    console.warn('R360 MQL details query failed:', error instanceof Error ? error.message : 'Unknown error');
   }
 
   try {
     eqlRows = (await getBigQuery().query({ query: eqlQuery }))[0] as any[];
   } catch (error: any) {
-    console.warn('EQL details query failed:', error?.message || error);
+    console.warn('EQL details query failed:', error instanceof Error ? error.message : 'Unknown error');
     eqlRows = [];
   }
 
   try {
     strategicMqlRows = (await getBigQuery().query({ query: strategicMqlQuery }))[0] as any[];
   } catch (error: any) {
-    console.warn('Strategic MQL details query failed:', error?.message || error);
+    console.warn('Strategic MQL details query failed:', error instanceof Error ? error.message : 'Unknown error');
     strategicMqlRows = [];
   }
 
@@ -2490,7 +2490,7 @@ async function getSQLDetails(filters: ReportFilters) {
     try {
       [strategicRows] = await getBigQuery().query({ query: strategicSqlQuery }) as any[];
     } catch (error) {
-      console.warn('Strategic SQL query failed:', error);
+      console.warn('Strategic SQL query failed:', error instanceof Error ? error.message : 'Unknown error');
     }
 
     const [[porRows], [r360Rows]] = await Promise.all([
@@ -2507,7 +2507,7 @@ async function getSQLDetails(filters: ReportFilters) {
       R360: r360Data as any[],
     };
   } catch (error) {
-    console.warn('SQL details query failed:', error);
+    console.warn('SQL details query failed:', error instanceof Error ? error.message : 'Unknown error');
     return { POR: [], R360: [] };
   }
 }
@@ -3488,7 +3488,7 @@ async function getGoogleAds(filters: ReportFilters) {
     const [rows] = await getBigQuery().query({ query });
     return rows;
   } catch (error) {
-    console.warn('Google Ads query failed, returning empty:', error);
+    console.warn('Google Ads query failed, returning empty:', error instanceof Error ? error.message : 'Unknown error');
     return [];
   }
 }

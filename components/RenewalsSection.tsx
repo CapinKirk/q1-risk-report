@@ -9,7 +9,7 @@ import {
   Product,
   Region,
 } from '@/lib/types';
-import { formatCurrency, formatPercent } from '@/lib/formatters';
+import { formatCurrency, formatPercent, safeSalesforceUrl } from '@/lib/formatters';
 import SortableHeader from './SortableHeader';
 import { useSortableTable } from '@/lib/useSortableTable';
 import RegionBadge from './RegionBadge';
@@ -586,7 +586,7 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
               {(activeTab === 'won' ? renewalsTableWon.sortedData : renewalsTablePipeline.sortedData).slice(0, 20).map((opp, i) => (
                 <tr key={i}>
                   <td>
-                    <a href={opp.salesforce_url} target="_blank" rel="noopener noreferrer">
+                    <a href={safeSalesforceUrl(opp.salesforce_url)} target="_blank" rel="noopener noreferrer">
                       {opp.account_name}
                     </a>
                   </td>
@@ -677,7 +677,7 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
                 <tr key={i}>
                   <td>
                     <a
-                      href={contract.SalesforceUrl || `https://por.my.salesforce.com/${contract.Id}`}
+                      href={safeSalesforceUrl(contract.SalesforceUrl || (/^[a-zA-Z0-9]{15,18}$/.test(contract.Id) ? `https://por.my.salesforce.com/${contract.Id}` : ''))}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -791,7 +791,7 @@ export default function RenewalsSection({ products, regions, refreshKey = 0 }: R
                 <tr key={i} className="warning-row">
                   <td>
                     <a
-                      href={contract.SalesforceUrl || `https://por.my.salesforce.com/${contract.Id}`}
+                      href={safeSalesforceUrl(contract.SalesforceUrl || (/^[a-zA-Z0-9]{15,18}$/.test(contract.Id) ? `https://por.my.salesforce.com/${contract.Id}` : ''))}
                       target="_blank"
                       rel="noopener noreferrer"
                     >

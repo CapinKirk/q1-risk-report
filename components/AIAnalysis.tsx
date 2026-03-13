@@ -790,8 +790,10 @@ function toHTMLExport(markdown: string, generatedAt: string | null): string {
 
   for (const section of sections) {
     switch (section.type) {
-      case 'header':
-        html.push(`<h2 style="font-size:18px;font-weight:600;color:${section.header!.color};margin:24px 0 12px;padding:12px 16px;background:${section.header!.color}10;border-left:4px solid ${section.header!.color};border-radius:0 6px 6px 0;">${escapeHtml(section.header!.emoji)} ${escapeHtml(section.header!.title)}</h2>`);
+      case 'header': {
+        const safeColor = /^#[0-9a-fA-F]{3,8}$/.test(section.header!.color) ? section.header!.color : '#10b981';
+        html.push(`<h2 style="font-size:18px;font-weight:600;color:${safeColor};margin:24px 0 12px;padding:12px 16px;background:${safeColor}10;border-left:4px solid ${safeColor};border-radius:0 6px 6px 0;">${escapeHtml(section.header!.emoji)} ${escapeHtml(section.header!.title)}</h2>`);
+      }
         break;
       case 'metrics':
         html.push('<div style="display:flex;flex-direction:column;gap:8px;margin:12px 0;">');
@@ -847,7 +849,7 @@ function toHTMLExport(markdown: string, generatedAt: string | null): string {
     }
   }
 
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Analysis & Recommendations</title>
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';"><title>Analysis & Recommendations</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:900px;margin:0 auto;padding:40px 20px;background:#fff;color:#1f2937;line-height:1.6;}
 strong{font-weight:600;}.badge-por{background:#22c55e;color:white;padding:2px 6px;border-radius:3px;font-size:12px;font-weight:600;}
 .badge-r360{background:#ef4444;color:white;padding:2px 6px;border-radius:3px;font-size:12px;font-weight:600;}

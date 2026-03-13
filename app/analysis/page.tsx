@@ -92,7 +92,7 @@ function AnalysisContent() {
 
       setTrendData(result.data);
     } catch (err: any) {
-      console.error('Analysis error:', err);
+      console.error('Analysis error:', err instanceof Error ? err.message : 'Unknown error');
       setError(err.message || 'Failed to analyze trends');
     } finally {
       setIsLoading(false);

@@ -394,7 +394,7 @@ function ReportContent() {
 
       return transformedData;
     } catch (error: any) {
-      console.error('Live data fetch error:', error);
+      console.error('Live data fetch error:', error instanceof Error ? error.message : 'Unknown error');
       setRefreshError(error.message || 'Failed to fetch live data');
       return null;
     } finally {

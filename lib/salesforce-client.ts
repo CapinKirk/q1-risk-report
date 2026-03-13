@@ -88,7 +88,7 @@ export function executeSoqlViaCLI<T = any>(soql: string): T[] {
         // Fall through to original error
       }
     }
-    console.error('SF CLI query error:', error.message);
+    console.error('SF CLI query error:', error instanceof Error ? error.message : 'Unknown error');
     throw error;
   }
 }
@@ -133,7 +133,7 @@ export async function getSalesforceConnection(): Promise<Connection> {
       } as any);
 
     } catch (jwtError: any) {
-      console.warn('JWT auth failed, falling back to username-password:', jwtError.message);
+      console.warn('JWT auth failed, falling back to username-password');
 
       // Fall back to username-password
       if (!password) {
