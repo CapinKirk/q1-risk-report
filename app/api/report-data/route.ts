@@ -4896,7 +4896,7 @@ export async function POST(request: Request) {
     });
 
   } catch (error: any) {
-    console.error('BigQuery error:', error);
+    console.error('BigQuery error:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json(
       { error: 'Failed to fetch data from BigQuery' },
       { status: 500 }

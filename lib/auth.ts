@@ -50,11 +50,6 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          hd: 'pointofrental.com', // Restrict to org domain on Google consent screen
-        },
-      },
     }),
     // Salesforce provider for data enrichment (optional secondary auth)
     ...(SALESFORCE_CLIENT_ID && SALESFORCE_CLIENT_SECRET ? [
@@ -76,7 +71,7 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account, profile }) {
       // All providers must pass email domain check
       if (!isAllowedEmail(user.email)) {
-        console.log('Access denied: unauthorized email domain');
+        console.warn('Access denied: unauthorized email domain');
         return false;
       }
       return true;
@@ -105,7 +100,7 @@ export const authOptions: NextAuthOptions = {
           refreshToken: account.refresh_token,
           expiresAt: account.expires_at ? account.expires_at * 1000 : undefined,
         };
-        console.log('Salesforce tokens stored in session');
+        // Salesforce tokens stored in session
       }
 
       return token;
@@ -124,6 +119,7 @@ export const authOptions: NextAuthOptions = {
 /**
  * Check if user has Salesforce connection in their session
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function hasSalesforceConnection(session: any): boolean {
   return !!(session?.salesforce?.accessToken);
 }
@@ -131,6 +127,7 @@ export function hasSalesforceConnection(session: any): boolean {
 /**
  * Get Salesforce tokens from session (if available)
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getSalesforceTokens(session: any): { accessToken: string; instanceUrl: string } | null {
   if (!session?.salesforce?.accessToken) {
     return null;
