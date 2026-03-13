@@ -13,6 +13,7 @@ import {
   Product,
   Region,
 } from '@/lib/types';
+import { requireAuth } from '@/lib/api-auth';
 
 // Empty summary for fallback
 function getEmptySummary(): RenewalSummary {
@@ -169,7 +170,6 @@ async function getRenewalTargets(): Promise<RenewalTargets> {
       }
     }
 
-    console.log('Renewal targets loaded:', Object.keys(targets).length, 'products');
     return targets;
   } catch (error: any) {
     console.error('Failed to fetch renewal targets from RevOpsReport:', error.message);
@@ -254,7 +254,6 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
       LIMIT 2000
     `;
 
-    console.log('Querying Contract data from BigQuery with USD conversion...');
     const [rows] = await bigquery.query({ query });
 
     const today = new Date();
@@ -323,13 +322,10 @@ async function queryContractsFromBigQuery(): Promise<SalesforceContract[]> {
 // This bypasses BigQuery sync delay for up-to-date data
 async function queryContractsFromSalesforce(): Promise<SalesforceContract[]> {
   if (!isSalesforceConfigured()) {
-    console.log('Salesforce credentials not configured, skipping direct SF query');
     return [];
   }
 
   try {
-    console.log('Querying Contract data directly from Salesforce...');
-
     // SOQL query to get contract data with currency conversion
     // Note: CurrencyType lookup must be done separately as SOQL doesn't support cross-object currency joins
     const soql = `
@@ -744,8 +740,6 @@ function calculateRenewalSummary(
 
   const ragStatus = calculateRAG(qtdAttainmentPct);
 
-  console.log(`Renewal Forecast (P90): Won Uplift=${wonRenewalUplift}, Q1 Expected Uplift=${q1ExpectedUplift}, Total Forecast=${forecastedBookings}, Q1 Target=${effectiveQ1Target}, Attainment=${qtdAttainmentPct}%, RAG=${ragStatus}`);
-
   // Track contracts with ACV but missing uplift - these are revenue leakage!
   // CRITICAL: Use passed-in list if provided to ensure 100% consistency with response
   const missingUpliftContracts = missingUpliftContractsList || contracts.filter(c => c.CurrentACV > 0 && c.UpliftAmount === 0);
@@ -809,6 +803,9 @@ export async function GET(request: Request) {
   const startTime = Date.now();
 
   try {
+    const authError = await requireAuth(request);
+    if (authError) return authError;
+
     const { searchParams } = new URL(request.url);
     const validProducts = ['POR', 'R360'];
     const validRegions = ['AMER', 'EMEA', 'APAC'];
@@ -823,8 +820,6 @@ export async function GET(request: Request) {
     const forceRefresh = searchParams.get('refresh') === 'true';
     const sfConfigured = isSalesforceConfigured();
 
-    console.log('Renewals API called with filters:', filters, 'refresh:', forceRefresh, 'SF configured:', sfConfigured);
-
     // Fetch contract data - use Salesforce directly if refresh requested and configured
     let contracts: SalesforceContract[];
     let dataSource: 'salesforce' | 'bigquery';
@@ -836,7 +831,6 @@ export async function GET(request: Request) {
 
       // If SF query fails, fall back to BigQuery
       if (contracts.length === 0) {
-        console.log('Salesforce query returned no results, falling back to BigQuery');
         contracts = await queryContractsFromBigQuery();
         dataSource = 'bigquery';
       }
@@ -854,7 +848,6 @@ export async function GET(request: Request) {
 
     const sfAvailable = contracts.length > 0;
     const isLiveData = dataSource === 'salesforce';
-    console.log(`Renewals: won=${bqRenewals.won.length}, lost=${bqRenewals.lost.length}, pipeline=${bqRenewals.pipeline.length}`);
 
     // Split by product
     const wonByProduct = splitByProduct(bqRenewals.won);
@@ -928,7 +921,6 @@ export async function GET(request: Request) {
     };
 
     const duration = Date.now() - startTime;
-    console.log(`Renewals API completed in ${duration}ms`);
 
     return NextResponse.json({
       success: true,
@@ -947,7 +939,7 @@ export async function GET(request: Request) {
     });
 
   } catch (error: any) {
-    console.error('Renewals API error:', error);
+    console.error('Renewals API error:', error instanceof Error ? error.message : 'Unknown error');
     // Return empty data instead of error so UI can still render
     const emptyData = getEmptyRenewalsData();
     return NextResponse.json({

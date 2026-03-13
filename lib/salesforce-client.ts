@@ -17,7 +17,7 @@
  */
 
 import jsforce, { Connection } from 'jsforce';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 
 // Singleton connection instance
 let connectionInstance: Connection | null = null;
@@ -40,17 +40,15 @@ export function isSfCliAvailable(): boolean {
   try {
     const targetOrg = process.env.SALESFORCE_TARGET_ORG || 'por-prod';
     // Check if sf CLI is installed and can reach the org
-    execSync(`sf org display --target-org ${targetOrg} --json`, {
+    execFileSync('sf', ['org', 'display', '--target-org', targetOrg, '--json'], {
       encoding: 'utf-8',
       timeout: 10000,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     sfCliAvailable = true;
-    console.log('Salesforce: SF CLI available with org', targetOrg);
     return true;
   } catch {
     sfCliAvailable = false;
-    console.log('Salesforce: SF CLI not available, will use API credentials');
     return false;
   }
 }
@@ -62,11 +60,9 @@ export function executeSoqlViaCLI<T = any>(soql: string): T[] {
   const targetOrg = process.env.SALESFORCE_TARGET_ORG || 'por-prod';
 
   try {
-    // Escape the SOQL query for shell
-    const escapedSoql = soql.replace(/"/g, '\\"');
-
-    const result = execSync(
-      `sf data query --target-org ${targetOrg} --query "${escapedSoql}" --json`,
+    const result = execFileSync(
+      'sf',
+      ['data', 'query', '--target-org', targetOrg, '--query', soql, '--json'],
       {
         encoding: 'utf-8',
         timeout: 60000, // 60 second timeout for queries
@@ -136,7 +132,6 @@ export async function getSalesforceConnection(): Promise<Connection> {
         clientId,
       } as any);
 
-      console.log('Salesforce: Connected via JWT Bearer flow');
     } catch (jwtError: any) {
       console.warn('JWT auth failed, falling back to username-password:', jwtError.message);
 
@@ -146,12 +141,10 @@ export async function getSalesforceConnection(): Promise<Connection> {
       }
 
       await conn.login(username, password + securityToken);
-      console.log('Salesforce: Connected via username-password flow');
     }
   } else if (password) {
     // Username-password flow
     await conn.login(username, password + securityToken);
-    console.log('Salesforce: Connected via username-password flow');
   } else {
     throw new Error('Either SALESFORCE_PASSWORD or (SALESFORCE_CLIENT_ID + SALESFORCE_PRIVATE_KEY) required');
   }

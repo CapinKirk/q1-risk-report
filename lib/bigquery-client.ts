@@ -28,21 +28,19 @@ export function getBigQueryClient(): BigQuery {
         projectId: BIGQUERY_CONFIG.PROJECT_ID,
         credentials,
       });
-      console.log('BigQuery: Using credentials from environment variable');
+      // BigQuery credentials loaded from environment variable
     } catch (error) {
       console.error('BigQuery: Failed to parse credentials JSON:', error);
       // Fall back to default credentials
       bigQueryInstance = new BigQuery({
         projectId: BIGQUERY_CONFIG.PROJECT_ID,
       });
-      console.log('BigQuery: Using default credentials (ADC)');
     }
   } else {
     // Use Application Default Credentials
     bigQueryInstance = new BigQuery({
       projectId: BIGQUERY_CONFIG.PROJECT_ID,
     });
-    console.log('BigQuery: Using default credentials (ADC)');
   }
 
   return bigQueryInstance;

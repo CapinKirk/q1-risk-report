@@ -141,8 +141,6 @@ export async function POST(request: NextRequest) {
     const idList = safeIds.map(id => `'${id}'`).join(', ');
     const soql = `SELECT ${fieldList} FROM Opportunity WHERE Id IN (${idList})`;
 
-    console.log(`Enriching ${safeIds.length} opportunities from Salesforce`);
-
     // Execute query
     const result = await conn.query<EnrichedOpportunity>(soql);
 
@@ -160,7 +158,7 @@ export async function POST(request: NextRequest) {
       source: 'salesforce',
     });
   } catch (error: any) {
-    console.error('Salesforce enrichment error:', error);
+    console.error('Salesforce enrichment error:', error instanceof Error ? error.message : 'Unknown error');
 
     // Handle specific Salesforce errors
     if (error.errorCode === 'INVALID_SESSION_ID') {
@@ -185,6 +183,9 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const sfTokens = getSalesforceTokens(session);
 
     return NextResponse.json({

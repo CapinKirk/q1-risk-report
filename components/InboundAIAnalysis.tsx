@@ -207,8 +207,19 @@ function formatInline(text: string): string {
   // Sanitize to prevent XSS from AI-generated content
   return DOMPurify.sanitize(result, {
     ALLOWED_TAGS: ['strong', 'em', 'code', 'span', 'li'],
-    ALLOWED_ATTR: ['class', 'value'],
+    ALLOWED_ATTR: ['class'],
+    FORCE_BODY: true,
   });
+}
+
+// Escape HTML entities for safe interpolation into HTML export templates
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // Detect section type from header text
@@ -760,7 +771,7 @@ function toHTMLExport(markdown: string, generatedAt: string | null): string {
   for (const section of sections) {
     switch (section.type) {
       case 'header':
-        html.push(`<h2 style="font-size:18px;font-weight:600;color:${section.header!.color};margin:24px 0 12px;padding:12px 16px;background:${section.header!.color}10;border-left:4px solid ${section.header!.color};border-radius:0 6px 6px 0;">${section.header!.emoji} ${section.header!.title}</h2>`);
+        html.push(`<h2 style="font-size:18px;font-weight:600;color:${section.header!.color};margin:24px 0 12px;padding:12px 16px;background:${section.header!.color}10;border-left:4px solid ${section.header!.color};border-radius:0 6px 6px 0;">${escapeHtml(section.header!.emoji)} ${escapeHtml(section.header!.title)}</h2>`);
         break;
       case 'metrics':
         html.push('<div style="display:flex;flex-direction:column;gap:8px;margin:12px 0;">');
@@ -774,8 +785,8 @@ function toHTMLExport(markdown: string, generatedAt: string | null): string {
         for (const action of section.actions!) {
           html.push(`<div style="padding:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
             <div style="font-weight:600;margin-bottom:8px;">${formatInline(action.action)}</div>
-            <div style="font-size:12px;color:#6b7280;">${action.owner ? `<strong>Owner:</strong> ${action.owner}` : ''} ${action.timeline ? `<strong>Timeline:</strong> ${action.timeline}` : ''}</div>
-            ${action.impact ? `<div style="font-size:12px;color:#059669;margin-top:6px;"><strong>Impact:</strong> ${action.impact}</div>` : ''}
+            <div style="font-size:12px;color:#6b7280;">${action.owner ? `<strong>Owner:</strong> ${escapeHtml(action.owner)}` : ''} ${action.timeline ? `<strong>Timeline:</strong> ${escapeHtml(action.timeline)}` : ''}</div>
+            ${action.impact ? `<div style="font-size:12px;color:#059669;margin-top:6px;"><strong>Impact:</strong> ${escapeHtml(action.impact)}</div>` : ''}
           </div>`);
         }
         html.push('</div>');
@@ -884,7 +895,7 @@ export default function InboundAIAnalysis({ reportData, selectedProducts, select
     const html = toHTMLExport(state.analysis, state.generatedAt);
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 

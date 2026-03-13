@@ -6,7 +6,24 @@ import { Suspense } from 'react';
 
 function SignInContent() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  let callbackUrl = '/';
+  try {
+    const raw = searchParams.get('callbackUrl') || '/';
+    const decoded = decodeURIComponent(raw);
+    // Block protocol-relative URLs, backslashes, encoded traversals, and scheme injection
+    const lc = decoded.toLowerCase();
+    if (
+      decoded.startsWith('/') &&
+      !decoded.startsWith('//') &&
+      !decoded.includes('\\') &&
+      !lc.includes('%2f') &&
+      !lc.includes('%5c') &&
+      !lc.includes(':')
+    ) {
+      // Strip fragment, preserve path + query only
+      callbackUrl = decoded.split('#')[0];
+    }
+  } catch { /* invalid URL — default to '/' */ }
   const error = searchParams.get('error');
 
   return (

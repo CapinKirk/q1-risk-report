@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getBigQueryClient } from '@/lib/bigquery-client';
+import { requireAuth } from '@/lib/api-auth';
 import {
   BIGQUERY_CONFIG,
   REGION_REVERSE_MAP,
@@ -91,6 +92,9 @@ function capDetailsToCounts(
  * RevOpsPlan is the single source of truth for ALL planned targets
  */
 async function getRenewalTargetsFromRawPlan(riskProfile: string = 'P90'): Promise<Map<string, number>> {
+  const VALID_PROFILES = ['P50', 'P75', 'P90'];
+  const safeProfile = VALID_PROFILES.includes(riskProfile) ? riskProfile : 'P90';
+
   try {
     const query = `
       SELECT
@@ -98,7 +102,7 @@ async function getRenewalTargetsFromRawPlan(riskProfile: string = 'P90'): Promis
         Region AS region,
         ROUND(SUM(COALESCE(Target_ACV_Won, 0)), 2) AS q1_target
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPlan\`
-      WHERE RiskProfile = '${riskProfile}'
+      WHERE RiskProfile = '${safeProfile}'
         AND ActivityQuarterYear = '2026-Q1'
         AND OpportunityType = 'Renewal'
       GROUP BY 1, 2
@@ -118,7 +122,6 @@ async function getRenewalTargetsFromRawPlan(riskProfile: string = 'P90'): Promis
       }
     }
 
-    console.log('Renewal targets from RevOpsPlan (P90):', Object.fromEntries(renewalTargetMap));
     return renewalTargetMap;
   } catch (error: any) {
     console.error('Failed to fetch renewal targets from RevOpsPlan:', error.message);
@@ -179,7 +182,7 @@ async function getRevOpsPerformanceData(filters: ReportFilters): Promise<{
       ROUND(SUM(COALESCE(Target_Won, 0)), 0) AS target_won,
       ROUND(SUM(COALESCE(Target_Bookings_ACV, 0)), 2) AS target_acv
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPerformance\`
-    WHERE RiskProfile = '${filters.riskProfile}'
+    WHERE RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
       AND ActivityDate BETWEEN '${filters.startDate}' AND '${filters.endDate}'
       ${regionFilter}
     GROUP BY 1, 2, 3, 4
@@ -199,7 +202,7 @@ async function getRevOpsPerformanceData(filters: ReportFilters): Promise<{
       ROUND(SUM(COALESCE(Target_Won, 0)), 0) AS q1_target_won,
       ROUND(SUM(COALESCE(Target_Bookings_ACV, 0)), 2) AS q1_target_acv
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPerformance\`
-    WHERE RiskProfile = '${filters.riskProfile}'
+    WHERE RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
       AND ActivityDate BETWEEN '2026-01-01' AND '2026-03-31'
       ${regionFilter}
     GROUP BY 1, 2, 3, 4
@@ -503,8 +506,6 @@ async function getFYTargetsFromPlan(): Promise<Map<string, number>> {
       if (key.startsWith('POR')) porTotal += value;
       else if (key.startsWith('R360')) r360Total += value;
     });
-    console.log(`FY Targets from RAW_2026_Plan_by_Month: POR=$${porTotal.toLocaleString()}, R360=$${r360Total.toLocaleString()}, Total=$${(porTotal + r360Total).toLocaleString()}`);
-
     return fyTargetMap;
   } catch (error: any) {
     console.error('Failed to fetch FY targets from RAW_2026_Plan_by_Month:', error.message);
@@ -555,7 +556,6 @@ async function getSourceMixAllocations(): Promise<Map<string, number>> {
       sourceMixMap.set(key, parseFloat(row.avg_source_mix) || 0);
     }
 
-    console.log('Source mix allocations loaded:', sourceMixMap.size, 'entries');
     return sourceMixMap;
   } catch (error: any) {
     console.error('Failed to fetch source mix allocations:', error.message);
@@ -563,16 +563,25 @@ async function getSourceMixAllocations(): Promise<Map<string, number>> {
   }
 }
 
+const VALID_RISK_PROFILES = new Set(['P50', 'P75', 'P90']);
+function safeRiskProfile(rp: string): string {
+  return VALID_RISK_PROFILES.has(rp) ? rp : 'P90';
+}
+
 // Build filter clauses for RevOpsReport queries
 function buildRevOpsFilterClause(filters: ReportFilters): string {
+  const VALID_PRODUCTS = new Set(['POR', 'R360']);
+  const VALID_REGIONS = new Set(['AMER', 'EMEA', 'APAC']);
   const conditions: string[] = [];
+  const safeProducts = (filters.products || []).filter(p => VALID_PRODUCTS.has(p));
+  const safeRegions = (filters.regions || []).filter(r => VALID_REGIONS.has(r));
 
-  if (filters.products && filters.products.length > 0 && filters.products.length < 2) {
-    conditions.push(`RecordType IN (${filters.products.map(p => `'${p}'`).join(', ')})`);
+  if (safeProducts.length > 0 && safeProducts.length < 2) {
+    conditions.push(`RecordType IN (${safeProducts.map(p => `'${p}'`).join(', ')})`);
   }
 
-  if (filters.regions && filters.regions.length > 0 && filters.regions.length < 3) {
-    conditions.push(`Region IN (${filters.regions.map(r => `'${r}'`).join(', ')})`);
+  if (safeRegions.length > 0 && safeRegions.length < 3) {
+    conditions.push(`Region IN (${safeRegions.map(r => `'${r}'`).join(', ')})`);
   }
 
   return conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';
@@ -583,17 +592,22 @@ function buildOpportunityFilterClause(filters: ReportFilters): {
   productClause: string;
   regionClause: string;
 } {
+  const VALID_PRODUCTS = new Set(['POR', 'R360']);
+  const VALID_REGIONS = new Set(['AMER', 'EMEA', 'APAC']);
+  const safeProducts = (filters.products || []).filter(p => VALID_PRODUCTS.has(p));
+  const safeRegions = (filters.regions || []).filter(r => VALID_REGIONS.has(r));
+
   let productClause = '';
-  if (filters.products && filters.products.length > 0) {
+  if (safeProducts.length > 0) {
     productClause = `AND (
-      (por_record__c = true AND 'POR' IN (${filters.products.map(p => `'${p}'`).join(', ')})) OR
-      (r360_record__c = true AND 'R360' IN (${filters.products.map(p => `'${p}'`).join(', ')}))
+      (por_record__c = true AND 'POR' IN (${safeProducts.map(p => `'${p}'`).join(', ')})) OR
+      (r360_record__c = true AND 'R360' IN (${safeProducts.map(p => `'${p}'`).join(', ')}))
     )`;
   }
 
   let regionClause = '';
-  if (filters.regions && filters.regions.length > 0 && filters.regions.length < 3) {
-    const divisions = filters.regions.map(r => `'${REGION_REVERSE_MAP[r as keyof typeof REGION_REVERSE_MAP]}'`).join(', ');
+  if (safeRegions.length > 0 && safeRegions.length < 3) {
+    const divisions = safeRegions.map(r => `'${REGION_REVERSE_MAP[r as keyof typeof REGION_REVERSE_MAP]}'`).join(', ');
     regionClause = `AND Division IN (${divisions})`;
   }
 
@@ -630,7 +644,7 @@ async function getRevOpsQTDData(filters: ReportFilters) {
         ROUND(SUM(COALESCE(Target_Won, 0)), 0) AS q1_target_won
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsReport\`
       WHERE Horizon = 'QTD'
-        AND RiskProfile = '${filters.riskProfile}'
+        AND RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
         AND Period_Start_Date = '2026-01-01'
         AND RecordType IN ('POR', 'R360')
         AND Region IN ('AMER', 'EMEA', 'APAC')
@@ -659,7 +673,7 @@ async function getRevOpsQTDData(filters: ReportFilters) {
         ROUND(SUM(COALESCE(Target_Won, 0)), 2) AS period_target_won
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsReport\`
       WHERE Horizon = 'MTD'
-        AND RiskProfile = '${filters.riskProfile}'
+        AND RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
         AND Period_Start_Date >= '2026-01-01'
         AND Period_Start_Date <= DATE_TRUNC(CAST('${filters.endDate}' AS DATE), MONTH)
         AND RecordType IN ('POR', 'R360')
@@ -691,7 +705,7 @@ async function getRevOpsQTDData(filters: ReportFilters) {
         ROUND(AVG(COALESCE(SAL_to_SQO_Leakage_Variance, 0)), 1) AS sal_to_sqo_leakage
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsReport\`
       WHERE Horizon = 'QTD'
-        AND RiskProfile = '${filters.riskProfile}'
+        AND RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
         AND Period_Start_Date = '2026-01-01'
         AND RecordType IN ('POR', 'R360')
         AND Region IN ('AMER', 'EMEA', 'APAC')
@@ -729,8 +743,7 @@ async function getRevOpsQTDData(filters: ReportFilters) {
       COALESCE(a.actual_won, 0) AS actual_won,
       COALESCE(a.mql_to_sql_leakage, 0) AS mql_to_sql_leakage,
       COALESCE(a.sql_to_sal_leakage, 0) AS sql_to_sal_leakage,
-      COALESCE(a.sal_to_sqo_leakage, 0) AS sal_to_sqo_leakage,
-      '${filters.riskProfile}' AS risk_profile
+      COALESCE(a.sal_to_sqo_leakage, 0) AS sal_to_sqo_leakage
     FROM qtd_targets t
     FULL OUTER JOIN report_actuals a
       ON t.product = a.product AND t.region = a.region AND t.category = a.category
@@ -743,7 +756,6 @@ async function getRevOpsQTDData(filters: ReportFilters) {
 
   try {
     const [rows] = await getBigQuery().query({ query });
-    console.log(`RevOpsReport QTD+MTD data: ${(rows as any[]).length} rows`);
     return rows as any[];
   } catch (error: any) {
     console.error('RevOpsReport QTD+MTD query failed:', error.message);
@@ -771,7 +783,7 @@ async function getRevOpsQ1Targets(filters: ReportFilters) {
       END AS category,
       ROUND(SUM(COALESCE(Target_ACV_Won, 0)), 2) AS q1_target
     FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.RevOpsPlan\`
-    WHERE RiskProfile = '${filters.riskProfile}'
+    WHERE RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
       AND ActivityQuarterYear = '2026-Q1'
       AND RecordType IN ('POR', 'R360')
       AND Region IN ('AMER', 'EMEA', 'APAC')
@@ -866,10 +878,8 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
       const key = `${row.product}-${row.region}-RENEWAL`;
       const upliftValue = parseFloat(row.total_expected_increase_usd) || 0;
       upliftMap.set(key, upliftValue);
-      console.log(`RenewalUplift: ${key} = ${upliftValue}`);
     }
 
-    console.log(`RenewalUpliftMap size: ${upliftMap.size}`);
     return upliftMap;
   } catch (error: any) {
     console.error('Error fetching renewal uplift:', error.message);
@@ -914,7 +924,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsReport\`
       WHERE Horizon = 'MTD'
         AND RecordType = '${recordType}'
-        AND RiskProfile = '${filters.riskProfile}'
+        AND RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
         AND Period_Start_Date >= '2026-01-01'
         AND Period_Start_Date <= DATE_TRUNC(CAST('${filters.endDate}' AS DATE), MONTH)
         AND OpportunityType != 'Renewal'
@@ -935,7 +945,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsReport\`
       WHERE Horizon = 'QTD'
         AND RecordType = '${recordType}'
-        AND RiskProfile = '${filters.riskProfile}'
+        AND RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
         AND Period_Start_Date = '2026-01-01'
         AND OpportunityType != 'Renewal'
         AND Source IS NOT NULL AND Source != ''
@@ -968,7 +978,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
         SUM(COALESCE(Actual_MQL, 0)) AS total_actual_mql
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsReport\`
       WHERE RecordType = '${recordType}'
-        AND RiskProfile = '${filters.riskProfile}'
+        AND RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
         AND Horizon = 'QTD'
         AND Period_Start_Date = '2026-01-01'
         AND OpportunityType = 'New Business'
@@ -982,7 +992,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
         SUM(COALESCE(Actual_MQL, 0)) AS total_actual_eql
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsReport\`
       WHERE RecordType = '${recordType}'
-        AND RiskProfile = '${filters.riskProfile}'
+        AND RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
         AND Horizon = 'QTD'
         AND Period_Start_Date = '2026-01-01'
         AND OpportunityType IN ('Existing Business', 'Migration')
@@ -998,7 +1008,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
         SUM(COALESCE(Actual_SQO, 0)) AS total_actual_sqo
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsReport\`
       WHERE RecordType = '${recordType}'
-        AND RiskProfile = '${filters.riskProfile}'
+        AND RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
         AND Horizon = 'QTD'
         AND Period_Start_Date = '2026-01-01'
         AND OpportunityType != 'Renewal'
@@ -1014,7 +1024,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsReport\`
       WHERE Horizon = 'MTD'
         AND RecordType = '${recordType}'
-        AND RiskProfile = '${filters.riskProfile}'
+        AND RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
         AND Period_Start_Date >= '2026-01-01'
         AND Period_Start_Date <= DATE_TRUNC(CAST('${filters.endDate}' AS DATE), MONTH)
         AND OpportunityType != 'Renewal'
@@ -1030,7 +1040,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsReport\`
       WHERE Horizon = 'MTD'
         AND RecordType = '${recordType}'
-        AND RiskProfile = '${filters.riskProfile}'
+        AND RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
         AND Period_Start_Date >= '2026-01-01'
         AND Period_Start_Date <= DATE_TRUNC(CAST('${filters.endDate}' AS DATE), MONTH)
         AND OpportunityType != 'Renewal'
@@ -1047,7 +1057,7 @@ async function getFunnelBySource(filters: ReportFilters, product: 'POR' | 'R360'
       FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.Staging.RevOpsReport\`
       WHERE Horizon = 'MTD'
         AND RecordType = '${recordType}'
-        AND RiskProfile = '${filters.riskProfile}'
+        AND RiskProfile = '${safeRiskProfile(filters.riskProfile)}'
         AND Period_Start_Date >= '2026-01-01'
         AND Period_Start_Date <= DATE_TRUNC(CAST('${filters.endDate}' AS DATE), MONTH)
         AND OpportunityType != 'Renewal'
@@ -2492,7 +2502,6 @@ async function getSQLDetails(filters: ReportFilters) {
     const porData = [...(porRows || []), ...(strategicRows || []).filter((r: any) => r.product === 'POR')];
     const r360Data = [...(r360Rows || []), ...(strategicRows || []).filter((r: any) => r.product === 'R360')];
 
-    console.log(`SQL Details: POR=${porData.length}, R360=${r360Data.length}, Strategic=${strategicRows?.length || 0}`);
     return {
       POR: porData as any[],
       R360: r360Data as any[],
@@ -2727,13 +2736,12 @@ async function getSALDetails(filters: ReportFilters) {
     // Combine results
     const allPorRows = [...porRows, ...strategicRows];
 
-    console.log(`SAL query returned ${porRows?.length || 0} standard rows + ${strategicRows?.length || 0} strategic rows = ${allPorRows.length} total`);
     return {
       POR: allPorRows,
       R360: [] as any[], // R360 doesn't have SAL stage
     };
   } catch (error) {
-    console.error('SAL details query failed:', error);
+    console.error('SAL details query failed:', error instanceof Error ? error.message : 'Unknown error');
     return { POR: [], R360: [] };
   }
 }
@@ -3111,14 +3119,12 @@ async function getSQODetails(filters: ReportFilters) {
       console.warn('Strategic SQO query failed (table may not exist):', strategicError);
     }
 
-    console.log(`SQO query returned ${porRows?.length || 0} POR rows, ${r360Rows?.length || 0} R360 rows, ${strategicRows?.length || 0} strategic rows`);
-
     return {
       POR: [...(porRows as any[]), ...strategicRows.filter(r => r.product === 'POR')],
       R360: [...(r360Rows as any[]), ...strategicRows.filter(r => r.product === 'R360')],
     };
   } catch (error) {
-    console.error('SQO details query failed:', error);
+    console.error('SQO details query failed:', error instanceof Error ? error.message : 'Unknown error');
     return { POR: [], R360: [] };
   }
 }
@@ -3516,6 +3522,9 @@ function calculateRAG(attainmentPct: number): RAGStatus {
 // Main handler
 export async function POST(request: Request) {
   try {
+    const authError = await requireAuth(request);
+    if (authError) return authError;
+
     const body = await request.json();
     const { startDate, endDate, products = [], regions = [], riskProfile = 'P90' } = body;
 
@@ -3531,6 +3540,24 @@ export async function POST(request: Request) {
     if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
       return NextResponse.json(
         { error: 'startDate and endDate must be YYYY-MM-DD format' },
+        { status: 400 }
+      );
+    }
+
+    // Semantic date validation — prevent unbounded BigQuery scans
+    const parsedStart = new Date(startDate);
+    const parsedEnd = new Date(endDate);
+    if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+      return NextResponse.json(
+        { error: 'Invalid date values' },
+        { status: 400 }
+      );
+    }
+    const minDate = new Date('2025-01-01');
+    const maxDate = new Date('2026-12-31');
+    if (parsedStart < minDate || parsedEnd > maxDate || parsedStart > parsedEnd) {
+      return NextResponse.json(
+        { error: 'Dates must be between 2025-01-01 and 2026-12-31, and startDate must precede endDate' },
         { status: 400 }
       );
     }
@@ -3639,7 +3666,6 @@ export async function POST(request: Request) {
         const existingRow = revOpsTargetMap.get(key);
         const oldTarget = existingRow.q1_target;
         existingRow.q1_target = correctTarget;
-        console.log(`RENEWAL target override: ${key} = $${correctTarget} (was $${oldTarget} from RevOpsReport)`);
       } else {
         // Create a new entry for renewals not in RevOpsReport
         const [product, region] = key.split('-');
@@ -3659,9 +3685,7 @@ export async function POST(request: Request) {
           mql_to_sql_leakage: 0,
           sql_to_sal_leakage: 0,
           sal_to_sqo_leakage: 0,
-          risk_profile: filters.riskProfile,
         });
-        console.log(`RENEWAL target added: ${key} = $${correctTarget}`);
       }
     }
 
@@ -3727,7 +3751,6 @@ export async function POST(request: Request) {
         // DO NOT add uplift to qtdAcv - that's expected, not actual
         // Only forecast includes uplift for RAG calculation
         q1Forecast = wonAcv + renewalUplift;
-        console.log(`RENEWAL ${target.product}-${target.region}: Won=${wonAcv}, Uplift=${renewalUplift}, Forecasted=${q1Forecast}, Q1Target=${q1Target}`);
       }
 
       // Calculate QTD target based on period progress
@@ -3816,7 +3839,6 @@ export async function POST(request: Request) {
         mql_to_sql_leakage: parseFloat(target.mql_to_sql_leakage) || 0,
         sql_to_sal_leakage: parseFloat(target.sql_to_sal_leakage) || 0,
         sal_to_sqo_leakage: parseFloat(target.sal_to_sqo_leakage) || 0,
-        risk_profile: target.risk_profile || filters.riskProfile,
       });
     }
 
@@ -3855,7 +3877,6 @@ export async function POST(request: Request) {
         : 0,
       total_won_deals: totalWonDeals,
       total_lost_deals: totalLostDeals,
-      risk_profile: filters.riskProfile,
     };
 
     // Calculate product totals
@@ -3896,7 +3917,6 @@ export async function POST(request: Request) {
           total_won_deals: prodWonDeals,
           total_lost_deals: prodLostDeals,
           total_lost_acv: prodLostAcv,
-          risk_profile: filters.riskProfile,
         };
       }
     }
@@ -4839,7 +4859,7 @@ export async function POST(request: Request) {
     const response = {
       generated_at_utc: new Date().toISOString(),
       report_date: endDate,
-      filters_applied: filters,
+      filters_applied: (({ riskProfile: _rp, ...rest }) => rest)(filters),
       period: periodInfo,
       grand_total: grandTotal,
       product_totals: productTotals,
