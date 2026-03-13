@@ -56,8 +56,9 @@ export async function executeQuery<T = any>(query: string): Promise<T[]> {
     const [rows] = await client.query({ query });
     return rows as T[];
   } catch (error: any) {
-    console.error('BigQuery query error:', error.message);
-    throw new Error(`BigQuery query failed: ${error.message}`);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('BigQuery query error:', msg);
+    throw new Error(`BigQuery query failed: ${msg}`);
   }
 }
 

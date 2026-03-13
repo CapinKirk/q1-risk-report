@@ -124,7 +124,7 @@ async function getRenewalTargetsFromRawPlan(riskProfile: string = 'P90'): Promis
 
     return renewalTargetMap;
   } catch (error: any) {
-    console.error('Failed to fetch renewal targets from RevOpsPlan:', error.message);
+    console.error('Failed to fetch renewal targets from RevOpsPlan:', error instanceof Error ? error.message : 'Unknown error');
     return new Map();
   }
 }
@@ -508,7 +508,7 @@ async function getFYTargetsFromPlan(): Promise<Map<string, number>> {
     });
     return fyTargetMap;
   } catch (error: any) {
-    console.error('Failed to fetch FY targets from RAW_2026_Plan_by_Month:', error.message);
+    console.error('Failed to fetch FY targets from RAW_2026_Plan_by_Month:', error instanceof Error ? error.message : 'Unknown error');
     return new Map();
   }
 }
@@ -558,7 +558,7 @@ async function getSourceMixAllocations(): Promise<Map<string, number>> {
 
     return sourceMixMap;
   } catch (error: any) {
-    console.error('Failed to fetch source mix allocations:', error.message);
+    console.error('Failed to fetch source mix allocations:', error instanceof Error ? error.message : 'Unknown error');
     return new Map();
   }
 }
@@ -758,7 +758,7 @@ async function getRevOpsQTDData(filters: ReportFilters) {
     const [rows] = await getBigQuery().query({ query });
     return rows as any[];
   } catch (error: any) {
-    console.error('RevOpsReport QTD+MTD query failed:', error.message);
+    console.error('RevOpsReport QTD+MTD query failed:', error instanceof Error ? error.message : 'Unknown error');
     return [];
   }
 }
@@ -795,7 +795,7 @@ async function getRevOpsQ1Targets(filters: ReportFilters) {
     const [rows] = await getBigQuery().query({ query });
     return rows as any[];
   } catch (error: any) {
-    console.error('RevOpsPlan Q1 targets query failed:', error.message);
+    console.error('RevOpsPlan Q1 targets query failed:', error instanceof Error ? error.message : 'Unknown error');
     return [];
   }
 }
@@ -882,7 +882,7 @@ async function getUpcomingRenewalUplift(): Promise<Map<string, number>> {
 
     return upliftMap;
   } catch (error: any) {
-    console.error('Error fetching renewal uplift:', error.message);
+    console.error('Error fetching renewal uplift:', error instanceof Error ? error.message : 'Unknown error');
     return new Map();
   }
 }
@@ -3116,7 +3116,7 @@ async function getSQODetails(filters: ReportFilters) {
       const [rows] = await getBigQuery().query({ query: strategicSqoQuery });
       strategicRows = rows as any[];
     } catch (strategicError) {
-      console.warn('Strategic SQO query failed (table may not exist):', strategicError);
+      console.warn('Strategic SQO query failed (table may not exist):', strategicError instanceof Error ? strategicError.message : 'Unknown error');
     }
 
     return {
@@ -3396,7 +3396,7 @@ async function getUtmBreakdown(filters: ReportFilters) {
 
     return result;
   } catch (error: any) {
-    console.error('UTM breakdown query error:', error.message);
+    console.error('UTM breakdown query error:', error instanceof Error ? error.message : 'Unknown error');
     return {
       POR: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [], by_branded: [] },
       R360: { by_source: [], by_medium: [], by_campaign: [], by_keyword: [], by_branded: [] },
