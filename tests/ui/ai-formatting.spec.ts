@@ -8,6 +8,9 @@ test.describe('AI Analysis Formatting', () => {
   });
 
   test('AI Analysis uses emoji headers after regeneration', async ({ page }) => {
+    // GPT-5.2 with the expanded Trend Anomaly + Segment Breakdown prompt takes
+    // 40–60s on a warm path; 60s waitForSelector had zero margin and flaked.
+    test.setTimeout(240_000);
     // Find the first AI Analysis section
     const aiSection = page.locator('[data-testid="ai-analysis"]').first();
     await expect(aiSection).toBeVisible();
@@ -24,9 +27,9 @@ test.describe('AI Analysis Formatting', () => {
     await expect(generateBtn).toBeVisible();
     await generateBtn.click();
 
-    // Wait for the analysis to generate (may take 10-30 seconds)
+    // Wait for the analysis to generate (can take up to 3 minutes with retries)
     await page.waitForSelector('[data-testid="ai-analysis"] .analysis-content', {
-      timeout: 60000,
+      timeout: 180_000,
     });
 
     // Get the analysis content
@@ -58,6 +61,8 @@ test.describe('AI Analysis Formatting', () => {
   });
 
   test('Inbound AI Analysis uses emoji headers after regeneration', async ({ page }) => {
+    // Same latency envelope as above — generous timeout to absorb GPT-5.2 cold path.
+    test.setTimeout(240_000);
     // Find the Inbound AI Analysis section
     const inboundSection = page.locator('[data-testid="inbound-ai-analysis"]');
     await expect(inboundSection).toBeVisible();
@@ -74,9 +79,9 @@ test.describe('AI Analysis Formatting', () => {
     await expect(generateBtn).toBeVisible();
     await generateBtn.click();
 
-    // Wait for the analysis to generate
+    // Wait for the analysis to generate (up to 3 minutes)
     await page.waitForSelector('[data-testid="inbound-ai-analysis"] .analysis-content', {
-      timeout: 60000,
+      timeout: 180_000,
     });
 
     // Get the analysis content

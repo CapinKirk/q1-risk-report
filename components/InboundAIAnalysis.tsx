@@ -123,6 +123,23 @@ function filterReportData(reportData: ReportData, products: Product[], regions: 
       POR: includePOR ? filterByRegion(reportData.sal_details?.POR) : [],
       R360: includeR360 ? filterByRegion(reportData.sal_details?.R360) : [],
     },
+    sqo_details: {
+      POR: includePOR ? filterByRegion((reportData as any).sqo_details?.POR) : [],
+      R360: includeR360 ? filterByRegion((reportData as any).sqo_details?.R360) : [],
+    },
+    // Deal lists aren't used by the inbound AI route; drop to stay under Vercel's
+    // 4.5MB serverless request-body cap (otherwise Vercel returns HTML 413 and
+    // the client JSON.parse fails with "Unexpected token 'R', 'Request En'…").
+    won_deals: undefined as any,
+    lost_deals: undefined as any,
+    pipeline_deals: undefined as any,
+    // Phase 1+2 additions — filter to active products.
+    mql_trend_by_month: ((reportData as any).mql_trend_by_month || [])
+      .filter((r: any) => (includePOR && r.product === 'POR') || (includeR360 && r.product === 'R360')),
+    ad_spend_trend_by_month: ((reportData as any).ad_spend_trend_by_month || [])
+      .filter((r: any) => (includePOR && r.product === 'POR') || (includeR360 && r.product === 'R360')),
+    attainment_by_segment: ((reportData as any).attainment_by_segment || [])
+      .filter((r: any) => (includePOR && r.product === 'POR') || (includeR360 && r.product === 'R360')),
     utm_breakdown: reportData.utm_breakdown,
     mql_disqualification_summary: reportData.mql_disqualification_summary,
   };
@@ -867,6 +884,16 @@ export default function InboundAIAnalysis({ reportData, selectedProducts, select
           },
         }),
       });
+      // Defensive: Vercel returns HTML for 413 Payload Too Large. Detect before
+      // parsing so the user sees a clear message instead of "Unexpected token 'R'…".
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const text = await response.text().catch(() => '');
+        const hint = response.status === 413 || /too\s*large|request\s*entity/i.test(text)
+          ? 'Analysis payload is too large for the serverless endpoint. Try narrowing filters (product/region) and retry.'
+          : `AI endpoint returned a non-JSON response (HTTP ${response.status}). ${text.slice(0, 120)}`;
+        throw new Error(hint);
+      }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to generate analysis');
       setState({ loading: false, analysis: data.analysis, error: null, generatedAt: data.generated_at });

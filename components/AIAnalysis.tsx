@@ -144,6 +144,34 @@ function filterReportData(
       POR: includePOR ? filterByRegion(reportData.sql_details?.POR) : [],
       R360: includeR360 ? filterByRegion(reportData.sql_details?.R360) : [],
     },
+    // Previously passed through unfiltered via the `...reportData` spread above,
+    // which let 5–6MB of detail rows through on large periods and tripped Vercel's
+    // 4.5MB serverless limit (returned HTML 413; client then JSON-parse-failed
+    // with "Unexpected token 'R', 'Request En'…"). These arrays ARE consumed by
+    // the AI route's dropoff analysis, so filter rather than drop.
+    sal_details: {
+      POR: includePOR ? filterByRegion((reportData as any).sal_details?.POR) : [],
+      R360: includeR360 ? filterByRegion((reportData as any).sal_details?.R360) : [],
+    },
+    sqo_details: {
+      POR: includePOR ? filterByRegion((reportData as any).sqo_details?.POR) : [],
+      R360: includeR360 ? filterByRegion((reportData as any).sqo_details?.R360) : [],
+    },
+    // Deal lists (won/lost/pipeline) are UI drill-down data — the AI route
+    // never reads them, so drop them entirely to stay under Vercel's 4.5MB
+    // request-body cap. Keeping them adds ~3–4MB to every AI call for zero benefit.
+    won_deals: undefined as any,
+    lost_deals: undefined as any,
+    pipeline_deals: undefined as any,
+    // Phase 1 trend data — filter by active product so OOS rows don't travel.
+    // The AI route does its own region filter via activeRegions.
+    mql_trend_by_month: ((reportData as any).mql_trend_by_month || [])
+      .filter((r: any) => (includePOR && r.product === 'POR') || (includeR360 && r.product === 'R360')),
+    ad_spend_trend_by_month: ((reportData as any).ad_spend_trend_by_month || [])
+      .filter((r: any) => (includePOR && r.product === 'POR') || (includeR360 && r.product === 'R360')),
+    // Phase 2 segment breakdown — same product filter.
+    attainment_by_segment: ((reportData as any).attainment_by_segment || [])
+      .filter((r: any) => (includePOR && r.product === 'POR') || (includeR360 && r.product === 'R360')),
     utm_breakdown: reportData.utm_breakdown,
     mql_disqualification_summary: reportData.mql_disqualification_summary,
   };
@@ -930,6 +958,18 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
           },
         }),
       });
+
+      // Defensive: Vercel returns HTML for edge errors like 413 "Request Entity
+      // Too Large". Parsing that as JSON gives the user an opaque "Unexpected
+      // token 'R'…" error. Detect non-JSON responses up front.
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const text = await response.text().catch(() => '');
+        const hint = response.status === 413 || /too\s*large|request\s*entity/i.test(text)
+          ? 'Analysis payload is too large for the serverless endpoint. Try narrowing filters (product/region) and retry.'
+          : `AI endpoint returned a non-JSON response (HTTP ${response.status}). ${text.slice(0, 120)}`;
+        throw new Error(hint);
+      }
 
       const data = await response.json();
 

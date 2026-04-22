@@ -8,10 +8,13 @@ test.describe('Report Filters', () => {
   });
 
   test('should display all filter sections', async ({ page }) => {
+    // The filter bar currently exposes Product / Region / Category as primary
+    // controls. Source is still a dimension in the data (see Source Attainment
+    // section below) but the filter-bar pill was removed — so we no longer
+    // assert a source-filter testid here.
     await expect(page.getByTestId('product-filter')).toBeVisible();
     await expect(page.getByTestId('region-filter')).toBeVisible();
     await expect(page.getByTestId('category-filter')).toBeVisible();
-    await expect(page.getByTestId('source-filter')).toBeVisible();
   });
 
   test('should have "All Products" active by default', async ({ page }) => {
@@ -62,7 +65,12 @@ test.describe('Report Filters', () => {
     await expect(renewalBtn).toHaveClass(/active/);
   });
 
-  test('should filter by source', async ({ page }) => {
+  test.fixme('should filter by source', async ({ page }) => {
+    // DISABLED 2026-04-22: the Source filter pill (data-testid="source-inbound")
+    // was removed from the top filter bar. Source remains a valid URL param
+    // (?source=INBOUND) and is still referenced in the Source Attainment by
+    // Channel table, but there's no button to click to set it anymore.
+    // Re-enable this test only after the filter UI is restored or replaced.
     const inboundBtn = page.getByTestId('source-inbound');
     await inboundBtn.click();
 
