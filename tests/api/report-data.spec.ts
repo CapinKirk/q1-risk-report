@@ -134,7 +134,9 @@ test.describe('Renewals API', () => {
 
 test.describe('AI Analysis API', () => {
   test('POST /api/ai-analysis should accept valid request', async ({ request }) => {
-    // AI endpoint can take long due to OpenAI API call
+    // AI endpoint can take long due to OpenAI API call — GPT-5.2 with the
+    // expanded prompt returns in 40–60s on a warm path, longer on cold.
+    test.setTimeout(180_000);
     const response = await request.post(`${API_BASE}/ai-analysis`, {
       data: {
         product: 'POR',
@@ -145,7 +147,7 @@ test.describe('AI Analysis API', () => {
           pipeline: { POR: { totalACV: 300000 } },
         },
       },
-      timeout: 30000, // 30 second timeout for AI calls
+      timeout: 150_000,
     });
 
     // Should either succeed or return appropriate error (400 if missing OpenAI key)
