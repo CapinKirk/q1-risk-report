@@ -232,13 +232,13 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
     : 'This analysis covers ALL products (POR and R360) and ALL regions (AMER, EMEA, APAC).';
 
   const outboundDirective = isOutboundOnly
-    ? `\n\n**OUTBOUND MOTION RULES (NON-NEGOTIABLE):**
+    ? `\n\n**OUTBOUND MOTION RULES (NON-NEGOTIABLE — VIOLATION INVALIDATES THE ENTIRE RESPONSE):**
 - The outbound funnel starts at SQL. There is NO MQL stage and NO MQL target.
-- DO NOT reference MQLs, MQL pacing, MQL conversion rates, MQL reversions, or MQL dropoffs anywhere in the analysis.
+- You MUST NOT output the string "MQL", "MQLs", "Marketing Qualified Lead", "MQL→SQL", "MQL→SQO", or any MQL-based metric anywhere in the response. Zero occurrences. This is a hard rule.
 - DO NOT frame missing MQLs or zero MQLs as a risk signal; MQLs simply do not exist in this motion.
-- Ignore any required-output instruction below that mentions MQL, MQL→SQL, or UTM MQL volume.
+- Ignore any required-output instruction below that mentions MQL, MQL→SQL, UTM MQL volume, UTM source, UTM keyword, branded/non-branded, or Google Ads. Those sections do not apply to outbound.
 - DO NOT include a Google Ads section and do not cite Google Ads spend, CPA, or campaign performance. Paid search is an inbound-only channel.
-- Replace the traditional MQL→SQL→SAL→SQO funnel framing with SQL→SAL→SQO when discussing velocity and dropoff.\n`
+- Use SQL→SAL→SQO as the ONLY funnel framing. Top-of-funnel = SQL for the purposes of this analysis.\n`
     : '';
 
   // Calculate key metrics for context (only for active products)
@@ -554,41 +554,41 @@ For ${includePOR && includeR360 ? 'each product (POR, R360)' : includePOR ? 'POR
 - Win rate analysis and deal velocity indicators
 
 ### 3. CHANNEL PERFORMANCE ANALYSIS
-Using the Source Channel Attainment AND UTM Source/Keyword/Branded data:
+Using the Source Channel Attainment${isOutboundOnly ? '' : ' AND UTM Source/Keyword/Branded'} data:
 - Rank ALL channels by dollar gap (largest miss first)
 - Identify RED channels (below 50% attainment) with dollar impact
 - Identify YELLOW channels (50-80% attainment) with recovery potential
 - Identify overperforming channels (above 120%) as acceleration opportunities
-- UTM source breakdown: which sources drive the most MQLs AND SQOs
-- Branded vs Non-Branded keyword performance: conversion rate differences, volume split
+${isOutboundOnly ? '' : `- UTM source breakdown: which sources drive the most MQLs AND SQOs
+- Branded vs Non-Branded keyword performance: conversion rate differences, volume split`}
 - Channel diversification risk: over-reliance on any single source
 - Channel mix recommendations by product
 
 ### 4. FUNNEL HEALTH & VELOCITY
-- Stage-by-stage conversion analysis (MQL→SQL→SAL→SQO)
+- Stage-by-stage conversion analysis (${isOutboundOnly ? 'SQL→SAL→SQO' : 'MQL→SQL→SAL→SQO'})
 - Identify the worst funnel bottleneck by source and region
 - Compare conversion rates across sources (which sources produce highest quality leads)
 - Funnel pacing vs plan: where is top-of-funnel vs bottom-of-funnel relative to targets
-- Lead quality indicators: MQL reversion rates, stall rates
+${isOutboundOnly ? '- Lead quality indicators: SQL stall rates, SAL dropoff rates' : '- Lead quality indicators: MQL reversion rates, stall rates'}
 
 ### 5. FUNNEL DROPOFF ANALYSIS BY SOURCE (CRITICAL FOR MARKETING INSIGHTS)
-For EACH funnel stage (MQL, SQL, SAL, SQO), analyze dropoffs by SOURCE CHANNEL:
-- **Paid vs Organic Performance**: Compare conversion and dropoff rates between paid (Inbound/PPC) vs organic sources
+For EACH funnel stage (${isOutboundOnly ? 'SQL, SAL, SQO' : 'MQL, SQL, SAL, SQO'}), analyze dropoffs by SOURCE CHANNEL:
+${isOutboundOnly ? '' : `- **Paid vs Organic Performance**: Compare conversion and dropoff rates between paid (Inbound/PPC) vs organic sources
   - Which channel type has higher quality leads (lower dropoff rate)?
-  - Where is paid spend being wasted (high dropoff after MQL)?
-- **Source-Level Dropoff Rates**: For each source (Inbound, Outbound, AE Sourced, etc.):
-  - Total leads, conversion rate, loss rate, ACV at risk
+  - Where is paid spend being wasted (high dropoff after MQL)?`}
+- **Source-Level Dropoff Rates**: For each source (${isOutboundOnly ? 'Outbound only' : 'Inbound, Outbound, AE Sourced, etc.'}):
+  - Total ${isOutboundOnly ? 'SQLs' : 'leads'}, conversion rate, loss rate, ACV at risk
   - Identify worst-performing sources by loss rate
   - Identify best-performing sources for replication
-- **UTM Campaign/Keyword Dropoff Patterns**: Cross-reference with UTM data to identify:
+${isOutboundOnly ? '' : `- **UTM Campaign/Keyword Dropoff Patterns**: Cross-reference with UTM data to identify:
   - Which campaigns/keywords generate leads that DROP OFF vs CONVERT
   - High-volume keywords with low conversion (wasted spend indicators)
-  - High-converting keywords that deserve more budget
+  - High-converting keywords that deserve more budget`}
 - **Top Dropoff Reasons by Source**: For each major source, what are the primary loss reasons?
-  - Are paid leads dropping due to "Not Qualified" (targeting issue)?
-  - Are organic leads dropping due to "Unresponsive" (nurture issue)?
+${isOutboundOnly ? '' : `  - Are paid leads dropping due to "Not Qualified" (targeting issue)?
+  - Are organic leads dropping due to "Unresponsive" (nurture issue)?`}
 - **Stage-specific source insights**:
-  - MQL: Which sources have highest reversion rates? (lead quality signal)
+${isOutboundOnly ? '' : '  - MQL: Which sources have highest reversion rates? (lead quality signal)'}
   - SQL: Which sources stall most at SQL? (qualification accuracy)
   - SQO: Which sources lose most deals? (deal quality signal)
 - **Budget Reallocation Signal**: Based on source performance, recommend:
@@ -608,13 +608,17 @@ For EACH funnel stage (MQL, SQL, SAL, SQO), analyze dropoffs by SOURCE CHANNEL:
 - Loss rate trends by region and product
 - Loss concentration: are losses concentrated in specific segments or distributed
 
-### 8. MARKETING & CHANNEL EFFICIENCY
+${isOutboundOnly ? `### 8. OUTBOUND EFFICIENCY
+- SDR productivity signals: SQL volume by rep/region, SQL→SAL conversion by source
+- SQL quality indicators: stall rate, loss rate by source
+- Coverage: SQL pacing against SQL target by region
+- Recommendations for outbound motion tuning (targeting, cadence, enablement)` : `### 8. MARKETING & CHANNEL EFFICIENCY
 - Google Ads ROI by region: CPA relative to average deal size
 - Spend efficiency: regions with highest/lowest conversion rates
 - UTM keyword effectiveness: top converting keywords by MQL→SQO rate
 - Branded vs Non-Branded: compare conversion quality and volume contribution
 - Channel cost-effectiveness ranking
-- Recommendations for budget reallocation based on UTM and Ads data
+- Recommendations for budget reallocation based on UTM and Ads data`}
 
 ### 9. PREDICTIVE INDICATORS & FORECAST
 - Current daily run rate: $${Math.round(dailyRunRate).toLocaleString()}/day
@@ -778,12 +782,16 @@ ${criticalMisses.length > 0 ? criticalMisses.map((row: any) =>
 
 ${includePOR ? `## Funnel Performance (POR by Category)
 ${funnelData.POR.map((row: any) =>
-  `- ${row.category} ${row.region}: MQL ${row.actual_mql}/${row.qtd_target_mql || 0} (${row.mql_pacing_pct}%), SQL ${row.actual_sql}/${row.qtd_target_sql || 0} (${row.sql_pacing_pct}%), SQO ${row.actual_sqo}/${row.qtd_target_sqo || 0} (${row.sqo_pacing_pct}%)`
+  isOutboundOnly
+    ? `- ${row.category} ${row.region}: SQL ${row.actual_sql}/${row.qtd_target_sql || 0} (${row.sql_pacing_pct}%), SQO ${row.actual_sqo}/${row.qtd_target_sqo || 0} (${row.sqo_pacing_pct}%)`
+    : `- ${row.category} ${row.region}: MQL ${row.actual_mql}/${row.qtd_target_mql || 0} (${row.mql_pacing_pct}%), SQL ${row.actual_sql}/${row.qtd_target_sql || 0} (${row.sql_pacing_pct}%), SQO ${row.actual_sqo}/${row.qtd_target_sqo || 0} (${row.sqo_pacing_pct}%)`
 ).join('\n')}` : ''}
 
 ${includeR360 ? `## Funnel Performance (R360 by Category - USE THESE EXACT NUMBERS)
 ${funnelData.R360.map((row: any) =>
-  `- ${row.category} ${row.region}: MQL ${row.actual_mql}/${row.qtd_target_mql || 0} (${row.mql_pacing_pct}% pacing), SQL ${row.actual_sql}/${row.qtd_target_sql || 0} (${row.sql_pacing_pct}% pacing), SQO ${row.actual_sqo}/${row.qtd_target_sqo || 0} (${row.sqo_pacing_pct}% pacing)`
+  isOutboundOnly
+    ? `- ${row.category} ${row.region}: SQL ${row.actual_sql}/${row.qtd_target_sql || 0} (${row.sql_pacing_pct}% pacing), SQO ${row.actual_sqo}/${row.qtd_target_sqo || 0} (${row.sqo_pacing_pct}% pacing)`
+    : `- ${row.category} ${row.region}: MQL ${row.actual_mql}/${row.qtd_target_mql || 0} (${row.mql_pacing_pct}% pacing), SQL ${row.actual_sql}/${row.qtd_target_sql || 0} (${row.sql_pacing_pct}% pacing), SQO ${row.actual_sqo}/${row.qtd_target_sqo || 0} (${row.sqo_pacing_pct}% pacing)`
 ).join('\n')}` : ''}
 
 ## Pipeline Health by Segment
@@ -804,12 +812,16 @@ ${(loss_reason_rca?.R360 || []).slice(0, 8).map((row: any) =>
 
 ${includePOR ? `## Funnel Performance by Source (POR)
 ${funnelBySourceData.POR.map((row: any) =>
-  `- ${row.source} (${row.region}): Target ACV $${(row.target_acv || 0).toLocaleString()}, MQL ${row.actual_mql}/${row.target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.target_sqo || 0}, Conversion MQL→SQL: ${row.mql_to_sql_rate || 0}%`
+  isOutboundOnly
+    ? `- ${row.source} (${row.region}): Target ACV $${(row.target_acv || 0).toLocaleString()}, SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.target_sqo || 0}`
+    : `- ${row.source} (${row.region}): Target ACV $${(row.target_acv || 0).toLocaleString()}, MQL ${row.actual_mql}/${row.target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.target_sqo || 0}, Conversion MQL→SQL: ${row.mql_to_sql_rate || 0}%`
 ).join('\n') || 'No POR source data'}` : ''}
 
 ${includeR360 ? `## Funnel Performance by Source (R360)
 ${funnelBySourceData.R360.map((row: any) =>
-  `- ${row.source} (${row.region}): Target ACV $${(row.target_acv || 0).toLocaleString()}, MQL ${row.actual_mql}/${row.target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.target_sqo || 0}, Conversion MQL→SQL: ${row.mql_to_sql_rate || 0}%`
+  isOutboundOnly
+    ? `- ${row.source} (${row.region}): Target ACV $${(row.target_acv || 0).toLocaleString()}, SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.target_sqo || 0}`
+    : `- ${row.source} (${row.region}): Target ACV $${(row.target_acv || 0).toLocaleString()}, MQL ${row.actual_mql}/${row.target_mql || 0} (${row.mql_pacing_pct || 0}%), SQL ${row.actual_sql}/${row.target_sql || 0} (${row.sql_pacing_pct || 0}%), SQO ${row.actual_sqo || 0}/${row.target_sqo || 0}, Conversion MQL→SQL: ${row.mql_to_sql_rate || 0}%`
 ).join('\n') || 'No R360 source data'}` : ''}
 
 ${isOutboundOnly ? '' : `## MQL Disqualification/Reversion Summary
@@ -920,7 +932,7 @@ ${googleAdsData.R360.map((row: any) =>
   `- ${row.region}: $${(row.ad_spend_usd || 0).toLocaleString()} spend, ${row.clicks || 0} clicks, ${row.conversions || 0} conversions, CPA: $${row.cpa_usd || 'N/A'}`
 ).join('\n') || 'No R360 ads data'}` : ''}`}
 
-## UTM Source Analysis (Lead Origin Tracking)
+${isOutboundOnly ? '' : `## UTM Source Analysis (Lead Origin Tracking)
 ${includePOR ? `### POR - By UTM Source (Top 10)
 ${utmSourcePOR.length > 0 ? utmSourcePOR.map((s: any) =>
   `- ${s.name}: ${s.total} MQLs, ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
@@ -951,7 +963,7 @@ ${brandedPOR.length > 0 ? brandedPOR.map((s: any) =>
 ${includeR360 ? `### R360 - Branded vs Non-Branded
 ${brandedR360.length > 0 ? brandedR360.map((s: any) =>
   `- ${s.name}: ${s.total} MQLs (${s.total > 0 ? Math.round((s.total / (brandedR360.reduce((sum: number, x: any) => sum + x.total, 0) || 1)) * 100) : 0}% of total), ${s.convRate}% MQL→SQL, ${s.sqoRate}% MQL→SQO, ${s.sqoCount} SQOs`
-).join('\n') : 'No branded/non-branded data'}` : ''}
+).join('\n') : 'No branded/non-branded data'}` : ''}`}
 
 ## Source Channel Attainment (Revenue by Source)
 ${includePOR ? `### POR by Source
@@ -973,7 +985,10 @@ ${topGaps.map((r: any) => `- ${r.product} ${r.source} (${r.region}): -$${Math.ab
 ${topOverperformers.map((r: any) => `- ${r.product} ${r.source} (${r.region}): +$${(r.gap || 0).toLocaleString()} surplus, ${r.attainment_pct || 0}% attainment`).join('\n') || 'No overperformers identified'}
 
 ### Worst Funnel Bottlenecks (lowest SQO pacing)
-${worstSqoPacing.map((r: any) => `- ${r.product} ${r.source} (${r.region}): SQO pacing ${r.sqo_pacing_pct || 0}%, SQL pacing ${r.sql_pacing_pct || 0}%, MQL→SQL rate ${r.mql_to_sql_rate || 0}%`).join('\n') || 'No bottlenecks identified'}
+${worstSqoPacing.map((r: any) => isOutboundOnly
+  ? `- ${r.product} ${r.source} (${r.region}): SQO pacing ${r.sqo_pacing_pct || 0}%, SQL pacing ${r.sql_pacing_pct || 0}%`
+  : `- ${r.product} ${r.source} (${r.region}): SQO pacing ${r.sqo_pacing_pct || 0}%, SQL pacing ${r.sql_pacing_pct || 0}%, MQL→SQL rate ${r.mql_to_sql_rate || 0}%`
+).join('\n') || 'No bottlenecks identified'}
 
 ### Projection Summary
 - Daily run rate: $${Math.round(dailyRunRate).toLocaleString()}/day (${daysElapsed} days elapsed)
