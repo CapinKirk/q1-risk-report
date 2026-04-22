@@ -920,8 +920,13 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
           filterContext: {
             products: selectedProducts.length === 0 ? ['POR', 'R360'] : selectedProducts,
             regions: selectedRegions.length === 0 ? ['AMER', 'EMEA', 'APAC'] : selectedRegions,
+            categories: selectedCategories,
             sources: selectedSources,
-            isFiltered: selectedProducts.length > 0 || selectedRegions.length > 0 || selectedSources.length > 0,
+            isFiltered:
+              selectedProducts.length > 0 ||
+              selectedRegions.length > 0 ||
+              selectedCategories.length > 0 ||
+              selectedSources.length > 0,
           },
         }),
       });

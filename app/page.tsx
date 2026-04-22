@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import type { Region, Product, Category, Source, ReportData, AttainmentRow, RAGStatus } from '@/lib/types';
 import type { RiskProfile } from '@/lib/constants/dimensions';
 import { filterReportData, parseRegionsFromURL, parseProductsFromURL, parseCategoriesFromURL, parseSourcesFromURL } from '@/lib/filterData';
+import { computeFilterScope } from '@/lib/filterScope';
 import ReportFilter from '@/components/ReportFilter';
 import UserMenu from '@/components/UserMenu';
 import ExecutiveKPICards from '@/components/ExecutiveKPICards';
@@ -489,6 +490,13 @@ function ReportContent() {
 
   const { period } = filteredData;
 
+  const filterScope = computeFilterScope({
+    products: selectedProducts,
+    regions: selectedRegions,
+    categories: selectedCategories,
+    sources: selectedSources,
+  });
+
   return (
     <div className="container">
       <LoadingOverlay isLoading={isRefreshing} />
@@ -592,8 +600,8 @@ function ReportContent() {
       <AttainmentTable data={filteredData} />
       <SourceAttainment data={filteredData} />
 
-      {/* Renewals Overview Section - Only show if RENEWAL category is included in filter */}
-      {(selectedCategories.length === 0 || selectedCategories.includes('RENEWAL')) && (
+      {/* Renewals Overview Section - Hidden when RENEWAL not in active scope (e.g., filtered out or outbound-only) */}
+      {!filterScope.suppressRenewal && (
         <RenewalsSection
           products={selectedProducts}
           regions={selectedRegions}
@@ -609,8 +617,8 @@ function ReportContent() {
         />
       )}
 
-      {/* MQL Details with Salesforce links */}
-      {filteredData.mql_details && (
+      {/* MQL Details with Salesforce links - Hidden when top-of-funnel is out of scope */}
+      {!filterScope.suppressMQL && filteredData.mql_details && (
         <MQLDetails mqlDetails={filteredData.mql_details} />
       )}
 
@@ -642,7 +650,7 @@ function ReportContent() {
       {/* Opportunities Table with filtering and pagination */}
       <OpportunitiesTable data={filteredData} selectedRegions={selectedRegions} />
 
-      {!(selectedSources.length === 1 && selectedSources[0] === 'OUTBOUND') && (
+      {!filterScope.suppressGoogleAds && (
         <GoogleAdsPerf data={filteredData} />
       )}
 
@@ -655,13 +663,15 @@ function ReportContent() {
         selectedSources={selectedSources}
       />
 
-      {/* Marketing/Inbound Funnel AI Analysis */}
-      <InboundAIAnalysis
-        reportData={filteredData}
-        selectedProducts={selectedProducts}
-        selectedRegions={selectedRegions}
-        selectedCategories={selectedCategories}
-      />
+      {/* Marketing/Inbound Funnel AI Analysis - Hidden when inbound motion is out of scope */}
+      {!filterScope.suppressInboundAnalysis && (
+        <InboundAIAnalysis
+          reportData={filteredData}
+          selectedProducts={selectedProducts}
+          selectedRegions={selectedRegions}
+          selectedCategories={selectedCategories}
+        />
+      )}
 
       <footer className="footer">
         <p>
