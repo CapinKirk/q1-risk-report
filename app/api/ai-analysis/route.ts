@@ -271,8 +271,10 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
   const porTotal = includePOR ? (product_totals?.POR || {}) : {};
   const r360Total = includeR360 ? (product_totals?.R360 || {}) : {};
 
-  // Normalize attainment data to flat array
-  const allAttainment = normalizeAttainmentDetail(attainment_detail);
+  // Normalize attainment data to flat array, then drop rows for categories
+  // that are out of the active scope (e.g. MIGRATION/RENEWAL under outbound-only).
+  const allAttainment = normalizeAttainmentDetail(attainment_detail)
+    .filter((row: any) => !row.category || effectiveCategories.includes(row.category));
 
   // Identify misses (segments below 90% attainment)
   const misses = allAttainment.filter((row: any) => row.qtd_attainment_pct < 90);
