@@ -243,9 +243,25 @@ interface CrossAccountReallocation {
   note: string;
 }
 
+// Return true if the given YYYY-MM month is an IN-PROGRESS month for the
+// report's asOfDate (i.e. the month matches asOfDate's month AND asOfDate
+// is not the last day of that month). Used to exclude partial months from
+// MoM comparisons — otherwise you get spurious "drops" just because only
+// 21 of 30 days are in the data.
+function isPartialMonth(month: string, asOfDate: string): boolean {
+  const d = new Date(asOfDate + 'T00:00:00Z');
+  const asOfMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  if (month !== asOfMonth) return false;
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  return d.getUTCDate() < lastDay;
+}
+
 // Detect MoM drops >= threshold in monthly MQL counts, grouped by
-// product/region/source/segment. Returns the worst 10 anomalies.
-function detectMqlAnomalies(trend: MqlMonthlyRow[], dropThresholdPct = 25): MqlAnomaly[] {
+// product/region/source/segment. Skips partial current months to avoid
+// flagging "day 21 of 30" as a drop. Returns the worst 10 anomalies.
+function detectMqlAnomalies(
+  trend: MqlMonthlyRow[], asOfDate: string, dropThresholdPct = 25
+): MqlAnomaly[] {
   const groups = new Map<string, MqlMonthlyRow[]>();
   for (const row of trend) {
     const key = `${row.product}|${row.region}|${row.source}|${row.segment}`;
@@ -259,6 +275,7 @@ function detectMqlAnomalies(trend: MqlMonthlyRow[], dropThresholdPct = 25): MqlA
       const prev = rows[i - 1];
       const curr = rows[i];
       if (prev.mql_count < 20) continue; // low-volume noise filter
+      if (isPartialMonth(curr.month, asOfDate)) continue; // skip in-progress month
       const pctChange = ((curr.mql_count - prev.mql_count) / prev.mql_count) * 100;
       if (pctChange <= -dropThresholdPct) {
         anomalies.push({
@@ -273,9 +290,11 @@ function detectMqlAnomalies(trend: MqlMonthlyRow[], dropThresholdPct = 25): MqlA
   return anomalies.sort((a, b) => a.mom_pct_change - b.mom_pct_change).slice(0, 10);
 }
 
-// Detect campaigns that dropped spend significantly (>=30% MoM)
-// Also returns the worst 10.
-function detectAdSpendAnomalies(trend: AdSpendMonthlyRow[], dropThresholdPct = 30): AdSpendAnomaly[] {
+// Detect campaigns that dropped spend significantly (>=30% MoM).
+// Skips partial current months. Returns the worst 10.
+function detectAdSpendAnomalies(
+  trend: AdSpendMonthlyRow[], asOfDate: string, dropThresholdPct = 30
+): AdSpendAnomaly[] {
   const groups = new Map<string, AdSpendMonthlyRow[]>();
   for (const row of trend) {
     const key = `${row.product}|${row.region}|${row.campaign_name}`;
@@ -289,6 +308,7 @@ function detectAdSpendAnomalies(trend: AdSpendMonthlyRow[], dropThresholdPct = 3
       const prev = rows[i - 1];
       const curr = rows[i];
       if (prev.ad_spend_usd < 1000) continue; // low-spend noise filter
+      if (isPartialMonth(curr.month, asOfDate)) continue; // skip in-progress month
       const pctChange = ((curr.ad_spend_usd - prev.ad_spend_usd) / prev.ad_spend_usd) * 100;
       if (pctChange <= -dropThresholdPct) {
         anomalies.push({
@@ -305,36 +325,44 @@ function detectAdSpendAnomalies(trend: AdSpendMonthlyRow[], dropThresholdPct = 3
 
 // Find campaigns that were active (>$500/mo) but have been dark (=$0)
 // for the last 2+ consecutive months. Colin's exact scenario (Mobile Only, PMAX).
-function detectDarkCampaigns(trend: AdSpendMonthlyRow[]): DarkCampaign[] {
-  const groups = new Map<string, AdSpendMonthlyRow[]>();
+//
+// Excludes the partial current month from the "dark" count — if a campaign
+// was active last month and the current month is just 21 days in with $0,
+// we don't know yet whether it went dark or just hasn't spent yet this month.
+function detectDarkCampaigns(trend: AdSpendMonthlyRow[], asOfDate: string): DarkCampaign[] {
   const allMonths = Array.from(new Set(trend.map(r => r.month))).sort();
   if (allMonths.length < 3) return [];
+  // Consider only months that are complete — partial current month excluded
+  const completeMonths = allMonths.filter(m => !isPartialMonth(m, asOfDate));
+  if (completeMonths.length < 3) return [];
+
+  const groups = new Map<string, AdSpendMonthlyRow[]>();
   for (const row of trend) {
     const key = `${row.product}|${row.region}|${row.campaign_name}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(row);
   }
+
   const dark: DarkCampaign[] = [];
   for (const rows of Array.from(groups.values())) {
     rows.sort((a, b) => a.month.localeCompare(b.month));
-    // Reconstruct by-month map to detect zero months by absence
     const byMonth = new Map<string, number>();
     for (const r of rows) byMonth.set(r.month, r.ad_spend_usd);
 
-    // Walk allMonths from the end backwards; find the last month where
-    // spend > $500, then measure how many consecutive months of $0/absent followed.
+    // Find the last complete month where spend > $500, then measure how many
+    // consecutive complete months of $0/absent followed (excluding the partial current month).
     let lastActiveIdx = -1;
     let lastActiveSpend = 0;
-    for (let i = allMonths.length - 1; i >= 0; i--) {
-      const s = byMonth.get(allMonths[i]) ?? 0;
+    for (let i = completeMonths.length - 1; i >= 0; i--) {
+      const s = byMonth.get(completeMonths[i]) ?? 0;
       if (s > 500) { lastActiveIdx = i; lastActiveSpend = s; break; }
     }
-    if (lastActiveIdx < 0) continue; // never active
-    const monthsDark = allMonths.length - 1 - lastActiveIdx;
+    if (lastActiveIdx < 0) continue;
+    const monthsDark = completeMonths.length - 1 - lastActiveIdx;
     if (monthsDark >= 2) {
       dark.push({
         product: rows[0].product, region: rows[0].region, campaign_name: rows[0].campaign_name,
-        last_active_month: allMonths[lastActiveIdx],
+        last_active_month: completeMonths[lastActiveIdx],
         last_active_spend: Math.round(lastActiveSpend),
         months_dark: monthsDark,
       });
@@ -345,7 +373,10 @@ function detectDarkCampaigns(trend: AdSpendMonthlyRow[]): DarkCampaign[] {
 
 // Detect months where POR spend dropped AND R360 spend rose in the same
 // region — the POR→R360 reallocation pattern Colin's analysis caught.
-function detectCrossAccountReallocations(trend: AdSpendMonthlyRow[]): CrossAccountReallocation[] {
+// Excludes partial current month so we don't mis-flag normal month-in-progress spending.
+function detectCrossAccountReallocations(
+  trend: AdSpendMonthlyRow[], asOfDate: string
+): CrossAccountReallocation[] {
   const byMonthRegion = new Map<string, { POR: number; R360: number }>();
   for (const row of trend) {
     const key = `${row.month}|${row.region}`;
@@ -369,6 +400,7 @@ function detectCrossAccountReallocations(trend: AdSpendMonthlyRow[]): CrossAccou
     for (let i = 1; i < rows.length; i++) {
       const prev = rows[i - 1];
       const curr = rows[i];
+      if (isPartialMonth(curr.month, asOfDate)) continue; // skip in-progress month
       const porDelta = curr.por - prev.por;
       const r360Delta = curr.r360 - prev.r360;
       // POR dropped by >= $2K AND R360 rose by >= 50% of POR's drop
@@ -625,14 +657,17 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
 
   // Honor MQL/Ads suppression rules — if the filter excludes the inbound motion
   // entirely (outbound-only), these sections are irrelevant noise.
+  // asOfDate is passed so detectors can exclude the in-progress current month
+  // (otherwise a 21-of-30-day April gets flagged as a "drop" vs a full March).
+  const asOfDate: string = period?.as_of_date || new Date().toISOString().slice(0, 10);
   const mqlAnomalies = (suppressMQL || isOutboundOnly)
-    ? [] : detectMqlAnomalies(mqlTrendRows);
+    ? [] : detectMqlAnomalies(mqlTrendRows, asOfDate);
   const adSpendAnomalies = (suppressGoogleAds || isOutboundOnly)
-    ? [] : detectAdSpendAnomalies(adSpendTrendRows);
+    ? [] : detectAdSpendAnomalies(adSpendTrendRows, asOfDate);
   const darkCampaigns = (suppressGoogleAds || isOutboundOnly)
-    ? [] : detectDarkCampaigns(adSpendTrendRows);
+    ? [] : detectDarkCampaigns(adSpendTrendRows, asOfDate);
   const reallocations = (suppressGoogleAds || isOutboundOnly)
-    ? [] : detectCrossAccountReallocations(adSpendTrendRows);
+    ? [] : detectCrossAccountReallocations(adSpendTrendRows, asOfDate);
 
   // Phase 2: NEW LOGO segment breakdown (SMB vs Strategic), filtered to scope.
   const segmentRows: any[] = (attainment_by_segment || [])
@@ -1068,9 +1103,9 @@ ${reallocations.length > 0 ? reallocations.map(r =>
 ).join('\n') : 'None detected — no cross-account reallocation pattern in the window.'}
 
 ### Monthly MQL Volume Series (for reference — use TREND ANOMALIES above as the analytical summary)
+_The month matching the as-of date may be in progress and is marked "(partial)". Never cite a partial month as a "MoM drop" without explicitly noting the partial status — compare only to closed-month trends._
 ${mqlTrendRows.length > 0
   ? (() => {
-      // Summarize by product-region-source, most recent 6 months
       const key = (r: MqlMonthlyRow) => `${r.product} ${r.region} ${r.source}`;
       const grouped = new Map<string, MqlMonthlyRow[]>();
       for (const r of mqlTrendRows) {
@@ -1081,7 +1116,10 @@ ${mqlTrendRows.length > 0
         .filter(([, rows]) => rows.reduce((s, x) => s + x.mql_count, 0) >= 20)
         .map(([k, rows]) => {
           rows.sort((a, b) => a.month.localeCompare(b.month));
-          const series = rows.map(r => `${r.month}:${r.mql_count}`).join(' → ');
+          const series = rows.map(r => {
+            const partial = isPartialMonth(r.month, asOfDate) ? ' (partial)' : '';
+            return `${r.month}:${r.mql_count}${partial}`;
+          }).join(' → ');
           return `- ${k}: ${series}`;
         })
         .slice(0, 12)
