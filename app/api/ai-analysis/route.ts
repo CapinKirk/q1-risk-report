@@ -205,6 +205,188 @@ function formatSourceDropoffSummary(sourceData: Record<string, { total: number; 
   ).join('\n');
 }
 
+// ============================================================================
+// TREND ANOMALY DETECTION (Phase 1)
+// ----------------------------------------------------------------------------
+// The AI previously only saw current-period snapshots, so drops that happened
+// MONTHS ago (like the Dec 2025 MQL drought that caused Q2 pipe starvation)
+// were invisible. These helpers pre-compute anomalies from 6-month trend data
+// and surface them in the prompt so the model doesn't have to do arithmetic.
+// ============================================================================
+
+interface MqlMonthlyRow {
+  month: string; product: string; region: string; source: string; segment: string;
+  mql_count: number; sql_count: number; sqo_count: number;
+}
+interface AdSpendMonthlyRow {
+  month: string; product: string; region: string; campaign_name: string;
+  ad_spend_usd: number; impressions: number; clicks: number; conversions: number;
+}
+interface MqlAnomaly {
+  product: string; region: string; source: string; segment: string;
+  prior_month: string; current_month: string;
+  prior_mql: number; current_mql: number; mom_pct_change: number;
+}
+interface AdSpendAnomaly {
+  product: string; region: string; campaign_name: string;
+  prior_month: string; current_month: string;
+  prior_spend: number; current_spend: number; mom_pct_change: number;
+}
+interface DarkCampaign {
+  product: string; region: string; campaign_name: string;
+  last_active_month: string; last_active_spend: number; months_dark: number;
+}
+interface CrossAccountReallocation {
+  month: string; region: string;
+  por_spend: number; por_delta: number;
+  r360_spend: number; r360_delta: number;
+  note: string;
+}
+
+// Detect MoM drops >= threshold in monthly MQL counts, grouped by
+// product/region/source/segment. Returns the worst 10 anomalies.
+function detectMqlAnomalies(trend: MqlMonthlyRow[], dropThresholdPct = 25): MqlAnomaly[] {
+  const groups = new Map<string, MqlMonthlyRow[]>();
+  for (const row of trend) {
+    const key = `${row.product}|${row.region}|${row.source}|${row.segment}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(row);
+  }
+  const anomalies: MqlAnomaly[] = [];
+  for (const rows of Array.from(groups.values())) {
+    rows.sort((a, b) => a.month.localeCompare(b.month));
+    for (let i = 1; i < rows.length; i++) {
+      const prev = rows[i - 1];
+      const curr = rows[i];
+      if (prev.mql_count < 20) continue; // low-volume noise filter
+      const pctChange = ((curr.mql_count - prev.mql_count) / prev.mql_count) * 100;
+      if (pctChange <= -dropThresholdPct) {
+        anomalies.push({
+          product: curr.product, region: curr.region, source: curr.source, segment: curr.segment,
+          prior_month: prev.month, current_month: curr.month,
+          prior_mql: prev.mql_count, current_mql: curr.mql_count,
+          mom_pct_change: Math.round(pctChange * 10) / 10,
+        });
+      }
+    }
+  }
+  return anomalies.sort((a, b) => a.mom_pct_change - b.mom_pct_change).slice(0, 10);
+}
+
+// Detect campaigns that dropped spend significantly (>=30% MoM)
+// Also returns the worst 10.
+function detectAdSpendAnomalies(trend: AdSpendMonthlyRow[], dropThresholdPct = 30): AdSpendAnomaly[] {
+  const groups = new Map<string, AdSpendMonthlyRow[]>();
+  for (const row of trend) {
+    const key = `${row.product}|${row.region}|${row.campaign_name}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(row);
+  }
+  const anomalies: AdSpendAnomaly[] = [];
+  for (const rows of Array.from(groups.values())) {
+    rows.sort((a, b) => a.month.localeCompare(b.month));
+    for (let i = 1; i < rows.length; i++) {
+      const prev = rows[i - 1];
+      const curr = rows[i];
+      if (prev.ad_spend_usd < 1000) continue; // low-spend noise filter
+      const pctChange = ((curr.ad_spend_usd - prev.ad_spend_usd) / prev.ad_spend_usd) * 100;
+      if (pctChange <= -dropThresholdPct) {
+        anomalies.push({
+          product: curr.product, region: curr.region, campaign_name: curr.campaign_name,
+          prior_month: prev.month, current_month: curr.month,
+          prior_spend: prev.ad_spend_usd, current_spend: curr.ad_spend_usd,
+          mom_pct_change: Math.round(pctChange * 10) / 10,
+        });
+      }
+    }
+  }
+  return anomalies.sort((a, b) => a.mom_pct_change - b.mom_pct_change).slice(0, 10);
+}
+
+// Find campaigns that were active (>$500/mo) but have been dark (=$0)
+// for the last 2+ consecutive months. Colin's exact scenario (Mobile Only, PMAX).
+function detectDarkCampaigns(trend: AdSpendMonthlyRow[]): DarkCampaign[] {
+  const groups = new Map<string, AdSpendMonthlyRow[]>();
+  const allMonths = Array.from(new Set(trend.map(r => r.month))).sort();
+  if (allMonths.length < 3) return [];
+  for (const row of trend) {
+    const key = `${row.product}|${row.region}|${row.campaign_name}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(row);
+  }
+  const dark: DarkCampaign[] = [];
+  for (const rows of Array.from(groups.values())) {
+    rows.sort((a, b) => a.month.localeCompare(b.month));
+    // Reconstruct by-month map to detect zero months by absence
+    const byMonth = new Map<string, number>();
+    for (const r of rows) byMonth.set(r.month, r.ad_spend_usd);
+
+    // Walk allMonths from the end backwards; find the last month where
+    // spend > $500, then measure how many consecutive months of $0/absent followed.
+    let lastActiveIdx = -1;
+    let lastActiveSpend = 0;
+    for (let i = allMonths.length - 1; i >= 0; i--) {
+      const s = byMonth.get(allMonths[i]) ?? 0;
+      if (s > 500) { lastActiveIdx = i; lastActiveSpend = s; break; }
+    }
+    if (lastActiveIdx < 0) continue; // never active
+    const monthsDark = allMonths.length - 1 - lastActiveIdx;
+    if (monthsDark >= 2) {
+      dark.push({
+        product: rows[0].product, region: rows[0].region, campaign_name: rows[0].campaign_name,
+        last_active_month: allMonths[lastActiveIdx],
+        last_active_spend: Math.round(lastActiveSpend),
+        months_dark: monthsDark,
+      });
+    }
+  }
+  return dark.sort((a, b) => b.last_active_spend - a.last_active_spend).slice(0, 10);
+}
+
+// Detect months where POR spend dropped AND R360 spend rose in the same
+// region — the POR→R360 reallocation pattern Colin's analysis caught.
+function detectCrossAccountReallocations(trend: AdSpendMonthlyRow[]): CrossAccountReallocation[] {
+  const byMonthRegion = new Map<string, { POR: number; R360: number }>();
+  for (const row of trend) {
+    const key = `${row.month}|${row.region}`;
+    const entry = byMonthRegion.get(key) || { POR: 0, R360: 0 };
+    if (row.product === 'POR') entry.POR += row.ad_spend_usd;
+    else entry.R360 += row.ad_spend_usd;
+    byMonthRegion.set(key, entry);
+  }
+
+  // Group month-region entries by region so we can diff MoM
+  const byRegion = new Map<string, Array<{ month: string; por: number; r360: number }>>();
+  for (const [key, val] of Array.from(byMonthRegion.entries())) {
+    const [month, region] = key.split('|');
+    if (!byRegion.has(region)) byRegion.set(region, []);
+    byRegion.get(region)!.push({ month, por: val.POR, r360: val.R360 });
+  }
+
+  const results: CrossAccountReallocation[] = [];
+  for (const [region, rows] of Array.from(byRegion.entries())) {
+    rows.sort((a, b) => a.month.localeCompare(b.month));
+    for (let i = 1; i < rows.length; i++) {
+      const prev = rows[i - 1];
+      const curr = rows[i];
+      const porDelta = curr.por - prev.por;
+      const r360Delta = curr.r360 - prev.r360;
+      // POR dropped by >= $2K AND R360 rose by >= 50% of POR's drop
+      if (porDelta <= -2000 && r360Delta >= Math.abs(porDelta) * 0.5) {
+        results.push({
+          month: curr.month, region,
+          por_spend: Math.round(curr.por),
+          por_delta: Math.round(porDelta),
+          r360_spend: Math.round(curr.r360),
+          r360_delta: Math.round(r360Delta),
+          note: `POR ${region} spend fell $${Math.abs(Math.round(porDelta)).toLocaleString()}; R360 ${region} rose $${Math.round(r360Delta).toLocaleString()} same month. Possible budget reallocation.`,
+        });
+      }
+    }
+  }
+  return results.sort((a, b) => a.por_delta - b.por_delta).slice(0, 5);
+}
+
 // Build the analysis prompt based on report data
 function buildAnalysisPrompt(reportData: any, analysisType: string, filterContext?: FilterContext): string {
   const {
@@ -212,7 +394,9 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
     funnel_by_category, funnel_by_source, pipeline_rca, loss_reason_rca,
     source_attainment, google_ads, google_ads_rca,
     mql_details, sql_details, sal_details, sqo_details,
-    mql_disqualification_summary, utm_breakdown
+    mql_disqualification_summary, utm_breakdown,
+    // Phase 1+2: trend + segment data added to ReportData
+    mql_trend_by_month, ad_spend_trend_by_month, attainment_by_segment,
   } = reportData;
 
   // Determine which products are active based on filter context
@@ -426,6 +610,51 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
     ? filterContext.regions
     : ['AMER', 'EMEA', 'APAC'];
 
+  // ------------------------------------------------------------------
+  // Phase 1+2: filter + analyze 6-month trend data and segment breakdown.
+  // These give the AI visibility into upstream signals (MQL drops, ad
+  // campaigns going dark, SMB-vs-Strategic gaps) that current-period
+  // snapshots don't contain.
+  // ------------------------------------------------------------------
+  const mqlTrendRows: MqlMonthlyRow[] = (mql_trend_by_month || [])
+    .filter((r: any) => activeProducts.includes(r.product))
+    .filter((r: any) => activeRegions.includes(r.region));
+  const adSpendTrendRows: AdSpendMonthlyRow[] = (ad_spend_trend_by_month || [])
+    .filter((r: any) => activeProducts.includes(r.product))
+    .filter((r: any) => activeRegions.includes(r.region));
+
+  // Honor MQL/Ads suppression rules — if the filter excludes the inbound motion
+  // entirely (outbound-only), these sections are irrelevant noise.
+  const mqlAnomalies = (suppressMQL || isOutboundOnly)
+    ? [] : detectMqlAnomalies(mqlTrendRows);
+  const adSpendAnomalies = (suppressGoogleAds || isOutboundOnly)
+    ? [] : detectAdSpendAnomalies(adSpendTrendRows);
+  const darkCampaigns = (suppressGoogleAds || isOutboundOnly)
+    ? [] : detectDarkCampaigns(adSpendTrendRows);
+  const reallocations = (suppressGoogleAds || isOutboundOnly)
+    ? [] : detectCrossAccountReallocations(adSpendTrendRows);
+
+  // Phase 2: NEW LOGO segment breakdown (SMB vs Strategic), filtered to scope.
+  const segmentRows: any[] = (attainment_by_segment || [])
+    .filter((r: any) => activeProducts.includes(r.product))
+    .filter((r: any) => activeRegions.includes(r.region))
+    .filter((r: any) => effectiveCategories.includes(r.category));
+
+  // Build month-by-month series for POR US INBOUND (most common ask) so the
+  // AI can reference exact values without doing math on raw rows.
+  const buildMonthlySeries = (
+    product: string, region: string, source: string, segment?: string
+  ): MqlMonthlyRow[] => {
+    return mqlTrendRows
+      .filter(r =>
+        r.product === product &&
+        r.region === region &&
+        (source === 'ALL' || r.source.toUpperCase().includes(source.toUpperCase())) &&
+        (!segment || r.segment === segment)
+      )
+      .sort((a, b) => a.month.localeCompare(b.month));
+  };
+
   // Group attainment data by region for regional breakdowns
   const amerAttainment = allAttainment.filter((r: any) => r.region === 'AMER');
   const emeaAttainment = allAttainment.filter((r: any) => r.region === 'EMEA');
@@ -572,13 +801,23 @@ Provide a comprehensive, data-driven analysis. Frame ALL suggested actions as RE
 - Overall Q1 trajectory: on-track, at-risk, or behind
 - Current daily run rate vs required daily rate to hit target
 - Biggest single risk factor with dollar impact
+- **If any TREND ANOMALIES were detected (see data context), call out the most material one in the Executive Summary — these are upstream signals (MQL faucet drops, ad campaigns going dark, cross-account reallocation) that predict downstream pipeline risk months before it shows in attainment.**
 ${includePOR && includeR360 ? '- Product divergence summary (POR vs R360)' : `- Regional performance summary for ${includePOR ? 'POR' : 'R360'}`}
+
+### 1.5. TREND ANOMALY REVIEW (PRIORITY — CAUSAL CHAIN)
+Analyze the pre-computed anomalies in the TREND ANOMALIES data section below (MQL MoM drops, ad-spend drops, dark campaigns, cross-account reallocations). For each material anomaly:
+- **What happened**: which product/region/source/campaign, which month, magnitude
+- **Downstream impact**: tie the anomaly to specific attainment or pipeline impact visible in the current QTD data (e.g., "Dec 2025 MQL drop → thin Q2 Day-21 open pipe in Inbound SMB")
+- **Root cause hypothesis**: spend cut? campaign paused? seasonality? If a POR spend drop aligns with an R360 spend rise the same month, call out the reallocation explicitly.
+- **Recoverable vs structural**: is the signal still active (campaign still dark) or has it normalized?
+- If NO anomalies are present in the data (empty sections), skip this with a one-line "No material trend anomalies detected in the 6-month window" — do not fabricate.
 
 ### 2. REVENUE ATTAINMENT DEEP DIVE
 For ${includePOR && includeR360 ? 'each product (POR, R360)' : includePOR ? 'POR' : 'R360'} by region:
 - Current attainment % vs QTD target
-- Segment-level performance ranking (best to worst)
-- Concentration risk: which segments are carrying the load vs dragging
+- **Category-level ranking** (NEW LOGO / EXPANSION / MIGRATION / STRATEGIC / RENEWAL) from best to worst
+- **Segment breakdown within NEW LOGO**: if the data context contains a "NEW LOGO Segment Breakdown" section, rank SMB vs Strategic attainment for each product × region. Call out segments below 70% attainment explicitly with dollar gap. ("Segment" here means SMB or Strategic — NOT the category name.)
+- Concentration risk: which categories/segments are carrying the load vs dragging
 - Win rate analysis and deal velocity indicators
 
 ### 3. CHANNEL PERFORMANCE ANALYSIS
@@ -805,6 +1044,57 @@ ${includeR360 && activeRegions.length === 3 ? `## R360 Performance (All Regions)
 - Lost Deals: ${r360Total.total_lost_deals || 0} worth $${(r360Total.total_lost_acv || 0).toLocaleString()}` : ''}
 
 ${buildRegionalDetail()}
+
+## TREND ANOMALIES (6-MONTH WINDOW — PRE-COMPUTED, USE THESE EXACT VALUES)
+
+### MQL Volume Drops (MoM drops ≥25% in identified product/region/source/segment)
+${mqlAnomalies.length > 0 ? mqlAnomalies.map(a =>
+  `- ${a.product} ${a.region} ${a.source} ${a.segment}: ${a.prior_month} MQLs ${a.prior_mql} → ${a.current_month} MQLs ${a.current_mql} (${a.mom_pct_change}% MoM)`
+).join('\n') : 'None detected — MQL volume steady across 6-month window.'}
+
+### Ad Spend Drops (MoM spend drops ≥30% per campaign)
+${adSpendAnomalies.length > 0 ? adSpendAnomalies.map(a =>
+  `- ${a.product} ${a.region} "${a.campaign_name}": ${a.prior_month} $${Math.round(a.prior_spend).toLocaleString()} → ${a.current_month} $${Math.round(a.current_spend).toLocaleString()} (${a.mom_pct_change}% MoM)`
+).join('\n') : 'None detected — campaign spend stable.'}
+
+### Dark Campaigns (active >$500/mo, now $0 for 2+ consecutive months)
+${darkCampaigns.length > 0 ? darkCampaigns.map(c =>
+  `- ${c.product} ${c.region} "${c.campaign_name}": last active ${c.last_active_month} at $${c.last_active_spend.toLocaleString()}/mo, now dark ${c.months_dark} month(s). RECOVERABLE LEVER.`
+).join('\n') : 'None detected — no previously-active campaigns have gone dark.'}
+
+### Cross-Account Reallocation (POR spend ↓ and R360 spend ↑ same month, same region)
+${reallocations.length > 0 ? reallocations.map(r =>
+  `- ${r.month} ${r.region}: ${r.note} POR total $${r.por_spend.toLocaleString()}, R360 total $${r.r360_spend.toLocaleString()}.`
+).join('\n') : 'None detected — no cross-account reallocation pattern in the window.'}
+
+### Monthly MQL Volume Series (for reference — use TREND ANOMALIES above as the analytical summary)
+${mqlTrendRows.length > 0
+  ? (() => {
+      // Summarize by product-region-source, most recent 6 months
+      const key = (r: MqlMonthlyRow) => `${r.product} ${r.region} ${r.source}`;
+      const grouped = new Map<string, MqlMonthlyRow[]>();
+      for (const r of mqlTrendRows) {
+        if (!grouped.has(key(r))) grouped.set(key(r), []);
+        grouped.get(key(r))!.push(r);
+      }
+      return Array.from(grouped.entries())
+        .filter(([, rows]) => rows.reduce((s, x) => s + x.mql_count, 0) >= 20)
+        .map(([k, rows]) => {
+          rows.sort((a, b) => a.month.localeCompare(b.month));
+          const series = rows.map(r => `${r.month}:${r.mql_count}`).join(' → ');
+          return `- ${k}: ${series}`;
+        })
+        .slice(0, 12)
+        .join('\n') || '(insufficient volume for monthly comparison)';
+    })()
+  : '(no trend data available)'}
+
+## NEW LOGO SEGMENT BREAKDOWN (SMB vs Strategic — APPORTIONED TARGETS, USE EXACT VALUES)
+${segmentRows.length > 0 ? segmentRows.map((r: any) =>
+  `- ${r.product} ${r.region} NEW LOGO ${r.segment}: QTD Actual $${(r.qtd_acv || 0).toLocaleString()}, QTD Target $${(r.qtd_target || 0).toLocaleString()}, ${r.qtd_attainment_pct}% attainment, Gap $${(r.qtd_gap || 0).toLocaleString()}, ${r.pipeline_coverage_x}x coverage, RAG: ${r.rag_status} (target source: ${r.target_source || 'prior_year_actuals'})`
+).join('\n') : '(no NEW LOGO segment rows in scope — filter may exclude NEW LOGO, or no POR/R360 NEW LOGO bookings for this period)'}
+
+**NOTE on segment targets:** Segment-level QTD targets are apportioned from each product × region × NEW LOGO category target using the 2025 prior-year SMB/Strategic split. The "target source" annotation indicates whether historical data was used (prior_year_actuals) or the 70/30 fallback (default_70_30_fallback). Apportioned targets are directional, not authoritative — cite them as "~$X" when the underlying plan doesn't break out segment.
 
 ## Critical Misses (Below 70% Attainment)
 ${criticalMisses.length > 0 ? criticalMisses.map((row: any) =>
@@ -1035,7 +1325,7 @@ ${includePOR ? `- POR projected: $${Math.round(porProjected).toLocaleString()} (
 ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()} (${r360Q1Target > 0 ? Math.round((r360Projected / r360Q1Target) * 100) : 0}% of target)` : ''}
 
 ## CRITICAL RULES
-1. PRODUCE ALL 10 SECTIONS - do not skip any section. Each section must be DETAILED and COMPREHENSIVE.
+1. PRODUCE ALL SECTIONS (10 core + section 1.5 Trend Anomaly Review when data is present) - do not skip any section. Each section must be DETAILED and COMPREHENSIVE.
 2. **ZERO TOLERANCE FOR FABRICATED NUMBERS**: You MUST use ONLY the exact numbers provided in the data sections above. NEVER calculate, derive, estimate, or round numbers yourself. If you output a number that differs from what's in the data context, the ENTIRE response will be rejected.
 3. **NEVER CALCULATE QTD TARGETS**: The QTD Target values are PRE-COMPUTED and provided directly. DO NOT derive QTD targets by multiplying Q1 targets by quarter percentage. Use ONLY the "QTD Target" values shown in each data row. This is CRITICAL - calculating your own QTD targets will produce WRONG numbers.
 4. ALL METRICS MUST BE EXPLICITLY QTD: Every attainment %, variance %, dollar amount, and count MUST be labeled as QTD. Examples: "QTD attainment: 56%", "$141K QTD actual", "QTD gap: -$110K", "12 QTD deals". NEVER show a metric without the QTD prefix/suffix.
@@ -1060,6 +1350,9 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 23. **DO NOT MENTION QUARTER PROGRESS**: NEVER compare attainment to quarter progress percentage. NEVER say "at X% quarter progress" or "vs Y% benchmark". Only show QTD attainment (actual/target). The quarter progress is ${period?.quarter_pct_complete || 0}% but do NOT include this in your analysis output.
 24. **FUNNEL MATH CONSISTENCY (CRITICAL)**: MQL/SQL status categories are MUTUALLY EXCLUSIVE and must sum to 100%. Categories: Converted (success), Reverted (lost), Stalled (at risk), In Progress (healthy pipeline). If X% converted and Y% are reverted/stalled, the remaining % are "in progress" (still being worked, NOT lost). Do NOT make contradictory statements like "60% conversion and 0% loss" if other leads exist - explain where the remaining % are (in progress).
 25. **LEAD STATUS DEFINITIONS**: "Converted" = moved to next stage (success). "Reverted" = disqualified/removed from funnel (loss). "Stalled" = stuck >30 days without progress (at risk). "In Progress" = actively being worked, not yet converted (healthy pipeline, NOT lost). When discussing funnel health, distinguish between true losses (reverted) and leads still in pipeline (in progress or stalled).
+26. **TREND ANOMALIES ARE PRE-COMPUTED**: Use the exact values in the "TREND ANOMALIES" data section. Never fabricate month names, percentages, or campaign names. If a section says "None detected", report that honestly — do not manufacture anomalies. When citing an anomaly, always give the specific month ("Dec 2025", not "recent months") and the magnitude (both counts and percent).
+27. **SEGMENT vs CATEGORY — DO NOT CONFUSE**: "Category" = NEW LOGO, EXPANSION, MIGRATION, STRATEGIC, RENEWAL (from RevOpsReport OpportunityType). "Segment" = SMB or Strategic (SMB/Strategic split within NEW LOGO from the apportioned breakdown). When the "NEW LOGO Segment Breakdown" data section is present, analyze SMB and Strategic separately within each product × region; flag whichever is lagging. Segment targets are apportioned from historical data — mark them "~$X (apportioned)" when citing specific dollar values.
+28. **CAUSAL CHAIN REASONING**: If a TREND ANOMALY is present AND a downstream segment is underperforming, connect them explicitly. Example: "POR US Inbound SMB QTD attainment 34% (RED); root cause Dec 2025 MQL drop 199→121 (-39% MoM) driven by POR US ad-spend cut -$6.7K same month." Don't stop at surface-level attainment — walk the chain from symptom back to cause.
 
 --- END DATA CONTEXT ---
 
@@ -1109,7 +1402,12 @@ export async function POST(request: Request) {
       ? `This analysis covers ONLY ${filteredProduct}. You MUST NOT mention, reference, compare to, or acknowledge the existence of ${excludedProduct} anywhere in your output. ${excludedProduct} does not exist for this analysis. If you mention ${excludedProduct} even once, the entire output will be rejected.`
       : 'Include product comparisons (POR vs R360) in every section where both products have data.';
 
-    const systemMessage = `You are a senior Revenue Operations analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly bookings analysis. You write LONG, COMPREHENSIVE reports with EXACTLY 10 sections: Executive Summary, Revenue Attainment Deep Dive, Channel Performance, Funnel Health & Velocity, Funnel Dropoff Analysis, Pipeline Risk, Win/Loss Patterns, Marketing & Channel Efficiency, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific dollar amounts, percentages, and gaps throughout. Be brutally honest about underperformance with root cause analysis. Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 9000-12000 CHARACTERS. NEVER stop before completing all 10 sections.
+    const systemMessage = `You are a senior Revenue Operations analyst at a B2B SaaS company producing EXTREMELY DETAILED quarterly bookings analysis. You write LONG, COMPREHENSIVE reports with the following sections in order: Executive Summary, Trend Anomaly Review (section 1.5 — include when TREND ANOMALIES data section has any detected items; skip with a one-liner if all empty), Revenue Attainment Deep Dive, Channel Performance, Funnel Health & Velocity, Funnel Dropoff Analysis, Pipeline Risk, Win/Loss Patterns, Marketing & Channel Efficiency, Predictive Indicators, and Prioritized Recommendations. EVERY section must have 5+ data-backed observations. Include regional breakdowns (AMER/EMEA/APAC) in every section. ${productInstruction} Cite specific dollar amounts, percentages, and gaps throughout. Be brutally honest about underperformance with root cause analysis. When trend anomalies are present, walk the causal chain from symptom (e.g. weak QTD attainment) back to cause (e.g. MQL drop months earlier → ad-spend cut). Frame suggestions as recommendations with priority (P1/P2/P3). TARGET 9000-12000 CHARACTERS. NEVER stop before completing all sections.
+
+**TERMINOLOGY — IMPORTANT:**
+- **Category** = NEW LOGO / EXPANSION / MIGRATION / STRATEGIC / RENEWAL (the OpportunityType dimension)
+- **Segment** = SMB or Strategic (the account-size dimension within NEW LOGO, from the Segment Breakdown data)
+- Do not use "segment" when you mean "category". The segment breakdown is a NEW data source — when present, analyze SMB and Strategic separately.
 
 **CRITICAL DATA ACCURACY RULES**:
 1. You MUST use ONLY the EXACT numbers provided in the data sections. NEVER calculate, derive, estimate, round, or modify any number yourself.

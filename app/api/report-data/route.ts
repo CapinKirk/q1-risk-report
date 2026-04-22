@@ -3493,6 +3493,367 @@ async function getGoogleAds(filters: ReportFilters) {
   }
 }
 
+/**
+ * Get 6-month MQL/SQL/SQO trend from DailyRevenueFunnel.
+ * Used by the AI summary to detect faucet-level anomalies (e.g. Dec 2025
+ * MQL drop upstream of a Q2 pipe shortfall) that current-period snapshots hide.
+ * Split by RecordType (product), Region, FunnelType (as source label), and Segment.
+ */
+async function getMqlTrendByMonth(filters: ReportFilters) {
+  // DRF is a daily snapshot table. We want "how many leads FIRST became MQL
+  // in month X" — not "how many leads had MQL=1 flag on any day in month X"
+  // (which over-counts because a lead flagged in Nov still shows up in Dec/Jan
+  // snapshots).
+  //
+  // Two paths:
+  //   1. POR records (LeadID/ContactID present): dedupe by lead + take the
+  //      first CaptureDate where MQL=1 as the event date; bucket by that month.
+  //   2. R360 INBOUND records (LeadID/ContactID null): each DRF row IS one
+  //      unique MQL event (per known data shape), so CaptureDate is the event
+  //      date — no dedup needed.
+  const query = `
+    WITH with_ids AS (
+      SELECT
+        CASE WHEN UPPER(RecordType) = 'POR' THEN 'POR' ELSE 'R360' END AS product,
+        Region AS region,
+        COALESCE(FunnelType, 'Unknown') AS source,
+        COALESCE(NULLIF(Segment, ''), 'Mixed') AS segment,
+        COALESCE(LeadID, ContactID) AS lead_key,
+        MIN(CASE WHEN MQL = 1 THEN CaptureDate END) AS first_mql_date,
+        MIN(CASE WHEN \`SQL\` = 1 THEN CaptureDate END) AS first_sql_date,
+        MIN(CASE WHEN SQO = 1 THEN CaptureDate END) AS first_sqo_date
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.${BIGQUERY_CONFIG.TABLES.DAILY_REVENUE_FUNNEL}\`
+      WHERE CaptureDate >= DATE_TRUNC(DATE_SUB(DATE('${filters.endDate}'), INTERVAL 5 MONTH), MONTH)
+        AND CaptureDate <= DATE('${filters.endDate}')
+        AND Region IN ('AMER', 'EMEA', 'APAC')
+        AND (LeadID IS NOT NULL OR ContactID IS NOT NULL)
+      GROUP BY product, region, source, segment, lead_key
+    ),
+    with_ids_monthly AS (
+      -- Each stage may land in a different month than MQL; aggregate all three.
+      SELECT
+        FORMAT_DATE('%Y-%m', first_mql_date) AS month, product, region, source, segment,
+        COUNTIF(first_mql_date IS NOT NULL) AS mql_count, 0 AS sql_count, 0 AS sqo_count
+      FROM with_ids
+      WHERE first_mql_date IS NOT NULL
+      GROUP BY 1,2,3,4,5
+      UNION ALL
+      SELECT
+        FORMAT_DATE('%Y-%m', first_sql_date) AS month, product, region, source, segment,
+        0, COUNTIF(first_sql_date IS NOT NULL), 0
+      FROM with_ids
+      WHERE first_sql_date IS NOT NULL
+      GROUP BY 1,2,3,4,5
+      UNION ALL
+      SELECT
+        FORMAT_DATE('%Y-%m', first_sqo_date) AS month, product, region, source, segment,
+        0, 0, COUNTIF(first_sqo_date IS NOT NULL)
+      FROM with_ids
+      WHERE first_sqo_date IS NOT NULL
+      GROUP BY 1,2,3,4,5
+    ),
+    without_ids_monthly AS (
+      -- R360 INBOUND (and any other DRF rows with NULL identifiers):
+      -- each row = one unique event, CaptureDate = event date. No dedup.
+      SELECT
+        FORMAT_DATE('%Y-%m', CaptureDate) AS month,
+        CASE WHEN UPPER(RecordType) = 'POR' THEN 'POR' ELSE 'R360' END AS product,
+        Region AS region,
+        COALESCE(FunnelType, 'Unknown') AS source,
+        COALESCE(NULLIF(Segment, ''), 'Mixed') AS segment,
+        COUNTIF(MQL = 1) AS mql_count,
+        COUNTIF(\`SQL\` = 1) AS sql_count,
+        COUNTIF(SQO = 1) AS sqo_count
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.${BIGQUERY_CONFIG.TABLES.DAILY_REVENUE_FUNNEL}\`
+      WHERE CaptureDate >= DATE_TRUNC(DATE_SUB(DATE('${filters.endDate}'), INTERVAL 5 MONTH), MONTH)
+        AND CaptureDate <= DATE('${filters.endDate}')
+        AND Region IN ('AMER', 'EMEA', 'APAC')
+        AND LeadID IS NULL AND ContactID IS NULL
+      GROUP BY month, product, region, source, segment
+    ),
+    combined AS (
+      SELECT * FROM with_ids_monthly
+      UNION ALL
+      SELECT * FROM without_ids_monthly
+    ),
+    summed AS (
+      SELECT
+        month, product, region, source, segment,
+        SUM(mql_count) AS mql_total,
+        SUM(sql_count) AS sql_total,
+        SUM(sqo_count) AS sqo_total
+      FROM combined
+      GROUP BY month, product, region, source, segment
+    )
+    SELECT
+      month, product, region, source, segment,
+      mql_total AS mql_count,
+      sql_total AS sql_count,
+      sqo_total AS sqo_count
+    FROM summed
+    WHERE mql_total > 0 OR sql_total > 0 OR sqo_total > 0
+    ORDER BY month, product, region, source, segment
+  `;
+
+  try {
+    const [rows] = await getBigQuery().query({ query });
+    return rows.map((r: any) => ({
+      month: r.month,
+      product: r.product,
+      region: r.region,
+      source: r.source,
+      segment: r.segment,
+      mql_count: parseInt(r.mql_count) || 0,
+      sql_count: parseInt(r.sql_count) || 0,
+      sqo_count: parseInt(r.sqo_count) || 0,
+    }));
+  } catch (error) {
+    console.warn('MQL trend query failed, returning empty:', error instanceof Error ? error.message : 'Unknown error');
+    return [];
+  }
+}
+
+/**
+ * Get 6-month Google Ads spend trend by campaign (both POR and R360 accounts).
+ * Used by the AI summary to detect:
+ *   - Campaigns that went dark (spend → $0) and didn't recover
+ *   - Cross-account reallocation (POR ↓ + R360 ↑ same month)
+ *   - MoM spend cuts correlated with downstream MQL drops
+ * Filtered to campaigns with any month of spend > $500 to keep payload small.
+ */
+async function getAdSpendTrendByMonth(filters: ReportFilters) {
+  const query = `
+    WITH por_campaigns AS (
+      SELECT campaign_id, campaign_name
+      FROM (
+        SELECT campaign_id, campaign_name,
+               ROW_NUMBER() OVER (PARTITION BY campaign_id ORDER BY _DATA_DATE DESC) AS rn
+        FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_POR}.ads_Campaign_8275359090\`
+      )
+      WHERE rn = 1
+    ),
+    r360_campaigns AS (
+      SELECT campaign_id, campaign_name
+      FROM (
+        SELECT campaign_id, campaign_name,
+               ROW_NUMBER() OVER (PARTITION BY campaign_id ORDER BY _DATA_DATE DESC) AS rn
+        FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_R360}.ads_Campaign_3799591491\`
+      )
+      WHERE rn = 1
+    ),
+    por_monthly AS (
+      SELECT
+        FORMAT_DATE('%Y-%m', s.segments_date) AS month,
+        'POR' AS product,
+        CASE
+          WHEN UPPER(c.campaign_name) LIKE 'US %' OR UPPER(c.campaign_name) LIKE '%_NA' OR UPPER(c.campaign_name) LIKE '%_NA_%' THEN 'AMER'
+          WHEN UPPER(c.campaign_name) LIKE 'UK %' OR UPPER(c.campaign_name) LIKE '%_UK' OR UPPER(c.campaign_name) LIKE '%_UK_%' THEN 'EMEA'
+          WHEN UPPER(c.campaign_name) LIKE 'AU %' OR UPPER(c.campaign_name) LIKE '%_AUS' OR UPPER(c.campaign_name) LIKE '%_AUS_%' OR UPPER(c.campaign_name) LIKE '%_AU_%' THEN 'APAC'
+          ELSE 'AMER'
+        END AS region,
+        c.campaign_name,
+        SUM(s.metrics_impressions) AS impressions,
+        SUM(s.metrics_clicks) AS clicks,
+        SUM(s.metrics_conversions) AS conversions,
+        ROUND(SUM(s.metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_POR}.ads_CampaignBasicStats_8275359090\` s
+      JOIN por_campaigns c ON s.campaign_id = c.campaign_id
+      WHERE s.segments_date >= DATE_TRUNC(DATE_SUB(DATE('${filters.endDate}'), INTERVAL 5 MONTH), MONTH)
+        AND s.segments_date <= DATE('${filters.endDate}')
+        AND s.segments_ad_network_type = 'SEARCH'
+      GROUP BY month, product, region, c.campaign_name
+    ),
+    r360_monthly AS (
+      SELECT
+        FORMAT_DATE('%Y-%m', s.segments_date) AS month,
+        'R360' AS product,
+        CASE
+          WHEN UPPER(c.campaign_name) LIKE 'US %' OR UPPER(c.campaign_name) LIKE '%_NA' OR UPPER(c.campaign_name) LIKE '%_NA_%' THEN 'AMER'
+          WHEN UPPER(c.campaign_name) LIKE 'UK %' OR UPPER(c.campaign_name) LIKE '%_UK' OR UPPER(c.campaign_name) LIKE '%_UK_%' THEN 'EMEA'
+          WHEN UPPER(c.campaign_name) LIKE 'AU %' OR UPPER(c.campaign_name) LIKE '%_AUS' OR UPPER(c.campaign_name) LIKE '%_AUS_%' OR UPPER(c.campaign_name) LIKE '%_AU_%' THEN 'APAC'
+          ELSE 'AMER'
+        END AS region,
+        c.campaign_name,
+        SUM(s.metrics_impressions) AS impressions,
+        SUM(s.metrics_clicks) AS clicks,
+        SUM(s.metrics_conversions) AS conversions,
+        ROUND(SUM(s.metrics_cost_micros) / 1000000.0, 2) AS ad_spend_usd
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.GOOGLE_ADS_R360}.ads_CampaignBasicStats_3799591491\` s
+      JOIN r360_campaigns c ON s.campaign_id = c.campaign_id
+      WHERE s.segments_date >= DATE_TRUNC(DATE_SUB(DATE('${filters.endDate}'), INTERVAL 5 MONTH), MONTH)
+        AND s.segments_date <= DATE('${filters.endDate}')
+        AND s.segments_ad_network_type = 'SEARCH'
+      GROUP BY month, product, region, c.campaign_name
+    ),
+    combined AS (
+      SELECT * FROM por_monthly
+      UNION ALL
+      SELECT * FROM r360_monthly
+    ),
+    -- Keep any campaign that spent >$500 in at least one of the 6 months
+    -- OR spent >$100 in the most recent 3 months (catches cuts-to-zero)
+    significant_campaigns AS (
+      SELECT DISTINCT product, campaign_name
+      FROM combined
+      WHERE ad_spend_usd > 500
+    )
+    SELECT c.*
+    FROM combined c
+    INNER JOIN significant_campaigns sc
+      ON c.product = sc.product AND c.campaign_name = sc.campaign_name
+    ORDER BY c.product, c.region, c.campaign_name, c.month
+  `;
+
+  try {
+    const [rows] = await getBigQuery().query({ query });
+    return rows.map((r: any) => ({
+      month: r.month,
+      product: r.product,
+      region: r.region,
+      campaign_name: r.campaign_name,
+      ad_spend_usd: parseFloat(r.ad_spend_usd) || 0,
+      impressions: parseInt(r.impressions) || 0,
+      clicks: parseInt(r.clicks) || 0,
+      conversions: parseFloat(r.conversions) || 0,
+    }));
+  } catch (error) {
+    console.warn('Ad spend trend query failed, returning empty:', error instanceof Error ? error.message : 'Unknown error');
+    return [];
+  }
+}
+
+/**
+ * Get NEW LOGO segment (SMB vs Strategic) current-period breakdown from OVT.
+ * Threshold: ACV > 100K = Strategic, else SMB. Filters to SalesFilter='Sales/Marketing'
+ * to match RevOpsPerformance (excludes admin/finance/NULL filter contamination).
+ *
+ * Returns rows like: { product, region, segment, qtd_acv, qtd_deals, qtd_lost_acv,
+ * qtd_lost_deals, pipeline_acv, pipeline_count }
+ */
+async function getNewLogoSegmentActuals(filters: ReportFilters) {
+  const regionFilter = filters.regions.length > 0
+    ? `AND Division IN (${filters.regions.map(r => `'${REGION_REVERSE_MAP[r as keyof typeof REGION_REVERSE_MAP]}'`).join(',')})`
+    : `AND Division IN ('US', 'UK', 'AU')`;
+  const productFilter = filters.products.length === 1
+    ? (filters.products[0] === 'POR' ? 'AND por_record__c = true' : 'AND por_record__c = false')
+    : '';
+
+  const query = `
+    WITH period_opps AS (
+      SELECT
+        CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
+        CASE Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        CASE WHEN ACV > 100000 THEN 'Strategic' ELSE 'SMB' END AS segment,
+        CASE
+          WHEN Won = true THEN 'Won'
+          WHEN IsClosed = true THEN 'Lost'
+          ELSE 'Open'
+        END AS status,
+        COALESCE(ACV, 0) AS acv
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.${BIGQUERY_CONFIG.TABLES.OPPORTUNITY}\`
+      WHERE Type = 'New Business'
+        AND COALESCE(ACV, 0) > 0
+        AND SalesFilter = 'Sales/Marketing'
+        AND CloseDate >= DATE('${filters.startDate}')
+        AND CloseDate <= DATE('${filters.endDate}')
+        ${regionFilter}
+        ${productFilter}
+    )
+    SELECT
+      product, region, segment,
+      COUNTIF(status = 'Won') AS qtd_deals,
+      SUM(IF(status = 'Won', acv, 0)) AS qtd_acv,
+      COUNTIF(status = 'Lost') AS qtd_lost_deals,
+      SUM(IF(status = 'Lost', acv, 0)) AS qtd_lost_acv,
+      SUM(IF(status = 'Open', acv, 0)) AS pipeline_acv,
+      COUNTIF(status = 'Open') AS pipeline_count
+    FROM period_opps
+    WHERE region IS NOT NULL
+    GROUP BY product, region, segment
+    ORDER BY product, region, segment
+  `;
+
+  try {
+    const [rows] = await getBigQuery().query({ query });
+    return rows.map((r: any) => ({
+      product: r.product,
+      region: r.region,
+      segment: r.segment,
+      qtd_deals: parseInt(r.qtd_deals) || 0,
+      qtd_acv: parseFloat(r.qtd_acv) || 0,
+      qtd_lost_deals: parseInt(r.qtd_lost_deals) || 0,
+      qtd_lost_acv: parseFloat(r.qtd_lost_acv) || 0,
+      pipeline_acv: parseFloat(r.pipeline_acv) || 0,
+      pipeline_count: parseInt(r.pipeline_count) || 0,
+    }));
+  } catch (error) {
+    console.warn('New logo segment actuals query failed, returning empty:', error instanceof Error ? error.message : 'Unknown error');
+    return [];
+  }
+}
+
+/**
+ * Get prior-year (2025) NEW LOGO SMB/Strategic split per product×region.
+ * Used to apportion 2026 Q1 targets (which don't carry segment granularity in
+ * RevOpsReport). Returns a map of `${product}-${region}-${segment}` → share (0..1).
+ * Falls back to 70/30 SMB/Strategic in the main handler if a row is missing.
+ */
+async function getNewLogoSegmentHistoricalSplit(): Promise<Map<string, number>> {
+  const query = `
+    WITH won_2025 AS (
+      SELECT
+        CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
+        CASE Division
+          WHEN 'US' THEN 'AMER'
+          WHEN 'UK' THEN 'EMEA'
+          WHEN 'AU' THEN 'APAC'
+        END AS region,
+        CASE WHEN ACV > 100000 THEN 'Strategic' ELSE 'SMB' END AS segment,
+        ACV
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.${BIGQUERY_CONFIG.TABLES.OPPORTUNITY}\`
+      WHERE Type = 'New Business'
+        AND Won = true
+        AND COALESCE(ACV, 0) > 0
+        AND SalesFilter = 'Sales/Marketing'
+        AND EXTRACT(YEAR FROM CloseDate) = 2025
+        AND Division IN ('US', 'UK', 'AU')
+    ),
+    per_segment AS (
+      SELECT product, region, segment, SUM(ACV) AS segment_acv
+      FROM won_2025
+      WHERE region IS NOT NULL
+      GROUP BY product, region, segment
+    ),
+    per_region AS (
+      SELECT product, region, SUM(ACV) AS total_acv
+      FROM won_2025
+      WHERE region IS NOT NULL
+      GROUP BY product, region
+    )
+    SELECT
+      s.product, s.region, s.segment,
+      SAFE_DIVIDE(s.segment_acv, r.total_acv) AS share
+    FROM per_segment s
+    JOIN per_region r ON s.product = r.product AND s.region = r.region
+  `;
+
+  const result = new Map<string, number>();
+  try {
+    const [rows] = await getBigQuery().query({ query });
+    for (const r of rows as any[]) {
+      const key = `${r.product}-${r.region}-${r.segment}`;
+      result.set(key, parseFloat(r.share) || 0);
+    }
+  } catch (error) {
+    console.warn('New logo segment historical split query failed, using 70/30 fallback:', error instanceof Error ? error.message : 'Unknown error');
+  }
+  return result;
+}
+
 // Calculate period info
 function calculatePeriodInfo(startDate: string, endDate: string) {
   const quarterStart = new Date('2026-01-01');
@@ -3602,6 +3963,10 @@ export async function POST(request: Request) {
       expMigSourceCounts,
       inboundUniqueCounts,
       inboundSourceCounts,
+      mqlTrendByMonth,
+      adSpendTrendByMonth,
+      newLogoSegmentActuals,
+      newLogoSegmentHistoricalSplit,
     ] = await Promise.all([
       getRevOpsQTDData(filters),
       getRevenueActuals(filters),
@@ -3627,6 +3992,10 @@ export async function POST(request: Request) {
       getExpMigSourceCounts(filters),
       getInboundUniqueCounts(filters),
       getInboundSourceCounts(filters),
+      getMqlTrendByMonth(filters),
+      getAdSpendTrendByMonth(filters),
+      getNewLogoSegmentActuals(filters),
+      getNewLogoSegmentHistoricalSplit(),
     ]);
 
     // Calculate period info
@@ -3840,6 +4209,88 @@ export async function POST(request: Request) {
         sql_to_sal_leakage: parseFloat(target.sql_to_sal_leakage) || 0,
         sal_to_sqo_leakage: parseFloat(target.sal_to_sqo_leakage) || 0,
       });
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 2: NEW LOGO segment breakdown (SMB vs Strategic)
+    //
+    // RevOpsReport targets are at product × region × category granularity,
+    // so SMB-vs-Strategic within NEW LOGO is invisible to the AI summary by
+    // default. Here we apportion each NEW LOGO target by prior-year (2025)
+    // SMB/Strategic share, pair it with current-period segment actuals from
+    // OVT, and emit two supplemental rows per region. The AI prompt consumes
+    // `attainment_by_segment` without changing any existing consumer.
+    // ------------------------------------------------------------------
+    const DEFAULT_SMB_SHARE = 0.7;   // fallback when no 2025 history exists
+    const attainmentBySegment: any[] = [];
+    const segmentActualsMap = new Map<string, any>();
+    for (const row of newLogoSegmentActuals as any[]) {
+      segmentActualsMap.set(`${row.product}-${row.region}-${row.segment}`, row);
+    }
+
+    for (const [key, target] of Array.from(revOpsTargetMap.entries())) {
+      if (target.category !== 'NEW LOGO') continue;
+      const { product, region } = target;
+      const q1Target = parseFloat(target.q1_target) || 0;
+      if (q1Target <= 0) continue;
+
+      // Historical share — fall back to 70/30 SMB/Strategic if we have no
+      // 2025 bookings for this product/region (e.g. brand-new R360 segment).
+      const smbShare = newLogoSegmentHistoricalSplit.get(`${product}-${region}-SMB`)
+        ?? DEFAULT_SMB_SHARE;
+      const strategicShare = newLogoSegmentHistoricalSplit.get(`${product}-${region}-Strategic`)
+        ?? (1 - DEFAULT_SMB_SHARE);
+      // Renormalize in case the two shares don't sum to 1 (missing segment)
+      const total = smbShare + strategicShare;
+      const normSmb = total > 0 ? smbShare / total : DEFAULT_SMB_SHARE;
+      const normStrategic = total > 0 ? strategicShare / total : (1 - DEFAULT_SMB_SHARE);
+
+      for (const segment of ['SMB', 'Strategic'] as const) {
+        const share = segment === 'SMB' ? normSmb : normStrategic;
+        const segQ1Target = q1Target * share;
+        const segQtdTarget = segQ1Target * (periodInfo.quarter_pct_complete / 100);
+
+        const actuals = segmentActualsMap.get(`${product}-${region}-${segment}`) || {};
+        const segQtdAcv = actuals.qtd_acv || 0;
+        const segQtdDeals = actuals.qtd_deals || 0;
+        const segLostAcv = actuals.qtd_lost_acv || 0;
+        const segLostDeals = actuals.qtd_lost_deals || 0;
+        const segPipelineAcv = actuals.pipeline_acv || 0;
+
+        const attainmentPct = segQtdTarget > 0
+          ? Math.round((segQtdAcv / segQtdTarget) * 100)
+          : 100;
+        const remainingGap = Math.max(0, segQ1Target - segQtdAcv);
+        const coverage = remainingGap > 0 ? segPipelineAcv / remainingGap : 0;
+        const closedCount = segQtdDeals + segLostDeals;
+        const winRate = closedCount > 0
+          ? Math.round((segQtdDeals / closedCount) * 1000) / 10
+          : 0;
+
+        attainmentBySegment.push({
+          product,
+          region,
+          category: 'NEW LOGO',
+          segment,
+          is_rollup: false,
+          q1_target: Math.round(segQ1Target * 100) / 100,
+          qtd_target: Math.round(segQtdTarget * 100) / 100,
+          qtd_deals: segQtdDeals,
+          qtd_acv: Math.round(segQtdAcv * 100) / 100,
+          qtd_attainment_pct: attainmentPct,
+          qtd_gap: Math.round((segQtdAcv - segQtdTarget) * 100) / 100,
+          pipeline_acv: Math.round(segPipelineAcv * 100) / 100,
+          pipeline_coverage_x: Math.round(coverage * 10) / 10,
+          win_rate_pct: winRate,
+          qtd_lost_deals: segLostDeals,
+          qtd_lost_acv: Math.round(segLostAcv * 100) / 100,
+          rag_status: calculateRAG(attainmentPct),
+          // Provenance — so consumers know the target is apportioned
+          target_source: newLogoSegmentHistoricalSplit.get(`${product}-${region}-${segment}`) !== undefined
+            ? 'prior_year_actuals'
+            : 'default_70_30_fallback',
+        });
+      }
     }
 
     // Calculate grand total
@@ -4885,6 +5336,11 @@ export async function POST(request: Request) {
       top_risk_pockets: topRiskPockets,
       action_items: actionItems,
       utm_breakdown: utmBreakdownData,
+      // Phase 1: 6-month trend data for AI anomaly detection
+      mql_trend_by_month: mqlTrendByMonth,
+      ad_spend_trend_by_month: adSpendTrendByMonth,
+      // Phase 2: NEW LOGO segment breakdown (SMB vs Strategic) for AI
+      attainment_by_segment: attainmentBySegment,
     };
 
     return NextResponse.json(response, {

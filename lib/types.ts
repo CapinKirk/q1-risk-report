@@ -168,11 +168,21 @@ export interface ProductTotal {
   total_lost_acv: number;
 }
 
+// Segment classification for NEW LOGO breakdown
+// SMB = account-size below ~$100K ACV; Strategic = above
+export type Segment = 'SMB' | 'Strategic' | 'Mixed';
+
 // Attainment detail row
 export interface AttainmentRow {
   product: Product;
   region: Region;
   category: Category;
+  // NEW (Phase 2): optional segment/source dimensions for deeper breakdowns.
+  // When `is_rollup` is true, the row is the existing category total (SMB + Strategic summed).
+  // When false, it's a segment-specific row. Back-compat: all existing consumers ignore these.
+  segment?: Segment;
+  source?: Source;
+  is_rollup?: boolean;
   fy_target?: number;
   q1_target: number;
   qtd_target: number;
@@ -186,6 +196,31 @@ export interface AttainmentRow {
   qtd_lost_deals: number;
   qtd_lost_acv: number;
   rag_status: RAGStatus;
+}
+
+// Monthly MQL trend row — used by AI to detect volume drops / faucet issues
+export interface MqlTrendByMonthRow {
+  month: string;              // YYYY-MM
+  product: Product;
+  region: Region;
+  source: string;             // INBOUND, OUTBOUND, etc. (raw DRF FunnelType label)
+  segment: Segment;           // SMB, Strategic, or Mixed
+  mql_count: number;
+  sql_count: number;
+  sqo_count: number;
+}
+
+// Monthly ad spend trend row — used by AI to detect campaign cuts and
+// cross-account reallocation (POR -> R360 within same month).
+export interface AdSpendTrendByMonthRow {
+  month: string;              // YYYY-MM
+  product: Product;
+  region: Region;
+  campaign_name: string;
+  ad_spend_usd: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
 }
 
 // Source attainment row
@@ -238,6 +273,7 @@ export interface FunnelBySourceRow extends FunnelByCategoryRow {
 export interface FunnelBySourceActuals {
   region: Region;
   source: string;
+  category: string;
   // Actuals
   actual_mql: number;
   actual_sql: number;
@@ -342,6 +378,9 @@ export interface ReportData {
     POR: AttainmentRow[];
     R360: AttainmentRow[];
   };
+  // NEW (Phase 2): SMB/Strategic breakdown within NEW LOGO, apportioned from
+  // 2025 prior-year split. Every row has segment set and is_rollup=false.
+  attainment_by_segment?: AttainmentRow[];
   source_attainment: {
     POR: SourceAttainmentRow[];
     R360: SourceAttainmentRow[];
@@ -437,6 +476,9 @@ export interface ReportData {
     POR: { reverted_pct: number; converted_pct: number; stalled_pct: number };
     R360: { reverted_pct: number; converted_pct: number; stalled_pct: number };
   };
+  // NEW (Phase 1): monthly trends for anomaly detection in AI summary
+  mql_trend_by_month?: MqlTrendByMonthRow[];
+  ad_spend_trend_by_month?: AdSpendTrendByMonthRow[];
 }
 
 // Executive Summary Counts
