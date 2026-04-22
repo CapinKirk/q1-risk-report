@@ -364,8 +364,19 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
 
   // Normalize attainment data to flat array, then drop rows for categories
   // that are out of the active scope (e.g. MIGRATION/RENEWAL under outbound-only).
+  // Also drop rows that have NO signal at all (zero target + zero won + zero lost
+  // + zero deal count) — those represent planned-but-untouched segments and the
+  // AI would otherwise burn output space saying "no activity" for them.
   const allAttainment = normalizeAttainmentDetail(attainment_detail)
-    .filter((row: any) => !row.category || effectiveCategories.includes(row.category));
+    .filter((row: any) => !row.category || effectiveCategories.includes(row.category))
+    .filter((row: any) => {
+      const target = (row.q1_target || 0) + (row.qtd_target || 0);
+      const activity = (row.qtd_acv || 0) + (row.qtd_lost_acv || 0)
+        + (row.qtd_deals || 0) + (row.qtd_lost_deals || 0)
+        + (row.pipeline_acv || 0);
+      // Keep if there's either a real target or any actual activity.
+      return target > 0 || activity > 0;
+    });
 
   // Identify misses (segments below 90% attainment)
   const misses = allAttainment.filter((row: any) => row.qtd_attainment_pct < 90);
@@ -1270,6 +1281,7 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 26. **TREND ANOMALIES ARE PRE-COMPUTED**: Use the exact values in the "TREND ANOMALIES" data section. Never fabricate month names, percentages, or campaign names. If a section says "None detected", report that honestly — do not manufacture anomalies. When citing an anomaly, always give the specific month ("Dec 2025", not "recent months") and the magnitude (both counts and percent).
 27. **SEGMENT vs CATEGORY — DO NOT CONFUSE**: "Category" = NEW LOGO, EXPANSION, MIGRATION, STRATEGIC, RENEWAL (from RevOpsReport OpportunityType). "Segment" = SMB or Strategic (from DRF.Segment, splitting the New Business opportunity type by account tier). SMB segment maps 1:1 to NEW LOGO category; Strategic segment maps 1:1 to STRATEGIC category. When the "NEW LOGO Segment Breakdown" data section is present, analyze SMB and Strategic separately within each product × region and flag whichever is lagging. Segment target numbers come directly from RevOps — cite them as exact dollars.
 28. **CAUSAL CHAIN REASONING**: If a TREND ANOMALY is present AND a downstream segment is underperforming, connect them explicitly. Example: "POR US Inbound SMB QTD attainment 34% (RED); root cause Dec 2025 MQL drop 199→121 (-39% MoM) driven by POR US ad-spend cut -$6.7K same month." Don't stop at surface-level attainment — walk the chain from symptom back to cause.
+29. **WIN RATE TERMINOLOGY — DO NOT INVENT PHRASES**: Use "win rate" (the pre-computed win_rate_pct field, deal count basis) when discussing won/lost ratios. Do NOT invent phrasings like "net negative categories", "lost \$X vs won \$Y", or "dollar-based win rate" — those conflate deal volume with ACV and read as unprofessional. If you need the dollar view, frame it as "lost ACV concentration" or "ACV leakage" and cite the specific loss reasons that drive it. NEVER report a row where both won ACV and lost ACV are \$0 — such rows are filtered upstream; if you somehow see one, skip it silently.
 
 --- END DATA CONTEXT ---
 
