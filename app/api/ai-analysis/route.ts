@@ -1094,7 +1094,10 @@ ${segmentRows.length > 0 ? segmentRows.map((r: any) =>
   `- ${r.product} ${r.region} NEW LOGO ${r.segment}: QTD Actual $${(r.qtd_acv || 0).toLocaleString()}, QTD Target $${(r.qtd_target || 0).toLocaleString()}, ${r.qtd_attainment_pct}% attainment, Gap $${(r.qtd_gap || 0).toLocaleString()}, ${r.pipeline_coverage_x}x coverage, RAG: ${r.rag_status} (target source: ${r.target_source || 'prior_year_actuals'})`
 ).join('\n') : '(no NEW LOGO segment rows in scope — filter may exclude NEW LOGO, or no POR/R360 NEW LOGO bookings for this period)'}
 
-**NOTE on segment targets:** Segment-level QTD targets are apportioned from each product × region × NEW LOGO category target using the 2025 prior-year SMB/Strategic split. The "target source" annotation indicates whether historical data was used (prior_year_actuals) or the 70/30 fallback (default_70_30_fallback). Apportioned targets are directional, not authoritative — cite them as "~$X" when the underlying plan doesn't break out segment.
+**NOTE on segment breakdown (read carefully before analyzing):**
+- Segment rows split NEW LOGO bookings by account ACV tier: SMB = deals ≤ $100K ACV, Strategic = deals > $100K ACV. Both derive from OVT Type='New Business' filtered to SalesFilter='Sales/Marketing'.
+- **Definitional overlap with STRATEGIC category:** The STRATEGIC category (shown separately in the Category Ranking) is derived from DailyRevenueFunnel.Segment='Strategic'. Most DRF-Strategic deals are also >$100K in OVT, so the "Strategic" segment row and the STRATEGIC category row often refer to the same underlying deals. Do NOT flag this overlap as a distortion — it's a known definitional duplicate. Use the segment row to compare SMB vs larger-account performance *within NEW LOGO*, and use the STRATEGIC category for the top-end tier analysis.
+- QTD targets are apportioned from the NEW LOGO category target using 2025 prior-year SMB/Strategic ACV share. The "target source" annotation indicates prior_year_actuals or the 70/30 fallback (default_70_30_fallback). Apportioned targets are directional — cite segment target numbers as "~$X" when underlying plan doesn't break out segment.
 
 ## Critical Misses (Below 70% Attainment)
 ${criticalMisses.length > 0 ? criticalMisses.map((row: any) =>
