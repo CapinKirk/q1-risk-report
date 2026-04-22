@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from 'react';
 import DOMPurify from 'isomorphic-dompurify';
-import { ReportData, Product, Region, Category, AttainmentRow, ProductTotal } from '@/lib/types';
+import { ReportData, Product, Region, Category, Source, AttainmentRow, ProductTotal } from '@/lib/types';
 
 interface AIAnalysisProps {
   reportData: ReportData | null;
   selectedProducts: Product[];
   selectedRegions: Region[];
   selectedCategories: Category[];
+  selectedSources: Source[];
 }
 
 interface AnalysisState {
@@ -890,7 +891,7 @@ function getFilterLabel(products: Product[], regions: Region[], categories: Cate
   return label;
 }
 
-export default function AIAnalysis({ reportData, selectedProducts, selectedRegions, selectedCategories }: AIAnalysisProps) {
+export default function AIAnalysis({ reportData, selectedProducts, selectedRegions, selectedCategories, selectedSources }: AIAnalysisProps) {
   const [state, setState] = useState<AnalysisState>({
     loading: false,
     analysis: null,
@@ -919,7 +920,8 @@ export default function AIAnalysis({ reportData, selectedProducts, selectedRegio
           filterContext: {
             products: selectedProducts.length === 0 ? ['POR', 'R360'] : selectedProducts,
             regions: selectedRegions.length === 0 ? ['AMER', 'EMEA', 'APAC'] : selectedRegions,
-            isFiltered: selectedProducts.length > 0 || selectedRegions.length > 0,
+            sources: selectedSources,
+            isFiltered: selectedProducts.length > 0 || selectedRegions.length > 0 || selectedSources.length > 0,
           },
         }),
       });

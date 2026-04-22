@@ -642,7 +642,9 @@ function ReportContent() {
       {/* Opportunities Table with filtering and pagination */}
       <OpportunitiesTable data={filteredData} selectedRegions={selectedRegions} />
 
-      <GoogleAdsPerf data={filteredData} />
+      {!(selectedSources.length === 1 && selectedSources[0] === 'OUTBOUND') && (
+        <GoogleAdsPerf data={filteredData} />
+      )}
 
       {/* AI-Powered Analysis & Recommendations */}
       <AIAnalysis
@@ -650,6 +652,7 @@ function ReportContent() {
         selectedProducts={selectedProducts}
         selectedRegions={selectedRegions}
         selectedCategories={selectedCategories}
+        selectedSources={selectedSources}
       />
 
       {/* Marketing/Inbound Funnel AI Analysis */}
