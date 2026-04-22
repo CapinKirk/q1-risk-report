@@ -1095,9 +1095,12 @@ ${segmentRows.length > 0 ? segmentRows.map((r: any) =>
 ).join('\n') : '(no NEW LOGO segment rows in scope — filter may exclude NEW LOGO, or no POR/R360 NEW LOGO bookings for this period)'}
 
 **NOTE on segment breakdown (read carefully before analyzing):**
-- Segment rows split NEW LOGO bookings by account ACV tier: SMB = deals ≤ $100K ACV, Strategic = deals > $100K ACV. Both derive from OVT Type='New Business' filtered to SalesFilter='Sales/Marketing'.
-- **Definitional overlap with STRATEGIC category:** The STRATEGIC category (shown separately in the Category Ranking) is derived from DailyRevenueFunnel.Segment='Strategic'. Most DRF-Strategic deals are also >$100K in OVT, so the "Strategic" segment row and the STRATEGIC category row often refer to the same underlying deals. Do NOT flag this overlap as a distortion — it's a known definitional duplicate. Use the segment row to compare SMB vs larger-account performance *within NEW LOGO*, and use the STRATEGIC category for the top-end tier analysis.
-- QTD targets are apportioned from the NEW LOGO category target using 2025 prior-year SMB/Strategic ACV share. The "target source" annotation indicates prior_year_actuals or the 70/30 fallback (default_70_30_fallback). Apportioned targets are directional — cite segment target numbers as "~$X" when underlying plan doesn't break out segment.
+- Segment rows split the Type='New Business' deal set into two buckets using the authoritative DailyRevenueFunnel.Segment flag (same categorization RevOpsReport uses to produce the NEW LOGO and STRATEGIC category rows). Filtered to OVT SalesFilter='Sales/Marketing' to match RevOpsPerformance authority.
+  - **SMB segment ≡ RevOps NEW LOGO category** (deals where DRF.Segment is not 'Strategic')
+  - **Strategic segment ≡ RevOps STRATEGIC category** (deals where DRF.Segment = 'Strategic')
+- **The segment breakdown is a tier lens on the same deals as the category rows, not a new data source.** The "SMB" segment row and the "NEW LOGO" category row refer to the same underlying deals — just cited differently. The "Strategic" segment row and the "STRATEGIC" category row likewise refer to the same deals. Do NOT flag this as distortion or double-count.
+- **Why show both:** the segment breakdown carries apportioned targets (from 2025 prior-year SMB/Strategic ACV share) so you can compare SMB vs Strategic attainment side-by-side for a single product × region. The category rows give the top-line RAG. Use segment rows when discussing tier-level performance; use category rows for the executive summary rollup.
+- QTD targets are apportioned from the NEW LOGO category target. The "target source" annotation is prior_year_actuals when historical data exists, or default_70_30_fallback otherwise. Apportioned targets are directional — cite segment target numbers as "~$X".
 
 ## Critical Misses (Below 70% Attainment)
 ${criticalMisses.length > 0 ? criticalMisses.map((row: any) =>

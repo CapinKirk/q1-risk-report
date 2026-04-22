@@ -3723,43 +3723,67 @@ async function getAdSpendTrendByMonth(filters: ReportFilters) {
 }
 
 /**
- * Get NEW LOGO segment (SMB vs Strategic) current-period breakdown from OVT.
- * Threshold: ACV > 100K = Strategic, else SMB. Filters to SalesFilter='Sales/Marketing'
- * to match RevOpsPerformance (excludes admin/finance/NULL filter contamination).
+ * Get NEW LOGO segment (SMB vs Strategic) current-period breakdown from OVT,
+ * using DRF.Segment as the authoritative Strategic classification to match
+ * RevOpsReport's categorization.
  *
- * Returns rows like: { product, region, segment, qtd_acv, qtd_deals, qtd_lost_acv,
- * qtd_lost_deals, pipeline_acv, pipeline_count }
+ * Categorization rules (in priority order):
+ *   1. If the OVT row's OpportunityID has a DRF row with Segment='Strategic',
+ *      classify as 'Strategic' (matches RevOps STRATEGIC category).
+ *   2. If the OVT row has NO matching DRF row (rare — opp not yet snapshotted),
+ *      fall back to ACV > 100K threshold as a proxy.
+ *   3. Otherwise classify as 'SMB' (maps to RevOps NEW LOGO category).
+ *
+ * Filters to SalesFilter='Sales/Marketing' to match RevOpsPerformance's
+ * authority and exclude admin/finance/NULL filter contamination.
  */
 async function getNewLogoSegmentActuals(filters: ReportFilters) {
   const regionFilter = filters.regions.length > 0
-    ? `AND Division IN (${filters.regions.map(r => `'${REGION_REVERSE_MAP[r as keyof typeof REGION_REVERSE_MAP]}'`).join(',')})`
-    : `AND Division IN ('US', 'UK', 'AU')`;
+    ? `AND o.Division IN (${filters.regions.map(r => `'${REGION_REVERSE_MAP[r as keyof typeof REGION_REVERSE_MAP]}'`).join(',')})`
+    : `AND o.Division IN ('US', 'UK', 'AU')`;
   const productFilter = filters.products.length === 1
-    ? (filters.products[0] === 'POR' ? 'AND por_record__c = true' : 'AND por_record__c = false')
+    ? (filters.products[0] === 'POR' ? 'AND o.por_record__c = true' : 'AND o.por_record__c = false')
     : '';
 
   const query = `
-    WITH period_opps AS (
+    WITH drf_segment AS (
+      -- Dedup DRF to one row per OpportunityID. Segment should be stable per
+      -- opportunity, so ANY_VALUE is safe (identical values would collapse;
+      -- if there's ever divergence we prefer 'Strategic' to stay aligned with
+      -- the STRATEGIC category — MAX picks 'Strategic' > 'SMB' alphabetically).
       SELECT
-        CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
-        CASE Division
+        OpportunityID,
+        MAX(Segment) AS segment
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.STAGING}.${BIGQUERY_CONFIG.TABLES.DAILY_REVENUE_FUNNEL}\`
+      WHERE OpportunityID IS NOT NULL
+      GROUP BY OpportunityID
+    ),
+    period_opps AS (
+      SELECT
+        CASE WHEN o.por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
+        CASE o.Division
           WHEN 'US' THEN 'AMER'
           WHEN 'UK' THEN 'EMEA'
           WHEN 'AU' THEN 'APAC'
         END AS region,
-        CASE WHEN ACV > 100000 THEN 'Strategic' ELSE 'SMB' END AS segment,
         CASE
-          WHEN Won = true THEN 'Won'
-          WHEN IsClosed = true THEN 'Lost'
+          WHEN d.segment = 'Strategic' THEN 'Strategic'
+          WHEN d.segment IS NULL AND o.ACV > 100000 THEN 'Strategic'
+          ELSE 'SMB'
+        END AS segment,
+        CASE
+          WHEN o.Won = true THEN 'Won'
+          WHEN o.IsClosed = true THEN 'Lost'
           ELSE 'Open'
         END AS status,
-        COALESCE(ACV, 0) AS acv
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.${BIGQUERY_CONFIG.TABLES.OPPORTUNITY}\`
-      WHERE Type = 'New Business'
-        AND COALESCE(ACV, 0) > 0
-        AND SalesFilter = 'Sales/Marketing'
-        AND CloseDate >= DATE('${filters.startDate}')
-        AND CloseDate <= DATE('${filters.endDate}')
+        COALESCE(o.ACV, 0) AS acv
+      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.${BIGQUERY_CONFIG.TABLES.OPPORTUNITY}\` o
+      LEFT JOIN drf_segment d ON o.Id = d.OpportunityID
+      WHERE o.Type = 'New Business'
+        AND COALESCE(o.ACV, 0) > 0
+        AND o.SalesFilter = 'Sales/Marketing'
+        AND o.CloseDate >= DATE('${filters.startDate}')
+        AND o.CloseDate <= DATE('${filters.endDate}')
         ${regionFilter}
         ${productFilter}
     )
@@ -3794,64 +3818,6 @@ async function getNewLogoSegmentActuals(filters: ReportFilters) {
     console.warn('New logo segment actuals query failed, returning empty:', error instanceof Error ? error.message : 'Unknown error');
     return [];
   }
-}
-
-/**
- * Get prior-year (2025) NEW LOGO SMB/Strategic split per product×region.
- * Used to apportion 2026 Q1 targets (which don't carry segment granularity in
- * RevOpsReport). Returns a map of `${product}-${region}-${segment}` → share (0..1).
- * Falls back to 70/30 SMB/Strategic in the main handler if a row is missing.
- */
-async function getNewLogoSegmentHistoricalSplit(): Promise<Map<string, number>> {
-  const query = `
-    WITH won_2025 AS (
-      SELECT
-        CASE WHEN por_record__c = true THEN 'POR' ELSE 'R360' END AS product,
-        CASE Division
-          WHEN 'US' THEN 'AMER'
-          WHEN 'UK' THEN 'EMEA'
-          WHEN 'AU' THEN 'APAC'
-        END AS region,
-        CASE WHEN ACV > 100000 THEN 'Strategic' ELSE 'SMB' END AS segment,
-        ACV
-      FROM \`${BIGQUERY_CONFIG.PROJECT_ID}.${BIGQUERY_CONFIG.DATASETS.SFDC}.${BIGQUERY_CONFIG.TABLES.OPPORTUNITY}\`
-      WHERE Type = 'New Business'
-        AND Won = true
-        AND COALESCE(ACV, 0) > 0
-        AND SalesFilter = 'Sales/Marketing'
-        AND EXTRACT(YEAR FROM CloseDate) = 2025
-        AND Division IN ('US', 'UK', 'AU')
-    ),
-    per_segment AS (
-      SELECT product, region, segment, SUM(ACV) AS segment_acv
-      FROM won_2025
-      WHERE region IS NOT NULL
-      GROUP BY product, region, segment
-    ),
-    per_region AS (
-      SELECT product, region, SUM(ACV) AS total_acv
-      FROM won_2025
-      WHERE region IS NOT NULL
-      GROUP BY product, region
-    )
-    SELECT
-      s.product, s.region, s.segment,
-      SAFE_DIVIDE(s.segment_acv, r.total_acv) AS share
-    FROM per_segment s
-    JOIN per_region r ON s.product = r.product AND s.region = r.region
-  `;
-
-  const result = new Map<string, number>();
-  try {
-    const [rows] = await getBigQuery().query({ query });
-    for (const r of rows as any[]) {
-      const key = `${r.product}-${r.region}-${r.segment}`;
-      result.set(key, parseFloat(r.share) || 0);
-    }
-  } catch (error) {
-    console.warn('New logo segment historical split query failed, using 70/30 fallback:', error instanceof Error ? error.message : 'Unknown error');
-  }
-  return result;
 }
 
 // Calculate period info
@@ -3966,7 +3932,6 @@ export async function POST(request: Request) {
       mqlTrendByMonth,
       adSpendTrendByMonth,
       newLogoSegmentActuals,
-      newLogoSegmentHistoricalSplit,
     ] = await Promise.all([
       getRevOpsQTDData(filters),
       getRevenueActuals(filters),
@@ -3995,7 +3960,6 @@ export async function POST(request: Request) {
       getMqlTrendByMonth(filters),
       getAdSpendTrendByMonth(filters),
       getNewLogoSegmentActuals(filters),
-      getNewLogoSegmentHistoricalSplit(),
     ]);
 
     // Calculate period info
@@ -4212,84 +4176,81 @@ export async function POST(request: Request) {
     }
 
     // ------------------------------------------------------------------
-    // Phase 2: NEW LOGO segment breakdown (SMB vs Strategic)
+    // Phase 2+3: NEW LOGO segment breakdown (SMB vs Strategic)
     //
-    // RevOpsReport targets are at product × region × category granularity,
-    // so SMB-vs-Strategic within NEW LOGO is invisible to the AI summary by
-    // default. Here we apportion each NEW LOGO target by prior-year (2025)
-    // SMB/Strategic share, pair it with current-period segment actuals from
-    // OVT, and emit two supplemental rows per region. The AI prompt consumes
-    // `attainment_by_segment` without changing any existing consumer.
+    // After the Phase 3 alignment to DRF.Segment authority, the segment
+    // rows map 1:1 to RevOps categories:
+    //   SMB segment      ≡ NEW LOGO category (DRF.Segment != 'Strategic')
+    //   Strategic segment ≡ STRATEGIC category (DRF.Segment = 'Strategic')
+    //
+    // Because segment = category, we use the category's RevOps target
+    // directly — no apportionment. The segment rows exist as a separate
+    // tier-framed lens for the AI; the data reconciles to the category
+    // rows to the penny.
     // ------------------------------------------------------------------
-    const DEFAULT_SMB_SHARE = 0.7;   // fallback when no 2025 history exists
     const attainmentBySegment: any[] = [];
     const segmentActualsMap = new Map<string, any>();
     for (const row of newLogoSegmentActuals as any[]) {
       segmentActualsMap.set(`${row.product}-${row.region}-${row.segment}`, row);
     }
 
-    for (const [key, target] of Array.from(revOpsTargetMap.entries())) {
-      if (target.category !== 'NEW LOGO') continue;
-      const { product, region } = target;
-      const q1Target = parseFloat(target.q1_target) || 0;
-      if (q1Target <= 0) continue;
+    const SEGMENT_TO_CATEGORY: Record<'SMB' | 'Strategic', string> = {
+      SMB: 'NEW LOGO',
+      Strategic: 'STRATEGIC',
+    };
 
-      // Historical share — fall back to 70/30 SMB/Strategic if we have no
-      // 2025 bookings for this product/region (e.g. brand-new R360 segment).
-      const smbShare = newLogoSegmentHistoricalSplit.get(`${product}-${region}-SMB`)
-        ?? DEFAULT_SMB_SHARE;
-      const strategicShare = newLogoSegmentHistoricalSplit.get(`${product}-${region}-Strategic`)
-        ?? (1 - DEFAULT_SMB_SHARE);
-      // Renormalize in case the two shares don't sum to 1 (missing segment)
-      const total = smbShare + strategicShare;
-      const normSmb = total > 0 ? smbShare / total : DEFAULT_SMB_SHARE;
-      const normStrategic = total > 0 ? strategicShare / total : (1 - DEFAULT_SMB_SHARE);
+    for (const product of ['POR', 'R360']) {
+      for (const region of ['AMER', 'EMEA', 'APAC']) {
+        for (const segment of ['SMB', 'Strategic'] as const) {
+          const category = SEGMENT_TO_CATEGORY[segment];
+          const target = revOpsTargetMap.get(`${product}-${region}-${category}`);
+          if (!target) continue;
 
-      for (const segment of ['SMB', 'Strategic'] as const) {
-        const share = segment === 'SMB' ? normSmb : normStrategic;
-        const segQ1Target = q1Target * share;
-        const segQtdTarget = segQ1Target * (periodInfo.quarter_pct_complete / 100);
+          const q1Target = parseFloat(target.q1_target) || 0;
+          const qtdTarget = q1Target * (periodInfo.quarter_pct_complete / 100);
 
-        const actuals = segmentActualsMap.get(`${product}-${region}-${segment}`) || {};
-        const segQtdAcv = actuals.qtd_acv || 0;
-        const segQtdDeals = actuals.qtd_deals || 0;
-        const segLostAcv = actuals.qtd_lost_acv || 0;
-        const segLostDeals = actuals.qtd_lost_deals || 0;
-        const segPipelineAcv = actuals.pipeline_acv || 0;
+          const actuals = segmentActualsMap.get(`${product}-${region}-${segment}`) || {};
+          const segQtdAcv = actuals.qtd_acv || 0;
+          const segQtdDeals = actuals.qtd_deals || 0;
+          const segLostAcv = actuals.qtd_lost_acv || 0;
+          const segLostDeals = actuals.qtd_lost_deals || 0;
+          const segPipelineAcv = actuals.pipeline_acv || 0;
 
-        const attainmentPct = segQtdTarget > 0
-          ? Math.round((segQtdAcv / segQtdTarget) * 100)
-          : 100;
-        const remainingGap = Math.max(0, segQ1Target - segQtdAcv);
-        const coverage = remainingGap > 0 ? segPipelineAcv / remainingGap : 0;
-        const closedCount = segQtdDeals + segLostDeals;
-        const winRate = closedCount > 0
-          ? Math.round((segQtdDeals / closedCount) * 1000) / 10
-          : 0;
+          const attainmentPct = qtdTarget > 0
+            ? Math.round((segQtdAcv / qtdTarget) * 100)
+            : 100;
+          const remainingGap = Math.max(0, q1Target - segQtdAcv);
+          const coverage = remainingGap > 0 ? segPipelineAcv / remainingGap : 0;
+          const closedCount = segQtdDeals + segLostDeals;
+          const winRate = closedCount > 0
+            ? Math.round((segQtdDeals / closedCount) * 1000) / 10
+            : 0;
 
-        attainmentBySegment.push({
-          product,
-          region,
-          category: 'NEW LOGO',
-          segment,
-          is_rollup: false,
-          q1_target: Math.round(segQ1Target * 100) / 100,
-          qtd_target: Math.round(segQtdTarget * 100) / 100,
-          qtd_deals: segQtdDeals,
-          qtd_acv: Math.round(segQtdAcv * 100) / 100,
-          qtd_attainment_pct: attainmentPct,
-          qtd_gap: Math.round((segQtdAcv - segQtdTarget) * 100) / 100,
-          pipeline_acv: Math.round(segPipelineAcv * 100) / 100,
-          pipeline_coverage_x: Math.round(coverage * 10) / 10,
-          win_rate_pct: winRate,
-          qtd_lost_deals: segLostDeals,
-          qtd_lost_acv: Math.round(segLostAcv * 100) / 100,
-          rag_status: calculateRAG(attainmentPct),
-          // Provenance — so consumers know the target is apportioned
-          target_source: newLogoSegmentHistoricalSplit.get(`${product}-${region}-${segment}`) !== undefined
-            ? 'prior_year_actuals'
-            : 'default_70_30_fallback',
-        });
+          attainmentBySegment.push({
+            product,
+            region,
+            // category matches the underlying RevOps category this segment
+            // maps to (SMB→NEW LOGO, Strategic→STRATEGIC)
+            category,
+            segment,
+            is_rollup: false,
+            q1_target: Math.round(q1Target * 100) / 100,
+            qtd_target: Math.round(qtdTarget * 100) / 100,
+            qtd_deals: segQtdDeals,
+            qtd_acv: Math.round(segQtdAcv * 100) / 100,
+            qtd_attainment_pct: attainmentPct,
+            qtd_gap: Math.round((segQtdAcv - qtdTarget) * 100) / 100,
+            pipeline_acv: Math.round(segPipelineAcv * 100) / 100,
+            pipeline_coverage_x: Math.round(coverage * 10) / 10,
+            win_rate_pct: winRate,
+            qtd_lost_deals: segLostDeals,
+            qtd_lost_acv: Math.round(segLostAcv * 100) / 100,
+            rag_status: calculateRAG(attainmentPct),
+            // Target comes directly from the RevOps category (no apportionment
+            // needed after the DRF.Segment alignment).
+            target_source: 'revops_category_direct',
+          });
+        }
       }
     }
 

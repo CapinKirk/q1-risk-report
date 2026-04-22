@@ -82,11 +82,17 @@ test.describe('AI summary trend + segment canary (Phase 1+2)', () => {
     expect(Array.isArray(segRows)).toBeTruthy();
     expect(segRows.length).toBeGreaterThan(0);
 
-    // Every row must have segment set and category = 'NEW LOGO'
+    // Every row must have a segment and map to its RevOps category:
+    //   SMB segment      → category = 'NEW LOGO'  (DRF.Segment != 'Strategic')
+    //   Strategic segment → category = 'STRATEGIC' (DRF.Segment = 'Strategic')
     for (const row of segRows) {
-      expect(row.category).toBe('NEW LOGO');
       expect(['SMB', 'Strategic']).toContain(row.segment);
       expect(row.is_rollup).toBe(false);
+      if (row.segment === 'SMB') {
+        expect(row.category).toBe('NEW LOGO');
+      } else {
+        expect(row.category).toBe('STRATEGIC');
+      }
     }
 
     // For POR AMER we must have BOTH SMB and Strategic (the exact slice
@@ -98,7 +104,7 @@ test.describe('AI summary trend + segment canary (Phase 1+2)', () => {
       (r: any) => r.product === 'POR' && r.region === 'AMER' && r.segment === 'Strategic'
     );
     expect(porAmerSMB, 'POR AMER NEW LOGO SMB row missing').toBeTruthy();
-    expect(porAmerStrategic, 'POR AMER NEW LOGO Strategic row missing').toBeTruthy();
+    expect(porAmerStrategic, 'POR AMER Strategic segment row missing').toBeTruthy();
     expect(porAmerSMB.qtd_target).toBeGreaterThan(0);
     expect(porAmerStrategic.qtd_target).toBeGreaterThan(0);
   });
