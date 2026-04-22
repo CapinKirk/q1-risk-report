@@ -29,6 +29,41 @@ const REPORT_BODY = {
   endDate: '2026-04-21',
 };
 
+// Vercel's serverless request-body cap is 4.5 MB. Once the AI payload gets
+// anywhere near that we're one data addition away from HTTP 413 and the
+// "Unexpected token 'R'" JSON-parse regression. 3 MB leaves ~50% headroom.
+const AI_PAYLOAD_SAFE_MAX_BYTES = 3 * 1024 * 1024;
+
+// Small helper — replicates what the component does before POST so we're
+// testing the SHIPPABLE payload, not the server's full response. Any new
+// heavy field added without a corresponding trim gets caught here.
+function buildComponentAiPayload(full: any, products: string[], regions: string[]) {
+  const includePOR = products.length === 0 || products.includes('POR');
+  const includeR360 = products.length === 0 || products.includes('R360');
+  const filterByProdRegion = <T extends { product?: string; region?: string }>(arr: T[] = []) =>
+    arr.filter((r: T) =>
+      (!r.product || (includePOR && r.product === 'POR') || (includeR360 && r.product === 'R360')) &&
+      (!r.region || regions.length === 0 || regions.includes(r.region))
+    );
+  return {
+    reportData: {
+      ...full,
+      won_deals: undefined,
+      lost_deals: undefined,
+      pipeline_deals: undefined,
+      mql_details: { POR: [], R360: [] },
+      sql_details: { POR: [], R360: [] },
+      sal_details: { POR: [], R360: [] },
+      sqo_details: { POR: [], R360: [] },
+      mql_trend_by_month: filterByProdRegion(full.mql_trend_by_month || []),
+      ad_spend_trend_by_month: filterByProdRegion(full.ad_spend_trend_by_month || []),
+      attainment_by_segment: filterByProdRegion(full.attainment_by_segment || []),
+    },
+    analysisType: 'bookings_miss',
+    filterContext: { products, regions, isFiltered: products.length > 0 || regions.length > 0 },
+  };
+}
+
 test.describe('AI summary trend + segment canary (Phase 1+2)', () => {
   test('report-data returns mql_trend_by_month array with recent months', async ({ request }) => {
     const resp = await request.post(`${API_BASE}/report-data`, { data: REPORT_BODY });
@@ -107,6 +142,35 @@ test.describe('AI summary trend + segment canary (Phase 1+2)', () => {
     expect(porAmerStrategic, 'POR AMER Strategic segment row missing').toBeTruthy();
     expect(porAmerSMB.qtd_target).toBeGreaterThan(0);
     expect(porAmerStrategic.qtd_target).toBeGreaterThan(0);
+  });
+
+  test('AI payload stays well under Vercel 4.5MB limit across filter scopes', async ({ request }) => {
+    const resp = await request.post(`${API_BASE}/report-data`, { data: REPORT_BODY });
+    const full = await resp.json();
+
+    // Expect the server-side aggregation field to be present. If it regresses
+    // to absent, the AI route will fall back to raw details and payloads will
+    // balloon again.
+    expect(
+      full.ai_funnel_aggregations,
+      'ai_funnel_aggregations missing — server-side aggregation regressed; AI payloads will bloat'
+    ).toBeTruthy();
+
+    const scopes: Array<{ name: string; products: string[]; regions: string[] }> = [
+      { name: 'all products / all regions (worst case)', products: [], regions: [] },
+      { name: 'POR only / all regions', products: ['POR'], regions: [] },
+      { name: 'POR / AMER (narrow)', products: ['POR'], regions: ['AMER'] },
+      { name: 'R360 / AMER (narrow)', products: ['R360'], regions: ['AMER'] },
+    ];
+
+    for (const scope of scopes) {
+      const payload = buildComponentAiPayload(full, scope.products, scope.regions);
+      const bytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+      expect(
+        bytes,
+        `AI payload for [${scope.name}] = ${(bytes / 1024 / 1024).toFixed(2)} MB, exceeds safe ceiling of ${(AI_PAYLOAD_SAFE_MAX_BYTES / 1024 / 1024).toFixed(2)} MB`
+      ).toBeLessThan(AI_PAYLOAD_SAFE_MAX_BYTES);
+    }
   });
 
   test('AI analysis output references segment (SMB/Strategic) when data is present', async ({ request }) => {
