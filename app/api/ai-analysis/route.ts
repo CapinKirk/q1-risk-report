@@ -1080,17 +1080,20 @@ ${includeR360 && activeRegions.length === 3 ? `## R360 Performance (All Regions)
 
 ${buildRegionalDetail()}
 
-## TREND ANOMALIES (6-MONTH WINDOW — PRE-COMPUTED, USE THESE EXACT VALUES)
+${(isOutboundOnly || (suppressMQL && suppressGoogleAds))
+  ? `## TREND ANOMALIES (6-MONTH WINDOW)
+Skipped — the active filter excludes the inbound/paid motion that this section covers. Do not emit a "Trend Anomaly Review" section in your response; begin at section 2 (REVENUE ATTAINMENT DEEP DIVE).`
+  : `## TREND ANOMALIES (6-MONTH WINDOW — PRE-COMPUTED, USE THESE EXACT VALUES)
 
-### MQL Volume Drops (MoM drops ≥25% in identified product/region/source/segment)
+${suppressMQL ? '' : `### MQL Volume Drops (MoM drops ≥25% in identified product/region/source/segment)
 ${mqlAnomalies.length > 0 ? mqlAnomalies.map(a =>
   `- ${a.product} ${a.region} ${a.source} ${a.segment}: ${a.prior_month} MQLs ${a.prior_mql} → ${a.current_month} MQLs ${a.current_mql} (${a.mom_pct_change}% MoM)`
-).join('\n') : 'None detected — MQL volume steady across 6-month window.'}
-
-### Ad Spend Drops (MoM spend drops ≥30% per campaign)
+).join('\n') : 'None detected — top-of-funnel volume steady across closed months in the 6-month window.'}
+`}
+${suppressGoogleAds ? '' : `### Ad Spend Drops (MoM spend drops ≥30% per campaign)
 ${adSpendAnomalies.length > 0 ? adSpendAnomalies.map(a =>
   `- ${a.product} ${a.region} "${a.campaign_name}": ${a.prior_month} $${Math.round(a.prior_spend).toLocaleString()} → ${a.current_month} $${Math.round(a.current_spend).toLocaleString()} (${a.mom_pct_change}% MoM)`
-).join('\n') : 'None detected — campaign spend stable.'}
+).join('\n') : 'None detected — campaign spend stable across closed months.'}
 
 ### Dark Campaigns (active >$500/mo, now $0 for 2+ consecutive months)
 ${darkCampaigns.length > 0 ? darkCampaigns.map(c =>
@@ -1101,8 +1104,9 @@ ${darkCampaigns.length > 0 ? darkCampaigns.map(c =>
 ${reallocations.length > 0 ? reallocations.map(r =>
   `- ${r.month} ${r.region}: ${r.note} POR total $${r.por_spend.toLocaleString()}, R360 total $${r.r360_spend.toLocaleString()}.`
 ).join('\n') : 'None detected — no cross-account reallocation pattern in the window.'}
+`}`}
 
-### Monthly MQL Volume Series (for reference — use TREND ANOMALIES above as the analytical summary)
+${suppressMQL ? '' : `### Monthly MQL Volume Series (for reference — use TREND ANOMALIES above as the analytical summary)
 _The month matching the as-of date may be in progress and is marked "(partial)". Never cite a partial month as a "MoM drop" without explicitly noting the partial status — compare only to closed-month trends._
 ${mqlTrendRows.length > 0
   ? (() => {
@@ -1125,20 +1129,19 @@ ${mqlTrendRows.length > 0
         .slice(0, 12)
         .join('\n') || '(insufficient volume for monthly comparison)';
     })()
-  : '(no trend data available)'}
+  : '(no trend data available)'}`}
 
-## NEW LOGO SEGMENT BREAKDOWN (SMB vs Strategic — APPORTIONED TARGETS, USE EXACT VALUES)
+## NEW LOGO SEGMENT BREAKDOWN (SMB vs Strategic — derived from DRF.Segment authority)
 ${segmentRows.length > 0 ? segmentRows.map((r: any) =>
-  `- ${r.product} ${r.region} NEW LOGO ${r.segment}: QTD Actual $${(r.qtd_acv || 0).toLocaleString()}, QTD Target $${(r.qtd_target || 0).toLocaleString()}, ${r.qtd_attainment_pct}% attainment, Gap $${(r.qtd_gap || 0).toLocaleString()}, ${r.pipeline_coverage_x}x coverage, RAG: ${r.rag_status} (target source: ${r.target_source || 'prior_year_actuals'})`
-).join('\n') : '(no NEW LOGO segment rows in scope — filter may exclude NEW LOGO, or no POR/R360 NEW LOGO bookings for this period)'}
+  `- ${r.product} ${r.region} ${r.segment} (maps to ${r.category} category): QTD Actual $${(r.qtd_acv || 0).toLocaleString()}, QTD Target $${(r.qtd_target || 0).toLocaleString()}, ${r.qtd_attainment_pct}% attainment, Gap $${(r.qtd_gap || 0).toLocaleString()}, ${r.pipeline_coverage_x}x coverage, RAG: ${r.rag_status}`
+).join('\n') : '(no segment rows in scope — filter may exclude NEW LOGO/STRATEGIC, or no relevant bookings this period)'}
 
 **NOTE on segment breakdown (read carefully before analyzing):**
 - Segment rows split the Type='New Business' deal set into two buckets using the authoritative DailyRevenueFunnel.Segment flag (same categorization RevOpsReport uses to produce the NEW LOGO and STRATEGIC category rows). Filtered to OVT SalesFilter='Sales/Marketing' to match RevOpsPerformance authority.
   - **SMB segment ≡ RevOps NEW LOGO category** (deals where DRF.Segment is not 'Strategic')
   - **Strategic segment ≡ RevOps STRATEGIC category** (deals where DRF.Segment = 'Strategic')
 - **The segment breakdown is a tier lens on the same deals as the category rows, not a new data source.** The "SMB" segment row and the "NEW LOGO" category row refer to the same underlying deals — just cited differently. The "Strategic" segment row and the "STRATEGIC" category row likewise refer to the same deals. Do NOT flag this as distortion or double-count.
-- **Why show both:** the segment breakdown carries apportioned targets (from 2025 prior-year SMB/Strategic ACV share) so you can compare SMB vs Strategic attainment side-by-side for a single product × region. The category rows give the top-line RAG. Use segment rows when discussing tier-level performance; use category rows for the executive summary rollup.
-- QTD targets are apportioned from the NEW LOGO category target. The "target source" annotation is prior_year_actuals when historical data exists, or default_70_30_fallback otherwise. Apportioned targets are directional — cite segment target numbers as "~$X".
+- **Why show both:** the segment view lets you compare SMB vs Strategic side-by-side for a single product × region without hunting across category rows. Use segment rows when discussing tier-level performance; use category rows for the executive summary rollup. Target numbers on segment rows come directly from the corresponding RevOps category target (no apportionment needed post-Phase-3) — cite them as exact dollars, not "~$X".
 
 ## Critical Misses (Below 70% Attainment)
 ${criticalMisses.length > 0 ? criticalMisses.map((row: any) =>
@@ -1395,7 +1398,7 @@ ${includeR360 ? `- R360 projected: $${Math.round(r360Projected).toLocaleString()
 24. **FUNNEL MATH CONSISTENCY (CRITICAL)**: MQL/SQL status categories are MUTUALLY EXCLUSIVE and must sum to 100%. Categories: Converted (success), Reverted (lost), Stalled (at risk), In Progress (healthy pipeline). If X% converted and Y% are reverted/stalled, the remaining % are "in progress" (still being worked, NOT lost). Do NOT make contradictory statements like "60% conversion and 0% loss" if other leads exist - explain where the remaining % are (in progress).
 25. **LEAD STATUS DEFINITIONS**: "Converted" = moved to next stage (success). "Reverted" = disqualified/removed from funnel (loss). "Stalled" = stuck >30 days without progress (at risk). "In Progress" = actively being worked, not yet converted (healthy pipeline, NOT lost). When discussing funnel health, distinguish between true losses (reverted) and leads still in pipeline (in progress or stalled).
 26. **TREND ANOMALIES ARE PRE-COMPUTED**: Use the exact values in the "TREND ANOMALIES" data section. Never fabricate month names, percentages, or campaign names. If a section says "None detected", report that honestly — do not manufacture anomalies. When citing an anomaly, always give the specific month ("Dec 2025", not "recent months") and the magnitude (both counts and percent).
-27. **SEGMENT vs CATEGORY — DO NOT CONFUSE**: "Category" = NEW LOGO, EXPANSION, MIGRATION, STRATEGIC, RENEWAL (from RevOpsReport OpportunityType). "Segment" = SMB or Strategic (SMB/Strategic split within NEW LOGO from the apportioned breakdown). When the "NEW LOGO Segment Breakdown" data section is present, analyze SMB and Strategic separately within each product × region; flag whichever is lagging. Segment targets are apportioned from historical data — mark them "~$X (apportioned)" when citing specific dollar values.
+27. **SEGMENT vs CATEGORY — DO NOT CONFUSE**: "Category" = NEW LOGO, EXPANSION, MIGRATION, STRATEGIC, RENEWAL (from RevOpsReport OpportunityType). "Segment" = SMB or Strategic (from DRF.Segment, splitting the New Business opportunity type by account tier). SMB segment maps 1:1 to NEW LOGO category; Strategic segment maps 1:1 to STRATEGIC category. When the "NEW LOGO Segment Breakdown" data section is present, analyze SMB and Strategic separately within each product × region and flag whichever is lagging. Segment target numbers come directly from RevOps — cite them as exact dollars.
 28. **CAUSAL CHAIN REASONING**: If a TREND ANOMALY is present AND a downstream segment is underperforming, connect them explicitly. Example: "POR US Inbound SMB QTD attainment 34% (RED); root cause Dec 2025 MQL drop 199→121 (-39% MoM) driven by POR US ad-spend cut -$6.7K same month." Don't stop at surface-level attainment — walk the chain from symptom back to cause.
 
 --- END DATA CONTEXT ---
