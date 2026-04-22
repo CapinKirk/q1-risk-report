@@ -479,6 +479,11 @@ export interface ReportData {
   // NEW (Phase 1): monthly trends for anomaly detection in AI summary
   mql_trend_by_month?: MqlTrendByMonthRow[];
   ad_spend_trend_by_month?: AdSpendTrendByMonthRow[];
+  // NEW (Round 6): server-side pre-aggregated funnel dropoff summaries.
+  // Lets the AI route skip re-aggregating from raw mql/sql/sal/sqo_details,
+  // which unlocks dropping those ~4MB arrays from the client→server payload.
+  // Shape intentionally loose here; see lib/ai-aggregations.ts for the detail.
+  ai_funnel_aggregations?: any;
 }
 
 // Executive Summary Counts

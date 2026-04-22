@@ -31,10 +31,15 @@ const REGION_COLORS = {
   APAC: { bg: '#fce7f3', text: '#9d174d' },
 };
 
-// Filter report data by product and region
+// Filter report data by product and region, AND strip heavy drill-down fields
+// that would otherwise blow past Vercel's 4.5MB serverless-request cap (see
+// components/AIAnalysis.tsx for the same fix and a longer explanation). The
+// AI route never reads won/lost/pipeline deal lists, so we drop them entirely.
 function filterReportData(reportData: ReportData, product: Product, region: Region): ReportData {
   const filterByRegion = <T extends { region?: Region }>(arr: T[]): T[] =>
     arr?.filter(item => item.region === region) || [];
+
+  const anyData = reportData as any;
 
   return {
     ...reportData,
@@ -66,6 +71,20 @@ function filterReportData(reportData: ReportData, product: Product, region: Regi
       POR: product === 'POR' ? filterByRegion(reportData.google_ads?.POR || []) : [],
       R360: product === 'R360' ? filterByRegion(reportData.google_ads?.R360 || []) : [],
     },
+    // Round 6: dropoff aggregations computed server-side; drop raw details.
+    mql_details: { POR: [], R360: [] },
+    sql_details: { POR: [], R360: [] },
+    sal_details: { POR: [], R360: [] },
+    sqo_details: { POR: [], R360: [] },
+    ai_funnel_aggregations: anyData.ai_funnel_aggregations,
+    // Deal lists — not used by AI route. Drop to shave 3–4MB.
+    won_deals: undefined as any,
+    lost_deals: undefined as any,
+    pipeline_deals: undefined as any,
+    // Phase 1+2 additions — filter by active product.
+    mql_trend_by_month: (anyData.mql_trend_by_month || []).filter((r: any) => r.product === product),
+    ad_spend_trend_by_month: (anyData.ad_spend_trend_by_month || []).filter((r: any) => r.product === product),
+    attainment_by_segment: (anyData.attainment_by_segment || []).filter((r: any) => r.product === product && r.region === region),
   };
 }
 
@@ -95,6 +114,17 @@ export default function AIAnalysisTile({ product, region, reportData, isActive, 
           analysisType: 'bookings_miss',
         }),
       });
+
+      // Defensive: Vercel returns HTML for 413. Detect before response.json()
+      // so the user sees a clear message instead of "Unexpected token 'R'…".
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const text = await response.text().catch(() => '');
+        const hint = response.status === 413 || /too\s*large|request\s*entity/i.test(text)
+          ? 'Analysis payload is too large. Narrow to a specific product + region and retry.'
+          : `AI endpoint returned a non-JSON response (HTTP ${response.status}).`;
+        throw new Error(hint);
+      }
 
       const data = await response.json();
 

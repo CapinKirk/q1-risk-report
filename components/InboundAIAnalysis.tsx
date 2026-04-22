@@ -111,22 +111,12 @@ function filterReportData(reportData: ReportData, products: Product[], regions: 
       POR: includePOR ? (reportData.google_ads_rca?.POR || []) : [],
       R360: includeR360 ? (reportData.google_ads_rca?.R360 || []) : [],
     },
-    mql_details: {
-      POR: includePOR ? filterByRegion(reportData.mql_details?.POR) : [],
-      R360: includeR360 ? filterByRegion(reportData.mql_details?.R360) : [],
-    },
-    sql_details: {
-      POR: includePOR ? filterByRegion(reportData.sql_details?.POR) : [],
-      R360: includeR360 ? filterByRegion(reportData.sql_details?.R360) : [],
-    },
-    sal_details: {
-      POR: includePOR ? filterByRegion(reportData.sal_details?.POR) : [],
-      R360: includeR360 ? filterByRegion(reportData.sal_details?.R360) : [],
-    },
-    sqo_details: {
-      POR: includePOR ? filterByRegion((reportData as any).sqo_details?.POR) : [],
-      R360: includeR360 ? filterByRegion((reportData as any).sqo_details?.R360) : [],
-    },
+    // Round 6: dropoff aggregations computed server-side; drop raw details.
+    mql_details: { POR: [], R360: [] },
+    sql_details: { POR: [], R360: [] },
+    sal_details: { POR: [], R360: [] },
+    sqo_details: { POR: [], R360: [] },
+    ai_funnel_aggregations: (reportData as any).ai_funnel_aggregations,
     // Deal lists aren't used by the inbound AI route; drop to stay under Vercel's
     // 4.5MB serverless request-body cap (otherwise Vercel returns HTML 413 and
     // the client JSON.parse fails with "Unexpected token 'R', 'Request En'…").

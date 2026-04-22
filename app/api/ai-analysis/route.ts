@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { computeFilterScope } from '@/lib/filterScope';
+import {
+  aggregateDropoffReasons as libAggregateDropoffReasons,
+  aggregateDropoffsBySource as libAggregateDropoffsBySource,
+  aggregateBySourceType as libAggregateBySourceType,
+  calcStageStats as libCalcStageStats,
+  STAGE_STATUS_SETS,
+  type DropoffData,
+} from '@/lib/ai-aggregations';
 
 export const maxDuration = 180; // Allow up to 180s for retries with longer outputs
 
@@ -33,146 +41,9 @@ function normalizeAttainmentDetail(attainment_detail: any): any[] {
   return [...porData, ...r360Data];
 }
 
-// Classify source as Paid or Organic
-function classifySource(source: string): 'PAID' | 'ORGANIC' | 'OTHER' {
-  const s = (source || '').toUpperCase();
-  // Paid sources
-  if (s.includes('PAID') || s.includes('PPC') || s.includes('CPC') || s.includes('GOOGLE ADS') ||
-      s.includes('BING ADS') || s.includes('FACEBOOK ADS') || s.includes('LINKEDIN ADS') ||
-      s.includes('DISPLAY') || s.includes('RETARGETING') || s === 'INBOUND') {
-    return 'PAID';
-  }
-  // Organic sources
-  if (s.includes('ORGANIC') || s.includes('SEO') || s.includes('DIRECT') || s.includes('REFERRAL') ||
-      s.includes('SOCIAL') || s.includes('EMAIL') || s.includes('CONTENT') || s.includes('WEBINAR')) {
-    return 'ORGANIC';
-  }
-  // Other sources (Outbound, AE Sourced, etc.)
-  return 'OTHER';
-}
-
-// Enhanced dropoff aggregation with source breakdown
-interface DropoffData {
-  count: number;
-  acv: number;
-  byRegion: Record<string, number>;
-  bySource: Record<string, { count: number; acv: number }>;
-  bySourceType: { PAID: { count: number; acv: number }; ORGANIC: { count: number; acv: number }; OTHER: { count: number; acv: number } };
-}
-
-function aggregateDropoffReasons(details: any[], statusField: string, lostStatuses: string[]): Record<string, DropoffData> {
-  const reasons: Record<string, DropoffData> = {};
-
-  for (const row of details) {
-    const status = row[statusField];
-    if (!lostStatuses.includes(status)) continue;
-
-    const reason = row.loss_reason && row.loss_reason !== 'N/A' && row.loss_reason !== 'No Reason Provided'
-      ? row.loss_reason
-      : status === 'REVERTED' ? 'Reverted/Disqualified'
-      : status === 'STALLED' ? 'Stalled (No Activity)'
-      : 'No Reason Provided';
-
-    const source = row.source || 'Unknown';
-    const sourceType = classifySource(source);
-    const acv = row.opportunity_acv || 0;
-
-    if (!reasons[reason]) {
-      reasons[reason] = {
-        count: 0,
-        acv: 0,
-        byRegion: {},
-        bySource: {},
-        bySourceType: { PAID: { count: 0, acv: 0 }, ORGANIC: { count: 0, acv: 0 }, OTHER: { count: 0, acv: 0 } }
-      };
-    }
-    reasons[reason].count += 1;
-    reasons[reason].acv += acv;
-    reasons[reason].byRegion[row.region] = (reasons[reason].byRegion[row.region] || 0) + 1;
-
-    // Track by source
-    if (!reasons[reason].bySource[source]) {
-      reasons[reason].bySource[source] = { count: 0, acv: 0 };
-    }
-    reasons[reason].bySource[source].count += 1;
-    reasons[reason].bySource[source].acv += acv;
-
-    // Track by source type (Paid vs Organic)
-    reasons[reason].bySourceType[sourceType].count += 1;
-    reasons[reason].bySourceType[sourceType].acv += acv;
-  }
-
-  return reasons;
-}
-
-// Aggregate dropoffs by source channel
-function aggregateDropoffsBySource(details: any[], statusField: string, lostStatuses: string[], convertedStatuses: string[]): Record<string, { total: number; converted: number; lost: number; lostAcv: number; convRate: number; lossRate: number }> {
-  const sources: Record<string, { total: number; converted: number; lost: number; lostAcv: number }> = {};
-
-  for (const row of details) {
-    const source = row.source || 'Unknown';
-    const status = row[statusField];
-
-    if (!sources[source]) {
-      sources[source] = { total: 0, converted: 0, lost: 0, lostAcv: 0 };
-    }
-    sources[source].total += 1;
-
-    if (convertedStatuses.includes(status)) {
-      sources[source].converted += 1;
-    }
-    if (lostStatuses.includes(status)) {
-      sources[source].lost += 1;
-      sources[source].lostAcv += row.opportunity_acv || 0;
-    }
-  }
-
-  // Calculate rates
-  const result: Record<string, { total: number; converted: number; lost: number; lostAcv: number; convRate: number; lossRate: number }> = {};
-  for (const [source, data] of Object.entries(sources)) {
-    result[source] = {
-      ...data,
-      convRate: data.total > 0 ? Math.round((data.converted / data.total) * 100) : 0,
-      lossRate: data.total > 0 ? Math.round((data.lost / data.total) * 100) : 0,
-    };
-  }
-  return result;
-}
-
-// Aggregate by Paid vs Organic
-function aggregateBySourceType(details: any[], statusField: string, lostStatuses: string[], convertedStatuses: string[]): Record<string, { total: number; converted: number; lost: number; lostAcv: number; convRate: number; lossRate: number }> {
-  const types: Record<string, { total: number; converted: number; lost: number; lostAcv: number }> = {
-    PAID: { total: 0, converted: 0, lost: 0, lostAcv: 0 },
-    ORGANIC: { total: 0, converted: 0, lost: 0, lostAcv: 0 },
-    OTHER: { total: 0, converted: 0, lost: 0, lostAcv: 0 },
-  };
-
-  for (const row of details) {
-    const sourceType = classifySource(row.source || '');
-    const status = row[statusField];
-
-    types[sourceType].total += 1;
-
-    if (convertedStatuses.includes(status)) {
-      types[sourceType].converted += 1;
-    }
-    if (lostStatuses.includes(status)) {
-      types[sourceType].lost += 1;
-      types[sourceType].lostAcv += row.opportunity_acv || 0;
-    }
-  }
-
-  // Calculate rates
-  const result: Record<string, { total: number; converted: number; lost: number; lostAcv: number; convRate: number; lossRate: number }> = {};
-  for (const [type, data] of Object.entries(types)) {
-    result[type] = {
-      ...data,
-      convRate: data.total > 0 ? Math.round((data.converted / data.total) * 100) : 0,
-      lossRate: data.total > 0 ? Math.round((data.lost / data.total) * 100) : 0,
-    };
-  }
-  return result;
-}
+// classifySource + aggregate* + DropoffData moved to lib/ai-aggregations.ts so
+// /api/report-data can pre-compute these once (saves ~4MB of raw stage detail
+// per AI request — see Round 6 notes). DropoffData type re-imported at the top.
 
 // Format dropoff summary for prompt (enhanced with source info)
 function formatDropoffSummary(reasons: Record<string, DropoffData>): string {
@@ -429,6 +300,10 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
     mql_disqualification_summary, utm_breakdown,
     // Phase 1+2: trend + segment data added to ReportData
     mql_trend_by_month, ad_spend_trend_by_month, attainment_by_segment,
+    // Round 6: server-side pre-aggregated funnel dropoffs. When present, we skip
+    // re-aggregating from raw stage details (which lets the client drop those
+    // ~4MB arrays and stay under Vercel's request-body limit).
+    ai_funnel_aggregations,
   } = reportData;
 
   // Determine which products are active based on filter context
@@ -523,94 +398,89 @@ function buildAnalysisPrompt(reportData: any, analysisType: string, filterContex
   // Get MQL disqualification summary
   const dqSummary = mql_disqualification_summary || { POR: {}, R360: {} };
 
-  // Aggregate dropoff reasons for each funnel stage
+  // Prefer server-side pre-aggregates when the client shipped them (Round 6).
+  // Falls back to live aggregation over raw details for forward-compat — the
+  // fallback path keeps working if an old client still sends raw details.
+  const preagg = ai_funnel_aggregations;
+  const getDropoffReasons = (stage: 'mql' | 'sql' | 'sal' | 'sqo', product: 'POR' | 'R360', raw: any[]) => {
+    if (preagg?.[product]?.[stage]?.dropoff_reasons) return preagg[product][stage].dropoff_reasons;
+    return libAggregateDropoffReasons(raw, `${stage}_status`, [...STAGE_STATUS_SETS[stage].lost]);
+  };
   const mqlDropoffs = {
-    POR: aggregateDropoffReasons(includePOR ? (mql_details?.POR || []) : [], 'mql_status', ['REVERTED', 'STALLED']),
-    R360: aggregateDropoffReasons(includeR360 ? (mql_details?.R360 || []) : [], 'mql_status', ['REVERTED', 'STALLED']),
+    POR: getDropoffReasons('mql', 'POR', includePOR ? (mql_details?.POR || []) : []),
+    R360: getDropoffReasons('mql', 'R360', includeR360 ? (mql_details?.R360 || []) : []),
   };
   const sqlDropoffs = {
-    POR: aggregateDropoffReasons(includePOR ? (sql_details?.POR || []) : [], 'sql_status', ['LOST', 'STALLED']),
-    R360: aggregateDropoffReasons(includeR360 ? (sql_details?.R360 || []) : [], 'sql_status', ['LOST', 'STALLED']),
+    POR: getDropoffReasons('sql', 'POR', includePOR ? (sql_details?.POR || []) : []),
+    R360: getDropoffReasons('sql', 'R360', includeR360 ? (sql_details?.R360 || []) : []),
   };
   const salDropoffs = {
-    POR: aggregateDropoffReasons(includePOR ? (sal_details?.POR || []) : [], 'sal_status', ['LOST', 'STALLED']),
-    R360: aggregateDropoffReasons(includeR360 ? (sal_details?.R360 || []) : [], 'sal_status', ['LOST', 'STALLED']),
+    POR: getDropoffReasons('sal', 'POR', includePOR ? (sal_details?.POR || []) : []),
+    R360: getDropoffReasons('sal', 'R360', includeR360 ? (sal_details?.R360 || []) : []),
   };
   const sqoDropoffs = {
-    POR: aggregateDropoffReasons(includePOR ? (sqo_details?.POR || []) : [], 'sqo_status', ['LOST', 'STALLED']),
-    R360: aggregateDropoffReasons(includeR360 ? (sqo_details?.R360 || []) : [], 'sqo_status', ['LOST', 'STALLED']),
+    POR: getDropoffReasons('sqo', 'POR', includePOR ? (sqo_details?.POR || []) : []),
+    R360: getDropoffReasons('sqo', 'R360', includeR360 ? (sqo_details?.R360 || []) : []),
   };
 
-  // Calculate stage-level dropoff stats
-  const calcStageStats = (details: any[], statusField: string, convertedStatuses: string[], lostStatuses: string[]) => {
-    const total = details.length;
-    const converted = details.filter(d => convertedStatuses.includes(d[statusField])).length;
-    const lost = details.filter(d => lostStatuses.includes(d[statusField])).length;
-    const active = details.filter(d => d[statusField] === 'ACTIVE').length;
-    const lostAcv = details.filter(d => lostStatuses.includes(d[statusField])).reduce((sum, d) => sum + (d.opportunity_acv || 0), 0);
-    return { total, converted, lost, active, lostAcv, conversionRate: total > 0 ? Math.round((converted / total) * 100) : 0, lossRate: total > 0 ? Math.round((lost / total) * 100) : 0 };
+  // Prefer server-side pre-aggregated stage stats; fall back to computing from
+  // raw details for forward-compat.
+  const getStageStats = (stage: 'mql' | 'sql' | 'sal' | 'sqo', product: 'POR' | 'R360', raw: any[]) => {
+    if (preagg?.[product]?.[stage]?.stats) return preagg[product][stage].stats;
+    const sset = STAGE_STATUS_SETS[stage];
+    return libCalcStageStats(raw, `${stage}_status`, [...sset.converted], [...sset.lost]);
   };
 
   const stageStats = {
     mql: {
-      POR: calcStageStats(includePOR ? (mql_details?.POR || []) : [], 'mql_status', ['CONVERTED'], ['REVERTED', 'STALLED']),
-      R360: calcStageStats(includeR360 ? (mql_details?.R360 || []) : [], 'mql_status', ['CONVERTED'], ['REVERTED', 'STALLED']),
+      POR: getStageStats('mql', 'POR', includePOR ? (mql_details?.POR || []) : []),
+      R360: getStageStats('mql', 'R360', includeR360 ? (mql_details?.R360 || []) : []),
     },
     sql: {
-      POR: calcStageStats(includePOR ? (sql_details?.POR || []) : [], 'sql_status', ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON'], ['LOST', 'STALLED']),
-      R360: calcStageStats(includeR360 ? (sql_details?.R360 || []) : [], 'sql_status', ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON'], ['LOST', 'STALLED']),
+      POR: getStageStats('sql', 'POR', includePOR ? (sql_details?.POR || []) : []),
+      R360: getStageStats('sql', 'R360', includeR360 ? (sql_details?.R360 || []) : []),
     },
     sal: {
-      POR: calcStageStats(includePOR ? (sal_details?.POR || []) : [], 'sal_status', ['CONVERTED_SQO', 'WON'], ['LOST', 'STALLED']),
-      R360: calcStageStats(includeR360 ? (sal_details?.R360 || []) : [], 'sal_status', ['CONVERTED_SQO', 'WON'], ['LOST', 'STALLED']),
+      POR: getStageStats('sal', 'POR', includePOR ? (sal_details?.POR || []) : []),
+      R360: getStageStats('sal', 'R360', includeR360 ? (sal_details?.R360 || []) : []),
     },
     sqo: {
-      POR: calcStageStats(includePOR ? (sqo_details?.POR || []) : [], 'sqo_status', ['WON'], ['LOST', 'STALLED']),
-      R360: calcStageStats(includeR360 ? (sqo_details?.R360 || []) : [], 'sqo_status', ['WON'], ['LOST', 'STALLED']),
+      POR: getStageStats('sqo', 'POR', includePOR ? (sqo_details?.POR || []) : []),
+      R360: getStageStats('sqo', 'R360', includeR360 ? (sqo_details?.R360 || []) : []),
     },
   };
 
-  // Aggregate dropoffs by source channel for each stage
+  // Prefer server-side pre-aggregated source dropoffs; fall back to raw-detail
+  // computation otherwise.
+  const getSource = (stage: 'mql' | 'sql' | 'sal' | 'sqo', product: 'POR' | 'R360', raw: any[]) => {
+    const sset = STAGE_STATUS_SETS[stage];
+    if (preagg?.[product]?.[stage]?.by_source) {
+      return {
+        bySource: preagg[product][stage].by_source,
+        byType: preagg[product][stage].by_source_type,
+      };
+    }
+    return {
+      bySource: libAggregateDropoffsBySource(raw, `${stage}_status`, [...sset.lost], [...sset.converted]),
+      byType: libAggregateBySourceType(raw, `${stage}_status`, [...sset.lost], [...sset.converted]),
+    };
+  };
   const sourceDropoffs = {
     mql: {
-      POR: {
-        bySource: aggregateDropoffsBySource(includePOR ? (mql_details?.POR || []) : [], 'mql_status', ['REVERTED', 'STALLED'], ['CONVERTED']),
-        byType: aggregateBySourceType(includePOR ? (mql_details?.POR || []) : [], 'mql_status', ['REVERTED', 'STALLED'], ['CONVERTED']),
-      },
-      R360: {
-        bySource: aggregateDropoffsBySource(includeR360 ? (mql_details?.R360 || []) : [], 'mql_status', ['REVERTED', 'STALLED'], ['CONVERTED']),
-        byType: aggregateBySourceType(includeR360 ? (mql_details?.R360 || []) : [], 'mql_status', ['REVERTED', 'STALLED'], ['CONVERTED']),
-      },
+      POR: getSource('mql', 'POR', includePOR ? (mql_details?.POR || []) : []),
+      R360: getSource('mql', 'R360', includeR360 ? (mql_details?.R360 || []) : []),
     },
     sql: {
-      POR: {
-        bySource: aggregateDropoffsBySource(includePOR ? (sql_details?.POR || []) : [], 'sql_status', ['LOST', 'STALLED'], ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON']),
-        byType: aggregateBySourceType(includePOR ? (sql_details?.POR || []) : [], 'sql_status', ['LOST', 'STALLED'], ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON']),
-      },
-      R360: {
-        bySource: aggregateDropoffsBySource(includeR360 ? (sql_details?.R360 || []) : [], 'sql_status', ['LOST', 'STALLED'], ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON']),
-        byType: aggregateBySourceType(includeR360 ? (sql_details?.R360 || []) : [], 'sql_status', ['LOST', 'STALLED'], ['CONVERTED_SAL', 'CONVERTED_SQO', 'WON']),
-      },
+      POR: getSource('sql', 'POR', includePOR ? (sql_details?.POR || []) : []),
+      R360: getSource('sql', 'R360', includeR360 ? (sql_details?.R360 || []) : []),
     },
     sal: {
-      POR: {
-        bySource: aggregateDropoffsBySource(includePOR ? (sal_details?.POR || []) : [], 'sal_status', ['LOST', 'STALLED'], ['CONVERTED_SQO', 'WON']),
-        byType: aggregateBySourceType(includePOR ? (sal_details?.POR || []) : [], 'sal_status', ['LOST', 'STALLED'], ['CONVERTED_SQO', 'WON']),
-      },
-      R360: {
-        bySource: aggregateDropoffsBySource(includeR360 ? (sal_details?.R360 || []) : [], 'sal_status', ['LOST', 'STALLED'], ['CONVERTED_SQO', 'WON']),
-        byType: aggregateBySourceType(includeR360 ? (sal_details?.R360 || []) : [], 'sal_status', ['LOST', 'STALLED'], ['CONVERTED_SQO', 'WON']),
-      },
+      POR: getSource('sal', 'POR', includePOR ? (sal_details?.POR || []) : []),
+      R360: getSource('sal', 'R360', includeR360 ? (sal_details?.R360 || []) : []),
     },
     sqo: {
-      POR: {
-        bySource: aggregateDropoffsBySource(includePOR ? (sqo_details?.POR || []) : [], 'sqo_status', ['LOST', 'STALLED'], ['WON']),
-        byType: aggregateBySourceType(includePOR ? (sqo_details?.POR || []) : [], 'sqo_status', ['LOST', 'STALLED'], ['WON']),
-      },
-      R360: {
-        bySource: aggregateDropoffsBySource(includeR360 ? (sqo_details?.R360 || []) : [], 'sqo_status', ['LOST', 'STALLED'], ['WON']),
-        byType: aggregateBySourceType(includeR360 ? (sqo_details?.R360 || []) : [], 'sqo_status', ['LOST', 'STALLED'], ['WON']),
-      },
+      POR: getSource('sqo', 'POR', includePOR ? (sqo_details?.POR || []) : []),
+      R360: getSource('sqo', 'R360', includeR360 ? (sqo_details?.R360 || []) : []),
     },
   };
 

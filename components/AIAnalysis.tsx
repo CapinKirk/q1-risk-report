@@ -136,27 +136,17 @@ function filterReportData(
       POR: includePOR ? (reportData.google_ads_rca?.POR || []) : [],
       R360: includeR360 ? (reportData.google_ads_rca?.R360 || []) : [],
     },
-    mql_details: {
-      POR: includePOR ? filterByRegion(reportData.mql_details?.POR) : [],
-      R360: includeR360 ? filterByRegion(reportData.mql_details?.R360) : [],
-    },
-    sql_details: {
-      POR: includePOR ? filterByRegion(reportData.sql_details?.POR) : [],
-      R360: includeR360 ? filterByRegion(reportData.sql_details?.R360) : [],
-    },
-    // Previously passed through unfiltered via the `...reportData` spread above,
-    // which let 5–6MB of detail rows through on large periods and tripped Vercel's
-    // 4.5MB serverless limit (returned HTML 413; client then JSON-parse-failed
-    // with "Unexpected token 'R', 'Request En'…"). These arrays ARE consumed by
-    // the AI route's dropoff analysis, so filter rather than drop.
-    sal_details: {
-      POR: includePOR ? filterByRegion((reportData as any).sal_details?.POR) : [],
-      R360: includeR360 ? filterByRegion((reportData as any).sal_details?.R360) : [],
-    },
-    sqo_details: {
-      POR: includePOR ? filterByRegion((reportData as any).sqo_details?.POR) : [],
-      R360: includeR360 ? filterByRegion((reportData as any).sqo_details?.R360) : [],
-    },
+    // Stage detail arrays (mql/sql/sal/sqo_details) are ~4.2MB on wide scopes
+    // and used ONLY for dropoff aggregation by the AI route. As of Round 6
+    // that aggregation runs server-side in /api/report-data and ships via
+    // `ai_funnel_aggregations` (~15KB). So we drop raw details entirely from
+    // the AI payload — the server reads the pre-aggregate instead. This is
+    // what keeps unfiltered "All Products / All Regions" under the 4.5MB cap.
+    mql_details: { POR: [], R360: [] },
+    sql_details: { POR: [], R360: [] },
+    sal_details: { POR: [], R360: [] },
+    sqo_details: { POR: [], R360: [] },
+    ai_funnel_aggregations: (reportData as any).ai_funnel_aggregations,
     // Deal lists (won/lost/pipeline) are UI drill-down data — the AI route
     // never reads them, so drop them entirely to stay under Vercel's 4.5MB
     // request-body cap. Keeping them adds ~3–4MB to every AI call for zero benefit.

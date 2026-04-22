@@ -7,6 +7,7 @@ import {
   getRAGStatus,
   type RAGStatus,
 } from '@/lib/constants/dimensions';
+import { buildAllFunnelAggregations } from '@/lib/ai-aggregations';
 
 /**
  * Q1 2026 Risk Report API - RevOps Architecture
@@ -5267,6 +5268,13 @@ export async function POST(request: Request) {
       ),
     };
 
+    // Pre-aggregate stage dropoff summaries server-side. Ships ~10KB
+    // instead of forcing the client to re-upload ~4MB of raw stage details
+    // for the AI route to re-aggregate every time.
+    const aiFunnelAggregations = buildAllFunnelAggregations({
+      mql: mqlDetailsData, sql: sqlDetailsData, sal: salDetailsData, sqo: sqoDetailsData,
+    });
+
     // Build response
     const response = {
       generated_at_utc: new Date().toISOString(),
@@ -5302,6 +5310,9 @@ export async function POST(request: Request) {
       ad_spend_trend_by_month: adSpendTrendByMonth,
       // Phase 2: NEW LOGO segment breakdown (SMB vs Strategic) for AI
       attainment_by_segment: attainmentBySegment,
+      // Round 6: pre-aggregated funnel dropoff summaries so the AI route
+      // doesn't need the full stage-detail arrays uploaded from the client.
+      ai_funnel_aggregations: aiFunnelAggregations,
     };
 
     return NextResponse.json(response, {
